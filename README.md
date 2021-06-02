@@ -7,7 +7,22 @@ Protoc, the default compiler for protobuf schemas, can generate classes for Java
 with modern versions of Java. Because of this, I wrote this CLI tool that does the same exact thing, but keeping in mind code size and readability. As a result, Jackson is used to deserialize the protobuf and Lombok is used to reduce code size.
 
 ### Example
-Modern Protoc(50 lines of code):
+Protobuf Schema(12 LOC):
+```protobuf
+message AdReplyInfo {
+    optional string advertiserName = 1;
+    enum AdReplyInfoMediaType {
+        NONE = 0;
+        IMAGE = 1;
+        VIDEO = 2;
+    }
+    optional AdReplyInfoMediaType mediaType = 2;
+    optional bytes jpegThumbnail = 16;
+    optional string caption = 17;
+}
+```
+
+Modern Protoc(50 LOC):
 ```java
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.nio.ByteBuffer;
@@ -61,7 +76,7 @@ public class AdReplyInfo {
 }
 ```
 
-Google's Protobuc(279 lines of code):
+Google's Protobuc(279 LOC):
 ```java
 public interface AdReplyInfoOrBuilder extends
       // @@protoc_insertion_point(interface_extends:it.auties.whatsapp4j.model.AdReplyInfo)
