@@ -4,7 +4,7 @@ A modern implementation of protoc to generate java sources from protobuf schemas
 ### What is ModernProtoc
 
 Protoc, the default compiler for protobuf schemas, can generate classes for Java starting from a schema. The generated code, though, is really verbose and not up to date
-with Java's evolutions. Because of this, I wrote this CLI tool that does the same exact thing, but keeping in mind code size and readability.
+with modern versions of Java. Because of this, I wrote this CLI tool that does the same exact thing, but keeping in mind code size and readability. As a result, Jackson is used to deserialize the protobuf and Lombok is used to reduce code size.
 
 ### Example
 Modern Protoc(50 lines of code):
