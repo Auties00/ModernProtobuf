@@ -6,6 +6,10 @@ A modern implementation of protoc to generate java sources from protobuf schemas
 Protoc, the default compiler for protobuf schemas, can generate classes for Java starting from a schema. The generated code, though, is really verbose and not up to date
 with modern versions of Java. Because of this, I wrote this CLI tool that does the same exact thing, but keeping in mind code size and readability. As a result, Jackson is used to deserialize the protobuf and Lombok is used to reduce code size.
 
+### How to use
+
+Coming soon
+
 ### Example
 Protobuf Schema(12 LOC):
 ```protobuf
