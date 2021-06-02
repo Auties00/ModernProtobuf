@@ -3,7 +3,7 @@
 <% } %>
 
 <% if(imports) { %>
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.Accessors;
 

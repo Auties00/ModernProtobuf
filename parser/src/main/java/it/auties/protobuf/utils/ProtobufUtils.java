@@ -4,10 +4,8 @@ import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 
 import javax.lang.model.SourceVersion;
-import javax.xml.transform.Source;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 @UtilityClass
 public class ProtobufUtils {
@@ -41,17 +39,5 @@ public class ProtobufUtils {
         }
 
         return protobufType;
-    }
-
-    // This method is used inside the Message Model generator
-    @SuppressWarnings("unused")
-    public String toValidIdentifier(String identifier){
-        return SourceVersion.isKeyword(identifier) ? "_%s".formatted(identifier) : identifier;
-    }
-
-    @SneakyThrows
-    public String readGenerator(String name){
-        var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name));
-        return new String(Objects.requireNonNull(stream).readAllBytes(), StandardCharsets.UTF_8);
     }
 }

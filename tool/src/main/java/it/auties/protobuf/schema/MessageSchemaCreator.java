@@ -9,10 +9,10 @@ public record MessageSchemaCreator(MessageStatement message, String pack, boolea
     private static final String GENERATOR = ProtobufUtils.readGenerator("MessageTemplate");
     @Override
     public String createSchema() throws GeneratorException {
-        var generator = Generator.create(GENERATOR);
-        generator.bindValue("message", message);
-        generator.bindValue("pack", pack);
-        generator.bindValue("imports", imports);
-        return generator.generate();
+        return Generator.create(GENERATOR)
+                .bindValue("message", message)
+                .bindValue("pack", pack)
+                .bindValue("imports", imports)
+                .generate();
     }
 }

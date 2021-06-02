@@ -29,8 +29,24 @@ public class ProtobufSchemaCreator {
     }
 
     private void generateSchema(ProtobufObject<?> object) throws GeneratorException, IOException, FormatterException {
-        var schemaCreator = object instanceof MessageStatement msg ? new MessageSchemaCreator(msg, pack, true) : new EnumSchemaCreator((EnumStatement) object, pack, true);
+        var schemaCreator = findSchemaGenerator(object);
         var formattedSchema = formatter.formatSourceAndFixImports(schemaCreator.createSchema());
+        writeFile(object, formattedSchema);
+    }
+
+    private SchemaCreator findSchemaGenerator(ProtobufObject<?> object) {
+        if (object instanceof MessageStatement msg) {
+            return new MessageSchemaCreator(msg, pack, true);
+        }
+
+        if(object instanceof EnumStatement enm){
+            return new EnumSchemaCreator(enm, pack, true);
+        }
+
+        throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.getName(), object.getClass().getName()));
+    }
+
+    private void writeFile(ProtobufObject<?> object, String formattedSchema) throws IOException {
         Files.write(Path.of(directory.getPath(), "/%s.java".formatted(object.getName())), formattedSchema.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 }
