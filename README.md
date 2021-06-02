@@ -8,7 +8,7 @@ with Java's evolutions. Because of this, I wrote this CLI tool that does the sam
 
 ### Example
 Modern Protoc(50 lines of code):
-'''
+```java
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -59,10 +59,10 @@ public class AdReplyInfo {
     }
   }
 }
-'''
+```
 
 Google's Protobuc(279 lines of code):
-'''
+```java
 public interface AdReplyInfoOrBuilder extends
       // @@protoc_insertion_point(interface_extends:it.auties.whatsapp4j.model.AdReplyInfo)
       com.google.protobuf.MessageLiteOrBuilder {
@@ -331,4 +331,4 @@ public interface AdReplyInfoOrBuilder extends
 
       // @@protoc_insertion_point(enum_scope:it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType)
     }
-'''
+```
