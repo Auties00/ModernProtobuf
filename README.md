@@ -24,7 +24,7 @@ message AdReplyInfo {
 
 Modern Protoc(50 LOC):
 ```java
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
