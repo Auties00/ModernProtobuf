@@ -37,7 +37,6 @@ import lombok.experimental.Accessors;
 @Builder
 @Accessors(fluent = true)
 public class AdReplyInfo {
-
   @JsonProperty(value = "1", required = false)
   private String advertiserName;
 
