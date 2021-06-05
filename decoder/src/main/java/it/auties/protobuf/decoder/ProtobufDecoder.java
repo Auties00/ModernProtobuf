@@ -118,8 +118,9 @@ public class ProtobufDecoder<T> {
     }
 
     private Field[] findFields(){
-        var clazz = classes.peekFirst();
-        return clazz != null ? clazz.getDeclaredFields() : modelClass.getDeclaredFields();
+        return Optional.ofNullable(classes.peekFirst())
+                .map(Class::getDeclaredFields)
+                .orElse(modelClass.getDeclaredFields());
     }
 
     private boolean isProperty(Field field, int fieldNumber) {

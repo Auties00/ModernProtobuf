@@ -15,14 +15,6 @@ public class ArrayInputStream {
         this.pos = 0;
     }
 
-    public int limit() {
-        return limit;
-    }
-
-    public int position() {
-        return pos;
-    }
-
     public int readTag() throws IOException {
         if (isAtEnd()) {
             this.lastTag = 0;
