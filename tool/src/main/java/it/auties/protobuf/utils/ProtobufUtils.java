@@ -29,11 +29,8 @@ public class ProtobufUtils {
     public String generateCondition(String oneOfName, Iterator<FieldStatement> statements){
         var next = statements.next();
         return """
-                if(%s != null){
-                    return %s.%s;
-                }
-                
+                if(%s != null) return %s.%s;
                 %s
-                """.formatted(next.getName(), oneOfName, next.getNameAsConstant(), statements.hasNext() ? generateCondition(oneOfName, statements) : "throw new NoSuchElementException(\"No properties matching the requested OneOf field were deserialized\");");
+                """.formatted(next.getName(), oneOfName, next.getNameAsConstant(), statements.hasNext() ? generateCondition(oneOfName, statements) : "return %s.UNKNOWN;".formatted(oneOfName));
     }
 }

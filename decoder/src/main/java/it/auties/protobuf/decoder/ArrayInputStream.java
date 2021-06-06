@@ -170,7 +170,6 @@ public class ArrayInputStream {
         return readRawVarint64SlowPath();
     }
 
-
     public long readFixed64() throws IOException {
         return this.readRawLittleEndian64();
     }
@@ -215,7 +214,6 @@ public class ArrayInputStream {
 
         throw InvalidProtocolBufferException.truncatedMessage();
     }
-
 
     public int readFixed32() throws IOException {
         return this.readRawLittleEndian32();

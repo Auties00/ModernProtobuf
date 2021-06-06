@@ -13,7 +13,7 @@ import java.util.*;
 
 @Accessors(fluent = true)
 public enum ${enm.name} {
-    ${enm.statements.collect{ it.nameAsConstant + '(' + it.index + ')'}.join(', ')};
+    UNKNOWN(0),${enm.statements.collect{ it.nameAsConstant + '(' + it.index + ')'}.join(', ')};
 
     private final @Getter int index;
 
@@ -23,6 +23,6 @@ public enum ${enm.name} {
 
     @JsonCreator
     public static ${enm.name} forIndex(int index){
-        return Arrays.stream(values()).filter(entry -> entry.index() == index).findFirst().orElseThrow(() -> new NoSuchElementException("Cannot deserialize ${enm.name} from index %s".formatted(index)));
+        return Arrays.stream(values()).filter(entry -> entry.index() == index).findFirst().orElse(${enm.name}.UNKNOWN);
     }
 }
