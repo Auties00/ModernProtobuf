@@ -19,6 +19,30 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <mainClass>it.auties.protobuf.application.ModernProtocApplication</mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
                 <groupId>org.panteleyev</groupId>
                 <artifactId>jpackage-maven-plugin</artifactId>
                 <version>1.5.0</version>
@@ -27,34 +51,16 @@
                     <appVersion>${project.version}</appVersion>
                     <vendor>it.auties</vendor>
                     <runtimeImage>${java.home}</runtimeImage>
-                    <module>${project.build.sourceDirectory}/it/auties/protobuf/application/ModernProtocApplication</module>
                     <destination>${project.build.directory}/distro</destination>
+                    <input>${project.build.sourceDirectory}</input>
+                    <mainJar>${project.build.outputDirectory}\${artifactId}-${version}-jar-with-dependencies.jar</mainJar>
+                    <winConsole>true</winConsole>
+                    <winDirChooser>true</winDirChooser>
+                    <winPerUserInstall>true</winPerUserInstall>
                     <javaOptions>
                         <option>-Dfile.encoding=UTF-8</option>
                     </javaOptions>
                 </configuration>
-                <executions>
-                    <execution>
-                        <id>linux</id>
-                        <configuration>
-                            <icon>icons/icons.icns</icon>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>windows</id>
-                        <configuration>
-                            <winConsole>true</winConsole>
-                            <winDirChooser>true</winDirChooser>
-                            <winPerUserInstall>true</winPerUserInstall>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>mac</id>
-                        <configuration>
-                            <linuxShortcut>true</linuxShortcut>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
@@ -62,7 +68,7 @@
     <dependencies>
         <dependency>
             <groupId>it.auties</groupId>
-            <artifactId>protoc-decoder</artifactId>
+            <artifactId>protoc-api</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>

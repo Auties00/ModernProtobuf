@@ -14,7 +14,7 @@ import java.util.concurrent.Callable;
 @Command(name = "decode", mixinStandardHelpOptions = true, version = "generate 1.0", description = "Decodes a protobuf message encoded as binary data")
 public class DecodeCommand implements Callable<Integer> {
     @Parameters(index = "0", converter = RawProtobufConverter.class, description = "The protobuf message to decode, can be an array of bytes or an hex string")
-    private byte[] protobuf;
+    private byte[] protobuf = null;
 
     @Override
     public Integer call() {

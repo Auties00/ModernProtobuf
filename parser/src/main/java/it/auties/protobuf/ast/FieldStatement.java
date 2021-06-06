@@ -51,7 +51,7 @@ public class FieldStatement implements ProtobufStatement {
             return isRepeated() ? "List<Long>" : "long";
         }
 
-        return type;
+        return isRepeated() ? "List<%s>".formatted(type) : type;
     }
 
     public boolean isOptional(){

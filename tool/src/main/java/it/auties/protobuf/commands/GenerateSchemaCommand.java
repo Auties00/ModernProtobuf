@@ -19,7 +19,7 @@ import java.util.concurrent.Callable;
 @Command(name = "generate", mixinStandardHelpOptions = true, version = "generate 1.0", description = "Generates the java classes for a protobuf file")
 public class GenerateSchemaCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "The protobuf file used to generate the java classes")
-    private File protobuf;
+    private File protobuf = null;
 
     @Option(names = {"-o", "--output"}, description = "The directory where the generated classes should be outputted, by default a directory named schemas will be created in the home directory")
     private File output = new File(System.getProperty("user.home"), "/schemas");
