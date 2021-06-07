@@ -1,38 +1,30 @@
 package it.auties.protobuf.decoder;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import it.auties.protobuf.json.ByteStringModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import it.auties.protobuf.json.ByteStringModule;
+import it.auties.protobuf.model.ProtobufMessage;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@RequiredArgsConstructor(staticName = "forType")
-public class ProtobufDecoder<T> {
+@RequiredArgsConstructor
+public class ProtobufDecoder<T extends ProtobufMessage> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .registerModule(new Jdk8Module())
             .registerModule(new ByteStringModule());
-
-    private final Class<? extends T> modelClass;
-    private LinkedList<Class<?>> classes = new LinkedList<>();
+    private final T model;
+    private LinkedList<ProtobufMessage> classes = new LinkedList<>();
 
     public T decode(byte[] input) throws IOException {
-        return OBJECT_MAPPER.convertValue(decode(new ArrayInputStream(input)), modelClass);
-    }
-
-    public Map<Integer, Object> decodeAsMap(byte[] input) throws IOException {
-        return decode(new ArrayInputStream(input));
-    }
-
-    public String decodeAsJson(byte[] input) throws IOException {
-        return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(decodeAsMap(input));
+        return (T) OBJECT_MAPPER.convertValue(decode(new ArrayInputStream(input)), model.getClass());
     }
 
     private Map<Integer, Object> decode(ArrayInputStream input) throws IOException {
@@ -92,14 +84,23 @@ public class ProtobufDecoder<T> {
         return decode(new ArrayInputStream(read));
     }
 
+    @SuppressWarnings("unchecked")
     private Object readGroupOrString(ArrayInputStream input, int fieldNumber) throws IOException {
         var read = input.readBytes();
         return findPropertyType(fieldNumber)
-                .map(type -> isBuiltInType(type) ? new String(read) : readGroupOrString(type, read))
+                .map(type -> isBuiltInType(type) ? new String(read) : readGroupOrString(newMessage((Class<? extends ProtobufMessage>) type), read))
                 .orElseGet(() -> readGroupOrString(null, read));
     }
 
-    private Object readGroupOrString(Class<?> currentClass, byte[] read){
+    private ProtobufMessage newMessage(Class<? extends ProtobufMessage> type) {
+        try {
+            return type.getConstructor().newInstance();
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException("Cannot initialize message class %s".formatted(type.getName()), e);
+        }
+    }
+
+    private Object readGroupOrString(ProtobufMessage currentClass, byte[] read){
         try {
             classes.push(currentClass);
             return decode(new ArrayInputStream(read));
@@ -111,23 +112,8 @@ public class ProtobufDecoder<T> {
     }
 
     private Optional<Class<?>> findPropertyType(int fieldNumber) {
-        return Arrays.stream(findFields())
-                .filter(field -> isProperty(field, fieldNumber))
-                .findAny()
-                .map(Field::getType);
-    }
-
-    private Field[] findFields(){
-        return Optional.ofNullable(classes.peekFirst())
-                .map(Class::getDeclaredFields)
-                .orElse(modelClass.getDeclaredFields());
-    }
-
-    private boolean isProperty(Field field, int fieldNumber) {
-        return Optional.ofNullable(field.getAnnotation(JsonProperty.class))
-                .map(JsonProperty::value)
-                .filter(entry -> Objects.equals(entry, String.valueOf(fieldNumber)))
-                .isPresent();
+        var last = classes.peekFirst();
+        return Optional.ofNullable(last != null ? last.types().get(fieldNumber) : model.types().get(fieldNumber));
     }
 
     private boolean isBuiltInType(Class<?> clazz){

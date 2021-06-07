@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Annotation profile for com.github.auties00:protoc" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.20/lombok-1.18.20.jar" />
+        </processorPath>
+        <module name="parser" />
+        <module name="tool" />
+        <module name="api" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="protoc-api" target="16" />
+      <module name="protoc-parser" target="16" />
+      <module name="protoc-tool" target="16" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

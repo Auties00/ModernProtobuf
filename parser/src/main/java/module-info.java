@@ -4,4 +4,5 @@ module it.auties.protoc.parser {
 
     exports it.auties.protobuf.ast;
     exports it.auties.protobuf.parser;
+    exports it.auties.protobuf.model;
 }

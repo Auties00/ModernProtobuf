@@ -1,6 +1,7 @@
 package it.auties.protobuf.ast;
 
 import com.google.common.base.CaseFormat;
+import it.auties.protobuf.model.ProtobufMessage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -52,6 +53,30 @@ public class FieldStatement implements ProtobufStatement {
         }
 
         return isRepeated() ? "List<%s>".formatted(type) : type;
+    }
+
+    public String getRawType() {
+        if(type.equals("string")){
+            return "String";
+        }
+
+        if(type.equals("bool")){
+            return "boolean";
+        }
+
+        if(type.equals("bytes")){
+            return "byte[]";
+        }
+
+        if(type.equals("int32") || type.equals("uint32") || type.equals("sint32") || type.equals("fixed32") || type.equals("sfixed32")){
+            return "int";
+        }
+
+        if(type.equals("int64") || type.equals("uint64") || type.equals("sint64") || type.equals("fixed64") || type.equals("sfixed64")){
+            return "long";
+        }
+
+        return type;
     }
 
     public boolean isOptional(){

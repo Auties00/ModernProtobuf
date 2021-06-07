@@ -4,15 +4,15 @@
 
 <% if(imports) { %>
 import com.fasterxml.jackson.annotation.*;
+import it.auties.protobuf.model.*;
 import lombok.*;
 import lombok.experimental.Accessors;
 
-import java.nio.ByteBuffer;
 import java.util.*;
 <% } %>
 
 @Accessors(fluent = true)
-public enum ${enm.name} {
+public enum ${enm.name} implements ProtobufEnum {
     UNKNOWN(0),${enm.statements.collect{ it.nameAsConstant + '(' + it.index + ')'}.join(', ')};
 
     private final @Getter int index;

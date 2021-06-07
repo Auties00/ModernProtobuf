@@ -82,7 +82,7 @@ public class AdReplyInfo {
 Google's Protobuc(279 LOC):
 ```java
 public interface AdReplyInfoOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:it.auties.whatsapp4j.model.AdReplyInfo)
+      // @@protoc_insertion_point(interface_extends:it.auties.whatsapp4j.it.auties.model.AdReplyInfo)
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
@@ -103,15 +103,15 @@ public interface AdReplyInfoOrBuilder extends
         getAdvertiserNameBytes();
 
     /**
-     * <code>optional .it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType mediaType = 2;</code>
+     * <code>optional .it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType mediaType = 2;</code>
      * @return Whether the mediaType field is set.
      */
     boolean hasMediaType();
     /**
-     * <code>optional .it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType mediaType = 2;</code>
+     * <code>optional .it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType mediaType = 2;</code>
      * @return The mediaType.
      */
-    it.auties.whatsapp4j.model.WhatsappProtobuf.AdReplyInfo.AdReplyInfoMediaType getMediaType();
+    it.auties.whatsapp4j.it.auties.model.WhatsappProtobuf.AdReplyInfo.AdReplyInfoMediaType getMediaType();
 
     /**
      * <code>optional bytes jpegThumbnail = 16;</code>
@@ -142,12 +142,12 @@ public interface AdReplyInfoOrBuilder extends
         getCaptionBytes();
   }
   /**
-   * Protobuf type {@code it.auties.whatsapp4j.model.AdReplyInfo}
+   * Protobuf type {@code it.auties.whatsapp4j.it.auties.model.AdReplyInfo}
    */
   public  static final class AdReplyInfo extends
       com.google.protobuf.GeneratedMessageLite<
           AdReplyInfo, AdReplyInfo.Builder> implements
-      // @@protoc_insertion_point(message_implements:it.auties.whatsapp4j.model.AdReplyInfo)
+      // @@protoc_insertion_point(message_implements:it.auties.whatsapp4j.it.auties.model.AdReplyInfo)
       AdReplyInfoOrBuilder {
     private AdReplyInfo() {
       advertiserName_ = "";
@@ -155,7 +155,7 @@ public interface AdReplyInfoOrBuilder extends
       caption_ = "";
     }
     /**
-     * Protobuf enum {@code it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType}
+     * Protobuf enum {@code it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType}
      */
     public enum AdReplyInfoMediaType
         implements com.google.protobuf.Internal.EnumLite {
@@ -244,13 +244,13 @@ public interface AdReplyInfoOrBuilder extends
         this.value = value;
       }
 
-      // @@protoc_insertion_point(enum_scope:it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType)
+      // @@protoc_insertion_point(enum_scope:it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType)
     }
 
  public  static final class AdReplyInfo extends
       com.google.protobuf.GeneratedMessageLite<
           AdReplyInfo, AdReplyInfo.Builder> implements
-      // @@protoc_insertion_point(message_implements:it.auties.whatsapp4j.model.AdReplyInfo)
+      // @@protoc_insertion_point(message_implements:it.auties.whatsapp4j.it.auties.model.AdReplyInfo)
       AdReplyInfoOrBuilder {
     private AdReplyInfo() {
       advertiserName_ = "";
@@ -258,7 +258,7 @@ public interface AdReplyInfoOrBuilder extends
       caption_ = "";
     }
     /**
-     * Protobuf enum {@code it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType}
+     * Protobuf enum {@code it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType}
      */
     public enum AdReplyInfoMediaType
         implements com.google.protobuf.Internal.EnumLite {
@@ -347,6 +347,6 @@ public interface AdReplyInfoOrBuilder extends
         this.value = value;
       }
 
-      // @@protoc_insertion_point(enum_scope:it.auties.whatsapp4j.model.AdReplyInfo.AdReplyInfoMediaType)
+      // @@protoc_insertion_point(enum_scope:it.auties.whatsapp4j.it.auties.model.AdReplyInfo.AdReplyInfoMediaType)
     }
 ```
