@@ -23,7 +23,6 @@ public class ProtobufEncoder {
                 continue;
             }
 
-            var type = field.getType();
             field.setAccessible(true);
             var handle = field.get(object);
             if(handle == null){
@@ -31,6 +30,7 @@ public class ProtobufEncoder {
             }
 
             var number = Integer.parseInt(notation.value());
+            var type = field.getType();
             if(type.equals(Long.TYPE) || type.equals(Double.TYPE)){
                 output.writeUInt64(number, (long) handle);
             }else if(type.equals(Boolean.TYPE)){
@@ -41,6 +41,8 @@ public class ProtobufEncoder {
                 output.writeByteArray(number, (byte[]) handle);
             }else if(type.equals(int.class)){
                 output.writeFixed32(number, (int) handle);
+            }else if(Enum.class.isAssignableFrom(type)){
+                output.writeUInt64(number, findEnumIndex(object, type));
             }else {
                 output.writeTag(number, innerContext ? 2 : 3);
                 output.writeBytesNoTag(encode(handle, innerContext));
@@ -48,5 +50,27 @@ public class ProtobufEncoder {
         }
 
         return output.buffer().toByteArray();
+    }
+
+    private static int findEnumIndex(Object object, Class<?> type){
+        try {
+            var indexField = type.getDeclaredField("index");
+            indexField.setAccessible(true);
+            return (int) indexField.get(object);
+        }catch (NoSuchFieldException exception){
+            return findEnumIndexFallback(object, type);
+        }catch (Exception e){
+            throw new RuntimeException("Cannot extract index value from index", e);
+        }
+    }
+
+    private static int findEnumIndexFallback(Object object, Class<?> type) {
+        try {
+            var ordinalField = type.getDeclaredField("ordinal");
+            ordinalField.setAccessible(true);
+            return (int) ordinalField.get(object);
+        }catch (NoSuchFieldException | IllegalAccessException e) {
+           throw new RuntimeException("Cannot extract ordinal value from index", e);
+        }
     }
 }
