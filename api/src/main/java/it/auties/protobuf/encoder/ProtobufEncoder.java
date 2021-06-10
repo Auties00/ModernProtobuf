@@ -8,10 +8,6 @@ import java.nio.charset.StandardCharsets;
 
 public class ProtobufEncoder {
     public static byte[] encode(Object object) throws IOException, IllegalAccessException {
-        return encode(object, false);
-    }
-
-    private static byte[] encode(Object object, boolean innerContext) throws IOException, IllegalAccessException {
         var output = new ArrayOutputStream(new ByteArrayOutputStream());
         if(object == null){
             return output.buffer().toByteArray();
@@ -25,52 +21,57 @@ public class ProtobufEncoder {
 
             field.setAccessible(true);
             var handle = field.get(object);
-            if(handle == null){
+            if(!isValidField(handle, notation.required())){
                 continue;
             }
 
             var number = Integer.parseInt(notation.value());
-            var type = field.getType();
-            if(type.equals(Long.TYPE) || type.equals(Double.TYPE)){
-                output.writeUInt64(number, (long) handle);
-            }else if(type.equals(Boolean.TYPE)){
-                output.writeBool(number, (boolean) handle);
-            }else if(type.equals(String.class)){
-                output.writeBytes(number, ((String) handle).getBytes(StandardCharsets.UTF_8));
-            }else if(type.equals(byte[].class)){
-                output.writeByteArray(number, (byte[]) handle);
-            }else if(type.equals(int.class)){
-                output.writeFixed32(number, (int) handle);
-            }else if(Enum.class.isAssignableFrom(type)){
-                output.writeUInt64(number, findEnumIndex(object, type));
+            if(handle instanceof Long longHandle){
+                output.writeUInt64(number, longHandle);
+            }else if(handle instanceof Double doubleHandle){
+                output.writeFixed64(number, Double.doubleToRawLongBits(doubleHandle));
+            }else if(handle instanceof Boolean booleanHandle){
+                output.writeBool(number, booleanHandle);
+            }else if(handle instanceof String strHandle){
+                output.writeBytes(number, strHandle.getBytes(StandardCharsets.UTF_8));
+            }else if(handle instanceof byte[] bytesHandle){
+                output.writeByteArray(number, bytesHandle);
+            }else if(handle instanceof Integer intHandle){
+                output.writeFixed32(number, intHandle);
+            }else if(handle instanceof Enum<?>){
+                output.writeUInt64(number, findEnumIndex(handle));
             }else {
-                output.writeTag(number, innerContext ? 2 : 3);
-                output.writeBytesNoTag(encode(handle, innerContext));
+                output.writeTag(number, 2);
+                output.writeBytesNoTag(encode(handle));
             }
         }
 
         return output.buffer().toByteArray();
     }
 
-    private static int findEnumIndex(Object object, Class<?> type){
-        try {
-            var indexField = type.getDeclaredField("index");
-            indexField.setAccessible(true);
-            return (int) indexField.get(object);
-        }catch (NoSuchFieldException exception){
-            return findEnumIndexFallback(object, type);
-        }catch (Exception e){
-            throw new RuntimeException("Cannot extract index value from index", e);
+    private static boolean isValidField(Object handle, boolean required){
+        if(required){
+            return true;
         }
+
+        if(handle instanceof Number num){
+            return num.intValue() != 0;
+        }
+
+        if(handle instanceof Boolean bool){
+            return bool;
+        }
+
+        return handle != null;
     }
 
-    private static int findEnumIndexFallback(Object object, Class<?> type) {
+    private static int findEnumIndex(Object object){
         try {
-            var ordinalField = type.getDeclaredField("ordinal");
-            ordinalField.setAccessible(true);
-            return (int) ordinalField.get(object);
-        }catch (NoSuchFieldException | IllegalAccessException e) {
-           throw new RuntimeException("Cannot extract ordinal value from index", e);
+            var indexField = object.getClass().getDeclaredField("index");
+            indexField.setAccessible(true);
+            return (int) indexField.get(object);
+        }catch (Exception e){
+            throw new RuntimeException("Cannot extract index value from index", e);
         }
     }
 }

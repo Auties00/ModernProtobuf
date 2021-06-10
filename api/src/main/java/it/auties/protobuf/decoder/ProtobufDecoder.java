@@ -21,7 +21,7 @@ public class ProtobufDecoder<T> {
             .registerModule(new ByteStringModule());
 
     private final Class<? extends T> modelClass;
-    private LinkedList<Class<?>> classes = new LinkedList<>();
+    private final LinkedList<Class<?>> classes = new LinkedList<>();
 
     public T decode(byte[] input) throws IOException {
         return OBJECT_MAPPER.convertValue(decode(new ArrayInputStream(input)), modelClass);

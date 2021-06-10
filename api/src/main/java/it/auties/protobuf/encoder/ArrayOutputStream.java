@@ -13,16 +13,6 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
         return fieldNumber << 3 | wireType;
     }
 
-    public final void writeInt32(int fieldNumber, int value) {
-        this.writeTag(fieldNumber, 0);
-        this.writeInt32NoTag(value);
-    }
-
-    public final void writeUInt32(int fieldNumber, int value) {
-        this.writeTag(fieldNumber, 0);
-        this.writeUInt32NoTag(value);
-    }
-
     public final void writeFixed32(int fieldNumber, int value) {
         this.writeTag(fieldNumber, 5);
         this.writeFixed32NoTag(value);
@@ -69,14 +59,6 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
 
     public final void write(byte value) {
         buffer.write(value);
-    }
-
-    public final void writeInt32NoTag(int value) {
-        if (value >= 0) {
-            this.writeUInt32NoTag(value);
-        } else {
-            this.writeUInt64NoTag(value);
-        }
     }
 
     public final void writeUInt32NoTag(int value) {
