@@ -29,9 +29,7 @@ message AdReplyInfo {
 Modern Protoc(50 LOC):
 ```java
 import com.fasterxml.jackson.annotation.*;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 import lombok.*;
 import lombok.experimental.Accessors;
 
@@ -48,7 +46,7 @@ public class AdReplyInfo {
   private AdReplyInfoMediaType mediaType;
 
   @JsonProperty(value = "16", required = false)
-  private ByteBuffer jpegThumbnail;
+  private byte[] jpegThumbnail;
 
   @JsonProperty(value = "17", required = false)
   private String caption;
