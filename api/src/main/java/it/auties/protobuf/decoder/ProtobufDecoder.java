@@ -131,6 +131,6 @@ public class ProtobufDecoder<T> {
     }
 
     private boolean isBuiltInType(Class<?> clazz){
-        return String.class.isAssignableFrom(clazz) || clazz.isPrimitive() || clazz.isArray();
+        return String.class.isAssignableFrom(clazz) || Collection.class.isAssignableFrom(clazz) || clazz.isPrimitive() || clazz.isArray();
     }
 }
