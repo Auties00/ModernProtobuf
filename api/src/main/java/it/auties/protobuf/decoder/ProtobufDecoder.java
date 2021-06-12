@@ -111,16 +111,27 @@ public class ProtobufDecoder<T> {
     }
 
     private Optional<Class<?>> findPropertyType(int fieldNumber) {
-        return Arrays.stream(findFields())
+        return findFields()
+                .stream()
                 .filter(field -> isProperty(field, fieldNumber))
                 .findAny()
                 .map(Field::getType);
     }
 
-    private Field[] findFields(){
+    private List<Field> findFields(){
         return Optional.ofNullable(classes.peekFirst())
-                .map(Class::getDeclaredFields)
-                .orElse(modelClass.getDeclaredFields());
+                .map(this::findFields)
+                .orElse(Arrays.asList(modelClass.getDeclaredFields()));
+    }
+
+    private List<Field> findFields(Class<?> clazz){
+        if(clazz == null){
+            return List.of();
+        }
+
+        var fields = new ArrayList<>(Arrays.asList(clazz.getDeclaredFields()));
+        fields.addAll(findFields(clazz.getSuperclass()));
+        return fields;
     }
 
     private boolean isProperty(Field field, int fieldNumber) {
