@@ -2,7 +2,6 @@ package it.auties.protobuf.decoder;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import it.auties.protobuf.json.ByteStringModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +16,7 @@ import java.util.stream.Stream;
 public class ProtobufDecoder<T> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .registerModule(new Jdk8Module())
-            .registerModule(new ByteStringModule());
+            .registerModule(new Jdk8Module());
 
     private final Class<? extends T> modelClass;
     private final LinkedList<Class<?>> classes = new LinkedList<>();
@@ -32,7 +30,8 @@ public class ProtobufDecoder<T> {
     }
 
     public String decodeAsJson(byte[] input) throws IOException {
-        return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(decodeAsMap(input));
+        return OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(decodeAsMap(input));
     }
 
     private Map<Integer, Object> decode(ArrayInputStream input) throws IOException {
@@ -52,7 +51,8 @@ public class ProtobufDecoder<T> {
         }
 
         input.checkLastTagWas(0);
-        return results.stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, this::handleDuplicatedFields));
+        return results.stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, this::handleDuplicatedFields));
     }
 
     private <F, S> List<?> handleDuplicatedFields(F first, S second) {
@@ -95,8 +95,20 @@ public class ProtobufDecoder<T> {
     private Object readGroupOrString(ArrayInputStream input, int fieldNumber) throws IOException {
         var read = input.readBytes();
         return findPropertyType(fieldNumber)
-                .map(type -> isBuiltInType(type) ? new String(read) : readGroupOrString(type, read))
+                .map(type -> convertBytesToType(read, type))
                 .orElseGet(() -> readGroupOrString(null, read));
+    }
+
+    private Object convertBytesToType(byte[] read, Class<?> type) {
+        if(byte[].class.isAssignableFrom(type)){
+            return read;
+        }
+
+        if (String.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) || type.isPrimitive()) {
+            return new String(read);
+        }
+
+        return readGroupOrString(type, read);
     }
 
     private Object readGroupOrString(Class<?> currentClass, byte[] read){
@@ -139,9 +151,5 @@ public class ProtobufDecoder<T> {
                 .map(JsonProperty::value)
                 .filter(entry -> Objects.equals(entry, String.valueOf(fieldNumber)))
                 .isPresent();
-    }
-
-    private boolean isBuiltInType(Class<?> clazz){
-        return String.class.isAssignableFrom(clazz) || Collection.class.isAssignableFrom(clazz) || clazz.isPrimitive() || clazz.isArray();
     }
 }
