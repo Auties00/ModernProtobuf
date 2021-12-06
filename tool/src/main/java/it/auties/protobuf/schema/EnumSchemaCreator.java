@@ -1,7 +1,7 @@
 package it.auties.protobuf.schema;
 
 import groovy.text.GStringTemplateEngine;
-import it.auties.protobuf.ast.EnumStatement;
+import it.auties.protobuf.EnumStatement;
 import it.auties.protobuf.utils.ProtobufUtils;
 
 import java.io.IOException;

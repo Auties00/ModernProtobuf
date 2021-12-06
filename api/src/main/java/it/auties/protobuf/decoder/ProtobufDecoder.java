@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -18,11 +19,13 @@ public class ProtobufDecoder<T> {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .registerModule(new Jdk8Module());
 
+    @NonNull
     private final Class<? extends T> modelClass;
+
     private final LinkedList<Class<?>> classes = new LinkedList<>();
 
     public T decode(byte[] input) throws IOException {
-        return OBJECT_MAPPER.convertValue(decode(new ArrayInputStream(input)), modelClass);
+        return OBJECT_MAPPER.convertValue(decodeAsMap(input), modelClass);
     }
 
     public Map<Integer, Object> decodeAsMap(byte[] input) throws IOException {
@@ -72,7 +75,7 @@ public class ProtobufDecoder<T> {
         var content = switch (type) {
             case 0 -> input.readInt64();
             case 1 -> input.readFixed64();
-            case 2 -> readGroupOrString(input, number);
+            case 2 -> readDelimited(input, number);
             case 3 -> readGroup(input);
             case 4 -> endGroup();
             case 5 -> input.readFixed32();
@@ -87,16 +90,16 @@ public class ProtobufDecoder<T> {
         return null;
     }
 
-    public Object readGroup(ArrayInputStream input) throws IOException {
+    private Object readGroup(ArrayInputStream input) throws IOException {
         var read = input.readBytes();
         return decode(new ArrayInputStream(read));
     }
 
-    private Object readGroupOrString(ArrayInputStream input, int fieldNumber) throws IOException {
+    private Object readDelimited(ArrayInputStream input, int fieldNumber) throws IOException {
         var read = input.readBytes();
         return findPropertyType(fieldNumber)
                 .map(type -> convertBytesToType(read, type))
-                .orElseGet(() -> readGroupOrString(null, read));
+                .orElseGet(() -> readDelimited(null, read));
     }
 
     private Object convertBytesToType(byte[] read, Class<?> type) {
@@ -108,10 +111,10 @@ public class ProtobufDecoder<T> {
             return new String(read);
         }
 
-        return readGroupOrString(type, read);
+        return readDelimited(type, read);
     }
 
-    private Object readGroupOrString(Class<?> currentClass, byte[] read){
+    private Object readDelimited(Class<?> currentClass, byte[] read){
         try {
             classes.push(currentClass);
             return decode(new ArrayInputStream(read));

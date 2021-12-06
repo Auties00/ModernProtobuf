@@ -3,7 +3,7 @@ package it.auties.protobuf.decoder;
 import java.io.IOException;
 import java.util.Arrays;
 
-public class ArrayInputStream {
+class ArrayInputStream {
     private final byte[] buffer;
     private final int limit;
     private int pos;

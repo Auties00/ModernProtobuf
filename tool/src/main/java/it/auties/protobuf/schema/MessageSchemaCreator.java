@@ -1,7 +1,7 @@
 package it.auties.protobuf.schema;
 
 import groovy.text.GStringTemplateEngine;
-import it.auties.protobuf.ast.MessageStatement;
+import it.auties.protobuf.MessageStatement;
 import it.auties.protobuf.utils.ProtobufUtils;
 
 import java.io.IOException;

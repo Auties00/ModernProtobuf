@@ -1,4 +1,4 @@
-package it.auties.protobuf.ast;
+package it.auties.protobuf;
 
 import com.google.common.base.CaseFormat;
 import lombok.EqualsAndHashCode;

@@ -2,11 +2,10 @@ package it.auties.protobuf.schema;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.ast.EnumStatement;
-import it.auties.protobuf.ast.MessageStatement;
-import it.auties.protobuf.ast.ProtobufDocument;
-import it.auties.protobuf.ast.ProtobufObject;
-import lombok.AllArgsConstructor;
+import it.auties.protobuf.EnumStatement;
+import it.auties.protobuf.MessageStatement;
+import it.auties.protobuf.ProtobufDocument;
+import it.auties.protobuf.ProtobufObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,13 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-@AllArgsConstructor
-public class ProtobufSchemaCreator {
-    private final ProtobufDocument document;
-    private final String pack;
-    private final File directory;
-    private final Formatter formatter;
-
+public record ProtobufSchemaCreator(ProtobufDocument document, String pack,
+                                    File directory, Formatter formatter) {
     public void generateSchema() throws IOException, FormatterException, ClassNotFoundException {
         for (var protobufObject : document.getStatements()) {
             generateSchema(protobufObject);
@@ -38,7 +32,7 @@ public class ProtobufSchemaCreator {
             return new MessageSchemaCreator(msg, pack, true);
         }
 
-        if(object instanceof EnumStatement enm){
+        if (object instanceof EnumStatement enm) {
             return new EnumSchemaCreator(enm, pack, true);
         }
 

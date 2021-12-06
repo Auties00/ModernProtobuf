@@ -1,107 +1,117 @@
 package it.auties.protobuf.encoder;
 
+import lombok.SneakyThrows;
+
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 
 public record ArrayOutputStream(ByteArrayOutputStream buffer) {
-    public final void writeTag(int fieldNumber, int wireType) {
-        this.writeUInt32NoTag(makeTag(fieldNumber, wireType));
+    public static final int VAR_INT = 0;
+    public static final int FIXED_32 = 5;
+    public static final int FIXED_64 = 1;
+    public static final int DELIMITED = 2;
+
+    public ArrayOutputStream() {
+        this(new ByteArrayOutputStream());
     }
 
-    private int makeTag(int fieldNumber, int wireType) {
-        return fieldNumber << 3 | wireType;
+    public void writeTag(int fieldNumber, int wireType) {
+        writeUInt32NoTag((fieldNumber << 3) | wireType);
     }
 
-    public final void writeFixed32(int fieldNumber, int value) {
-        this.writeTag(fieldNumber, 5);
-        this.writeFixed32NoTag(value);
+    public void writeUInt32(int fieldNumber, int value) {
+        writeTag(fieldNumber, VAR_INT);
+        writeUInt32NoTag(value);
     }
 
-    public final void writeUInt64(int fieldNumber, long value) {
-        this.writeTag(fieldNumber, 0);
-        this.writeUInt64NoTag(value);
+    public void writeFixed32(int fieldNumber, int value) {
+        writeTag(fieldNumber, FIXED_32);
+        writeFixed32NoTag(value);
     }
 
-    public final void writeFixed64(int fieldNumber, long value) {
-        this.writeTag(fieldNumber, 1);
-        this.writeFixed64NoTag(value);
+    public void writeUInt64(int fieldNumber, long value) {
+        writeTag(fieldNumber, VAR_INT);
+        writeUInt64NoTag(value);
     }
 
-    public final void writeBool(int fieldNumber, boolean value) {
-        this.writeTag(fieldNumber, 0);
-        this.write((byte)(value ? 1 : 0));
+    public void writeFixed64(int fieldNumber, long value) {
+        writeTag(fieldNumber, FIXED_64);
+        writeFixed64NoTag(value);
     }
 
-    public final void writeBytes(int fieldNumber, byte[] value) throws IOException {
-        this.writeTag(fieldNumber, 2);
-        this.writeBytesNoTag(value);
+    public void writeBool(int fieldNumber, boolean value) {
+        writeTag(fieldNumber, VAR_INT);
+        write((byte) (value ? 1 : 0));
     }
 
-    public final void writeByteArray(int fieldNumber, byte[] value) throws IOException {
-        this.writeByteArray(fieldNumber, value, 0, value.length);
+    public void writeString(int fieldNumber, String value) {
+        writeTag(fieldNumber, DELIMITED);
+        writeStringNoTag(value);
     }
 
-    public final void writeByteArray(int fieldNumber, byte[] value, int offset, int length) throws IOException {
-        this.writeTag(fieldNumber, 2);
-        this.writeByteArrayNoTag(value, offset, length);
+    public void writeBytes(int fieldNumber, byte[] value) {
+        writeTag(fieldNumber, DELIMITED);
+        writeBytesNoTag(value);
     }
 
-    public final void writeBytesNoTag(byte[] value) throws IOException {
-        this.writeUInt32NoTag(value.length);
-        writeLazy(value, 0, value.length);
-    }
-
-    public final void writeByteArrayNoTag(byte[] value, int offset, int length) throws IOException {
-        this.writeUInt32NoTag(length);
-        this.write(value, offset, length);
-    }
-
-    public final void write(byte value) {
+    @SneakyThrows
+    public void writeBytesNoTag(byte[] value) {
+        writeUInt32NoTag(value.length);
         buffer.write(value);
     }
 
-    public final void writeUInt32NoTag(int value) {
-        while((value & -128) != 0) {
-            write((byte) (value & 127 | 128));
+    public void write(byte value) {
+        buffer.write(value);
+    }
+
+    public void writeUInt32NoTag(int value) {
+        while (true) {
+            if ((value & ~0x7F) == 0) {
+                write((byte) value);
+                return;
+            }
+
+            write((byte) ((value & 0x7F) | 0x80));
             value >>>= 7;
         }
-
-        write((byte)value);
     }
 
-    public final void writeFixed32NoTag(int value) {
-        write((byte)(value & 255));
-        write((byte)(value >> 8 & 255));
-        write((byte)(value >> 16 & 255));
-        write((byte)(value >> 24 & 255));
+    public void writeFixed32NoTag(int value) {
+        write((byte) (value & 0xFF));
+        write((byte) ((value >> 8) & 0xFF));
+        write((byte) ((value >> 16) & 0xFF));
+        write((byte) ((value >> 24) & 0xFF));
     }
 
-    public final void writeUInt64NoTag(long value) {
-        while((value & -128L) != 0L) {
-            write((byte)((int)value & 127 | 128));
+    public void writeUInt64NoTag(long value) {
+        while (true) {
+            if ((value & ~0x7FL) == 0) {
+                write((byte) value);
+                return;
+            }
+
+            write((byte) (((int) value & 0x7F) | 0x80));
             value >>>= 7;
         }
-
-        write((byte)((int)value));
     }
 
-    public final void writeFixed64NoTag(long value) {
-        write((byte)((int)value & 255));
-        write((byte)((int)(value >> 8) & 255));
-        write((byte)((int)(value >> 16) & 255));
-        write((byte)((int)(value >> 24) & 255));
-        write((byte)((int)(value >> 32) & 255));
-        write((byte)((int)(value >> 40) & 255));
-        write((byte)((int)(value >> 48) & 255));
-        write((byte)((int)(value >> 56) & 255));
+    public void writeFixed64NoTag(long value) {
+        write((byte) ((int) (value) & 0xFF));
+        write((byte) ((int) (value >> 8) & 0xFF));
+        write((byte) ((int) (value >> 16) & 0xFF));
+        write((byte) ((int) (value >> 24) & 0xFF));
+        write((byte) ((int) (value >> 32) & 0xFF));
+        write((byte) ((int) (value >> 40) & 0xFF));
+        write((byte) ((int) (value >> 48) & 0xFF));
+        write((byte) ((int) (value >> 56) & 0xFF));
     }
 
-    public final void write(byte[] value, int offset, int length) throws IOException {
-        buffer.write(Arrays.copyOfRange(value, offset, offset + length));
+    public void writeStringNoTag(String value) {
+        var bytes = value.getBytes(StandardCharsets.UTF_8);
+        writeBytesNoTag(bytes);
     }
 
-    public final void writeLazy(byte[] value, int offset, int length) throws IOException {
-        this.write(value, offset, length);
+    public byte[] readResult() {
+        return buffer.toByteArray();
     }
 }

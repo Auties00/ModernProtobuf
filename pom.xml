@@ -74,7 +74,7 @@
     </profiles>
 
     <properties>
-        <lombok.version>1.18.20</lombok.version>
+        <lombok.version>1.18.22</lombok.version>
     </properties>
 
     <build>
@@ -84,9 +84,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <target>16</target>
-                    <source>16</source>
-                    <release>16</release>
+                    <target>17</target>
+                    <source>17</source>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>org.projectlombok</groupId>

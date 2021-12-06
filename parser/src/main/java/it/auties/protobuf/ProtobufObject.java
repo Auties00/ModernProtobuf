@@ -1,11 +1,9 @@
-package it.auties.protobuf.ast;
+package it.auties.protobuf;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.experimental.Accessors;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 @AllArgsConstructor

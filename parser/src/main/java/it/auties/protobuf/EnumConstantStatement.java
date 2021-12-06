@@ -1,4 +1,4 @@
-package it.auties.protobuf.ast;
+package it.auties.protobuf;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

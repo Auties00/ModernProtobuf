@@ -1,4 +1,4 @@
-package it.auties.protobuf.ast;
+package it.auties.protobuf;
 
 import com.google.common.base.CaseFormat;
 import lombok.AllArgsConstructor;
@@ -22,7 +22,7 @@ public class FieldStatement implements ProtobufStatement {
         return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, getName());
     }
 
-    public String getType() {
+    public String getJavaType() {
         if(type.equals("string")){
             return isRepeated() ? "List<String>" : "String";
         }

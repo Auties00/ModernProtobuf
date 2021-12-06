@@ -1,6 +1,6 @@
-package it.auties.protobuf.parser;
+package it.auties.protobuf;
 
-import it.auties.protobuf.ast.*;
+import it.auties.protobuf.*;
 import lombok.AllArgsConstructor;
 
 import java.io.File;

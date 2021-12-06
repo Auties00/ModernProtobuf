@@ -2,7 +2,7 @@ package it.auties.protobuf.decoder;
 
 import java.io.IOException;
 
-public class InvalidProtocolBufferException extends IOException {
+class InvalidProtocolBufferException extends IOException {
     public InvalidProtocolBufferException(String description) {
         super(description);
     }
