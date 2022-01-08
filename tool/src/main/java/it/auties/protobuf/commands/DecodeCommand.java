@@ -11,10 +11,19 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 @Log4j2
-@Command(name = "decode", mixinStandardHelpOptions = true, version = "generate 1.0", description = "Decodes a protobuf message encoded as binary data")
+@Command(
+        name = "decode",
+        mixinStandardHelpOptions = true,
+        version = "decode 1.0",
+        description = "Decodes a protobuf message encoded as binary data"
+)
 public class DecodeCommand implements Callable<Integer> {
     @SuppressWarnings("FieldMayBeFinal")
-    @Parameters(index = "0", converter = RawProtobufConverter.class, description = "The protobuf message to decode, can be an array of bytes or an hex string")
+    @Parameters(
+            index = "0",
+            converter = RawProtobufConverter.class,
+            description = "The protobuf message to decode, can be an array of bytes or an hex string"
+    )
     private byte[] protobuf = null;
 
     @Override
@@ -23,7 +32,7 @@ public class DecodeCommand implements Callable<Integer> {
             var result = ProtobufDecoder.forType(Map.class).decodeAsJson(protobuf);
             log.info(result);
             return 0;
-        }catch (IOException ex){
+        } catch (IOException ex) {
             log.error("An uncaught exception was thrown, report this incident on github if you believe this to be a bug");
             log.throwing(ex);
             return -1;

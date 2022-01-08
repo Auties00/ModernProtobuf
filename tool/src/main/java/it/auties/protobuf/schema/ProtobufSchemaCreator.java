@@ -40,6 +40,7 @@ public record ProtobufSchemaCreator(ProtobufDocument document, String pack,
     }
 
     private void writeFile(ProtobufObject<?> object, String formattedSchema) throws IOException {
-        Files.write(Path.of(directory.getPath(), "/%s.java".formatted(object.getName())), formattedSchema.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        var path = Path.of(directory.getPath(), "/%s.java".formatted(object.getName()));
+        Files.write(path, formattedSchema.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 }

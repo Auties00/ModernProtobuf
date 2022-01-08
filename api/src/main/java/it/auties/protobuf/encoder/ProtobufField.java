@@ -13,5 +13,4 @@ record ProtobufField(JsonProperty property, JsonPropertyDescription description,
 
         return value != null && (!(value instanceof Number number) || number.floatValue() != 0F);
     }
-
 }
