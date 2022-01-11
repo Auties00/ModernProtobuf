@@ -21,7 +21,7 @@ class ArrayInputStream {
             return 0;
         }
 
-        this.lastTag = readRawVarint32();
+        this.lastTag = readVarInt32();
         if (getTagFieldNumber(lastTag) == 0) {
             throw InvalidProtocolBufferException.invalidTag();
         }
@@ -33,7 +33,7 @@ class ArrayInputStream {
         return tag >>> 3;
     }
 
-    public int readRawVarint32() throws IOException {
+    public int readVarInt32() throws IOException {
         fspath:
         {
             int tempPos = pos;
@@ -72,10 +72,10 @@ class ArrayInputStream {
             return x;
         }
 
-        return (int) readRawVarint64SlowPath();
+        return (int) readVarInt64Slow();
     }
 
-    long readRawVarint64SlowPath() throws IOException {
+    private long readVarInt64Slow() throws IOException {
         long result = 0;
         for (int shift = 0; shift < 64; shift += 7) {
             final byte b = readRawByte();
@@ -169,7 +169,7 @@ class ArrayInputStream {
             return x;
         }
 
-        return readRawVarint64SlowPath();
+        return readVarInt64Slow();
     }
 
     public long readFixed64() throws IOException {
@@ -188,7 +188,7 @@ class ArrayInputStream {
     }
 
     public byte[] readBytes() throws IOException {
-        int size = this.readRawVarint32();
+        int size = this.readVarInt32();
         if (size > 0 && size <= this.limit - this.pos) {
             var result = new byte[size];
             System.arraycopy(buffer, pos, result, 0, size);

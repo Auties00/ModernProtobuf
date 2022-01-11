@@ -41,7 +41,11 @@ public class ProtobufEncoder {
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {
         var number = Integer.parseInt(field.property().value());
-        switch (field.description().value()){
+        var type = field.description()
+                .value()
+                .replace("[packed]", "")
+                .trim();
+        switch (type){
             case "float", "fixed32", "sfixed32" -> output.writeFixed32(number, Float.floatToRawIntBits((float) field.value()));
             case "double", "fixed64", "sfixed64" -> output.writeFixed64(number, Double.doubleToRawLongBits((double) field.value()));
             case "bool" -> output.writeBool(number, (boolean) field.value());
