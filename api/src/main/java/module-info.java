@@ -1,4 +1,4 @@
-module it.auties.protoc.api {
+open module it.auties.protoc.api {
     requires static lombok;
     requires static java.logging;
     requires com.fasterxml.jackson.datatype.jdk8;

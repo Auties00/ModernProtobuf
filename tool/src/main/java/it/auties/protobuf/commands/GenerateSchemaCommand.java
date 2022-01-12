@@ -94,7 +94,7 @@ public class GenerateSchemaCommand implements Callable<Integer> {
         log.info("Generating AST for protobuf file...");
         var parser = new ProtobufParser(protobuf);
         var document = parser.tokenizeAndParse();
-        log.info("Generated AST successfully!");
+        log.info("Generated AST successfully");
         return document;
     }
 
@@ -102,6 +102,6 @@ public class GenerateSchemaCommand implements Callable<Integer> {
         log.info("Generating java classes from AST...");
         var generator = new ProtobufSchemaCreator(ast, pack, output, new Formatter());
         generator.generateSchema();
-        log.info("Generated java classes successfully!");
+        log.info("Generated java classes successfully at %s".formatted(output));
     }
 }

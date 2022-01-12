@@ -28,11 +28,12 @@ import static java.util.Objects.requireNonNullElse;
 public class ProtobufDecoder<T> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            // Use nightly build .registerModule(new BlackbirdModule())
             .registerModule(new Jdk8Module());
 
     private static final Map<Class<?>, List<Field>> cachedFields = new HashMap<>();
 
-    private static final Map<Type, Class<?>> cachedTypes = new HashMap<>();
+    private static final Map<Integer, Class<?>> cachedTypes = new HashMap<>();
 
     @NonNull
     private final Class<? extends T> modelClass;
@@ -126,15 +127,21 @@ public class ProtobufDecoder<T> {
 
     private Object readDelimited(ArrayInputStream input, int fieldNumber) throws IOException {
         var read = input.readBytes();
-        var type = findPropertyType(fieldNumber)
-                .orElse(ProtobufValue.BYTES);
+        var type = getPropertyType(fieldNumber)
+                .orElseGet(() -> getFallbackType(fieldNumber));
         return convertValueToObject(read, type);
+    }
+
+    private ProtobufValue getFallbackType(int fieldNumber) {
+        if(warnUnknownFields) {
+            log.warning("Falling back to BYTES for %s in schema %s".formatted(fieldNumber, classes.peekFirst()));
+        }
+        return ProtobufValue.BYTES;
     }
 
     private Object convertValueToObject(byte[] read, ProtobufValue value) throws IOException{
         if(value.packed()){
-            var stream = new ArrayInputStream(read);
-            return stream.readInt64();
+            return readPacked(read);
         }
 
         if(byte[].class.isAssignableFrom(value.type())){
@@ -146,6 +153,18 @@ public class ProtobufDecoder<T> {
         }
 
         return readDelimited(value.type(), read);
+    }
+
+    private ArrayList<Integer> readPacked(byte[] read) throws IOException {
+        var stream = new ArrayInputStream(read);
+        var length = stream.readRawVarint32();
+        var results = new ArrayList<Integer>();
+        while (results.size() * 4 != length){
+            var decoded = stream.readRawVarint32();
+            results.add(decoded);
+        }
+
+        return results;
     }
 
     private Object readDelimited(Class<?> currentClass, byte[] read){
@@ -160,11 +179,11 @@ public class ProtobufDecoder<T> {
         }
     }
 
-    private Optional<ProtobufValue> findPropertyType(int fieldNumber) {
-        var result = findFields()
+    private Optional<ProtobufValue> getPropertyType(int fieldNumber) {
+        var result = getFields()
                 .stream()
                 .filter(field -> isProperty(field, fieldNumber))
-                .map(field -> new ProtobufValue(foldType(field), isPacked(field)))
+                .map(field -> new ProtobufValue(getCachedPropertyType(field), isPacked(field)))
                 .findAny();
 
         if(result.isEmpty() && warnUnknownFields){
@@ -175,8 +194,32 @@ public class ProtobufDecoder<T> {
         return result;
     }
 
-    private Class<?> foldType(Field field) {
+    private Class<?> getCachedPropertyType(Field field) {
+        if(cachedTypes.containsKey(field.hashCode())){
+            return cachedTypes.get(field.hashCode());
+        }
 
+        var type = getPropertyType(field);
+        cachedTypes.put(field.hashCode(), type);
+        return type;
+    }
+
+    private Class<?> getPropertyType(Field field) {
+        var explicitType = field.getAnnotation(ProtobufType.class);
+        if(explicitType != null){
+            return explicitType.value();
+        }
+
+        var inferredType = inferPropertyType(field);
+        var substituteType = inferredType.getAnnotation(ProtobufType.class);
+        if(substituteType != null){
+            return substituteType.value();
+        }
+
+        return inferredType;
+    }
+
+    private Class<?> inferPropertyType(Field field) {
         if(!Collection.class.isAssignableFrom(field.getType())){
             return field.getType();
         }
@@ -187,10 +230,10 @@ public class ProtobufDecoder<T> {
         }
 
         var superClass = field.getType().getGenericSuperclass();
-        return foldSuperClass(superClass);
+        return inferPropertyType(superClass);
     }
 
-    private Class<?> foldSuperClass(Type superClass) {
+    private Class<?> inferPropertyType(Type superClass) {
         Objects.requireNonNull(superClass,
                 "Serialization issue: cannot deduce generic type of field through class hierarchy");
         if (superClass instanceof ParameterizedType parameterizedType) {
@@ -198,16 +241,16 @@ public class ProtobufDecoder<T> {
         }
 
         var concreteSuperClass = (Class<?>) superClass;
-        return foldSuperClass(concreteSuperClass.getGenericSuperclass());
+        return inferPropertyType(concreteSuperClass.getGenericSuperclass());
     }
 
-    private List<Field> findFields(){
+    private List<Field> getFields(){
         return Optional.ofNullable(classes.peekFirst())
-                .map(this::findFields)
+                .map(this::getFields)
                 .orElse(Arrays.asList(modelClass.getDeclaredFields()));
     }
 
-    private List<Field> findFields(Class<?> clazz){
+    private List<Field> getFields(Class<?> clazz){
         if(clazz == null){
             return List.of();
         }
@@ -217,7 +260,7 @@ public class ProtobufDecoder<T> {
         }
 
         var fields = new ArrayList<>(Arrays.asList(clazz.getDeclaredFields()));
-        fields.addAll(findFields(clazz.getSuperclass()));
+        fields.addAll(getFields(clazz.getSuperclass()));
         cachedFields.put(clazz, fields);
         return fields;
     }

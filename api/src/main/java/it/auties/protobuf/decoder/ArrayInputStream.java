@@ -21,7 +21,7 @@ class ArrayInputStream {
             return 0;
         }
 
-        this.lastTag = readVarInt32();
+        this.lastTag = readRawVarint32();
         if (getTagFieldNumber(lastTag) == 0) {
             throw InvalidProtocolBufferException.invalidTag();
         }
@@ -33,7 +33,7 @@ class ArrayInputStream {
         return tag >>> 3;
     }
 
-    public int readVarInt32() throws IOException {
+    public int readRawVarint32() throws IOException {
         fspath:
         {
             int tempPos = pos;
@@ -72,10 +72,10 @@ class ArrayInputStream {
             return x;
         }
 
-        return (int) readVarInt64Slow();
+        return (int) readRawVarint64SlowPath();
     }
 
-    private long readVarInt64Slow() throws IOException {
+    long readRawVarint64SlowPath() throws IOException {
         long result = 0;
         for (int shift = 0; shift < 64; shift += 7) {
             final byte b = readRawByte();
@@ -137,31 +137,29 @@ class ArrayInputStream {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35);
             } else if ((x ^= ((long) buffer[tempPos++] << 42)) >= 0L) {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35) ^ (~0L << 42);
-            } else {
-                if ((x ^= ((long) buffer[tempPos++] << 49)) < 0L) {
-                    x ^=
-                            (~0L << 7)
+            } else if ((x ^= ((long) buffer[tempPos++] << 49)) < 0L) {
+                x ^=
+                        (~0L << 7)
                                 ^ (~0L << 14)
                                 ^ (~0L << 21)
                                 ^ (~0L << 28)
                                 ^ (~0L << 35)
                                 ^ (~0L << 42)
                                 ^ (~0L << 49);
-                } else {
-                    x ^= ((long) buffer[tempPos++] << 56);
-                    x ^=
-                            (~0L << 7)
+            } else {
+                x ^= ((long) buffer[tempPos++] << 56);
+                x ^=
+                        (~0L << 7)
                                 ^ (~0L << 14)
                                 ^ (~0L << 21)
                                 ^ (~0L << 28)
                                 ^ (~0L << 35)
                                 ^ (~0L << 42)
                                 ^ (~0L << 49)
-                                    ^ (~0L << 56);
-                    if (x < 0L) {
-                        if (buffer[tempPos++] < 0L) {
-                            break fspath;
-                        }
+                                ^ (~0L << 56);
+                if (x < 0L) {
+                    if (buffer[tempPos++] < 0L) {
+                        break fspath;
                     }
                 }
             }
@@ -169,7 +167,7 @@ class ArrayInputStream {
             return x;
         }
 
-        return readVarInt64Slow();
+        return readRawVarint64SlowPath();
     }
 
     public long readFixed64() throws IOException {
@@ -188,7 +186,7 @@ class ArrayInputStream {
     }
 
     public byte[] readBytes() throws IOException {
-        int size = this.readVarInt32();
+        int size = this.readRawVarint32();
         if (size > 0 && size <= this.limit - this.pos) {
             var result = new byte[size];
             System.arraycopy(buffer, pos, result, 0, size);

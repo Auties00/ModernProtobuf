@@ -25,7 +25,7 @@ public class ${message.name} {
                     @JsonProperty(${statement.required ? "value = \"${statement.index}\", required = true" : statement.index})
                     @JsonPropertyDescription("${statement.type}")
                     ${statement.repeated ? "@JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)" : ""}
-                    ${statement.required ? "@NonNull : ""}
+                    ${statement.required ? "@NonNull" : ""}
                     private ${statement.javaType} ${it.auties.protobuf.utils.ProtobufUtils.toValidIdentifier(statement.name)};
                 """)
             } else if(statement instanceof it.auties.protobuf.OneOfStatement) {
