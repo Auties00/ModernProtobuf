@@ -123,60 +123,95 @@ public final class ProtobufParser {
         switch (tokensCache.size()) {
             case 3 -> {
                 if (instruction.isBlank() || Character.isDigit(instruction.charAt(0))) {
-                    throw new IllegalArgumentException("Cannot parse %s as an enum's field, invalid name".formatted(tokensCache));
+                    throw new IllegalArgumentException("Cannot parse %s as an enum's field: invalid name".formatted(tokensCache));
                 }
 
                 var operator = tokensCache.get(1);
                 if (!operator.equals("=")) {
-                    throw new IllegalArgumentException("Cannot parse %s as an enum's field, assignment operator expected".formatted(tokensCache));
+                    throw new IllegalArgumentException("Cannot parse %s as an enum's field: assignment operator expected".formatted(tokensCache));
                 }
 
                 var index = parseIndex(tokensCache.get(2));
                 if (!(objectsQueue.peekLast() instanceof EnumStatement enumStatement)) {
-                    throw new IllegalArgumentException("Cannot parse %s as an enum's field, invalid scope".formatted(tokensCache));
+                    throw new IllegalArgumentException("Cannot parse %s as an enum's field: invalid scope".formatted(tokensCache));
                 }
 
                 enumStatement.getStatements().add(new EnumConstantStatement(instruction, index));
             }
 
-            case 4, 5 -> {
+            case 4, 5, 10 -> {
                 var modifier = FieldModifier.forName(instruction);
                 var offset = modifier.isPresent() ? 1 : 0;
                 var operator = tokensCache.get(2 + offset);
                 if (!operator.equals("=")) {
-                    throw new IllegalArgumentException("Cannot parse %s as a regular field, assignment operator expected".formatted(tokensCache));
+                    throw new IllegalArgumentException("Cannot parse %s as a regular field: assignment operator expected".formatted(tokensCache));
                 }
 
                 var type = tokensCache.get(offset);
-
                 var name = tokensCache.get(1 + offset);
                 if (name.isBlank() || Character.isDigit(name.charAt(0))) {
-                    throw new IllegalArgumentException("Cannot parse %s as a regular field, invalid name".formatted(tokensCache));
+                    throw new IllegalArgumentException("Cannot parse %s as a regular field: invalid name".formatted(tokensCache));
                 }
 
                 var index = parseIndex(tokensCache.get(3 + offset));
                 var scope = objectsQueue.peekLast();
                 if (scope instanceof MessageStatement messageStatement) {
-                    messageStatement.getStatements().add(new FieldStatement(name, type, index, modifier.orElseThrow(() -> new IllegalArgumentException("Cannot parse %s as a regular field, invalid modifier".formatted(tokensCache)))));
+                    var checkedModifier = modifier.orElseThrow(() -> new IllegalArgumentException("Cannot parse %s as a regular field: invalid modifier".formatted(tokensCache)));
+                    var fieldStatement = new FieldStatement(name, type, index, checkedModifier, isPacked());
+                    messageStatement.getStatements().add(fieldStatement);
                     break;
                 }
 
                 if (scope instanceof OneOfStatement oneOfStatement) {
                     if (modifier.isPresent()) {
-                        throw new IllegalArgumentException("Cannot parse %s as an enum's field, invalid name".formatted(tokensCache));
+                        throw new IllegalArgumentException("Cannot parse %s as an enum's field: invalid name".formatted(tokensCache));
                     }
 
-                    oneOfStatement.getStatements().add(new FieldStatement(name, type, index, null));
+                    var oneOfOption = new FieldStatement(name, type, index, null, false);
+                    oneOfStatement.getStatements().add(oneOfOption);
                     break;
                 }
 
-                throw new IllegalArgumentException("Cannot parse %s as a regular field, invalid scope".formatted(tokensCache));
+                throw new IllegalArgumentException("Cannot parse %s as a regular field: invalid scope".formatted(tokensCache));
             }
 
-            default -> throw new IllegalArgumentException("Cannot parse %s as a regular field, invalid instruction".formatted(tokensCache));
+            default -> throw new IllegalArgumentException("Cannot parse %s as a regular field: invalid instruction".formatted(tokensCache));
         }
 
         tokensCache.clear();
+    }
+
+    private boolean isPacked(){
+        if(tokensCache.size() != 10){
+            return false;
+        }
+
+        var groupStart = tokensCache.get(tokensCache.size() - 5);
+        if(!Objects.equals(groupStart, "[")){
+            throw new IllegalArgumentException("Cannot parse %s as a regular field: invalid token".formatted(tokensCache));
+        }
+
+        var modifier = tokensCache.get(tokensCache.size() - 4);
+        if(!Objects.equals(modifier, "packed")){
+            return false;
+        }
+
+        var operator = tokensCache.get(tokensCache.size() - 3);
+        if(!Objects.equals(operator, "packed")){
+            return false;
+        }
+
+        var value = tokensCache.get(tokensCache.size() - 2);
+        if(!Objects.equals(value, "true")){
+            return false;
+        }
+
+        var closeGroup = tokensCache.get(tokensCache.size() - 1);
+        if(!Objects.equals(closeGroup, "[")){
+            throw new IllegalArgumentException("Cannot parse %s as a regular field: invalid token".formatted(tokensCache));
+        }
+
+        return true;
     }
 
     private int parseIndex(String parse) {

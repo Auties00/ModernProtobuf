@@ -1,10 +1,10 @@
 package it.auties.protobuf.decoder;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -14,6 +14,7 @@ import lombok.extern.java.Log;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,7 +28,12 @@ import static java.util.Objects.requireNonNullElse;
 public class ProtobufDecoder<T> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            // Use nightly build .registerModule(new BlackbirdModule())
             .registerModule(new Jdk8Module());
+
+    private static final Map<Class<?>, List<Field>> cachedFields = new HashMap<>();
+
+    private static final Map<Integer, Class<?>> cachedTypes = new HashMap<>();
 
     @NonNull
     private final Class<? extends T> modelClass;
@@ -39,7 +45,12 @@ public class ProtobufDecoder<T> {
 
     public T decode(byte[] input) throws IOException {
         var map = decodeAsMap(input);
-        return OBJECT_MAPPER.convertValue(map, modelClass);
+        try {
+            return OBJECT_MAPPER.convertValue(map, modelClass);
+        }catch (Throwable throwable){
+            log.warning("Map value -> %s".formatted(map));
+            throw new IOException("An exception occurred while decoding a message", throwable);
+        }
     }
 
     public Map<Integer, Object> decodeAsMap(byte[] input) throws IOException {
@@ -116,37 +127,45 @@ public class ProtobufDecoder<T> {
 
     private Object readDelimited(ArrayInputStream input, int fieldNumber) throws IOException {
         var read = input.readBytes();
-        var type = findPropertyType(fieldNumber);
-        return convertBytesToType(read, type.orElse(byte[].class));
+        var type = getPropertyType(fieldNumber)
+                .orElseGet(() -> getFallbackType(fieldNumber));
+        return convertValueToObject(read, type);
     }
 
-    private Object convertBytesToType(byte[] read, Class<?> type) throws IOException{
-        if(byte[].class.isAssignableFrom(type)){
+    private ProtobufValue getFallbackType(int fieldNumber) {
+        if(warnUnknownFields) {
+            log.warning("Falling back to BYTES for %s in schema %s".formatted(fieldNumber, classes.peekFirst()));
+        }
+        return ProtobufValue.BYTES;
+    }
+
+    private Object convertValueToObject(byte[] read, ProtobufValue value) throws IOException{
+        if(value.packed()){
+            return readPacked(read);
+        }
+
+        if(byte[].class.isAssignableFrom(value.type())){
             return read;
         }
 
-        if (String.class.isAssignableFrom(type)) {
+        if (String.class.isAssignableFrom(value.type())) {
             return new String(read, StandardCharsets.UTF_8);
         }
 
-        if(Number.class.isAssignableFrom(type)){
-            return readBytesAsNumber(read, type);
+        return readDelimited(value.type(), read);
+    }
+
+    private ArrayList<Integer> readPacked(byte[] read) throws IOException {
+        var stream = new ArrayInputStream(read);
+        var length = stream.readRawVarint32();
+        var results = new ArrayList<Integer>();
+        while (results.size() * 4 != length){
+            var decoded = stream.readRawVarint32();
+            results.add(decoded);
         }
 
-        return readDelimited(type, read);
+        return results;
     }
-
-    private Number readBytesAsNumber(byte[] read, Class<?> type) throws IOException {
-        var stream = new ArrayInputStream(read);
-        var primitiveType = read[0] & 7;
-        return switch (primitiveType) {
-            case 0 -> stream.readInt64();
-            case 1 -> stream.readFixed64();
-            case 5 -> stream.readFixed32();
-            default -> throw new InvalidProtocolBufferException.InvalidWireTypeException("Protocol message had invalid wire type(%s)".formatted(type));
-        };
-    }
-
 
     private Object readDelimited(Class<?> currentClass, byte[] read){
         try {
@@ -160,11 +179,11 @@ public class ProtobufDecoder<T> {
         }
     }
 
-    private Optional<Class<?>> findPropertyType(int fieldNumber) {
-        var result = findFields()
+    private Optional<ProtobufValue> getPropertyType(int fieldNumber) {
+        var result = getFields()
                 .stream()
                 .filter(field -> isProperty(field, fieldNumber))
-                .<Class<?>>map(this::foldType)
+                .map(field -> new ProtobufValue(getCachedPropertyType(field), isPacked(field)))
                 .findAny();
 
         if(result.isEmpty() && warnUnknownFields){
@@ -175,28 +194,74 @@ public class ProtobufDecoder<T> {
         return result;
     }
 
-    private Class<?> foldType(Field field) {
+    private Class<?> getCachedPropertyType(Field field) {
+        if(cachedTypes.containsKey(field.hashCode())){
+            return cachedTypes.get(field.hashCode());
+        }
+
+        var type = getPropertyType(field);
+        cachedTypes.put(field.hashCode(), type);
+        return type;
+    }
+
+    private Class<?> getPropertyType(Field field) {
+        var explicitType = field.getAnnotation(ProtobufType.class);
+        if(explicitType != null){
+            return explicitType.value();
+        }
+
+        var inferredType = inferPropertyType(field);
+        var substituteType = inferredType.getAnnotation(ProtobufType.class);
+        if(substituteType != null){
+            return substituteType.value();
+        }
+
+        return inferredType;
+    }
+
+    private Class<?> inferPropertyType(Field field) {
         if(!Collection.class.isAssignableFrom(field.getType())){
             return field.getType();
         }
 
-        var parameterizedType = (ParameterizedType) field.getGenericType();
-        return (Class<?>) parameterizedType.getActualTypeArguments()[0];
+        var genericType = field.getGenericType();
+        if(genericType instanceof ParameterizedType parameterizedType){
+            return (Class<?>) parameterizedType.getActualTypeArguments()[0];
+        }
+
+        var superClass = field.getType().getGenericSuperclass();
+        return inferPropertyType(superClass);
     }
 
-    private List<Field> findFields(){
+    private Class<?> inferPropertyType(Type superClass) {
+        Objects.requireNonNull(superClass,
+                "Serialization issue: cannot deduce generic type of field through class hierarchy");
+        if (superClass instanceof ParameterizedType parameterizedType) {
+            return (Class<?>) parameterizedType.getActualTypeArguments()[0];
+        }
+
+        var concreteSuperClass = (Class<?>) superClass;
+        return inferPropertyType(concreteSuperClass.getGenericSuperclass());
+    }
+
+    private List<Field> getFields(){
         return Optional.ofNullable(classes.peekFirst())
-                .map(this::findFields)
+                .map(this::getFields)
                 .orElse(Arrays.asList(modelClass.getDeclaredFields()));
     }
 
-    private List<Field> findFields(Class<?> clazz){
+    private List<Field> getFields(Class<?> clazz){
         if(clazz == null){
             return List.of();
         }
 
+        if(cachedFields.containsKey(clazz)){
+            return cachedFields.get(clazz);
+        }
+
         var fields = new ArrayList<>(Arrays.asList(clazz.getDeclaredFields()));
-        fields.addAll(findFields(clazz.getSuperclass()));
+        fields.addAll(getFields(clazz.getSuperclass()));
+        cachedFields.put(clazz, fields);
         return fields;
     }
 
@@ -204,6 +269,13 @@ public class ProtobufDecoder<T> {
         return Optional.ofNullable(field.getAnnotation(JsonProperty.class))
                 .map(JsonProperty::value)
                 .filter(entry -> Objects.equals(entry, String.valueOf(fieldNumber)))
+                .isPresent();
+    }
+
+    private boolean isPacked(Field field) {
+        return Optional.ofNullable(field.getAnnotation(JsonPropertyDescription.class))
+                .map(JsonPropertyDescription::value)
+                .filter(entry -> entry.contains("[packed]"))
                 .isPresent();
     }
 }

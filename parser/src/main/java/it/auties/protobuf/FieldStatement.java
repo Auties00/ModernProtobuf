@@ -13,10 +13,7 @@ public class FieldStatement implements ProtobufStatement {
     private String type;
     private int index;
     private FieldModifier modifier;
-
-    public String getName() {
-        return name;
-    }
+    private boolean packed;
 
     public String getNameAsConstant(){
         return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, getName());

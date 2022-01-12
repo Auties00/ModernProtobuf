@@ -137,31 +137,29 @@ class ArrayInputStream {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35);
             } else if ((x ^= ((long) buffer[tempPos++] << 42)) >= 0L) {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35) ^ (~0L << 42);
-            } else {
-                if ((x ^= ((long) buffer[tempPos++] << 49)) < 0L) {
-                    x ^=
-                            (~0L << 7)
+            } else if ((x ^= ((long) buffer[tempPos++] << 49)) < 0L) {
+                x ^=
+                        (~0L << 7)
                                 ^ (~0L << 14)
                                 ^ (~0L << 21)
                                 ^ (~0L << 28)
                                 ^ (~0L << 35)
                                 ^ (~0L << 42)
                                 ^ (~0L << 49);
-                } else {
-                    x ^= ((long) buffer[tempPos++] << 56);
-                    x ^=
-                            (~0L << 7)
+            } else {
+                x ^= ((long) buffer[tempPos++] << 56);
+                x ^=
+                        (~0L << 7)
                                 ^ (~0L << 14)
                                 ^ (~0L << 21)
                                 ^ (~0L << 28)
                                 ^ (~0L << 35)
                                 ^ (~0L << 42)
                                 ^ (~0L << 49)
-                                    ^ (~0L << 56);
-                    if (x < 0L) {
-                        if (buffer[tempPos++] < 0L) {
-                            break fspath;
-                        }
+                                ^ (~0L << 56);
+                if (x < 0L) {
+                    if (buffer[tempPos++] < 0L) {
+                        break fspath;
                     }
                 }
             }
