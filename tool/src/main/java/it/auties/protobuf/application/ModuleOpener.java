@@ -5,6 +5,7 @@ import sun.misc.Unsafe;
 
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -17,7 +18,6 @@ public class ModuleOpener {
     public void openJavac(){
         try {
             var jdkCompilerModule = findModule("jdk.compiler");
-
             var addOpensMethod = Module.class.getDeclaredMethod("implAddOpens", String.class, Module.class);
             var addOpensMethodOffset = unsafe.objectFieldOffset(ModulePlaceholder.class.getDeclaredField("first"));
             unsafe.putBooleanVolatile(addOpensMethod, addOpensMethodOffset, true);
@@ -38,7 +38,7 @@ public class ModuleOpener {
     private Module findModule(String moduleName) {
         return ModuleLayer.boot()
                 .findModule(moduleName)
-                .orElseThrow(() -> new ExceptionInInitializerError("Missing module: %s".formatted(moduleName)));
+                .orElseGet(() -> ClassLoader.getSystemClassLoader().getUnnamedModule());
     }
 
     private Unsafe openUnsafe() {
