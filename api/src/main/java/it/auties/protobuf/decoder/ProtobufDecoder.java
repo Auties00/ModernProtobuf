@@ -8,11 +8,13 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
 import lombok.extern.java.Log;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.Objects.requireNonNullElse;
 
 @RequiredArgsConstructor(staticName = "forType")
@@ -205,6 +208,11 @@ public class ProtobufDecoder<T> {
     }
 
     private Class<?> getPropertyType(Field field) {
+        var enclosingClass = field.getDeclaringClass();
+        if(ProtobufTypeDescriptor.class.isAssignableFrom(enclosingClass)){
+            return getPropertyTypeFromDescriptor(field, enclosingClass);
+        }
+
         var explicitType = field.getAnnotation(ProtobufType.class);
         if(explicitType != null){
             return explicitType.value();
@@ -217,6 +225,19 @@ public class ProtobufDecoder<T> {
         }
 
         return inferredType;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Class<?> getPropertyTypeFromDescriptor(Field field, Class<?> enclosingClass) {
+        try {
+            var indexAnnotation = requireNonNull(field.getAnnotation(JsonProperty.class), "Cannot use descriptor to infer type: please add @JsonProperty to the field %s inside the class %s".formatted(field.getName(), enclosingClass.getName()));
+            var descriptorClass = enclosingClass.asSubclass(ProtobufTypeDescriptor.class);
+            var descriptor = (Map<String, Class<?>>) descriptorClass.getMethod("descriptor")
+                    .invoke(null);
+            return descriptor.get(indexAnnotation.value());
+        }catch (Exception exception){
+            throw new IllegalArgumentException("Cannot use descriptor to infer type inside class %s: %s".formatted(enclosingClass.getName(), exception.getMessage()), exception);
+        }
     }
 
     private Class<?> inferPropertyType(Field field) {
@@ -234,7 +255,7 @@ public class ProtobufDecoder<T> {
     }
 
     private Class<?> inferPropertyType(Type superClass) {
-        Objects.requireNonNull(superClass,
+        requireNonNull(superClass,
                 "Serialization issue: cannot deduce generic type of field through class hierarchy");
         if (superClass instanceof ParameterizedType parameterizedType) {
             return (Class<?>) parameterizedType.getActualTypeArguments()[0];
