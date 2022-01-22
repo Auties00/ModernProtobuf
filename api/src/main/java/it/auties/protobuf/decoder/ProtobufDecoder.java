@@ -13,10 +13,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.java.Log;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -227,16 +224,51 @@ public class ProtobufDecoder<T> {
         return inferredType;
     }
 
-    @SuppressWarnings("unchecked")
+
     private Class<?> getPropertyTypeFromDescriptor(Field field, Class<?> enclosingClass) {
         try {
-            var indexAnnotation = requireNonNull(field.getAnnotation(JsonProperty.class), "Cannot use descriptor to infer type: please add @JsonProperty to the field %s inside the class %s".formatted(field.getName(), enclosingClass.getName()));
-            var descriptorClass = enclosingClass.asSubclass(ProtobufTypeDescriptor.class);
-            var descriptor = (Map<String, Class<?>>) descriptorClass.getMethod("descriptor")
-                    .invoke(null);
-            return descriptor.get(indexAnnotation.value());
+            var indexAnnotation = requireNonNull(field.getAnnotation(JsonProperty.class),
+                    "Cannot use descriptor to infer type: please add @JsonProperty to the field %s inside the class %s".formatted(field.getName(), enclosingClass.getName()));
+            var descriptor = (Map<?, ?>) invokeDescriptorMethod(enclosingClass);
+            return (Class<?>) descriptor.get(indexAnnotation.value());
         }catch (Exception exception){
             throw new IllegalArgumentException("Cannot use descriptor to infer type inside class %s: %s".formatted(enclosingClass.getName(), exception.getMessage()), exception);
+        }
+    }
+
+    private Object invokeDescriptorMethod(Class<?> clazz) {
+        var descriptorMethod = getDescriptorMethod(clazz, true);
+        if(!Modifier.isStatic(descriptorMethod.getModifiers())){
+            return invokeDescriptorMethodFallback(clazz, descriptorMethod);
+        }
+
+        try {
+            return descriptorMethod.invoke(null);
+        }catch (Throwable exception){
+            return invokeDescriptorMethodFallback(clazz, descriptorMethod);
+        }
+    }
+
+    private Object invokeDescriptorMethodFallback(Class<?> clazz, Method descriptorMethod) {
+        try {
+            var temp = clazz.getConstructor()
+                    .newInstance();
+            return descriptorMethod.invoke(temp);
+        }catch (Exception anotherException){
+            throw new IllegalArgumentException("Cannot use descriptor to infer type inside class %s: cannot invoke descriptor method statically or using an instance".formatted(clazz.getName()));
+        }
+    }
+
+    private Method getDescriptorMethod(Class<?> clazz, boolean accessible) {
+        try {
+            return accessible ? clazz.getMethod("descriptor")
+                    : clazz.getDeclaredMethod("descriptor");
+        }catch (NoSuchMethodException exception){
+            if(accessible){
+                return getDescriptorMethod(clazz, false);
+            }
+
+            throw new IllegalArgumentException("Cannot use descriptor to infer type inside class %s: missing descriptor method".formatted(clazz.getName()));
         }
     }
 
