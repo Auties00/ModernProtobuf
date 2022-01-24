@@ -1,12 +1,14 @@
 package it.auties.protobuf.encoder;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import it.auties.protobuf.util.IllegalReflection;
+import it.auties.protobuf.util.ProtobufUtils;
 import lombok.experimental.ExtensionMethod;
 import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 @UtilityClass
 @ExtensionMethod(IllegalReflection.class)
@@ -21,8 +23,9 @@ public class ProtobufEncoder {
     }
 
     private byte[] encodeObject(Object object, ArrayOutputStream output) {
-        Arrays.stream(object.getClass().getDeclaredFields())
-                .filter(field -> field.isAnnotationPresent(JsonProperty.class) && field.isAnnotationPresent(JsonPropertyDescription.class))
+        Stream.of(object.getClass().getFields(), object.getClass().getDeclaredFields())
+                .flatMap(Arrays::stream)
+                .filter(ProtobufEncoder::isProperty)
                 .map(IllegalReflection::opened)
                 .map(field -> createFieldOrThrow(object, field))
                 .filter(ProtobufField::valid)
@@ -31,29 +34,32 @@ public class ProtobufEncoder {
         return output.readResult();
     }
 
+    private boolean isProperty(Field field) {
+        return field.isAnnotationPresent(JsonProperty.class);
+    }
+
     private ProtobufField createFieldOrThrow(Object object, Field field) {
         try {
-            return new ProtobufField(field.getAnnotation(JsonProperty.class), field.getAnnotation(JsonPropertyDescription.class), field.get(object));
+            var index = ProtobufUtils.parseIndex(field);
+            var required = ProtobufUtils.isRequired(field);
+            var type = ProtobufUtils.parseType(field);
+            var value = field.get(object);
+            return new ProtobufField(index, type, value, required);
         }catch (IllegalAccessException exception){
             throw new IllegalStateException("Access failed: reflection opener failed", exception);
         }
     }
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {
-        var number = Integer.parseInt(field.property().value());
-        var type = field.description()
-                .value()
-                .replace("[packed]", "")
-                .trim();
-        switch (type){
-            case "float", "fixed32", "sfixed32" -> output.writeFixed32(number, Float.floatToRawIntBits((float) field.value()));
-            case "double", "fixed64", "sfixed64" -> output.writeFixed64(number, Double.doubleToRawLongBits((double) field.value()));
-            case "bool" -> output.writeBool(number, (boolean) field.value());
-            case "string" -> output.writeString(number, (String) field.value());
-            case "bytes" -> output.writeBytes(number, (byte[]) field.value());
-            case "int32", "uint32", "sint32" -> output.writeUInt32(number, (int) field.value());
-            case "int64", "uint64", "sint64" -> output.writeUInt64(number, (long) field.value());
-            default -> encodeFieldFallback(output, field, number);
+        switch (field.type()){
+            case "float", "fixed32", "sfixed32" -> output.writeFixed32(field.index(), Float.floatToRawIntBits((float) field.value()));
+            case "double", "fixed64", "sfixed64" -> output.writeFixed64(field.index(), Double.doubleToRawLongBits((double) field.value()));
+            case "bool" -> output.writeBool(field.index(), (boolean) field.value());
+            case "string" -> output.writeString(field.index(), (String) field.value());
+            case "bytes" -> output.writeBytes(field.index(), (byte[]) field.value());
+            case "int32", "uint32", "sint32" -> output.writeUInt32(field.index(), (int) field.value());
+            case "int64", "uint64", "sint64" -> output.writeUInt64(field.index(), (long) field.value());
+            default -> encodeFieldFallback(output, field, field.index());
         }
     }
 

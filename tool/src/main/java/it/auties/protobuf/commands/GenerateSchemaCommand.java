@@ -6,9 +6,9 @@ import it.auties.protobuf.ProtobufDocument;
 import it.auties.protobuf.ProtobufParser;
 import it.auties.protobuf.schema.ProtobufSchemaCreator;
 import lombok.extern.log4j.Log4j2;
-import picocli.CommandLine.Parameters;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 import sun.misc.Unsafe;
 
 import java.io.File;

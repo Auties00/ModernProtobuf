@@ -1,4 +1,4 @@
-package it.auties.protobuf.encoder;
+package it.auties.protobuf.util;
 
 import lombok.experimental.UtilityClass;
 import sun.misc.Unsafe;
@@ -8,7 +8,7 @@ import java.lang.reflect.AccessibleObject;
 import java.util.NoSuchElementException;
 
 @UtilityClass
-class IllegalReflection {
+public class IllegalReflection {
     private final Unsafe unsafe = openUnsafe();
     private final long offset = findOffset();
 

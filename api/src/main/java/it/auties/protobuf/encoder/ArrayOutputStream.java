@@ -6,10 +6,10 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
 public record ArrayOutputStream(ByteArrayOutputStream buffer) {
-    public static final int VAR_INT = 0;
-    public static final int FIXED_32 = 5;
-    public static final int FIXED_64 = 1;
-    public static final int DELIMITED = 2;
+    private static final int VAR_INT = 0;
+    private static final int FIXED_32 = 5;
+    private static final int FIXED_64 = 1;
+    private static final int DELIMITED = 2;
 
     public ArrayOutputStream() {
         this(new ByteArrayOutputStream());

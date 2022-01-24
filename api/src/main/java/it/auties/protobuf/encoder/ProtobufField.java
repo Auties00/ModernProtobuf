@@ -1,16 +1,19 @@
 package it.auties.protobuf.encoder;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-
 import java.util.Objects;
 
-record ProtobufField(JsonProperty property, JsonPropertyDescription description, Object value) {
+record ProtobufField(int index, String type, Object value, boolean required) {
     public boolean valid(){
-        if(property.required()){
+        if(required){
             Objects.requireNonNull(value, "Cannot encode object: missing mandatory field");
         }
 
-        return value != null && (!(value instanceof Number number) || number.floatValue() != 0F);
+        return value != null
+                && (!(value instanceof Number number) || number.floatValue() != 0F);
+    }
+
+    public String type(){
+        return type.replace("[packed]", "")
+                .trim();
     }
 }

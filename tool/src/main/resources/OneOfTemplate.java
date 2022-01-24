@@ -1,14 +1,7 @@
-<% if(!pack.empty && imports) { %>
-    package ${pack};
-<% } %>
-
-<% if(imports) { %>
-import com.fasterxml.jackson.annotation.*;
-import lombok.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.experimental.Accessors;
-
-import java.nio.ByteBuffer;
-import java.util.*;
 <% } %>
 
 @AllArgsConstructor

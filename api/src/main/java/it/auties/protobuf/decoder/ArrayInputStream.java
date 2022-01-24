@@ -23,7 +23,7 @@ class ArrayInputStream {
 
         this.lastTag = readRawVarint32();
         if (getTagFieldNumber(lastTag) == 0) {
-            throw InvalidProtocolBufferException.invalidTag();
+            throw DeserializationException.invalidTag();
         }
 
         return lastTag;
@@ -85,23 +85,23 @@ class ArrayInputStream {
             }
         }
 
-        throw InvalidProtocolBufferException.malformedVarint();
+        throw DeserializationException.malformedVarInt();
     }
 
     public byte readRawByte() throws IOException {
         if (pos == limit) {
-            throw InvalidProtocolBufferException.truncatedMessage();
+            throw DeserializationException.truncatedMessage();
         }
 
         return buffer[pos++];
     }
 
-    public void checkLastTagWas(final int value) throws InvalidProtocolBufferException {
+    public void checkLastTagWas(final int value) throws DeserializationException {
         if (lastTag == value) {
             return;
         }
 
-        throw InvalidProtocolBufferException.invalidEndTag(lastTag);
+        throw DeserializationException.invalidEndTag(lastTag);
     }
 
     public long readInt64() throws IOException {
@@ -177,7 +177,7 @@ class ArrayInputStream {
     public long readRawLittleEndian64() throws IOException {
         int tempPos = this.pos;
         if (this.limit - tempPos < 8) {
-            throw InvalidProtocolBufferException.truncatedMessage();
+            throw DeserializationException.truncatedMessage();
         }
 
         byte[] buffer = this.buffer;
@@ -209,10 +209,10 @@ class ArrayInputStream {
                 return new byte[0];
             }
 
-            throw InvalidProtocolBufferException.negativeSize();
+            throw DeserializationException.negativeSize();
         }
 
-        throw InvalidProtocolBufferException.truncatedMessage();
+        throw DeserializationException.truncatedMessage();
     }
 
     public int readFixed32() throws IOException {
@@ -222,7 +222,7 @@ class ArrayInputStream {
     public int readRawLittleEndian32() throws IOException {
         int tempPos = this.pos;
         if (this.limit - tempPos < 4) {
-            throw InvalidProtocolBufferException.truncatedMessage();
+            throw DeserializationException.truncatedMessage();
         }
 
         byte[] buffer = this.buffer;

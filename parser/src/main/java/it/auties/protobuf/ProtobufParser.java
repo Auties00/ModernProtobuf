@@ -1,6 +1,5 @@
 package it.auties.protobuf;
 
-import it.auties.protobuf.*;
 import lombok.AllArgsConstructor;
 
 import java.io.File;
