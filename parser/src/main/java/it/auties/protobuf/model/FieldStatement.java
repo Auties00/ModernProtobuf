@@ -1,4 +1,4 @@
-package it.auties.protobuf;
+package it.auties.protobuf.model;
 
 import com.google.common.base.CaseFormat;
 import lombok.AllArgsConstructor;

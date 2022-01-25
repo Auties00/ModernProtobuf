@@ -1,7 +1,13 @@
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+<% if(!pack.empty && imports) { %>
+package ${pack};
+<% } %>
+
+<% if(imports) { %>
+import com.fasterxml.jackson.annotation.*;
+import lombok.*;
 import lombok.experimental.Accessors;
+
+import java.util.*;
 <% } %>
 
 @AllArgsConstructor

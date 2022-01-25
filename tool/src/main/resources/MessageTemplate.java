@@ -1,8 +1,14 @@
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+<% if(!pack.empty && imports) { %>
+package ${pack};
+<% } %>
+
+<% if(imports) { %>
+import com.fasterxml.jackson.annotation.*;
+import lombok.*;
 import lombok.experimental.Accessors;
+
+import java.nio.ByteBuffer;
+import java.util.*;
 <% } %>
 
 @AllArgsConstructor
@@ -14,7 +20,7 @@ public class ${message.name} {
     <%
         def data = []
         for(statement in message.statements) {
-            if(statement instanceof it.auties.protobuf.FieldStatement) {
+            if(statement instanceof it.auties.protobuf.model.FieldStatement) {
                 data.add("""
                     @JsonProperty(${statement.required ? "value = \"${statement.index}\", required = true" : statement.index})
                     @JsonPropertyDescription("${statement.type}")
@@ -22,7 +28,7 @@ public class ${message.name} {
                     ${statement.required ? "@NonNull" : ""}
                     private ${statement.javaType} ${it.auties.protobuf.utils.ProtobufUtils.toValidIdentifier(statement.name)};
                 """)
-            } else if(statement instanceof it.auties.protobuf.OneOfStatement) {
+            } else if(statement instanceof it.auties.protobuf.model.OneOfStatement) {
                 for(oneOf in statement.statements) {
                     data.add("""
                         @JsonProperty("${oneOf.index}")
@@ -37,9 +43,9 @@ public class ${message.name} {
                 """)
 
                 data.push(new it.auties.protobuf.schema.OneOfSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.MessageStatement) {
+            } else if(statement instanceof it.auties.protobuf.model.MessageStatement) {
                 data.push(new it.auties.protobuf.schema.MessageSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.EnumStatement) {
+            } else if(statement instanceof it.auties.protobuf.model.EnumStatement) {
                 data.push(new it.auties.protobuf.schema.EnumSchemaCreator(statement, pack, false).createSchema())
             }
         }

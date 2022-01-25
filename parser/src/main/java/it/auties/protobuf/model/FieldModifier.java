@@ -1,4 +1,4 @@
-package it.auties.protobuf;
+package it.auties.protobuf.model;
 
 import java.util.Arrays;
 import java.util.Optional;

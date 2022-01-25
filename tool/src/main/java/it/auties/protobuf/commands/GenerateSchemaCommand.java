@@ -2,8 +2,8 @@ package it.auties.protobuf.commands;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.ProtobufDocument;
-import it.auties.protobuf.ProtobufParser;
+import it.auties.protobuf.model.ProtobufDocument;
+import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.schema.ProtobufSchemaCreator;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine.Command;

@@ -2,10 +2,10 @@ package it.auties.protobuf.schema;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.EnumStatement;
-import it.auties.protobuf.MessageStatement;
-import it.auties.protobuf.ProtobufDocument;
-import it.auties.protobuf.ProtobufObject;
+import it.auties.protobuf.model.EnumStatement;
+import it.auties.protobuf.model.MessageStatement;
+import it.auties.protobuf.model.ProtobufDocument;
+import it.auties.protobuf.model.ProtobufObject;
 
 import java.io.File;
 import java.io.IOException;
