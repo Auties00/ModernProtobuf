@@ -15,10 +15,22 @@ public class ProtobufUtils {
         return Integer.parseUnsignedInt(annotation.value());
     }
 
-    public String parseType(Field field) {
+    public String parseType(Field field, Object value) {
         var annotation = field.getAnnotation(JsonPropertyDescription.class);
-        return annotation != null ? annotation.value()
-                : "unknown";
+        if (annotation != null) {
+            return annotation.value();
+        }
+
+        return switch (value){
+            case Float ignored -> "float";
+            case Double ignored -> "double";
+            case Boolean ignored -> "bool";
+            case String ignored -> "string";
+            case byte[] ignored -> "bytes";
+            case Integer ignored -> "int32";
+            case Long ignored -> "int64";
+            case null, default -> "object";
+        };
     }
 
     public boolean isRequired(Field field) {

@@ -42,8 +42,8 @@ public class ProtobufEncoder {
         try {
             var index = ProtobufUtils.parseIndex(field);
             var required = ProtobufUtils.isRequired(field);
-            var type = ProtobufUtils.parseType(field);
             var value = field.get(object);
+            var type = ProtobufUtils.parseType(field, value);
             return new ProtobufField(index, type, value, required);
         }catch (IllegalAccessException exception){
             throw new IllegalStateException("Access failed: reflection opener failed", exception);

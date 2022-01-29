@@ -3,6 +3,9 @@ package it.auties.protobuf.model;
 import com.google.common.base.CaseFormat;
 import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 public class OneOfStatement extends ProtobufObject<FieldStatement> {
     public OneOfStatement(String name) {
