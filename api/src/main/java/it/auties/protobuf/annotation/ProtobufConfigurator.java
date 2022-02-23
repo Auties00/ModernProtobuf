@@ -1,4 +1,4 @@
-package it.auties.protobuf.decoder;
+package it.auties.protobuf.annotation;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotation;
 
@@ -7,9 +7,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target({ElementType.FIELD, ElementType.TYPE})
+@Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@JacksonAnnotation
-public @interface ProtobufType {
-    Class<?> value();
+public @interface ProtobufConfigurator {
+
 }

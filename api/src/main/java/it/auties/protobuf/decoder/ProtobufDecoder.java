@@ -1,10 +1,9 @@
 package it.auties.protobuf.decoder;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import it.auties.protobuf.annotation.ProtobufType;
+import it.auties.protobuf.annotation.ProtobufTypeDescriptor;
 import it.auties.protobuf.util.ProtobufUtils;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +18,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,11 +28,14 @@ import static java.util.Objects.requireNonNull;
 @Accessors(fluent = true, chain = true)
 @Log
 public class ProtobufDecoder<T> {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .registerModule(new Jdk8Module());
+    private static final ObjectMapper mapper;
+    private static final Map<Class<?>, List<ProtobufField>> cache;
 
-    private static final Map<Class<?>, List<ProtobufField>> cache = new HashMap<>();
+    static {
+        var configurator = ProtobufDecoderConfigurator.findConfigurator();
+        mapper = configurator.createMapper();
+        cache = new ConcurrentHashMap<>();
+    }
 
     @NonNull
     private final Class<? extends T> modelClass;
@@ -46,7 +49,7 @@ public class ProtobufDecoder<T> {
     public T decode(byte[] input) throws IOException {
         var map = decodeAsMap(input);
         try {
-            return OBJECT_MAPPER.convertValue(map, modelClass);
+            return mapper.convertValue(map, modelClass);
         }catch (Throwable throwable){
             log.warning("Map value -> %s".formatted(map));
             throw new IOException("An exception occurred while decoding a message", throwable);
@@ -58,7 +61,7 @@ public class ProtobufDecoder<T> {
     }
 
     public String decodeAsJson(byte[] input) throws IOException {
-        return OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
+        return mapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(decodeAsMap(input));
     }
 
@@ -209,16 +212,12 @@ public class ProtobufDecoder<T> {
 
         Stream.of(clazz.getFields(), clazz.getDeclaredFields())
                 .flatMap(Arrays::stream)
-                .filter(this::isProperty)
+                .filter(ProtobufUtils::isProperty)
                 .map(field -> new ProtobufField(ProtobufUtils.parseIndex(field), getPropertyType(field), isPacked(field)))
                 .forEach(results::add);
         results.addAll(getFields(clazz.getSuperclass()));
         cache.put(clazz, results);
         return results;
-    }
-
-    private boolean isProperty(Field field) {
-        return field.getAnnotation(JsonProperty.class) != null;
     }
 
     @SuppressWarnings("unchecked")

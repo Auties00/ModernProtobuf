@@ -1,6 +1,5 @@
 package it.auties.protobuf.encoder;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import it.auties.protobuf.util.IllegalReflection;
 import it.auties.protobuf.util.ProtobufUtils;
 import lombok.experimental.ExtensionMethod;
@@ -25,17 +24,13 @@ public class ProtobufEncoder {
     private byte[] encodeObject(Object object, ArrayOutputStream output) {
         Stream.of(object.getClass().getFields(), object.getClass().getDeclaredFields())
                 .flatMap(Arrays::stream)
-                .filter(ProtobufEncoder::isProperty)
+                .filter(ProtobufUtils::isProperty)
                 .map(IllegalReflection::opened)
                 .map(field -> createFieldOrThrow(object, field))
                 .filter(ProtobufField::valid)
                 .forEach(field -> encodeField(output, field));
 
         return output.readResult();
-    }
-
-    private boolean isProperty(Field field) {
-        return field.isAnnotationPresent(JsonProperty.class);
     }
 
     private ProtobufField createFieldOrThrow(Object object, Field field) {
@@ -51,15 +46,19 @@ public class ProtobufEncoder {
     }
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {
-        switch (field.type()){
-            case "float", "fixed32", "sfixed32" -> output.writeFixed32(field.index(), Float.floatToRawIntBits((float) field.value()));
-            case "double", "fixed64", "sfixed64" -> output.writeFixed64(field.index(), Double.doubleToRawLongBits((double) field.value()));
-            case "bool" -> output.writeBool(field.index(), (boolean) field.value());
-            case "string" -> output.writeString(field.index(), (String) field.value());
-            case "bytes" -> output.writeBytes(field.index(), (byte[]) field.value());
-            case "int32", "uint32", "sint32" -> output.writeUInt32(field.index(), (int) field.value());
-            case "int64", "uint64", "sint64" -> output.writeUInt64(field.index(), (long) field.value());
-            default -> encodeFieldFallback(output, field, field.index());
+        try {
+            switch (field.type()){
+                case "float", "fixed32", "sfixed32" -> output.writeFixed32(field.index(), Float.floatToRawIntBits((float) field.value()));
+                case "double", "fixed64", "sfixed64" -> output.writeFixed64(field.index(), Double.doubleToRawLongBits((double) field.value()));
+                case "bool" -> output.writeBool(field.index(), (boolean) field.value());
+                case "string" -> output.writeString(field.index(), (String) field.value());
+                case "bytes" -> output.writeBytes(field.index(), (byte[]) field.value());
+                case "int32", "uint32", "sint32" -> output.writeUInt32(field.index(), (int) field.value());
+                case "int64", "uint64", "sint64" -> output.writeUInt64(field.index(), (long) field.value());
+                default -> encodeFieldFallback(output, field, field.index());
+            }
+        }catch (ClassCastException exception){
+            throw new RuntimeException("A field misreported its own type in a schema: %s".formatted(field), exception);
         }
     }
 

@@ -1,4 +1,4 @@
-package it.auties.protobuf.decoder;
+package it.auties.protobuf.annotation;
 
 import java.util.Map;
 
