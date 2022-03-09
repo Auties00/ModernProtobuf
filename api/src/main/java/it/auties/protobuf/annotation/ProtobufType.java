@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-@JacksonAnnotation
 public @interface ProtobufType {
     Class<?> value();
 }
