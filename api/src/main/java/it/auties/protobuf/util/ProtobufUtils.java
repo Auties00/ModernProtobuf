@@ -1,47 +1,43 @@
 package it.auties.protobuf.util;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import it.auties.protobuf.annotation.ProtobufIgnore;
+import it.auties.protobuf.exception.ProtobufException;
+import it.auties.protobuf.model.ProtobufMessage;
+import it.auties.protobuf.model.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufProperty.Type;
+import it.auties.protobuf.model.ProtobufValue;
 import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.Field;
-import java.util.Objects;
+import java.util.Optional;
 
 @UtilityClass
 public class ProtobufUtils {
-    public boolean isProperty(Field field) {
-        return field.isAnnotationPresent(JsonProperty.class)
-                && !field.isAnnotationPresent(ProtobufIgnore.class);
+    public boolean isProperty(Field field){
+        var annotation = field.getAnnotation(ProtobufProperty.class);
+        return annotation != null && !annotation.ignore();
     }
 
-    public int parseIndex(Field field) {
-        var annotation = field.getAnnotation(JsonProperty.class);
-        Objects.requireNonNull(annotation, "Cannot parse index: missing property annotation");
-        return Integer.parseUnsignedInt(annotation.value());
+    public Optional<ProtobufProperty> getProperty(Field field){
+        return Optional.ofNullable(field.getAnnotation(ProtobufProperty.class))
+                .filter(annotation -> !annotation.ignore());
     }
 
-    public String parseType(Field field, Object value) {
-        var annotation = field.getAnnotation(JsonPropertyDescription.class);
-        if (annotation != null) {
-            return annotation.value();
-        }
-
-        return switch (value){
-            case Float ignored -> "float";
-            case Double ignored -> "double";
-            case Boolean ignored -> "bool";
-            case String ignored -> "string";
-            case byte[] ignored -> "bytes";
-            case Integer ignored -> "int32";
-            case Long ignored -> "int64";
-            case null, default -> "object";
-        };
+    public Type getProtobufType(ProtobufProperty property){
+        return property.concreteType() == Object.class ? property.type()
+                : Type.forJavaType(property.concreteType());
     }
 
-    public boolean isRequired(Field field) {
-        var annotation = field.getAnnotation(JsonProperty.class);
-        Objects.requireNonNull(annotation, "Cannot parse index: missing property annotation");
-        return annotation.required();
+    public Class<?> getJavaType(ProtobufProperty property) {
+        return property.concreteType() == Object.class ? property.type().javaType() :
+                property.concreteType();
+    }
+
+    public Class<? extends ProtobufMessage> getMessageType(Class<?> clazz){
+        return !ProtobufMessage.isMessage(clazz) ? null
+                :clazz.asSubclass(ProtobufMessage.class);
+    }
+
+    public boolean hasValue(Class<?> type) {
+        return type.isAnnotationPresent(ProtobufValue.class);
     }
 }

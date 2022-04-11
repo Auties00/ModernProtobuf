@@ -1,0 +1,5 @@
+package it.auties.protobuf;
+
+message RepeatedMessage {
+  repeated int32 content = 1;
+}

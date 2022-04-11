@@ -1,9 +1,11 @@
-package it.auties.protobuf.decoder;
+package it.auties.protobuf.util;
+
+import it.auties.protobuf.exception.ProtobufDeserializationException;
 
 import java.io.IOException;
 import java.util.Arrays;
 
-class ArrayInputStream {
+public class ArrayInputStream {
     private final byte[] buffer;
     private final int limit;
     private int pos;
@@ -23,7 +25,7 @@ class ArrayInputStream {
 
         this.lastTag = readRawVarint32();
         if (getTagFieldNumber(lastTag) == 0) {
-            throw DeserializationException.invalidTag();
+            throw ProtobufDeserializationException.invalidTag();
         }
 
         return lastTag;
@@ -85,23 +87,27 @@ class ArrayInputStream {
             }
         }
 
-        throw DeserializationException.malformedVarInt();
+        throw ProtobufDeserializationException.malformedVarInt();
     }
 
     public byte readRawByte() throws IOException {
         if (pos == limit) {
-            throw DeserializationException.truncatedMessage();
+            throw ProtobufDeserializationException.truncatedMessage();
         }
 
         return buffer[pos++];
     }
 
-    public void checkLastTagWas(final int value) throws DeserializationException {
+    public void checkLastTagWas(final int value) throws ProtobufDeserializationException {
         if (lastTag == value) {
             return;
         }
 
-        throw DeserializationException.invalidEndTag(lastTag);
+        throw ProtobufDeserializationException.invalidEndTag(lastTag);
+    }
+
+    public int lastTag() {
+        return lastTag;
     }
 
     public long readInt64() throws IOException {
@@ -177,7 +183,7 @@ class ArrayInputStream {
     public long readRawLittleEndian64() throws IOException {
         int tempPos = this.pos;
         if (this.limit - tempPos < 8) {
-            throw DeserializationException.truncatedMessage();
+            throw ProtobufDeserializationException.truncatedMessage();
         }
 
         byte[] buffer = this.buffer;
@@ -209,10 +215,10 @@ class ArrayInputStream {
                 return new byte[0];
             }
 
-            throw DeserializationException.negativeSize();
+            throw ProtobufDeserializationException.negativeSize();
         }
 
-        throw DeserializationException.truncatedMessage();
+        throw ProtobufDeserializationException.truncatedMessage();
     }
 
     public int readFixed32() throws IOException {
@@ -222,7 +228,7 @@ class ArrayInputStream {
     public int readRawLittleEndian32() throws IOException {
         int tempPos = this.pos;
         if (this.limit - tempPos < 4) {
-            throw DeserializationException.truncatedMessage();
+            throw ProtobufDeserializationException.truncatedMessage();
         }
 
         byte[] buffer = this.buffer;
@@ -232,5 +238,9 @@ class ArrayInputStream {
 
     public boolean isAtEnd() {
         return this.pos == this.limit;
+    }
+
+    public int position(){
+        return pos;
     }
 }

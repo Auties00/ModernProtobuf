@@ -1,5 +1,6 @@
 package it.auties.protobuf.parser;
 
+import it.auties.protobuf.exception.ProtobufSyntaxException;
 import it.auties.protobuf.model.*;
 import lombok.AllArgsConstructor;
 
@@ -143,8 +144,6 @@ public final class ProtobufParser {
         if (scope instanceof MessageStatement messageStatement) {
             ProtobufSyntaxException.validate(modifier.isPresent(),
                     "Illegal field declaration: expected a valid modifier");
-            ProtobufSyntaxException.validate(FieldModifier.forName(name).isEmpty(),
-                    "Illegal field declaration: valid modifiers cannot be used as names");
             var fieldStatement = new FieldStatement(name, type, index, modifier.get(), isPacked());
             messageStatement.getStatements()
                     .add(fieldStatement);
@@ -152,8 +151,6 @@ public final class ProtobufParser {
         }
 
         if (scope instanceof OneOfStatement oneOfStatement) {
-            ProtobufSyntaxException.validate(modifier.isEmpty(),
-                    "Invalid one of statement declaration: valid modifiers cannot be used as names");
             var oneOfOption = new FieldStatement(name, type, index, null, false);
             oneOfStatement.getStatements()
                     .add(oneOfOption);
@@ -226,7 +223,8 @@ public final class ProtobufParser {
 
     private Optional<Integer> parseIndex(String parse) {
         try {
-            return Optional.of(Integer.parseUnsignedInt(parse));
+            return Optional.of(Integer.parseUnsignedInt(parse))
+                    .filter(value -> value != 0);
         } catch (NumberFormatException ex) {
             return Optional.empty();
         }

@@ -10,6 +10,7 @@ import java.util.Map;
 
 public record OneOfSchemaCreator(OneOfStatement oneOfStatement, String pack, boolean imports) implements SchemaCreator{
     private static final String GENERATOR = ProtobufUtils.readGenerator("OneOfTemplate");
+
     @Override
     public String createSchema() throws IOException, ClassNotFoundException {
         return new GStringTemplateEngine()

@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser;
+package it.auties.protobuf.exception;
 
 public class ProtobufSyntaxException extends IllegalArgumentException {
     public ProtobufSyntaxException(String message, Object... args) {

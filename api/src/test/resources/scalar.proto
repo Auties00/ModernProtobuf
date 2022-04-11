@@ -1,0 +1,20 @@
+package it.auties.protobuf;
+
+message ScalarMessage {
+  optional fixed32 fixed32 = 1;
+  optional sfixed32 sfixed32 = 2;
+  optional int32 int32 = 3;
+  optional uint32 uint32 = 4;
+
+  optional fixed64 fixed64 = 5;
+  optional sfixed64 sfixed64 = 6;
+  optional int64 int64 = 7;
+  optional uint64 uint64 = 8;
+
+  optional float float = 9;
+  optional double double = 10;
+
+  optional bool bool = 11;
+  optional string string = 12;
+  optional bytes bytes = 13;
+}

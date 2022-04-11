@@ -13,8 +13,9 @@ import java.util.Objects;
 public class ProtobufUtils {
     @SneakyThrows
     public String readGenerator(String name){
-        var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name));
-        return new String(Objects.requireNonNull(stream).readAllBytes(), StandardCharsets.UTF_8);
+        try(var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name))){
+            return new String(Objects.requireNonNull(stream).readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     // This method is used inside the Message Model generator

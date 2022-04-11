@@ -1,6 +1,7 @@
-package it.auties.protobuf.commands;
+package it.auties.protobuf.command;
 
-import it.auties.protobuf.decoder.ProtobufDecoder;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.auties.protobuf.utils.RawProtobufConverter;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine.Command;
@@ -18,6 +19,9 @@ import java.util.concurrent.Callable;
         description = "Decodes a protobuf message encoded as binary data"
 )
 public class DecodeCommand implements Callable<Integer> {
+    private static final ObjectMapper JACKSON = new ObjectMapper()
+            .registerModule(new ProtobufModule());
+
     @SuppressWarnings("FieldMayBeFinal")
     @Parameters(
             index = "0",
@@ -29,11 +33,12 @@ public class DecodeCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         try {
-            var result = ProtobufDecoder.forType(Map.class).decodeAsJson(protobuf);
+            var result = JACKSON.readValue(protobuf,
+                    new TypeReference<Map<Integer, Object>>() {});
             log.info(result);
             return 0;
         } catch (IOException ex) {
-            log.error("An uncaught exception was thrown, report this incident on github if you believe this to be a bug");
+            log.info("Cannot parse Protobuf message");
             log.throwing(ex);
             return -1;
         }
