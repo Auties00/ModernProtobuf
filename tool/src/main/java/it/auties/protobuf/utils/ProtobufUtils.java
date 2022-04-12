@@ -1,6 +1,6 @@
 package it.auties.protobuf.utils;
 
-import it.auties.protobuf.model.FieldStatement;
+import it.auties.protobuf.parser.model.FieldStatement;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 

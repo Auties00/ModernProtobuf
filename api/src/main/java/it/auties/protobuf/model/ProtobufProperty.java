@@ -47,6 +47,22 @@ public @interface ProtobufProperty {
         @Getter
         public final Class<?> javaType;
 
+        public boolean isInt(){
+            return this == INT32
+                    || this == SINT32
+                    || this == UINT32
+                    || this == FIXED32
+                    || this == SFIXED32;
+        }
+
+        public boolean isLong(){
+            return this == INT64
+                    || this == SINT64
+                    || this == UINT64
+                    || this == FIXED64
+                    || this == SFIXED64;
+        }
+
         public static Type forJavaType(Class<?> clazz){
             return Arrays.stream(values())
                     .filter(entry -> entry.javaType().isAssignableFrom(clazz))

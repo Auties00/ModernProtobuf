@@ -99,6 +99,10 @@ public class ProtobufParser extends ParserMinimalBase {
         addType(type);
     }
 
+    public Object lastValue() {
+        return lastValue;
+    }
+
     private ArrayInputStream input(){
         return Objects.requireNonNull(inputs.peekFirst());
     }
@@ -144,13 +148,17 @@ public class ProtobufParser extends ParserMinimalBase {
     }
 
     private ProtobufField createProtobufField(Entry<String, ProtobufProperty> entry) {
-        return new ProtobufField(entry.getKey(), entry.getValue().index(),
+        return new ProtobufField(
+                entry.getKey(),
+                entry.getValue().index(),
                 ProtobufUtils.getProtobufType(entry.getValue()),
                 ProtobufUtils.getMessageType(ProtobufUtils.getJavaType(entry.getValue())),
                 null,
-                entry.getValue().packed(), entry.getValue().required(), entry.getValue().repeated());
+                entry.getValue().packed(),
+                entry.getValue().required(),
+                entry.getValue().repeated()
+        );
     }
-
 
     @Override
     public boolean canUseSchema(FormatSchema schema) {
@@ -177,7 +185,6 @@ public class ProtobufParser extends ParserMinimalBase {
                 case 5 -> input().readFixed32();
                 default -> throw new ProtobufDeserializationException("Protocol message(%s) had invalid wire type(%s)".formatted(lastIndex, lastType));
             };
-
 
             return super._currToken = switch (lastType) {
                 case 0, 1, 5 -> JsonToken.VALUE_NUMBER_INT;
@@ -220,14 +227,13 @@ public class ProtobufParser extends ParserMinimalBase {
             };
         }
 
-        var int32 = field.type().javaType().isAssignableFrom(Integer.class);
-        var int64 = field.type().javaType().isAssignableFrom(Long.class);
-        if (!int32 && !int64) {
-            throw new ProtobufDeserializationException("Field with index %s at %s is marked as packed but isn't an int or a long"
-                    .formatted(field.index(), type().getName()));
+        var int64 = field.type().isLong();
+        if (field.type().isInt() || int64) {
+            return readPacked(read, int64);
         }
 
-        return readPacked(read, int64);
+        throw new ProtobufDeserializationException("Field with index %s at %s is marked as packed but isn't an int or a long"
+                .formatted(field.index(), type().getName()));
     }
 
     private Object addMessage(byte[] read, Class<? extends ProtobufMessage> type) {
@@ -265,7 +271,7 @@ public class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public String getText() {
-        return (String) lastValue;
+        return (String) lastValue();
     }
 
     @Override
@@ -290,7 +296,7 @@ public class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Number getNumberValue() {
-        return (Number) lastValue;
+        return (Number) lastValue();
     }
 
     @Override
@@ -337,12 +343,12 @@ public class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Object getEmbeddedObject() {
-        return lastValue;
+        return lastValue();
     }
 
     @Override
     public byte[] getBinaryValue(Base64Variant decoder) {
-        return switch (lastValue){
+        return switch (lastValue()){
             case String string -> decoder.decode(string);
             case byte[] bytes -> bytes;
             default -> throw new IllegalStateException("Unexpected value");

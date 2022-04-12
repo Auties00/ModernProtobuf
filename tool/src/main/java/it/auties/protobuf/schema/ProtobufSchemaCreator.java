@@ -2,10 +2,12 @@ package it.auties.protobuf.schema;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.model.EnumStatement;
-import it.auties.protobuf.model.MessageStatement;
-import it.auties.protobuf.model.ProtobufDocument;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.parser.model.EnumStatement;
+import it.auties.protobuf.parser.model.MessageStatement;
+import it.auties.protobuf.parser.model.ProtobufDocument;
+import it.auties.protobuf.parser.model.ProtobufObject;
+import lombok.extern.java.Log;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+@Log4j2
 public record ProtobufSchemaCreator(ProtobufDocument document, String pack,
                                     File directory, Formatter formatter) {
     public void generateSchema() throws IOException, FormatterException, ClassNotFoundException {
@@ -23,8 +26,14 @@ public record ProtobufSchemaCreator(ProtobufDocument document, String pack,
 
     private void generateSchema(ProtobufObject<?> object) throws IOException, FormatterException, ClassNotFoundException {
         var schemaCreator = findSchemaGenerator(object);
-        var formattedSchema = formatter.formatSourceAndFixImports(schemaCreator.createSchema());
-        writeFile(object, formattedSchema);
+        var withoutFormatting = schemaCreator.createSchema();
+        try {
+            var formattedSchema = formatter.formatSourceAndFixImports(withoutFormatting);
+            writeFile(object, formattedSchema);
+        }catch (FormatterException formatterException){
+            log.warn("Erroneous code: %s".formatted(withoutFormatting));
+            throw formatterException;
+        }
     }
 
     private SchemaCreator findSchemaGenerator(ProtobufObject<?> object) {

@@ -2,7 +2,7 @@ package it.auties.protobuf.command;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.model.ProtobufDocument;
+import it.auties.protobuf.parser.model.ProtobufDocument;
 import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.schema.ProtobufSchemaCreator;
 import lombok.extern.log4j.Log4j2;
@@ -55,7 +55,7 @@ public class GenerateSchemaCommand implements Callable<Integer> {
             var ast = generateAST();
             generateSchema(ast);
             return 0;
-        }catch (IOException | FormatterException | ClassNotFoundException ex) {
+        }catch (Throwable ex) {
             log.error("An uncaught exception was thrown, report this incident on github if you believe this to be a bug");
             log.throwing(ex);
             return -1;

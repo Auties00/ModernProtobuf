@@ -1,9 +1,11 @@
-package it.auties.protobuf.model;
+package it.auties.protobuf.parser.model;
 
 import com.google.common.base.CaseFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.Locale;
 
 @NoArgsConstructor
 @AllArgsConstructor
@@ -17,6 +19,10 @@ public class FieldStatement implements ProtobufStatement {
 
     public String getNameAsConstant(){
         return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, getName());
+    }
+
+    public FieldType getFieldType() {
+        return FieldType.forName(type);
     }
 
     public String getJavaType() {

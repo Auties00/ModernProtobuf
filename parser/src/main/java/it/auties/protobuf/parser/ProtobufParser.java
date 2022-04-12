@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser;
 
-import it.auties.protobuf.exception.ProtobufSyntaxException;
-import it.auties.protobuf.model.*;
+import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.model.*;
 import lombok.AllArgsConstructor;
 
 import java.io.File;
@@ -69,7 +69,7 @@ public final class ProtobufParser {
 
     private void parseObjectEnd(List<ProtobufObject<?>> results) {
         ProtobufSyntaxException.validate(!objectsQueue.isEmpty(),
-                "Illegal character: cannot close a body that doesn't exist");
+                "Illegal character: cannot close a body that doesn't exist", tokensCache);
         ProtobufSyntaxException.validate(tokensCache.isEmpty(),
                 "Illegal character: cannot close object with %s", tokensCache);
         var removed = objectsQueue.removeLast();
@@ -82,14 +82,14 @@ public final class ProtobufParser {
 
     private void parseObjectStart() {
         ProtobufSyntaxException.validate(tokensCache.size() == 2,
-                "Illegal object declaration: expected an instruction and a name");
+                "Illegal object declaration: expected an instruction and a name", tokensCache);
         var instruction = tokensCache.getFirst();
         var name = tokensCache.getLast();
         var statement = switch (instruction) {
             case "message" -> new MessageStatement(name);
             case "oneof" -> new OneOfStatement(name);
             case "enum" -> new EnumStatement(name);
-            default -> throw new ProtobufSyntaxException("Illegal object declaration: %s is not a valid instruction", instruction);
+            default -> throw new ProtobufSyntaxException("Illegal object declaration: %s is not a valid instruction", tokensCache, instruction);
         };
 
         var last = objectsQueue.peekLast();
@@ -106,7 +106,7 @@ public final class ProtobufParser {
             return;
         }
 
-        throw new ProtobufSyntaxException("Illegal object declaration: only messages can be nested");
+        throw new ProtobufSyntaxException("Illegal object declaration: only messages can be nested", tokensCache);
     }
 
     private void parseField() {
@@ -119,7 +119,7 @@ public final class ProtobufParser {
         switch (tokensCache.size()) {
             case 3 -> parseEnumConstant(header);
             case 4, 5, 10 -> parseStandardField(header);
-            default -> throw new ProtobufSyntaxException("Illegal field declaration: invalid instruction");
+            default -> throw new ProtobufSyntaxException("Illegal field declaration: invalid instruction", tokensCache);
         }
 
         tokensCache.clear();
@@ -130,20 +130,20 @@ public final class ProtobufParser {
         var offset = modifier.isPresent() ? 1 : 0;
         var operator = tokensCache.get(2 + offset);
         ProtobufSyntaxException.validate(isAssignmentOperator(operator),
-                "Illegal field declaration: expected an assignment operator");
+                "Illegal field declaration: expected an assignment operator", tokensCache);
 
         var type = tokensCache.get(offset);
         var name = tokensCache.get(1 + offset);
         ProtobufSyntaxException.validate(isLegalEnumName(name),
-                "Illegal field declaration: expected a non-empty name that doesn't start with a number");
+                "Illegal field declaration: expected a non-empty name that doesn't start with a number", tokensCache);
 
         var index = parseIndex(tokensCache.get(3 + offset))
-                .orElseThrow(() -> new ProtobufSyntaxException("Illegal field declaration: expected an unsigned index"));
+                .orElseThrow(() -> new ProtobufSyntaxException("Illegal field declaration: expected an unsigned index", tokensCache));
 
         var scope = objectsQueue.peekLast();
         if (scope instanceof MessageStatement messageStatement) {
             ProtobufSyntaxException.validate(modifier.isPresent(),
-                    "Illegal field declaration: expected a valid modifier");
+                    "Illegal field declaration: expected a valid modifier", tokensCache);
             var fieldStatement = new FieldStatement(name, type, index, modifier.get(), isPacked());
             messageStatement.getStatements()
                     .add(fieldStatement);
@@ -157,24 +157,24 @@ public final class ProtobufParser {
             return;
         }
 
-        throw new ProtobufSyntaxException("Illegal field declaration: invalid scope");
+        throw new ProtobufSyntaxException("Illegal field declaration: invalid scope", tokensCache);
     }
 
     private void parseEnumConstant(String header) {
         ProtobufSyntaxException.validate(isLegalEnumName(header),
-                "Illegal enum constant declaration: expected a non-empty name that doesn't start with a number");
+                "Illegal enum constant declaration: expected a non-empty name that doesn't start with a number", tokensCache);
 
         var operator = tokensCache.get(1);
         ProtobufSyntaxException.validate(isAssignmentOperator(operator),
-                "Illegal enum constant declaration: expected an assignment operator");
+                "Illegal enum constant declaration: expected an assignment operator", tokensCache);
 
         var context = objectsQueue.peekLast();
         if (!(context instanceof EnumStatement enumStatement)) {
-            throw new ProtobufSyntaxException("Illegal enum constant declaration: invalid scope");
+            throw new ProtobufSyntaxException("Illegal enum constant declaration: invalid scope", tokensCache);
         }
 
-        var index = parseIndex(tokensCache.get(2))
-                .orElseThrow(() -> new ProtobufSyntaxException("Illegal enum constant declaration: expected an unsigned index"));
+        var index = parseIndex(tokensCache.get(2), true)
+                .orElseThrow(() -> new ProtobufSyntaxException("Illegal enum constant declaration: expected an unsigned index", tokensCache));
         var constant = new EnumConstantStatement(header, index);
         enumStatement.getStatements()
                 .add(constant);
@@ -198,7 +198,7 @@ public final class ProtobufParser {
 
         var groupStart = tokensCache.get(tokensCache.size() - 5);
         ProtobufSyntaxException.validate(Objects.equals(groupStart, "["),
-                "Illegal options declaration: expected array start");
+                "Illegal options declaration: expected array start", tokensCache);
 
         var modifier = tokensCache.get(tokensCache.size() - 4);
         if(!Objects.equals(modifier, "packed")){
@@ -217,14 +217,18 @@ public final class ProtobufParser {
 
         var closeGroup = tokensCache.get(tokensCache.size() - 1);
         ProtobufSyntaxException.validate(Objects.equals(closeGroup, "]"),
-                "Illegal options declaration: expected array end");
+                "Illegal options declaration: expected array end", tokensCache);
         return true;
     }
 
-    private Optional<Integer> parseIndex(String parse) {
+    private Optional<Integer> parseIndex(String parse){
+        return parseIndex(parse, false);
+    }
+
+    private Optional<Integer> parseIndex(String parse, boolean acceptZero) {
         try {
             return Optional.of(Integer.parseUnsignedInt(parse))
-                    .filter(value -> value != 0);
+                    .filter(value -> acceptZero || value != 0);
         } catch (NumberFormatException ex) {
             return Optional.empty();
         }

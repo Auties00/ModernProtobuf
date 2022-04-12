@@ -2,6 +2,7 @@ package it.auties.protobuf.command;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import it.auties.protobuf.jackson.ProtobufMapper;
 import it.auties.protobuf.utils.RawProtobufConverter;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine.Command;
@@ -19,8 +20,7 @@ import java.util.concurrent.Callable;
         description = "Decodes a protobuf message encoded as binary data"
 )
 public class DecodeCommand implements Callable<Integer> {
-    private static final ObjectMapper JACKSON = new ObjectMapper()
-            .registerModule(new ProtobufModule());
+    private static final ObjectMapper JACKSON = new ProtobufMapper();
 
     @SuppressWarnings("FieldMayBeFinal")
     @Parameters(

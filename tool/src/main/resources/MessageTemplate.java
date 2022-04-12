@@ -6,34 +6,40 @@ package ${pack};
 import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.Accessors;
+import lombok.extern.jackson.Jacksonized;
 
 import java.nio.ByteBuffer;
 import java.util.*;
 <% } %>
 
 @AllArgsConstructor
-@NoArgsConstructor
 @Data
 @Builder
+@Jacksonized
 @Accessors(fluent = true)
 public class ${message.name} {
     <%
         def data = []
         for(statement in message.statements) {
-            if(statement instanceof it.auties.protobuf.model.FieldStatement) {
+            if(statement instanceof it.auties.protobuf.parser.model.FieldStatement) {
                 data.add("""
-                    @JsonProperty(${statement.required ? "value = \"${statement.index}\", required = true" : \"statement.index\"})
-                    @JsonPropertyDescription("${statement.type}")
-                    ${statement.repeated ? "@JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)" : ""}
+                     @ProtobufProperty(
+                        index = ${statement.index},
+                        type = ProtobufProperty.Type.${statement.fieldType}
+                        ${statement.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = ${statement.type}.class" : ""}
+                        ${statement.repeated ? ",repeated = ${statement.repeated}" : ""}
+                    )
                     ${statement.required ? "@NonNull" : ""}
-                    ${statement.packed ? "@ProtobufPacked" : ""}
                     private ${statement.javaType} ${it.auties.protobuf.utils.ProtobufUtils.toValidIdentifier(statement.name)};
                 """)
-            } else if(statement instanceof it.auties.protobuf.model.OneOfStatement) {
+            } else if(statement instanceof it.auties.protobuf.parser.model.OneOfStatement) {
                 for(oneOf in statement.statements) {
                     data.add("""
-                        @JsonProperty("${oneOf.index}")
-                        @JsonPropertyDescription("${oneOf.type}")
+                        @ProtobufProperty(
+                            index = ${oneOf.index},
+                            type = ProtobufProperty.Type.${oneOf.type}
+                            ${oneOf.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = oneOf.type" : ""}
+                        )
                         private ${oneOf.javaType} ${oneOf.name};
                     """)
                 }
@@ -44,9 +50,9 @@ public class ${message.name} {
                 """)
 
                 data.push(new it.auties.protobuf.schema.OneOfSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.model.MessageStatement) {
+            } else if(statement instanceof it.auties.protobuf.parser.model.MessageStatement) {
                 data.push(new it.auties.protobuf.schema.MessageSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.model.EnumStatement) {
+            } else if(statement instanceof it.auties.protobuf.parser.model.EnumStatement) {
                 data.push(new it.auties.protobuf.schema.EnumSchemaCreator(statement, pack, false).createSchema())
             }
         }

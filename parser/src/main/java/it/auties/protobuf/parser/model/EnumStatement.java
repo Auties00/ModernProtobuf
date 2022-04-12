@@ -1,4 +1,4 @@
-package it.auties.protobuf.model;
+package it.auties.protobuf.parser.model;
 
 import lombok.EqualsAndHashCode;
 

@@ -1,6 +1,21 @@
 package it.auties.protobuf;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.deser.BeanDeserializer;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerBase;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import it.auties.protobuf.jackson.ProtobufParser;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufSchema;
@@ -10,16 +25,19 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 
 public class RepeatedTest implements TestProvider {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var repeatedMessage = new ModernRepeatedMessage(List.of(1, 2, 3));
+        var repeatedMessage = new ModernRepeatedMessage(List.of(1));
         var encoded = JACKSON.writeValueAsBytes(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
-        var modernDecoded = JACKSON.reader()
+        var modernDecoded = JACKSON
+                .reader()
                 .withFeatures(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
                 .with(ProtobufSchema.of(ModernRepeatedMessage.class))
                 .readValue(encoded, ModernRepeatedMessage.class);
@@ -27,7 +45,6 @@ public class RepeatedTest implements TestProvider {
     }
 
     @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
     @Data
     @Builder
@@ -39,6 +56,16 @@ public class RepeatedTest implements TestProvider {
                 repeated = true
         )
         private List<Integer> content;
+
+        static class ModernRepeatedMessageBuilder {
+            public void content(List<Integer> entries){
+                if(content == null){
+                    this.content = entries;
+                }else {
+                    content.addAll(entries);
+                }
+            }
+        }
     }
 
     public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
