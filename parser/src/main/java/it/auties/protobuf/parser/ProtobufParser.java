@@ -1,7 +1,10 @@
 package it.auties.protobuf.parser;
 
-import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
-import it.auties.protobuf.parser.model.*;
+import it.auties.protobuf.parser.model.FieldModifier;
+import it.auties.protobuf.parser.model.ProtobufSyntaxException;
+import it.auties.protobuf.parser.object.ProtobufDocument;
+import it.auties.protobuf.parser.object.ProtobufObject;
+import it.auties.protobuf.parser.statement.*;
 import lombok.AllArgsConstructor;
 
 import java.io.File;
@@ -68,9 +71,9 @@ public final class ProtobufParser {
     }
 
     private void parseObjectEnd(List<ProtobufObject<?>> results) {
-        ProtobufSyntaxException.validate(!objectsQueue.isEmpty(),
+        ProtobufSyntaxException.check(!objectsQueue.isEmpty(),
                 "Illegal character: cannot close a body that doesn't exist", tokensCache);
-        ProtobufSyntaxException.validate(tokensCache.isEmpty(),
+        ProtobufSyntaxException.check(tokensCache.isEmpty(),
                 "Illegal character: cannot close object with %s", tokensCache);
         var removed = objectsQueue.removeLast();
         if (objectsQueue.isEmpty()) {
@@ -81,7 +84,7 @@ public final class ProtobufParser {
     }
 
     private void parseObjectStart() {
-        ProtobufSyntaxException.validate(tokensCache.size() == 2,
+        ProtobufSyntaxException.check(tokensCache.size() == 2,
                 "Illegal object declaration: expected an instruction and a name", tokensCache);
         var instruction = tokensCache.getFirst();
         var name = tokensCache.getLast();
@@ -129,12 +132,12 @@ public final class ProtobufParser {
         var modifier = FieldModifier.forName(header);
         var offset = modifier.isPresent() ? 1 : 0;
         var operator = tokensCache.get(2 + offset);
-        ProtobufSyntaxException.validate(isAssignmentOperator(operator),
+        ProtobufSyntaxException.check(isAssignmentOperator(operator),
                 "Illegal field declaration: expected an assignment operator", tokensCache);
 
         var type = tokensCache.get(offset);
         var name = tokensCache.get(1 + offset);
-        ProtobufSyntaxException.validate(isLegalEnumName(name),
+        ProtobufSyntaxException.check(isLegalEnumName(name),
                 "Illegal field declaration: expected a non-empty name that doesn't start with a number", tokensCache);
 
         var index = parseIndex(tokensCache.get(3 + offset))
@@ -142,7 +145,7 @@ public final class ProtobufParser {
 
         var scope = objectsQueue.peekLast();
         if (scope instanceof MessageStatement messageStatement) {
-            ProtobufSyntaxException.validate(modifier.isPresent(),
+            ProtobufSyntaxException.check(modifier.isPresent(),
                     "Illegal field declaration: expected a valid modifier", tokensCache);
             var fieldStatement = new FieldStatement(name, type, index, modifier.get(), isPacked());
             messageStatement.getStatements()
@@ -161,11 +164,11 @@ public final class ProtobufParser {
     }
 
     private void parseEnumConstant(String header) {
-        ProtobufSyntaxException.validate(isLegalEnumName(header),
+        ProtobufSyntaxException.check(isLegalEnumName(header),
                 "Illegal enum constant declaration: expected a non-empty name that doesn't start with a number", tokensCache);
 
         var operator = tokensCache.get(1);
-        ProtobufSyntaxException.validate(isAssignmentOperator(operator),
+        ProtobufSyntaxException.check(isAssignmentOperator(operator),
                 "Illegal enum constant declaration: expected an assignment operator", tokensCache);
 
         var context = objectsQueue.peekLast();
@@ -197,7 +200,7 @@ public final class ProtobufParser {
         }
 
         var groupStart = tokensCache.get(tokensCache.size() - 5);
-        ProtobufSyntaxException.validate(Objects.equals(groupStart, "["),
+        ProtobufSyntaxException.check(Objects.equals(groupStart, "["),
                 "Illegal options declaration: expected array start", tokensCache);
 
         var modifier = tokensCache.get(tokensCache.size() - 4);
@@ -216,7 +219,7 @@ public final class ProtobufParser {
         }
 
         var closeGroup = tokensCache.get(tokensCache.size() - 1);
-        ProtobufSyntaxException.validate(Objects.equals(closeGroup, "]"),
+        ProtobufSyntaxException.check(Objects.equals(closeGroup, "]"),
                 "Illegal options declaration: expected array end", tokensCache);
         return true;
     }

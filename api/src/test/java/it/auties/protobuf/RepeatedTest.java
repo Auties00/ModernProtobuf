@@ -1,24 +1,15 @@
 package it.auties.protobuf;
 
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.deser.BeanDeserializer;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerBase;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.databind.deser.std.CollectionDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.type.CollectionType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import it.auties.protobuf.jackson.ProtobufParser;
-import it.auties.protobuf.model.ProtobufMessage;
-import it.auties.protobuf.model.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufSchema;
+import it.auties.protobuf.api.model.ProtobufMessage;
+import it.auties.protobuf.api.model.ProtobufProperty;
+import it.auties.protobuf.api.model.ProtobufSchema;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
@@ -26,19 +17,17 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 public class RepeatedTest implements TestProvider {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var repeatedMessage = new ModernRepeatedMessage(List.of(1));
+        var repeatedMessage = new ModernRepeatedMessage(List.of(1, 2, 3));
         var encoded = JACKSON.writeValueAsBytes(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
         var modernDecoded = JACKSON
                 .reader()
-                .withFeatures(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
                 .with(ProtobufSchema.of(ModernRepeatedMessage.class))
                 .readValue(encoded, ModernRepeatedMessage.class);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
@@ -57,13 +46,11 @@ public class RepeatedTest implements TestProvider {
         )
         private List<Integer> content;
 
-        static class ModernRepeatedMessageBuilder {
-            public void content(List<Integer> entries){
-                if(content == null){
-                    this.content = entries;
-                }else {
-                    content.addAll(entries);
-                }
+        public static class ModernRepeatedMessageBuilder {
+            public ModernRepeatedMessageBuilder content(List<Integer> content){
+                if(this.content == null) this.content = new ArrayList<>();
+                this.content.addAll(content);
+                return this;
             }
         }
     }

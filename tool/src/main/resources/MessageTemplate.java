@@ -8,7 +8,6 @@ import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
 
-import java.nio.ByteBuffer;
 import java.util.*;
 <% } %>
 
@@ -19,9 +18,11 @@ import java.util.*;
 @Accessors(fluent = true)
 public class ${message.name} {
     <%
+        def builderInstructions = []
         def data = []
         for(statement in message.statements) {
-            if(statement instanceof it.auties.protobuf.parser.model.FieldStatement) {
+            if(statement instanceof it.auties.protobuf.parser.statement.FieldStatement) {
+                def validName = it.auties.protobuf.tool.util.ProtobufUtils.toValidIdentifier(statement.name);
                 data.add("""
                      @ProtobufProperty(
                         index = ${statement.index},
@@ -30,9 +31,18 @@ public class ${message.name} {
                         ${statement.repeated ? ",repeated = ${statement.repeated}" : ""}
                     )
                     ${statement.required ? "@NonNull" : ""}
-                    private ${statement.javaType} ${it.auties.protobuf.utils.ProtobufUtils.toValidIdentifier(statement.name)};
+                    private ${statement.javaType} ${validName};
                 """)
-            } else if(statement instanceof it.auties.protobuf.parser.model.OneOfStatement) {
+                if(statement.repeated){
+                    builderInstructions.add("""
+                       public ${message.name}Builder ${validName}(${statement.javaType} ${validName}){
+                           if(this.${validName} == null) this.${validName} = new ArrayList<>();
+                           this.${validName}.addAll(${validName});
+                           return this;
+                       }
+                    """)
+                }
+            } else if(statement instanceof it.auties.protobuf.parser.statement.OneOfStatement) {
                 for(oneOf in statement.statements) {
                     data.add("""
                         @ProtobufProperty(
@@ -40,20 +50,20 @@ public class ${message.name} {
                             type = ProtobufProperty.Type.${oneOf.type}
                             ${oneOf.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = oneOf.type" : ""}
                         )
-                        private ${oneOf.javaType} ${oneOf.name};
+                        private ${oneOf.javaType} ${it.auties.protobuf.tool.util.ProtobufUtils.toValidIdentifier(oneOf.name)};
                     """)
                 }
                 data.push("""
                     public ${statement.name} ${statement.nameAsField}Type() {
-                        ${it.auties.protobuf.utils.ProtobufUtils.generateCondition(statement.name, statement.statements.iterator())}
+                        ${it.auties.protobuf.tool.util.ProtobufUtils.generateCondition(statement.name, statement.statements.iterator())}
                     }
                 """)
 
-                data.push(new it.auties.protobuf.schema.OneOfSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.parser.model.MessageStatement) {
-                data.push(new it.auties.protobuf.schema.MessageSchemaCreator(statement, pack, false).createSchema())
-            } else if(statement instanceof it.auties.protobuf.parser.model.EnumStatement) {
-                data.push(new it.auties.protobuf.schema.EnumSchemaCreator(statement, pack, false).createSchema())
+                data.push(new it.auties.protobuf.tool.schema.OneOfSchemaCreator(statement, pack, false).createSchema())
+            } else if(statement instanceof it.auties.protobuf.parser.statement.MessageStatement) {
+                data.push(new it.auties.protobuf.tool.schema.MessageSchemaCreator(statement, pack, false).createSchema())
+            } else if(statement instanceof it.auties.protobuf.parser.statement.EnumStatement) {
+                data.push(new it.auties.protobuf.tool.schema.EnumSchemaCreator(statement, pack, false).createSchema())
             }
         }
     %>
@@ -61,4 +71,12 @@ public class ${message.name} {
     <% for(statement in data){ %>
         ${statement}
     <% } %>
+
+    <% if(!builderInstructions.empty){ %>
+        public static class ${message.name}Builder {
+            <% for(statement in builderInstructions){ %>
+                ${statement}
+            <% } %>
+        }
+    <% } %>   
 }

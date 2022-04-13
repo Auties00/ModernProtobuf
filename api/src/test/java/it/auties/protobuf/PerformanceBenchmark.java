@@ -1,20 +1,34 @@
 package it.auties.protobuf;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufSchema;
-import lombok.*;
+import it.auties.protobuf.decoder.ProtobufDecoder;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.openjdk.jmh.annotations.*;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
-public class ScalarTest implements TestProvider {
-    @Test
-    @SneakyThrows
-    public void encodeScalarTypes() {
+@State(Scope.Benchmark)
+@Fork(1)
+@Warmup(iterations = 2)
+@Measurement(iterations = 5)
+public class PerformanceBenchmark implements TestProvider {
+    private static final int ITERATIONS = 1_000;
+    private static final byte[] SERIALIZED_INPUT;
+
+    static {
         var modernScalarMessage = ModernScalarMessage.builder()
                 .fixed32(Integer.MAX_VALUE)
                 .sfixed32(Integer.MAX_VALUE)
@@ -31,52 +45,102 @@ public class ScalarTest implements TestProvider {
                 .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
                 .build();
 
-        var modernEncoded = JACKSON.writeValueAsBytes(modernScalarMessage);
-        var modernDecoded = JACKSON.readerFor(ModernScalarMessage.class)
-                .with(ProtobufSchema.of(ModernScalarMessage.class))
-                .readValue(modernEncoded, ModernScalarMessage.class);
-        equals(modernScalarMessage, modernDecoded);
-
-        var oldDecoded = ScalarMessage.parseFrom(modernEncoded);
-        equals(modernDecoded, oldDecoded);
-
-        var modernFromOldDecoded =  JACKSON.readerFor(ModernScalarMessage.class)
-                .with(ProtobufSchema.of(ModernScalarMessage.class))
-                .readValue(oldDecoded.toByteArray(), ModernScalarMessage.class);
-        equals(modernDecoded, modernFromOldDecoded);
+        try {
+            SERIALIZED_INPUT = JACKSON.writeValueAsBytes(modernScalarMessage);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
-        Assertions.assertEquals(modernScalarMessage.fixed32(), modernDecoded.fixed32());
-        Assertions.assertEquals(modernScalarMessage.sfixed32(), modernDecoded.sfixed32());
-        Assertions.assertEquals(modernScalarMessage.int32(), modernDecoded.int32());
-        Assertions.assertEquals(modernScalarMessage.uint32(), modernDecoded.uint32());
-        Assertions.assertEquals(modernScalarMessage.fixed64(), modernDecoded.fixed64());
-        Assertions.assertEquals(modernScalarMessage.sfixed64(), modernDecoded.sfixed64());
-        Assertions.assertEquals(modernScalarMessage.int64(), modernDecoded.int64());
-        Assertions.assertEquals(modernScalarMessage.uint64(), modernDecoded.uint64());
-        Assertions.assertEquals(modernScalarMessage._float(), modernDecoded._float());
-        Assertions.assertEquals(modernScalarMessage._double(), modernDecoded._double());
-        Assertions.assertEquals(modernScalarMessage.bool(), modernDecoded.bool());
-        Assertions.assertEquals(modernScalarMessage.string(), modernDecoded.string());
-        Assertions.assertArrayEquals(modernScalarMessage.bytes(), modernDecoded.bytes());
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleProtobuf() throws InvalidProtocolBufferException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            ScalarMessage.parseFrom(SERIALIZED_INPUT);
+        }
     }
 
-    private void equals(ModernScalarMessage modernDecoded, ScalarMessage oldDecoded) {
-        Assertions.assertEquals(modernDecoded.fixed32(), oldDecoded.getFixed32());
-        Assertions.assertEquals(modernDecoded.sfixed32(), oldDecoded.getSfixed32());
-        Assertions.assertEquals(modernDecoded.int32(), oldDecoded.getInt32());
-        Assertions.assertEquals(modernDecoded.uint32(), oldDecoded.getUint32());
-        Assertions.assertEquals(modernDecoded.fixed64(), oldDecoded.getFixed64());
-        Assertions.assertEquals(modernDecoded.sfixed64(), oldDecoded.getSfixed64());
-        Assertions.assertEquals(modernDecoded.int64(), oldDecoded.getInt64());
-        Assertions.assertEquals(modernDecoded.uint64(), oldDecoded.getUint64());
-        Assertions.assertEquals(modernDecoded._float(), oldDecoded.getFloat());
-        Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
-        Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
-        Assertions.assertEquals(modernDecoded.string(), oldDecoded.getString());
-        Assertions.assertArrayEquals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void legacyModernProtobuf() throws IOException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            ProtobufDecoder.forType(LegacyScalarMessage.class)
+                    .decode(SERIALIZED_INPUT);
+        }
     }
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void modernProtobuf() throws IOException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            JACKSON.reader()
+                    .with(ProtobufSchema.of(ModernScalarMessage.class))
+                    .readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
+        }
+    }
+
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    @Builder
+    @Accessors(fluent = true)
+    public static class LegacyScalarMessage {
+        @JsonProperty("1")
+        @JsonPropertyDescription("fixed32")
+        private int fixed32;
+
+        @JsonProperty("2")
+        @JsonPropertyDescription("sfixed32")
+        private int sfixed32;
+
+        @JsonProperty("3")
+        @JsonPropertyDescription("fixed32")
+        private int int32;
+
+        @JsonProperty("4")
+        @JsonPropertyDescription("uint32")
+        private int uint32;
+
+        @JsonProperty("5")
+        @JsonPropertyDescription("fixed64")
+        private long fixed64;
+
+        @JsonProperty("6")
+        @JsonPropertyDescription("sfixed64")
+        private long sfixed64;
+
+        @JsonProperty("7")
+        @JsonPropertyDescription("int64")
+        private long int64;
+
+        @JsonProperty("8")
+        @JsonPropertyDescription("uint64")
+        private long uint64;
+
+        @JsonProperty("9")
+        @JsonPropertyDescription("float")
+        private float _float;
+
+        @JsonProperty("10")
+        @JsonPropertyDescription("double")
+        private double _double;
+
+        @JsonProperty("11")
+        @JsonPropertyDescription("bool")
+        private boolean bool;
+
+        @JsonProperty("12")
+        @JsonPropertyDescription("string")
+        private String string;
+
+        @JsonProperty("13")
+        @JsonPropertyDescription("bytes")
+        private byte[] bytes;
+    }
+
 
     @AllArgsConstructor
     @NoArgsConstructor

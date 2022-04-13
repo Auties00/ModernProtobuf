@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
-import it.auties.protobuf.model.ProtobufMessage;
-import it.auties.protobuf.model.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufSchema;
+import it.auties.protobuf.api.model.ProtobufMessage;
+import it.auties.protobuf.api.model.ProtobufProperty;
+import it.auties.protobuf.api.model.ProtobufSchema;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
@@ -37,6 +37,7 @@ public class EmbeddedMessageTest implements TestProvider {
                 concreteType = AnotherMessage.class
         )
         private AnotherMessage content;
+
     }
 
     @AllArgsConstructor

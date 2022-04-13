@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
-import it.auties.protobuf.model.ProtobufMessage;
-import it.auties.protobuf.model.ProtobufProperty;
+import it.auties.protobuf.api.model.ProtobufMessage;
+import it.auties.protobuf.api.model.ProtobufProperty;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;

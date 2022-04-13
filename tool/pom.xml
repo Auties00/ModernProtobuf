@@ -70,7 +70,7 @@
                         <configuration>
                             <archive>
                                 <manifest>
-                                    <mainClass>it.auties.protobuf.application.ModernProtocApplication</mainClass>
+                                    <mainClass>it.auties.protobuf.tool.application.ModernProtocApplication</mainClass>
                                 </manifest>
                             </archive>
                             <descriptorRefs>

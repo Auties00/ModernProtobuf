@@ -5,9 +5,8 @@ open module it.auties.protoc.api {
     requires com.fasterxml.jackson.datatype.jdk8;
     requires com.fasterxml.jackson.databind;
     requires jdk.unsupported;
-    requires io.github.classgraph;
 
-    exports it.auties.protobuf.model;
-    exports it.auties.protobuf.exception;
-    exports it.auties.protobuf.jackson;
+    exports it.auties.protobuf.api.model;
+    exports it.auties.protobuf.api.exception;
+    exports it.auties.protobuf.api.jackson;
 }
