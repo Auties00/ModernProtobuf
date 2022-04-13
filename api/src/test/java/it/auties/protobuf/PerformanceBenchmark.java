@@ -7,7 +7,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufSchema;
-import it.auties.protobuf.decoder.ProtobufDecoder;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -66,8 +65,8 @@ public class PerformanceBenchmark implements TestProvider {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void legacyModernProtobuf() throws IOException {
         for (var i = 0; i < ITERATIONS; ++i) {
-            ProtobufDecoder.forType(LegacyScalarMessage.class)
-                    .decode(SERIALIZED_INPUT);
+            // ProtobufDecoder.forType(LegacyScalarMessage.class)
+            //        .decode(SERIALIZED_INPUT);
         }
     }
     @Benchmark
