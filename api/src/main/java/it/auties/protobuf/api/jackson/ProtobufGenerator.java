@@ -22,6 +22,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -132,7 +133,7 @@ class ProtobufGenerator extends GeneratorBase {
     }
 
     private void encodeRepeatedFields(ArrayOutputStream output, ProtobufField field) {
-        field.<List<?>>valueAs()
+        field.<Collection<?>>valueAs()
                 .stream()
                 .map(field::withValue)
                 .forEach(entry -> encodeField(output, entry));

@@ -1,5 +1,6 @@
 package it.auties.protobuf;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufSchema;
@@ -9,18 +10,18 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class EmbeddedMessageTest implements TestProvider {
+import java.util.Arrays;
+
+public class EnumTest implements TestProvider {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var anotherMessage = new AnotherMessage("Hello");
-        var someMessage = new SomeMessage(anotherMessage);
+        var someMessage = new SomeMessage(Type.THIRD);
         var encoded = JACKSON.writeValueAsBytes(someMessage);
         var decoded = JACKSON.reader()
                 .with(ProtobufSchema.of(SomeMessage.class))
                 .readValue(encoded, SomeMessage.class);
-        Assertions.assertNotNull(decoded.content());
-        Assertions.assertEquals(anotherMessage.content(), decoded.content().content());
+        Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
     @AllArgsConstructor
@@ -33,22 +34,19 @@ public class EmbeddedMessageTest implements TestProvider {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufProperty.Type.MESSAGE,
-                concreteType = AnotherMessage.class
+                concreteType = Type.class
         )
-        private AnotherMessage content;
+        private Type content;
     }
 
     @AllArgsConstructor
-    @NoArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
     @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 3,
-                type = ProtobufProperty.Type.STRING
-        )
-        private String content;
+    public enum Type implements ProtobufMessage{
+        FIRST(0),
+        SECOND(1),
+        THIRD(2);
+
+        @Getter
+        private final int index;
     }
 }

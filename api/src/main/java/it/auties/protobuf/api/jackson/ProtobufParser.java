@@ -33,6 +33,7 @@ class ProtobufParser extends ParserMinimalBase {
     private int lastIndex;
     private int lastType;
     private Object lastValue;
+    private Iterator<?> lastPackedValue;
 
     public ProtobufParser(IOContext ioContext, int parserFeatures, ObjectCodec codec, byte[] input) {
         super(parserFeatures);
@@ -108,7 +109,13 @@ class ProtobufParser extends ParserMinimalBase {
 
     private ProtobufField field(){
         var fieldsMap = Objects.requireNonNull(fieldsCache.get(type()));
-        return Objects.requireNonNull(fieldsMap.get(lastIndex));
+        var field = fieldsMap.get(lastIndex);
+        if (field != null) {
+            return field;
+        }
+
+        throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: missing field definition. This usually means that the field was mapped to the wrong message type"
+                .formatted(lastIndex, type().getName()));
     }
 
     private void addInput(byte[] bytes) {
@@ -120,18 +127,20 @@ class ProtobufParser extends ParserMinimalBase {
         cacheFields(type);
     }
 
-    private void cacheFields(Class<? extends ProtobufMessage> clazz) {
+    private Optional<Map<Integer, ProtobufField>> cacheFields(Class<? extends ProtobufMessage> clazz) {
         if (fieldsCache.containsKey(type())) {
-            return;
+            return Optional.empty();
         }
 
         var fields = createProtobufFields(clazz);
-        fieldsCache.put(clazz, fields);
         if (clazz.getSuperclass() == null || !ProtobufMessage.isMessage(clazz.getSuperclass())) {
-            return;
+            fieldsCache.put(clazz, fields);
+            return Optional.of(fields);
         }
 
-        cacheFields(clazz.getSuperclass().asSubclass(ProtobufMessage.class));
+        var superClass = clazz.getSuperclass().asSubclass(ProtobufMessage.class);
+        cacheFields(superClass).ifPresent(superFields -> superFields.forEach(fields::putIfAbsent));
+        return Optional.of(fields);
     }
 
     private ConcurrentMap<Integer, ProtobufField> createProtobufFields(Class<? extends ProtobufMessage> type) {
@@ -173,6 +182,17 @@ class ProtobufParser extends ParserMinimalBase {
 
         if (_currToken == JsonToken.FIELD_NAME) {
             this.lastValue = readValue();
+            return super._currToken = lastPackedValue != null ? JsonToken.START_ARRAY : parseToken();
+        }
+
+        if(lastPackedValue != null){
+            Objects.requireNonNull(lastPackedValue);
+            if(!lastPackedValue.hasNext()){
+                this.lastPackedValue = null;
+                return super._currToken = JsonToken.END_ARRAY;
+            }
+
+            this.lastValue = lastPackedValue.next();
             return super._currToken = parseToken();
         }
 
@@ -233,7 +253,9 @@ class ProtobufParser extends ParserMinimalBase {
 
         var int64 = field.type().isLong();
         if (field.type().isInt() || int64) {
-            return readPacked(read, int64);
+            this.lastType = int64 ? 5 : 0;
+            this.lastPackedValue = readPacked(read, int64);
+            return null;
         }
 
         throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected scalar type, got %s(packed field)"
@@ -246,14 +268,14 @@ class ProtobufParser extends ParserMinimalBase {
         return null;
     }
 
-    private List<? extends Number> readPacked(byte[] read, boolean int64) {
+    private Iterator<? extends Number> readPacked(byte[] read, boolean int64) {
         var stream = new ArrayInputStream(read);
         var results = new ArrayList<Number>();
         while (!stream.isAtEnd()) {
             results.add(int64 ? stream.readRawVarint64() : stream.readRawVarint32());
         }
 
-        return results;
+        return results.iterator();
     }
 
     @Override

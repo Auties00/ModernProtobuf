@@ -3,6 +3,7 @@ package it.auties.protobuf.api.model;
 import it.auties.protobuf.api.exception.ProtobufException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.experimental.Accessors;
 
 import java.lang.annotation.ElementType;
@@ -10,6 +11,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Arrays;
+import java.util.Optional;
 
 import static it.auties.protobuf.api.util.WireType.*;
 import static it.auties.protobuf.api.util.WireType.WIRE_TYPE_FIXED64;
@@ -29,7 +31,7 @@ public @interface ProtobufProperty {
     @AllArgsConstructor
     @Accessors(fluent = true)
     enum Type {
-        MESSAGE(ProtobufMessage.class),
+        MESSAGE(ProtobufMessage.class, Enum.class),
         FLOAT(float.class),
         DOUBLE(double.class),
         BOOLEAN(boolean.class),
@@ -47,7 +49,18 @@ public @interface ProtobufProperty {
         SFIXED64(long.class);
 
         @Getter
+        @NonNull
         public final Class<?> javaType;
+
+        public final Class<?> aliasType;
+
+        Type(Class<?> javaType){
+            this(javaType, null);
+        }
+
+        public Optional<Class<?>> aliasType() {
+            return Optional.ofNullable(aliasType);
+        }
 
         public int tag(){
             return switch (this){
@@ -76,7 +89,8 @@ public @interface ProtobufProperty {
 
         public static Type forJavaType(Class<?> clazz){
             return Arrays.stream(values())
-                    .filter(entry -> entry.javaType().isAssignableFrom(clazz))
+                    .filter(entry -> entry.javaType().isAssignableFrom(clazz)
+                            || entry.aliasType().filter(type -> type.isAssignableFrom(clazz)).isPresent())
                     .findFirst()
                     .orElseThrow(() -> new ProtobufException("%s is not a valid type: only Java built in types and messages can be used inside a protobuf message".formatted(clazz.getName())));
         }

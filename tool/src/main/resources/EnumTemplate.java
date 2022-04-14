@@ -3,10 +3,8 @@ package ${pack};
 <% } %>
 
 <% if(imports) { %>
-import com.fasterxml.jackson.annotation.*;
 import lombok.*;
-import lombok.experimental.Accessors;
-
+import lombok.experimental.*;
 import java.util.*;
 <% } %>
 
@@ -18,7 +16,6 @@ public enum ${enm.name} {
     @Getter
     private final int index;
 
-    @JsonCreator
     public static ${enm.name} forIndex(int index){
         return Arrays.stream(values()).filter(entry -> entry.index() == index).findFirst().orElse(null);
     }

@@ -3,12 +3,12 @@ package ${pack};
 <% } %>
 
 <% if(imports) { %>
-import com.fasterxml.jackson.annotation.*;
 import lombok.*;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
-
+import lombok.experimental.*;
+import lombok.extern.jackson.*;
 import java.util.*;
+import it.auties.protobuf.api.model.ProtobufProperty;
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.*;
 <% } %>
 
 @AllArgsConstructor
@@ -26,9 +26,10 @@ public class ${message.name} {
                 data.add("""
                      @ProtobufProperty(
                         index = ${statement.index},
-                        type = ProtobufProperty.Type.${statement.fieldType}
+                        type = ${statement.fieldType}
                         ${statement.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = ${statement.type}.class" : ""}
                         ${statement.repeated ? ",repeated = ${statement.repeated}" : ""}
+                        ${statement.packed ? ",packed = true" : "" }
                     )
                     ${statement.required ? "@NonNull" : ""}
                     private ${statement.javaType} ${validName};
@@ -47,8 +48,8 @@ public class ${message.name} {
                     data.add("""
                         @ProtobufProperty(
                             index = ${oneOf.index},
-                            type = ProtobufProperty.Type.${oneOf.type}
-                            ${oneOf.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = oneOf.type" : ""}
+                            type = ${oneOf.fieldType}
+                            ${oneOf.fieldType == it.auties.protobuf.parser.model.FieldType.MESSAGE ? ",concreteType = ${oneOf.type}.class" : ""}
                         )
                         private ${oneOf.javaType} ${it.auties.protobuf.tool.util.ProtobufUtils.toValidIdentifier(oneOf.name)};
                     """)

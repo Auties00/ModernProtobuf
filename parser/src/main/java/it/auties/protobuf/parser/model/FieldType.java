@@ -6,7 +6,7 @@ public enum FieldType {
     MESSAGE,
     FLOAT,
     DOUBLE,
-    BOOLEAN,
+    BOOL,
     STRING,
     BYTES,
     INT32,

@@ -9,18 +9,19 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class EmbeddedMessageTest implements TestProvider {
+import java.util.ArrayList;
+import java.util.List;
+
+public class PackedTest implements TestProvider {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var anotherMessage = new AnotherMessage("Hello");
-        var someMessage = new SomeMessage(anotherMessage);
+        var someMessage = new SomeMessage(List.of(1, 2, 3));
         var encoded = JACKSON.writeValueAsBytes(someMessage);
         var decoded = JACKSON.reader()
                 .with(ProtobufSchema.of(SomeMessage.class))
                 .readValue(encoded, SomeMessage.class);
-        Assertions.assertNotNull(decoded.content());
-        Assertions.assertEquals(anotherMessage.content(), decoded.content().content());
+        Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
     @AllArgsConstructor
@@ -32,23 +33,18 @@ public class EmbeddedMessageTest implements TestProvider {
     public static class SomeMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
-                type = ProtobufProperty.Type.MESSAGE,
-                concreteType = AnotherMessage.class
+                type = ProtobufProperty.Type.UINT32,
+                repeated = true,
+                packed = true
         )
-        private AnotherMessage content;
-    }
+        private List<Integer> content;
 
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 3,
-                type = ProtobufProperty.Type.STRING
-        )
-        private String content;
+        public static class SomeMessageBuilder{
+            public SomeMessageBuilder content(List<Integer> content){
+                if(this.content == null) this.content = new ArrayList<>();
+                this.content.addAll(content);
+                return this;
+            }
+        }
     }
 }
