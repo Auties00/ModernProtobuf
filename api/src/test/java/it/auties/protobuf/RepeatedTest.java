@@ -31,6 +31,7 @@ public class RepeatedTest implements TestProvider {
                 .with(ProtobufSchema.of(ModernRepeatedMessage.class))
                 .readValue(encoded, ModernRepeatedMessage.class);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
+        Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.content());
     }
 
     @AllArgsConstructor

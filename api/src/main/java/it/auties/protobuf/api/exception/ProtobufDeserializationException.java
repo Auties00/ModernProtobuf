@@ -21,11 +21,7 @@ public class ProtobufDeserializationException extends ProtobufException {
         return new ProtobufDeserializationException("A message contained a malformed var int");
     }
 
-    public static ProtobufDeserializationException invalidTag() {
-        return invalidEndTag(0);
-    }
-
-    public static ProtobufDeserializationException invalidEndTag(int tag) {
+    public static ProtobufDeserializationException invalidTag(int tag) {
         return new ProtobufDeserializationException("A message contained an invalid tag: %s".formatted(tag));
     }
 }

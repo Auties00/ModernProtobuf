@@ -16,14 +16,9 @@ public class ProtobufUtils {
         return annotation != null && !annotation.ignore();
     }
 
-    public Optional<ProtobufProperty> getProperty(Field field){
-        return Optional.ofNullable(field.getAnnotation(ProtobufProperty.class))
-                .filter(annotation -> !annotation.ignore());
-    }
-
-    public Type getProtobufType(ProtobufProperty property){
-        return property.concreteType() == Object.class ? property.type()
-                : Type.forJavaType(property.concreteType());
+    public ProtobufProperty getProperty(Field field){
+        var property = field.getAnnotation(ProtobufProperty.class);
+        return property == null || property.ignore() ? null : property;
     }
 
     public Class<?> getJavaType(ProtobufProperty property) {

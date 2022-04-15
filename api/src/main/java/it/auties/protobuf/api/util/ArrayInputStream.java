@@ -24,7 +24,7 @@ public class ArrayInputStream {
 
         this.lastTag = readRawVarint32();
         if (getTagFieldNumber(lastTag) == 0) {
-            throw ProtobufDeserializationException.invalidTag();
+            throw ProtobufDeserializationException.invalidTag(0);
         }
 
         return lastTag;
@@ -34,7 +34,7 @@ public class ArrayInputStream {
             return;
         }
 
-        throw ProtobufDeserializationException.invalidEndTag(lastTag);
+        throw ProtobufDeserializationException.invalidTag(lastTag);
     }
 
     private int getTagFieldNumber(int tag) {

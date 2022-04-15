@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.base.GeneratorBase;
 import com.fasterxml.jackson.core.json.JsonWriteContext;
 import it.auties.protobuf.api.exception.ProtobufException;
 import it.auties.protobuf.api.model.ProtobufMessage;
-import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.exception.ProtobufSerializationException;
 import it.auties.protobuf.api.util.ArrayOutputStream;
 import it.auties.protobuf.api.util.ProtobufField;
@@ -23,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.stream.Stream;
 
 // Would be better to follow the flow of GeneratorBase, but it requires to override the field discover system
@@ -85,15 +83,24 @@ class ProtobufGenerator extends GeneratorBase {
     }
 
     private ProtobufField createField(Object object, Field field) {
-        var property = ProtobufUtils.getProperty(field).orElseThrow();
-        return new ProtobufField(field.getName(), property.index(), ProtobufUtils.getProtobufType(property),
-                getFieldValue(object, field, property, ProtobufUtils.getJavaType(property)), property.packed(), property.required(), property.repeated());
+        var property = ProtobufUtils.getProperty(field);
+        var value = getFieldValue(object, field);
+        return new ProtobufField(
+                field.getName(),
+                property.index(),
+                property.type(),
+                value,
+                property.packed(),
+                property.required(),
+                property.repeated(),
+                property.requiresConversion()
+        );
     }
 
     @SneakyThrows
-    private Object getFieldValue(Object object, Field field, ProtobufProperty property, Class<?> type) {
+    private Object getFieldValue(Object object, Field field) {
         var value = field.get(object);
-        if (property.type() != ProtobufProperty.Type.MESSAGE || !ProtobufUtils.hasValue(type)) {
+        if (!ProtobufMessage.isMessage(field.getType()) || !ProtobufUtils.hasValue(field.getType())) {
             return value;
         }
 

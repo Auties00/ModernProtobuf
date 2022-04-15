@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 2)
-@Measurement(iterations = 5)
+@Warmup(iterations = 1)
+@Measurement(iterations = 3)
 public class PerformanceBenchmark implements TestProvider {
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;
@@ -54,24 +54,6 @@ public class PerformanceBenchmark implements TestProvider {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void googleProtobuf() throws InvalidProtocolBufferException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            ScalarMessage.parseFrom(SERIALIZED_INPUT);
-        }
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void legacyModernProtobuf() throws IOException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            // ProtobufDecoder.forType(LegacyScalarMessage.class)
-            //        .decode(SERIALIZED_INPUT);
-        }
-    }
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void modernProtobuf() throws IOException {
         for (var i = 0; i < ITERATIONS; ++i) {
             JACKSON.reader()
@@ -80,6 +62,14 @@ public class PerformanceBenchmark implements TestProvider {
         }
     }
 
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleProtobuf() throws InvalidProtocolBufferException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            ScalarMessage.parseFrom(SERIALIZED_INPUT);
+        }
+    }
 
     @AllArgsConstructor
     @NoArgsConstructor
