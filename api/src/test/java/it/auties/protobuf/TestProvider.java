@@ -4,5 +4,5 @@ import com.fasterxml.jackson.databind.*;
 import it.auties.protobuf.api.jackson.ProtobufMapper;
 
 public interface TestProvider {
-    ObjectMapper JACKSON =  new ProtobufMapper();
+    ProtobufMapper JACKSON =  new ProtobufMapper();
 }

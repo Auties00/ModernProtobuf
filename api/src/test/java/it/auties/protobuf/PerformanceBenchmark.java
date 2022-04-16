@@ -3,6 +3,7 @@ package it.auties.protobuf;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 public class PerformanceBenchmark implements TestProvider {
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;
+    private static final ObjectReader READER;
 
     static {
         var modernScalarMessage = ModernScalarMessage.builder()
@@ -49,6 +51,8 @@ public class PerformanceBenchmark implements TestProvider {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
+
+        READER = JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
     }
 
     @Benchmark
@@ -56,9 +60,7 @@ public class PerformanceBenchmark implements TestProvider {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void modernProtobuf() throws IOException {
         for (var i = 0; i < ITERATIONS; ++i) {
-            JACKSON.reader()
-                    .with(ProtobufSchema.of(ModernScalarMessage.class))
-                    .readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
+            READER.readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
         }
     }
 

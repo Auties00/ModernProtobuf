@@ -7,7 +7,10 @@ import it.auties.protobuf.api.exception.ProtobufDeserializationException;
 import it.auties.protobuf.api.model.ProtobufConverter;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufSchema;
-import it.auties.protobuf.api.util.*;
+import it.auties.protobuf.api.util.ArrayInputStream;
+import it.auties.protobuf.api.util.ProtobufField;
+import it.auties.protobuf.api.util.ProtobufUtils;
+import it.auties.protobuf.api.util.VersionInfo;
 import it.auties.reflection.Reflection;
 import lombok.SneakyThrows;
 
@@ -26,11 +29,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 class ProtobufParser extends ParserMinimalBase {
-    private static final Map<Class<? extends ProtobufMessage>, Map<Integer, ProtobufField>> fieldsCache = new ConcurrentHashMap<>();
+    private static final Map<Class<? extends ProtobufMessage>, Map<Integer, ProtobufField>> fieldsCache
+            = new ConcurrentHashMap<>();
 
     private final IOContext ioContext;
     private ObjectCodec codec;
     private ArrayInputStream input;
+    private ArrayInputStream packedInput;
     private Class<? extends ProtobufMessage> type;
     private boolean closed;
     private ProtobufField lastField;
@@ -154,12 +159,22 @@ class ProtobufParser extends ParserMinimalBase {
         }
 
         if (_currToken == JsonToken.FIELD_NAME) {
-            return readNextToken();
+            return super._currToken = readNextToken();
+        }
+        
+        if(packedInput != null){
+            if(packedInput.isAtEnd()){
+                this.packedInput = null;
+                return super._currToken = JsonToken.END_ARRAY;
+            }
+
+            this.lastValue = lastType == 1 ? packedInput.readRawVarint64() : packedInput.readRawVarint32();
+            return super._currToken = JsonToken.VALUE_NUMBER_INT;
         }
 
         var tag = input.readTag();
         if (tag == 0) {
-            return JsonToken.END_OBJECT;
+            return super._currToken = JsonToken.END_OBJECT;
         }
 
         var index = tag >>> 3;
@@ -168,52 +183,46 @@ class ProtobufParser extends ParserMinimalBase {
                     .formatted(index, type.getName()));
         }
 
-        this.lastField = findFieldByIndex(index);
+        this.lastField = fieldsCache.get(type).get(index);
         this.lastType = tag & 7;
         return super._currToken = JsonToken.FIELD_NAME;
     }
 
-    private ProtobufField findFieldByIndex(int index){
-        var fieldsMap = Objects.requireNonNull(fieldsCache.get(type));
-        var field = fieldsMap.get(index);
-        if (field != null) {
-            return field;
+    private JsonToken readNextToken() {
+        if(lastField == null){
+            this.lastValue = input.readBytes();
+            return JsonToken.VALUE_NULL;
         }
 
-        throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: missing field definition. This usually means that the field was mapped to the wrong message type"
-                .formatted(index, type.getName()));
-    }
-
-    private JsonToken readNextToken() {
         return switch (lastType) {
             case 0 -> {
                 this.lastValue = input.readInt64();
-                yield this._currToken = JsonToken.VALUE_NUMBER_INT;
+                yield JsonToken.VALUE_NUMBER_INT;
             }
 
             case 1 -> {
                 this.lastValue = input.readFixed64();
-                yield this._currToken = JsonToken.VALUE_NUMBER_INT;
+                yield lastField.repeated() ? JsonToken.VALUE_EMBEDDED_OBJECT : JsonToken.VALUE_NUMBER_INT;
             }
 
             case 2 -> {
                 this.lastValue = readDelimitedWithConversion();
-                yield this._currToken = JsonToken.VALUE_EMBEDDED_OBJECT;
+                yield packedInput != null ? JsonToken.START_ARRAY : JsonToken.VALUE_EMBEDDED_OBJECT;
             }
 
             case 3 -> {
                 this.lastValue = readEmbeddedMessage(input.readBytes());
-                yield this._currToken = JsonToken.VALUE_EMBEDDED_OBJECT;
+                yield JsonToken.VALUE_EMBEDDED_OBJECT;
             }
 
             case 4 -> {
                 this.lastValue = null;
-                yield this._currToken = JsonToken.END_OBJECT;
+                yield JsonToken.END_OBJECT;
             }
 
             case 5 -> {
                 this.lastValue = input.readFixed32();
-                yield this._currToken = JsonToken.VALUE_NUMBER_INT;
+                yield lastField.repeated() ? JsonToken.VALUE_EMBEDDED_OBJECT : JsonToken.VALUE_NUMBER_INT;
             }
 
             default -> throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, invalid wire type: %s"
@@ -256,7 +265,9 @@ class ProtobufParser extends ParserMinimalBase {
 
         var int64 = lastField.type().isLong();
         if (lastField.type().isInt() || int64) {
-            return readPacked(read, int64);
+            this.lastType = int64 ? 1 : 5;
+            this.packedInput = new ArrayInputStream(read);
+            return null;
         }
 
         throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected scalar type, got %s(packed field)"
@@ -271,7 +282,7 @@ class ProtobufParser extends ParserMinimalBase {
             var lastToken = this.currentToken();
             this.type = lastField.messageType();
             this.input = new ArrayInputStream(bytes);
-            this._currToken = JsonToken.START_OBJECT;
+            this._currToken = null;
             var result = readValueAs(lastField.messageType());
             this.type = lastType;
             this.input = lastInput;
@@ -283,19 +294,9 @@ class ProtobufParser extends ParserMinimalBase {
         }
     }
 
-    private List<? extends Number> readPacked(byte[] read, boolean int64) {
-        var stream = new ArrayInputStream(read);
-        var results = new ArrayList<Number>();
-        while (!stream.isAtEnd()) {
-            results.add(int64 ? stream.readRawVarint64() : stream.readRawVarint32());
-        }
-
-        return results;
-    }
-
     @Override
     public String getCurrentName() {
-        return lastField.name();
+        return lastField == null ? "unknown" : lastField.name();
     }
 
     @Override
@@ -327,7 +328,7 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public char[] getTextCharacters() {
-        return getText() != null ? getText().toCharArray() : null;
+        throw new UnsupportedOperationException("Text characters are not supported");
     }
 
     @Override
@@ -337,7 +338,8 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public int getTextLength() {
-        return getText() != null ? getText().length() : 0;
+        var text = getText();
+        return text != null ? text.length() : 0;
     }
 
     @Override
@@ -362,7 +364,7 @@ class ProtobufParser extends ParserMinimalBase {
             case DOUBLE -> NumberType.DOUBLE;
             case INT32, SINT32, UINT32, FIXED32, SFIXED32, BOOLEAN -> NumberType.INT;
             case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> NumberType.LONG;
-            default -> throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected Number, got %s"
+            default -> throw new ProtobufDeserializationException("Cannot get number type for field %s inside %s, type mismatch: expected Number, got %s"
                     .formatted(lastField.index(), this.type.getName(), lastField.type().name()));
         };
     }
@@ -378,8 +380,8 @@ class ProtobufParser extends ParserMinimalBase {
     }
 
     @Override
-    public BigInteger getBigIntegerValue() {
-        throw new UnsupportedOperationException("Big integers are not supported");
+    public BigInteger getBigIntegerValue() throws IOException {
+        return new BigInteger(getBinaryValue());
     }
 
     @Override
@@ -393,8 +395,8 @@ class ProtobufParser extends ParserMinimalBase {
     }
 
     @Override
-    public BigDecimal getDecimalValue() {
-        throw new UnsupportedOperationException("Big integers are not supported");
+    public BigDecimal getDecimalValue() throws IOException {
+        return new BigDecimal(getBigIntegerValue().longValue());
     }
 
     @Override
