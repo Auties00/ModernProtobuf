@@ -4,7 +4,10 @@ import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufProperty.Type;
 import it.auties.protobuf.api.model.ProtobufValue;
+import lombok.Builder;
+import lombok.experimental.SuperBuilder;
 import lombok.experimental.UtilityClass;
+import lombok.extern.jackson.Jacksonized;
 
 import java.lang.reflect.Field;
 import java.util.Optional;

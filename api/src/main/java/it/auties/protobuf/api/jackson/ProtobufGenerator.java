@@ -104,9 +104,7 @@ class ProtobufGenerator extends GeneratorBase {
             return value;
         }
 
-        var method = value.getClass().getMethod("value");
-        Reflection.open(method);
-        return method.invoke(value);
+        return ((ProtobufMessage) value).value();
     }
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {

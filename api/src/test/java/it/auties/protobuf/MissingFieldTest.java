@@ -13,11 +13,12 @@ public class MissingFieldTest implements TestProvider {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var someMessage = new Serializable("Hello");
+        var someMessage = new Serializable("Hello", "Hello", "Hello", "Hello");
         var encoded = JACKSON.writeValueAsBytes(someMessage);
-        JACKSON.reader()
+        var decoded = JACKSON.reader()
                 .with(ProtobufSchema.of(Deserializable.class))
                 .readValue(encoded, Deserializable.class);
+        Assertions.assertEquals(someMessage.content2(), decoded.content2());
     }
 
     @AllArgsConstructor
@@ -29,6 +30,15 @@ public class MissingFieldTest implements TestProvider {
     public static class Serializable implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = ProtobufProperty.Type.STRING)
         private String content;
+
+        @ProtobufProperty(index = 2, type = ProtobufProperty.Type.STRING)
+        private String content1;
+
+        @ProtobufProperty(index = 3, type = ProtobufProperty.Type.STRING)
+        private String content2;
+
+        @ProtobufProperty(index = 4, type = ProtobufProperty.Type.STRING)
+        private String content3;
     }
 
     @AllArgsConstructor
@@ -37,6 +47,7 @@ public class MissingFieldTest implements TestProvider {
     @Builder
     @Accessors(fluent = true)
     public static class Deserializable implements ProtobufMessage {
-
+        @ProtobufProperty(index = 3, type = ProtobufProperty.Type.STRING)
+        private String content2;
     }
 }
