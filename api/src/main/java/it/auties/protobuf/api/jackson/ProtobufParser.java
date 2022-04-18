@@ -129,7 +129,7 @@ class ProtobufParser extends ParserMinimalBase {
     private ProtobufField createProtobufField(Field field) {
         var property = ProtobufUtils.getProperty(field);
         return new ProtobufField(
-                field.getName(),
+                ProtobufUtils.getFieldName(field),
                 property.index(),
                 property.type(),
                 ProtobufUtils.getMessageType(ProtobufUtils.getJavaType(property)),

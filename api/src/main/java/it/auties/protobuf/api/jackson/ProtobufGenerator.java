@@ -24,14 +24,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.stream.Stream;
 
-// Would be better to follow the flow of GeneratorBase, but it requires to override the field discover system
+
 @ExtensionMethod(Reflection.class)
 class ProtobufGenerator extends GeneratorBase {
-    protected final static JsonWriteContext BOGUS_WRITE_CONTEXT = JsonWriteContext.createRootContext(null);
     private final OutputStream output;
 
     public ProtobufGenerator(int jsonFeatures, ObjectCodec codec, OutputStream output) {
-        super(jsonFeatures, codec, BOGUS_WRITE_CONTEXT);
+        super(jsonFeatures, codec, null);
         this.output = output;
     }
 
@@ -40,18 +39,134 @@ class ProtobufGenerator extends GeneratorBase {
 
     }
 
+
     @Override
-    public void writeEndObject() throws IOException {
-        if(getCurrentValue() == null){
+    public void writeEndObject() {
+
+    }
+
+    @Override
+    protected void _verifyValueWrite(String typeMsg) {
+
+    }
+
+    @Override
+    public void writeStartArray() {
+
+    }
+
+    @Override
+    public void writeEndArray() {
+
+    }
+
+    @Override
+    public void writeFieldName(String name) {
+
+    }
+
+    @Override
+    public void writeString(String text) {
+
+    }
+
+    @Override
+    public void writeString(char[] buffer, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeRawUTF8String(byte[] buffer, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeUTF8String(byte[] buffer, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeRaw(String text) {
+
+    }
+
+    @Override
+    public void writeRaw(String text, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeRaw(char[] text, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeRaw(char c) {
+
+    }
+
+    @Override
+    public void writeBinary(Base64Variant bv, byte[] data, int offset, int len) {
+
+    }
+
+    @Override
+    public void writeNumber(int v) {
+
+    }
+
+    @Override
+    public void writeNumber(long v) {
+
+    }
+
+    @Override
+    public void writeNumber(BigInteger v) {
+
+    }
+
+    @Override
+    public void writeNumber(double v) {
+
+    }
+
+    @Override
+    public void writeNumber(float v) {
+
+    }
+
+    @Override
+    public void writeNumber(BigDecimal v) {
+
+    }
+
+    @Override
+    public void writeNumber(String encodedValue) {
+
+    }
+
+    @Override
+    public void writeBoolean(boolean state) {
+
+    }
+
+    @Override
+    public void writeNull() {
+
+    }
+
+    @Override
+    public void writeStartObject(Object forValue) throws IOException {
+        if(forValue == null){
             return;
         }
 
-        if(!ProtobufMessage.isMessage(getCurrentValue().getClass())){
+        if(!ProtobufMessage.isMessage(forValue.getClass())){
             throw new ProtobufSerializationException("Cannot encode protobuf message: %s is not a valid message"
-                    .formatted(getCurrentValue().getClass().getName()));
+                    .formatted(forValue.getClass().getName()));
         }
 
-        var result = encode(getCurrentValue());
+        var result = encode(forValue);
         output.write(result);
     }
 
@@ -62,7 +177,14 @@ class ProtobufGenerator extends GeneratorBase {
 
         try {
             var output = new ArrayOutputStream();
-            return encodeObject(object, output);
+            Stream.of(object.getClass().getFields(), object.getClass().getDeclaredFields())
+                    .flatMap(Arrays::stream)
+                    .map(Reflection::open)
+                    .filter(ProtobufUtils::isProperty)
+                    .map(field -> createField(object, field))
+                    .filter(ProtobufField::valid)
+                    .forEach(field -> encodeField(output, field));
+            return output.buffer().toByteArray();
         }catch (ProtobufException exception){
             throw exception;
         }catch (Throwable throwable){
@@ -70,26 +192,13 @@ class ProtobufGenerator extends GeneratorBase {
         }
     }
 
-    private byte[] encodeObject(Object object, ArrayOutputStream output) {
-        Stream.of(object.getClass().getFields(), object.getClass().getDeclaredFields())
-                .flatMap(Arrays::stream)
-                .map(Reflection::open)
-                .filter(ProtobufUtils::isProperty)
-                .map(field -> createField(object, field))
-                .filter(ProtobufField::valid)
-                .forEach(field -> encodeField(output, field));
-
-        return output.buffer().toByteArray();
-    }
-
     private ProtobufField createField(Object object, Field field) {
         var property = ProtobufUtils.getProperty(field);
-        var value = getFieldValue(object, field);
         return new ProtobufField(
-                field.getName(),
+                ProtobufUtils.getFieldName(field),
                 property.index(),
                 property.type(),
-                value,
+                getFieldValue(object, field),
                 property.packed(),
                 property.required(),
                 property.repeated(),
@@ -187,116 +296,5 @@ class ProtobufGenerator extends GeneratorBase {
         } catch (IOException exception) {
             throw new UncheckedIOException("Cannot close output buffer", exception);
         }
-    }
-
-    @Override
-    protected void _verifyValueWrite(String typeMsg) {
-
-    }
-
-    @Override
-    public void writeStartArray() {
-        
-    }
-
-    @Override
-    public void writeEndArray() {
-        
-    }
-    
-    @Override
-    public void writeFieldName(String name) {
-        throw new ProtobufSerializationException("Detected mixed json and protobuf annotations. " +
-                "Please remove all json annotations to avoid conflicts");
-    }
-
-    @Override
-    public void writeString(String text) {
-        
-    }
-
-    @Override
-    public void writeString(char[] buffer, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeRawUTF8String(byte[] buffer, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeUTF8String(byte[] buffer, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeRaw(String text) {
-        
-    }
-
-    @Override
-    public void writeRaw(String text, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeRaw(char[] text, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeRaw(char c) {
-        
-    }
-
-    @Override
-    public void writeBinary(Base64Variant bv, byte[] data, int offset, int len) {
-        
-    }
-
-    @Override
-    public void writeNumber(int v) {
-        
-    }
-
-    @Override
-    public void writeNumber(long v) {
-        
-    }
-
-    @Override
-    public void writeNumber(BigInteger v) {
-        
-    }
-
-    @Override
-    public void writeNumber(double v) {
-        
-    }
-
-    @Override
-    public void writeNumber(float v) {
-        
-    }
-
-    @Override
-    public void writeNumber(BigDecimal v) {
-        
-    }
-
-    @Override
-    public void writeNumber(String encodedValue) {
-        
-    }
-
-    @Override
-    public void writeBoolean(boolean state) {
-        
-    }
-
-    @Override
-    public void writeNull() {
-        
     }
 }
