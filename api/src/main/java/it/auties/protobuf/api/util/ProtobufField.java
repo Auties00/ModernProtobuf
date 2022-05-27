@@ -32,7 +32,6 @@ public record ProtobufField(String name, int index, ProtobufProperty.Type type,
                     .formatted(index, type));
         }
 
-        return value != null
-                && (!(value instanceof Number number) || number.floatValue() != 0F);
+        return value != null;
     }
 }

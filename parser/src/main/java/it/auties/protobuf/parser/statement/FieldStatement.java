@@ -31,15 +31,18 @@ public final class FieldStatement implements ProtobufStatement {
         }
 
         if(type.equals("bool")){
-            return isRepeated() ? "List<Boolean>" : "boolean";
+            return isRepeated() ? "List<Boolean>"
+                    : isRequired() ? "boolean" : "Boolean";
         }
 
         if(type.equals("double")){
-            return isRepeated() ? "List<Double>" : "double";
+            return isRepeated() ? "List<Double>"
+                    : isRequired() ? "double" : "Double";
         }
 
         if(type.equals("float")){
-            return isRepeated() ? "List<Float>" : "float";
+            return isRepeated() ? "List<Float>"
+                    : isRequired() ? "float" : "Float";
         }
 
         if(type.equals("bytes")){
@@ -47,11 +50,13 @@ public final class FieldStatement implements ProtobufStatement {
         }
 
         if(type.equals("int32") || type.equals("uint32") || type.equals("sint32") || type.equals("fixed32") || type.equals("sfixed32")){
-            return isRepeated() ? "List<Integer>" : "int";
+            return isRepeated() ? "List<Integer>"
+                    : isRequired() ? "int" : "Integer";
         }
 
         if(type.equals("int64") || type.equals("uint64") || type.equals("sint64") || type.equals("fixed64") || type.equals("sfixed64")){
-            return isRepeated() ? "List<Long>" : "long";
+            return isRepeated() ? "List<Long>"
+                    : isRequired() ? "long" : "Long";
         }
 
         return isRepeated() ? "List<%s>".formatted(type) : type;
