@@ -3,10 +3,9 @@ package it.auties.protobuf.api.jackson;
 import com.fasterxml.jackson.core.Base64Variant;
 import com.fasterxml.jackson.core.ObjectCodec;
 import com.fasterxml.jackson.core.base.GeneratorBase;
-import com.fasterxml.jackson.core.json.JsonWriteContext;
 import it.auties.protobuf.api.exception.ProtobufException;
-import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.exception.ProtobufSerializationException;
+import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.util.ArrayOutputStream;
 import it.auties.protobuf.api.util.ProtobufField;
 import it.auties.protobuf.api.util.ProtobufUtils;
@@ -209,6 +208,10 @@ class ProtobufGenerator extends GeneratorBase {
     @SneakyThrows
     private Object getFieldValue(Object object, Field field) {
         var value = field.get(object);
+        if(value == null){
+            return null;
+        }
+
         if (!ProtobufMessage.isMessage(field.getType()) || !ProtobufUtils.hasValue(field.getType())) {
             return value;
         }
