@@ -31,11 +31,6 @@ public record ProtobufField(String name, int index, ProtobufProperty.Type type,
     }
 
     public boolean valid() {
-        if(type == MESSAGE && messageType == null){
-            throw new ProtobufSerializationException(("Erroneous field at index %s with type %s: cannot detect the message type. ".formatted(index, type) +
-                    "Usually this means that your model clas isn't specified or doesn't implement ProtobufModel"));
-        }
-
         if (required && value == null) {
             throw new ProtobufSerializationException("Erroneous field at index %s with type %s(%s): missing mandatory value"
                     .formatted(index, type, Objects.toString(messageType)));

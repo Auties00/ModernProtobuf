@@ -123,7 +123,6 @@ class ProtobufParser extends ParserMinimalBase {
                 .flatMap(Arrays::stream)
                 .filter(ProtobufUtils::isProperty)
                 .map(this::createProtobufField)
-                .peek(ProtobufField::valid)
                 .collect(Collectors.toConcurrentMap(ProtobufField::index, Function.identity()));
     }
 
@@ -133,7 +132,7 @@ class ProtobufParser extends ParserMinimalBase {
                 ProtobufUtils.getFieldName(field),
                 property.index(),
                 property.type(),
-                ProtobufUtils.getMessageType(ProtobufUtils.getJavaType(property)),
+                ProtobufUtils.getJavaType(property),
                 null,
                 property.packed(),
                 property.required(),

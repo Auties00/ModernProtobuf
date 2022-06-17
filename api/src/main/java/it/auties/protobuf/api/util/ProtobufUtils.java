@@ -1,6 +1,7 @@
 package it.auties.protobuf.api.util;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import it.auties.protobuf.api.exception.ProtobufSerializationException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufProperty.Type;
@@ -12,6 +13,8 @@ import lombok.extern.jackson.Jacksonized;
 
 import java.lang.reflect.Field;
 import java.util.Optional;
+
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
 
 @UtilityClass
 public class ProtobufUtils {
@@ -30,14 +33,26 @@ public class ProtobufUtils {
         return property == null || property.ignore() ? null : property;
     }
 
-    public Class<?> getJavaType(ProtobufProperty property) {
-        return property.concreteType() == Object.class ? property.type().javaType() :
-                property.concreteType();
-    }
+    public Class<? extends ProtobufMessage> getJavaType(ProtobufProperty property) {
+        if (property.concreteType() == Object.class) {
+            return null;
+        }
 
-    public Class<? extends ProtobufMessage> getMessageType(Class<?> clazz){
-        return !ProtobufMessage.isMessage(clazz) ? null
-                :clazz.asSubclass(ProtobufMessage.class);
+        if(property.concreteType() == null){
+            throw new ProtobufSerializationException("Missing concrete type property type");
+        }
+
+        if(property.concreteType().isEnum()){
+            return null;
+        }
+
+        if(!ProtobufMessage.isMessage(property.concreteType())){
+            throw new ProtobufSerializationException("%s is not a valid message type. ".formatted(property.concreteType()) +
+                        "This usually means that there is a missing concrete type property or that said class is not a ProtobufMessage");
+        }
+
+        return property.concreteType()
+                .asSubclass(ProtobufMessage.class);
     }
 
     public boolean hasValue(Class<?> type) {
