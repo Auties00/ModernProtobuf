@@ -4,6 +4,10 @@ import it.auties.protobuf.api.exception.ProtobufSerializationException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 
+import java.util.Objects;
+
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
+
 public record ProtobufField(String name, int index, ProtobufProperty.Type type,
                             Class<? extends ProtobufMessage> messageType, Object value, boolean packed,
                             boolean required, boolean repeated, boolean requiresConversion) {
@@ -27,9 +31,14 @@ public record ProtobufField(String name, int index, ProtobufProperty.Type type,
     }
 
     public boolean valid() {
+        if(type == MESSAGE && messageType == null){
+            throw new ProtobufSerializationException(("Erroneous field at index %s with type %s: cannot detect the message type. ".formatted(index, type) +
+                    "Usually this means that your model clas isn't specified or doesn't implement ProtobufModel"));
+        }
+
         if (required && value == null) {
-            throw new ProtobufSerializationException("Cannot encode object: missing mandatory field with index %s and type %s"
-                    .formatted(index, type));
+            throw new ProtobufSerializationException("Erroneous field at index %s with type %s(%s): missing mandatory value"
+                    .formatted(index, type, Objects.toString(messageType)));
         }
 
         return value != null;

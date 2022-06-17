@@ -123,6 +123,7 @@ class ProtobufParser extends ParserMinimalBase {
                 .flatMap(Arrays::stream)
                 .filter(ProtobufUtils::isProperty)
                 .map(this::createProtobufField)
+                .peek(ProtobufField::valid)
                 .collect(Collectors.toConcurrentMap(ProtobufField::index, Function.identity()));
     }
 
