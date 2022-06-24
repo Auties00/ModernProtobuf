@@ -24,6 +24,7 @@ public final class ProtobufParser {
     private final StreamTokenizer tokenizer;
     private final LinkedList<String> tokensCache;
     private final Deque<ProtobufObject<?>> objectsQueue;
+
     public ProtobufParser(String input) {
         this(new StreamTokenizer(new StringReader(input)), new LinkedList<>(), new LinkedList<>());
     }
@@ -92,7 +93,8 @@ public final class ProtobufParser {
             case "message" -> new MessageStatement(name);
             case "oneof" -> new OneOfStatement(name);
             case "enum" -> new EnumStatement(name);
-            default -> throw new ProtobufSyntaxException("Illegal object declaration: %s is not a valid instruction", tokensCache, instruction);
+            default ->
+                    throw new ProtobufSyntaxException("Illegal object declaration: %s is not a valid instruction", tokensCache, instruction);
         };
 
         var last = objectsQueue.peekLast();
@@ -194,8 +196,8 @@ public final class ProtobufParser {
     }
 
     // Find a better way lol
-    private boolean isPacked(){
-        if(tokensCache.size() != 10){
+    private boolean isPacked() {
+        if (tokensCache.size() != 10) {
             return false;
         }
 
@@ -204,17 +206,17 @@ public final class ProtobufParser {
                 "Illegal options declaration: expected array start", tokensCache);
 
         var modifier = tokensCache.get(tokensCache.size() - 4);
-        if(!Objects.equals(modifier, "packed")){
+        if (!Objects.equals(modifier, "packed")) {
             return false;
         }
 
         var operator = tokensCache.get(tokensCache.size() - 3);
-        if(!Objects.equals(operator, "=")){
+        if (!Objects.equals(operator, "=")) {
             return false;
         }
 
         var value = tokensCache.get(tokensCache.size() - 2);
-        if(!Objects.equals(value, "true")){
+        if (!Objects.equals(value, "true")) {
             return false;
         }
 
@@ -224,7 +226,7 @@ public final class ProtobufParser {
         return true;
     }
 
-    private Optional<Integer> parseIndex(String parse){
+    private Optional<Integer> parseIndex(String parse) {
         return parseIndex(parse, false);
     }
 

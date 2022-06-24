@@ -19,9 +19,9 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.stream.Stream;
+import java.util.List;
 
 
 @ExtensionMethod(Reflection.class)
@@ -156,11 +156,11 @@ class ProtobufGenerator extends GeneratorBase {
 
     @Override
     public void writeStartObject(Object forValue) throws IOException {
-        if(forValue == null){
+        if (forValue == null) {
             return;
         }
 
-        if(!ProtobufMessage.isMessage(forValue.getClass())){
+        if (!ProtobufMessage.isMessage(forValue.getClass())) {
             throw new ProtobufSerializationException("Cannot encode protobuf message: %s is not a valid message"
                     .formatted(forValue.getClass().getName()));
         }
@@ -170,25 +170,36 @@ class ProtobufGenerator extends GeneratorBase {
     }
 
     public byte[] encode(Object object) {
-        if(object == null){
+        if (object == null) {
             return new byte[0];
         }
 
         try {
             var output = new ArrayOutputStream();
-            Stream.of(object.getClass().getFields(), object.getClass().getDeclaredFields())
-                    .flatMap(Arrays::stream)
+            findFields(object.getClass())
+                    .stream()
                     .map(Reflection::open)
                     .filter(ProtobufUtils::isProperty)
                     .map(field -> createField(object, field))
                     .filter(ProtobufField::valid)
                     .forEach(field -> encodeField(output, field));
             return output.buffer().toByteArray();
-        }catch (ProtobufException exception){
+        } catch (ProtobufException exception) {
             throw exception;
-        }catch (Throwable throwable){
+        } catch (Throwable throwable) {
             throw new ProtobufSerializationException("An unknown exception occured while serializing", throwable);
         }
+    }
+
+    private List<Field> findFields(Class<?> clazz) {
+        var fields = new ArrayList<Field>();
+        fields.addAll(List.of(clazz.getDeclaredFields()));
+        fields.addAll(List.of(clazz.getFields()));
+        if (clazz.getSuperclass() != null) {
+            fields.addAll(findFields(clazz.getSuperclass()));
+        }
+
+        return fields;
     }
 
     private ProtobufField createField(Object object, Field field) {
@@ -208,7 +219,7 @@ class ProtobufGenerator extends GeneratorBase {
     @SneakyThrows
     private Object getFieldValue(Object object, Field field) {
         var value = field.get(object);
-        if(value == null){
+        if (value == null) {
             return null;
         }
 
@@ -221,12 +232,12 @@ class ProtobufGenerator extends GeneratorBase {
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {
         try {
-            if(field.repeated()){
+            if (field.repeated()) {
                 encodeRepeatedFields(output, field);
                 return;
             }
 
-            switch (field.type()){
+            switch (field.type()) {
                 case BOOLEAN -> output.writeBool(field.index(), field.valueAs());
                 case STRING -> output.writeString(field.index(), field.valueAs());
                 case BYTES -> output.writeByteArray(field.index(), field.valueAs());
@@ -239,12 +250,12 @@ class ProtobufGenerator extends GeneratorBase {
                 case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), field.valueAs());
 
                 case INT64, SINT64 -> output.writeInt64(field.index(), field.valueAs());
-                case UINT64  -> output.writeUInt64(field.index(), field.valueAs());
+                case UINT64 -> output.writeUInt64(field.index(), field.valueAs());
                 case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), field.valueAs());
 
                 default -> encodeFieldFallback(field.index(), field.value(), output);
             }
-        }catch (ClassCastException exception){
+        } catch (ClassCastException exception) {
             throw new RuntimeException("A field misreported its own type in a schema: %s".formatted(field), exception);
         }
     }
@@ -265,13 +276,13 @@ class ProtobufGenerator extends GeneratorBase {
         output.writeByteArray(index, encode(value));
     }
 
-    private int findEnumIndex(Object object){
+    private int findEnumIndex(Object object) {
         try {
             return (int) object.getClass()
                     .getMethod("index")
                     .open()
                     .invoke(object);
-        }catch (Throwable throwable){
+        } catch (Throwable throwable) {
             return findEnumIndexFallback(object);
         }
     }
@@ -282,7 +293,7 @@ class ProtobufGenerator extends GeneratorBase {
                     .getMethod("ordinal")
                     .open()
                     .invoke(object);
-        }catch (Throwable throwable){
+        } catch (Throwable throwable) {
             throw new RuntimeException("An exception occurred while invoking the index method for the enum", throwable);
         }
     }

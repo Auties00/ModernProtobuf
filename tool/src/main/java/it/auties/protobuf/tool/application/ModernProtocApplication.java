@@ -21,7 +21,7 @@ public class ModernProtocApplication {
         MODULES.forEach(pack -> {
             try {
                 addOpensMethod.invoke(jdkCompilerModule, pack, googleFormatModule);
-            }catch (Throwable throwable){
+            } catch (Throwable throwable) {
                 throw new RuntimeException("Cannot open package", throwable);
             }
         });
@@ -44,10 +44,10 @@ public class ModernProtocApplication {
 
     @SuppressWarnings("all")
     private static class ModulePlaceholder {
-        boolean first;
         static final Object staticObj = OutputStream.class;
-        volatile Object second;
         private static volatile boolean staticSecond;
         private static volatile boolean staticThird;
+        boolean first;
+        volatile Object second;
     }
 }

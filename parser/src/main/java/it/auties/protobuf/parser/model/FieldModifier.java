@@ -8,7 +8,7 @@ public enum FieldModifier {
     OPTIONAL,
     REPEATED;
 
-    public static Optional<FieldModifier> forName(String name){
+    public static Optional<FieldModifier> forName(String name) {
         return Arrays.stream(values())
                 .filter(entry -> entry.name().toLowerCase().equals(name))
                 .findAny();

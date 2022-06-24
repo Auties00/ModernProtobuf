@@ -39,9 +39,9 @@ public class PackedTest implements TestProvider {
         )
         private List<Integer> content;
 
-        public static class SomeMessageBuilder{
-            public SomeMessageBuilder content(List<Integer> content){
-                if(this.content == null) this.content = new ArrayList<>();
+        public static class SomeMessageBuilder {
+            public SomeMessageBuilder content(List<Integer> content) {
+                if (this.content == null) this.content = new ArrayList<>();
                 this.content.addAll(content);
                 return this;
             }

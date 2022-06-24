@@ -1,23 +1,19 @@
 package it.auties.protobuf;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.std.CollectionDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.type.CollectionType;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufSchema;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RepeatedTest implements TestProvider {
     @Test
@@ -34,6 +30,14 @@ public class RepeatedTest implements TestProvider {
         Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.content());
     }
 
+    public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
+        List<Integer> getContentList();
+
+        int getContentCount();
+
+        int getContent(int index);
+    }
+
     @AllArgsConstructor
     @Jacksonized
     @Data
@@ -48,20 +52,12 @@ public class RepeatedTest implements TestProvider {
         private List<Integer> content;
 
         public static class ModernRepeatedMessageBuilder {
-            public ModernRepeatedMessageBuilder content(List<Integer> content){
-                if(this.content == null) this.content = new ArrayList<>();
+            public ModernRepeatedMessageBuilder content(List<Integer> content) {
+                if (this.content == null) this.content = new ArrayList<>();
                 this.content.addAll(content);
                 return this;
             }
         }
-    }
-
-    public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
-        List<Integer> getContentList();
-
-        int getContentCount();
-
-        int getContent(int index);
     }
 
     public static final class RepeatedMessage extends
@@ -69,56 +65,22 @@ public class RepeatedTest implements TestProvider {
                     RepeatedMessage, RepeatedMessage.Builder> implements
 
             RepeatedMessageOrBuilder {
-        private RepeatedMessage() {
-            content_ = emptyIntList();
+        public static final int CONTENT_FIELD_NUMBER = 1;
+        private static final RepeatedMessage DEFAULT_INSTANCE;
+        private static volatile com.google.protobuf.Parser<RepeatedMessage> PARSER;
+
+        static {
+            RepeatedMessage defaultInstance = new RepeatedMessage();
+
+
+            DEFAULT_INSTANCE = defaultInstance;
+            com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                    RepeatedMessage.class, defaultInstance);
         }
 
-        public static final int CONTENT_FIELD_NUMBER = 1;
         private com.google.protobuf.Internal.IntList content_;
 
-        @Override
-        public List<Integer>
-        getContentList() {
-            return content_;
-        }
-
-        @Override
-        public int getContentCount() {
-            return content_.size();
-        }
-
-        @Override
-        public int getContent(int index) {
-            return content_.getInt(index);
-        }
-
-        private void ensureContentIsMutable() {
-            com.google.protobuf.Internal.IntList tmp = content_;
-            if (!tmp.isModifiable()) {
-                content_ =
-                        com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-            }
-        }
-
-        private void setContent(
-                int index, int value) {
-            ensureContentIsMutable();
-            content_.setInt(index, value);
-        }
-
-        private void addContent(int value) {
-            ensureContentIsMutable();
-            content_.addInt(value);
-        }
-
-        private void addAllContent(
-                Iterable<? extends Integer> values) {
-            ensureContentIsMutable();
-            com.google.protobuf.AbstractMessageLite.addAll(
-                    values, content_);
-        }
-
-        private void clearContent() {
+        private RepeatedMessage() {
             content_ = emptyIntList();
         }
 
@@ -215,6 +177,108 @@ public class RepeatedTest implements TestProvider {
             return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
         }
 
+        public static RepeatedMessage getDefaultInstance() {
+            return DEFAULT_INSTANCE;
+        }
+
+        public static com.google.protobuf.Parser<RepeatedMessage> parser() {
+            return DEFAULT_INSTANCE.getParserForType();
+        }
+
+        @Override
+        public List<Integer>
+        getContentList() {
+            return content_;
+        }
+
+        @Override
+        public int getContentCount() {
+            return content_.size();
+        }
+
+        @Override
+        public int getContent(int index) {
+            return content_.getInt(index);
+        }
+
+        private void ensureContentIsMutable() {
+            com.google.protobuf.Internal.IntList tmp = content_;
+            if (!tmp.isModifiable()) {
+                content_ =
+                        com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+            }
+        }
+
+        private void setContent(
+                int index, int value) {
+            ensureContentIsMutable();
+            content_.setInt(index, value);
+        }
+
+        private void addContent(int value) {
+            ensureContentIsMutable();
+            content_.addInt(value);
+        }
+
+        private void addAllContent(
+                Iterable<? extends Integer> values) {
+            ensureContentIsMutable();
+            com.google.protobuf.AbstractMessageLite.addAll(
+                    values, content_);
+        }
+
+        private void clearContent() {
+            content_ = emptyIntList();
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "fallthrough"})
+        protected final Object dynamicMethod(
+                MethodToInvoke method,
+                Object arg0, Object arg1) {
+            switch (method) {
+                case NEW_MUTABLE_INSTANCE: {
+                    return new RepeatedMessage();
+                }
+                case NEW_BUILDER: {
+                    return new Builder();
+                }
+                case BUILD_MESSAGE_INFO: {
+                    Object[] objects = new Object[]{
+                            "content_",
+                    };
+                    String info =
+                            "\u0001\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0001\u0000\u0001\u0016";
+                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                }
+
+                case GET_DEFAULT_INSTANCE: {
+                    return DEFAULT_INSTANCE;
+                }
+                case GET_PARSER: {
+                    com.google.protobuf.Parser<RepeatedMessage> parser = PARSER;
+                    if (parser == null) {
+                        synchronized (RepeatedMessage.class) {
+                            parser = PARSER;
+                            if (parser == null) {
+                                parser =
+                                        new DefaultInstanceBasedParser<RepeatedMessage>(
+                                                DEFAULT_INSTANCE);
+                                PARSER = parser;
+                            }
+                        }
+                    }
+                    return parser;
+                }
+                case GET_MEMOIZED_IS_INITIALIZED: {
+                    return (byte) 1;
+                }
+                case SET_MEMOIZED_IS_INITIALIZED: {
+                    return null;
+                }
+            }
+            throw new UnsupportedOperationException();
+        }
 
         public static final class Builder extends
                 com.google.protobuf.GeneratedMessageLite.Builder<
@@ -271,77 +335,6 @@ public class RepeatedTest implements TestProvider {
             }
 
 
-        }
-
-        @Override
-        @SuppressWarnings({"unchecked", "fallthrough"})
-        protected final Object dynamicMethod(
-                MethodToInvoke method,
-                Object arg0, Object arg1) {
-            switch (method) {
-                case NEW_MUTABLE_INSTANCE: {
-                    return new RepeatedMessage();
-                }
-                case NEW_BUILDER: {
-                    return new Builder();
-                }
-                case BUILD_MESSAGE_INFO: {
-                    Object[] objects = new Object[]{
-                            "content_",
-                    };
-                    String info =
-                            "\u0001\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0001\u0000\u0001\u0016";
-                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-                }
-
-                case GET_DEFAULT_INSTANCE: {
-                    return DEFAULT_INSTANCE;
-                }
-                case GET_PARSER: {
-                    com.google.protobuf.Parser<RepeatedMessage> parser = PARSER;
-                    if (parser == null) {
-                        synchronized (RepeatedMessage.class) {
-                            parser = PARSER;
-                            if (parser == null) {
-                                parser =
-                                        new DefaultInstanceBasedParser<RepeatedMessage>(
-                                                DEFAULT_INSTANCE);
-                                PARSER = parser;
-                            }
-                        }
-                    }
-                    return parser;
-                }
-                case GET_MEMOIZED_IS_INITIALIZED: {
-                    return (byte) 1;
-                }
-                case SET_MEMOIZED_IS_INITIALIZED: {
-                    return null;
-                }
-            }
-            throw new UnsupportedOperationException();
-        }
-
-
-        private static final RepeatedMessage DEFAULT_INSTANCE;
-
-        static {
-            RepeatedMessage defaultInstance = new RepeatedMessage();
-
-
-            DEFAULT_INSTANCE = defaultInstance;
-            com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-                    RepeatedMessage.class, defaultInstance);
-        }
-
-        public static RepeatedMessage getDefaultInstance() {
-            return DEFAULT_INSTANCE;
-        }
-
-        private static volatile com.google.protobuf.Parser<RepeatedMessage> PARSER;
-
-        public static com.google.protobuf.Parser<RepeatedMessage> parser() {
-            return DEFAULT_INSTANCE.getParserForType();
         }
     }
 }

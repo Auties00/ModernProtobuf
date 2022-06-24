@@ -8,12 +8,12 @@ import java.nio.charset.StandardCharsets;
 import static it.auties.protobuf.api.util.WireType.*;
 
 public record ArrayOutputStream(ByteArrayOutputStream buffer) {
+    public ArrayOutputStream() {
+        this(new ByteArrayOutputStream());
+    }
+
     static int makeTag(int fieldNumber, int wireType) {
         return (fieldNumber << TAG_TYPE_BITS) | wireType;
-    }
-    
-    public ArrayOutputStream(){
-        this(new ByteArrayOutputStream());
     }
 
     public void writeTag(int fieldNumber, int wireType) {

@@ -1,13 +1,14 @@
 package it.auties.protobuf.parser.statement;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public final class EnumConstantStatement extends ProtobufStatement {
+    private final int index;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-public final class EnumConstantStatement implements ProtobufStatement {
-    private String name;
-    private int index;
+    public EnumConstantStatement(String name, int index) {
+        super(name);
+        this.index = index;
+    }
+
+    public int getIndex() {
+        return index;
+    }
 }

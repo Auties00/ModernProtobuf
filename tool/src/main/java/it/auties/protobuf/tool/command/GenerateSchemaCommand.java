@@ -2,14 +2,14 @@ package it.auties.protobuf.tool.command;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.parser.ProtobufParser;
+import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
+import it.auties.protobuf.tool.util.LoggerUtils;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import sun.misc.Unsafe;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,33 +46,19 @@ public class GenerateSchemaCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        if(!createOutputDirectory()){
+        if (!createOutputDirectory()) {
             return -1;
         }
 
-        try{
-            suppressIllegalAccessWarning();
+        try {
+            LoggerUtils.suppressIllegalAccessWarning();
             var ast = generateAST();
             generateSchema(ast);
             return 0;
-        }catch (Throwable ex) {
+        } catch (Throwable ex) {
             log.error("An uncaught exception was thrown, report this incident on github if you believe this to be a bug");
             log.throwing(ex);
             return -1;
-        }
-    }
-
-    private void suppressIllegalAccessWarning() {
-        try {
-            var unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-            unsafeField.setAccessible(true);
-            var unsafe = (Unsafe) unsafeField.get(null);
-
-            var loggerClass = Class.forName("jdk.internal.module.IllegalAccessLogger");
-            var logger = loggerClass.getDeclaredField("logger");
-            unsafe.putObjectVolatile(loggerClass, unsafe.staticFieldOffset(logger), null);
-        }catch (Throwable ignored){
-
         }
     }
 

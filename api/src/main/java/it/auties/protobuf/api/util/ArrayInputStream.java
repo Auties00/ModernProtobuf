@@ -29,6 +29,7 @@ public class ArrayInputStream {
 
         return lastTag;
     }
+
     public void checkLastTagWas(final int value) throws ProtobufDeserializationException {
         if (lastTag == value) {
             return;
@@ -194,7 +195,7 @@ public class ArrayInputStream {
             return result;
         }
 
-        return size == 0 ? new byte[0]: this.readRawBytes(size);
+        return size == 0 ? new byte[0] : this.readRawBytes(size);
     }
 
     public byte[] readRawBytes(final int length) {
@@ -234,7 +235,7 @@ public class ArrayInputStream {
         return this.pos == this.limit;
     }
 
-    public int position(){
+    public int position() {
         return pos;
     }
 }

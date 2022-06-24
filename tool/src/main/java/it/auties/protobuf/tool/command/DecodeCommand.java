@@ -34,7 +34,8 @@ public class DecodeCommand implements Callable<Integer> {
     public Integer call() {
         try {
             var result = JACKSON.readValue(protobuf,
-                    new TypeReference<Map<Integer, Object>>() {});
+                    new TypeReference<Map<Integer, Object>>() {
+                    });
             log.info(result);
             return 0;
         } catch (IOException ex) {

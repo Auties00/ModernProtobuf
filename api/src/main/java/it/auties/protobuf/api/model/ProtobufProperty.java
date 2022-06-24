@@ -1,6 +1,5 @@
 package it.auties.protobuf.api.model;
 
-import it.auties.protobuf.api.exception.ProtobufException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
@@ -10,24 +9,25 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Optional;
-
-import static it.auties.protobuf.api.util.WireType.*;
-import static it.auties.protobuf.api.util.WireType.WIRE_TYPE_FIXED64;
 
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
 public @interface ProtobufProperty {
     int index();
+
     Type type();
+
     Class<?> concreteType() default Object.class;
+
     boolean required() default false;
+
     boolean ignore() default false;
+
     boolean packed() default false;
+
     boolean repeated() default false;
+
     boolean requiresConversion() default false;
 
     @AllArgsConstructor
@@ -54,7 +54,7 @@ public @interface ProtobufProperty {
         @NonNull
         public final Class<?> javaType;
 
-        public boolean isInt(){
+        public boolean isInt() {
             return this == INT32
                     || this == SINT32
                     || this == UINT32
@@ -62,7 +62,7 @@ public @interface ProtobufProperty {
                     || this == SFIXED32;
         }
 
-        public boolean isLong(){
+        public boolean isLong() {
             return this == INT64
                     || this == SINT64
                     || this == UINT64

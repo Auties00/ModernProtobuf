@@ -1,18 +1,17 @@
 package it.auties.protobuf.api.jackson;
 
-import com.fasterxml.jackson.core.FormatSchema;
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.Version;
-import com.fasterxml.jackson.core.exc.StreamReadException;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.auties.protobuf.api.exception.ProtobufDeserializationException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufSchema;
 import it.auties.protobuf.api.util.VersionInfo;
 
 import java.io.IOException;
-import java.net.URL;
 
 public class ProtobufMapper extends ObjectMapper {
     public ProtobufMapper() {
@@ -38,12 +37,12 @@ public class ProtobufMapper extends ObjectMapper {
 
     @Override
     protected Object _readMapAndClose(JsonParser parser, JavaType valueType) throws IOException {
-        if(!ProtobufMessage.isMessage(valueType.getRawClass())){
+        if (!ProtobufMessage.isMessage(valueType.getRawClass())) {
             throw new ProtobufDeserializationException("Cannot deserialize message, invalid type: expected ProtobufMessage, got %s"
                     .formatted(valueType.getRawClass().getName()));
         }
 
-        if(parser.getSchema() == null){
+        if (parser.getSchema() == null) {
             parser.setSchema(ProtobufSchema.of(valueType.getRawClass().asSubclass(ProtobufMessage.class)));
         }
 

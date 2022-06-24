@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Map;
 
-public record MessageSchemaCreator(MessageStatement message, String pack, boolean imports) implements SchemaCreator{
+public record MessageSchemaCreator(MessageStatement message, String pack, boolean imports) implements SchemaCreator {
     private static final String GENERATOR = ProtobufUtils.readGenerator("MessageTemplate");
 
     @Override

@@ -44,8 +44,8 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
         private List<AnotherMessage> content;
 
         public static class SomeMessageBuilder {
-            public SomeMessageBuilder content(List<AnotherMessage> content){
-                if(this.content == null) this.content = new ArrayList<>();
+            public SomeMessageBuilder content(List<AnotherMessage> content) {
+                if (this.content == null) this.content = new ArrayList<>();
                 this.content.addAll(content);
                 return this;
             }
@@ -68,8 +68,8 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
         private List<FinalMessage> content;
 
         public static class AnotherMessageBuilder {
-            public AnotherMessageBuilder content(List<FinalMessage> content){
-                if(this.content == null) this.content = new ArrayList<>();
+            public AnotherMessageBuilder content(List<FinalMessage> content) {
+                if (this.content == null) this.content = new ArrayList<>();
                 this.content.addAll(content);
                 return this;
             }
@@ -90,8 +90,8 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
         private List<Integer> content;
 
         public static class FinalMessageBuilder {
-            public FinalMessageBuilder content(List<Integer> content){
-                if(this.content == null) this.content = new ArrayList<>();
+            public FinalMessageBuilder content(List<Integer> content) {
+                if (this.content == null) this.content = new ArrayList<>();
                 this.content.addAll(content);
                 return this;
             }

@@ -93,14 +93,14 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public void setSchema(FormatSchema schema) {
-        if(schema == null){
+        if (schema == null) {
             return;
         }
 
         this.type = ((ProtobufSchema) schema).messageType();
         assertFieldsCache(type);
     }
-    
+
     private Map<Integer, ProtobufField> assertFieldsCache(@NonNull Class<? extends ProtobufMessage> clazz) {
         if (fieldsCache.containsKey(clazz)) {
             return fieldsCache.get(clazz);
@@ -145,7 +145,7 @@ class ProtobufParser extends ParserMinimalBase {
     public boolean canUseSchema(FormatSchema schema) {
         return schema instanceof ProtobufSchema;
     }
-    
+
     @Override
     public JsonToken nextToken() {
         if (type == null) {
@@ -160,9 +160,9 @@ class ProtobufParser extends ParserMinimalBase {
         if (_currToken == JsonToken.FIELD_NAME) {
             return super._currToken = readNextToken();
         }
-        
-        if(packedInput != null){
-            if(packedInput.isAtEnd()){
+
+        if (packedInput != null) {
+            if (packedInput.isAtEnd()) {
                 this.packedInput = null;
                 return super._currToken = JsonToken.END_ARRAY;
             }
@@ -190,7 +190,7 @@ class ProtobufParser extends ParserMinimalBase {
     private ProtobufField findField(int index) {
         try {
             return fieldsCache.get(type).get(index);
-        }catch (NullPointerException exception){
+        } catch (NullPointerException exception) {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: missing fields in cache(known: %s)"
                     .formatted(index, type.getName(), fieldsCache.keySet().stream().map(Class::getName).collect(Collectors.joining(","))));
         }
@@ -228,8 +228,9 @@ class ProtobufParser extends ParserMinimalBase {
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
 
-            default -> throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, invalid wire type: %s"
-                    .formatted(lastField.index(), type.getName(), lastType));
+            default ->
+                    throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, invalid wire type: %s"
+                            .formatted(lastField.index(), type.getName(), lastType));
         };
     }
 
@@ -262,7 +263,7 @@ class ProtobufParser extends ParserMinimalBase {
 
     private Object readDelimited() {
         var read = input.readBytes();
-        if(lastField == null){
+        if (lastField == null) {
             return read;
         }
 
@@ -271,8 +272,9 @@ class ProtobufParser extends ParserMinimalBase {
                 case BYTES -> read;
                 case STRING -> new String(read, StandardCharsets.UTF_8);
                 case MESSAGE -> readEmbeddedMessage(read);
-                default ->  throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected bytes, string or message, got %s"
-                        .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+                default ->
+                        throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected bytes, string or message, got %s"
+                                .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
             };
         }
 
@@ -287,8 +289,8 @@ class ProtobufParser extends ParserMinimalBase {
                 .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
     }
 
-    private Object readEmbeddedMessage(byte[] bytes){
-        if(lastField == null){
+    private Object readEmbeddedMessage(byte[] bytes) {
+        if (lastField == null) {
             return bytes;
         }
 
@@ -304,10 +306,10 @@ class ProtobufParser extends ParserMinimalBase {
         this.lastField = null;
         try {
             return readValueAs(lastField.messageType());
-        }catch (IOException exception){
+        } catch (IOException exception) {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot decode embedded message with type %s"
                     .formatted(lastField.index(), lastType.getName(), lastField.messageType().getName()), exception);
-        }finally {
+        } finally {
             this.type = lastType;
             this.input = lastInput;
             this._currToken = lastToken;
@@ -340,7 +342,7 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public String getText() {
-        if(getCurrentValue() instanceof String string){
+        if (getCurrentValue() instanceof String string) {
             return string;
         }
 
@@ -371,7 +373,7 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Number getNumberValue() {
-        if (getCurrentValue() instanceof Number number){
+        if (getCurrentValue() instanceof Number number) {
             return number;
         }
 
@@ -381,13 +383,14 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public NumberType getNumberType() {
-        return switch (lastField.type()){
+        return switch (lastField.type()) {
             case FLOAT -> NumberType.FLOAT;
             case DOUBLE -> NumberType.DOUBLE;
             case INT32, SINT32, UINT32, FIXED32, SFIXED32, BOOLEAN -> NumberType.INT;
             case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> NumberType.LONG;
-            default -> throw new ProtobufDeserializationException("Cannot get number type for field %s inside %s for wire type %s and value %s, type mismatch: expected Number, got %s(%s)"
-                    .formatted(lastField.index(), this.type.getName(), lastType, (lastValue == null ? "unknown" : lastValue.getClass().getName()), lastField.type().name(), _currToken.name()));
+            default ->
+                    throw new ProtobufDeserializationException("Cannot get number type for field %s inside %s for wire type %s and value %s, type mismatch: expected Number, got %s(%s)"
+                            .formatted(lastField.index(), this.type.getName(), lastType, (lastValue == null ? "unknown" : lastValue.getClass().getName()), lastField.type().name(), _currToken.name()));
         };
     }
 
@@ -428,11 +431,12 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public byte[] getBinaryValue(Base64Variant decoder) {
-        return switch (getCurrentValue()){
+        return switch (getCurrentValue()) {
             case String string -> decoder.decode(string);
             case byte[] bytes -> bytes;
-            default -> throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected String or byte[], got %s"
-                    .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+            default ->
+                    throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected String or byte[], got %s"
+                            .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
         };
     }
 }

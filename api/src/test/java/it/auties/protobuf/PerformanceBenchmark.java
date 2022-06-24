@@ -73,6 +73,62 @@ public class PerformanceBenchmark implements TestProvider {
         }
     }
 
+    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
+        boolean hasFixed32();
+
+        int getFixed32();
+
+        boolean hasSfixed32();
+
+        int getSfixed32();
+
+        boolean hasInt32();
+
+        int getInt32();
+
+        boolean hasUint32();
+
+        int getUint32();
+
+        boolean hasFixed64();
+
+        long getFixed64();
+
+        boolean hasSfixed64();
+
+        long getSfixed64();
+
+        boolean hasInt64();
+
+        long getInt64();
+
+        boolean hasUint64();
+
+        long getUint64();
+
+        boolean hasFloat();
+
+        float getFloat();
+
+        boolean hasDouble();
+
+        double getDouble();
+
+        boolean hasBool();
+
+        boolean getBool();
+
+        boolean hasString();
+
+        String getString();
+
+        com.google.protobuf.ByteString getStringBytes();
+
+        boolean hasBytes();
+
+        com.google.protobuf.ByteString getBytes();
+    }
+
     @AllArgsConstructor
     @NoArgsConstructor
     @Data
@@ -131,7 +187,6 @@ public class PerformanceBenchmark implements TestProvider {
         @JsonPropertyDescription("bytes")
         private byte[] bytes;
     }
-
 
     @AllArgsConstructor
     @NoArgsConstructor
@@ -218,359 +273,54 @@ public class PerformanceBenchmark implements TestProvider {
         )
         private byte[] bytes;
     }
-    
-    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
-        boolean hasFixed32();
-        int getFixed32();
-        boolean hasSfixed32();
-        int getSfixed32();
-        boolean hasInt32();
-        int getInt32();
-        boolean hasUint32();
-        int getUint32();
-        boolean hasFixed64();
-        long getFixed64();
-        boolean hasSfixed64();
-        long getSfixed64();
-        boolean hasInt64();
-        long getInt64();
-        boolean hasUint64();
-        long getUint64();
-        boolean hasFloat();
-        float getFloat();
-        boolean hasDouble();
-        double getDouble();
-        boolean hasBool();
-        boolean getBool();
-        boolean hasString();
-        String getString();
-        com.google.protobuf.ByteString getStringBytes();
-        boolean hasBytes();
-        com.google.protobuf.ByteString getBytes();
-    }
 
     public static final class ScalarMessage extends
             com.google.protobuf.GeneratedMessageLite<
                     ScalarMessage, ScalarMessage.Builder> implements
 
             ScalarMessageOrBuilder {
-        private ScalarMessage() {
-            string_ = "";
-            bytes_ = com.google.protobuf.ByteString.EMPTY;
+        public static final int SFIXED32_FIELD_NUMBER = 2;
+        public static final int INT32_FIELD_NUMBER = 3;
+        public static final int UINT32_FIELD_NUMBER = 4;
+        public static final int FIXED64_FIELD_NUMBER = 5;
+        public static final int SFIXED64_FIELD_NUMBER = 6;
+        public static final int INT64_FIELD_NUMBER = 7;
+        public static final int UINT64_FIELD_NUMBER = 8;
+        public static final int FLOAT_FIELD_NUMBER = 9;
+        public static final int DOUBLE_FIELD_NUMBER = 10;
+        public static final int BOOL_FIELD_NUMBER = 11;
+        public static final int STRING_FIELD_NUMBER = 12;
+        public static final int BYTES_FIELD_NUMBER = 13;
+        private static final ScalarMessage DEFAULT_INSTANCE;
+        private static volatile com.google.protobuf.Parser<ScalarMessage> PARSER;
+
+        static {
+            ScalarMessage defaultInstance = new ScalarMessage();
+
+
+            DEFAULT_INSTANCE = defaultInstance;
+            com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                    ScalarMessage.class, defaultInstance);
         }
 
         private int bitField0_;
         private int fixed32_;
-
-        @Override
-        public boolean hasFixed32() {
-            return ((bitField0_ & 0x00000001) != 0);
-        }
-
-        @Override
-        public int getFixed32() {
-            return fixed32_;
-        }
-
-        private void setFixed32(int value) {
-            bitField0_ |= 0x00000001;
-            fixed32_ = value;
-        }
-
-        private void clearFixed32() {
-            bitField0_ = (bitField0_ & ~0x00000001);
-            fixed32_ = 0;
-        }
-
-        public static final int SFIXED32_FIELD_NUMBER = 2;
         private int sfixed32_;
-
-        @Override
-        public boolean hasSfixed32() {
-            return ((bitField0_ & 0x00000002) != 0);
-        }
-
-        @Override
-        public int getSfixed32() {
-            return sfixed32_;
-        }
-
-        private void setSfixed32(int value) {
-            bitField0_ |= 0x00000002;
-            sfixed32_ = value;
-        }
-
-        private void clearSfixed32() {
-            bitField0_ = (bitField0_ & ~0x00000002);
-            sfixed32_ = 0;
-        }
-
-        public static final int INT32_FIELD_NUMBER = 3;
         private int int32_;
-
-        @Override
-        public boolean hasInt32() {
-            return ((bitField0_ & 0x00000004) != 0);
-        }
-
-        @Override
-        public int getInt32() {
-            return int32_;
-        }
-
-        private void setInt32(int value) {
-            bitField0_ |= 0x00000004;
-            int32_ = value;
-        }
-
-        private void clearInt32() {
-            bitField0_ = (bitField0_ & ~0x00000004);
-            int32_ = 0;
-        }
-
-        public static final int UINT32_FIELD_NUMBER = 4;
         private int uint32_;
-
-        @Override
-        public boolean hasUint32() {
-            return ((bitField0_ & 0x00000008) != 0);
-        }
-
-        @Override
-        public int getUint32() {
-            return uint32_;
-        }
-
-        private void setUint32(int value) {
-            bitField0_ |= 0x00000008;
-            uint32_ = value;
-        }
-
-        private void clearUint32() {
-            bitField0_ = (bitField0_ & ~0x00000008);
-            uint32_ = 0;
-        }
-
-        public static final int FIXED64_FIELD_NUMBER = 5;
         private long fixed64_;
-
-        @Override
-        public boolean hasFixed64() {
-            return ((bitField0_ & 0x00000010) != 0);
-        }
-
-        @Override
-        public long getFixed64() {
-            return fixed64_;
-        }
-
-        private void setFixed64(long value) {
-            bitField0_ |= 0x00000010;
-            fixed64_ = value;
-        }
-
-        private void clearFixed64() {
-            bitField0_ = (bitField0_ & ~0x00000010);
-            fixed64_ = 0L;
-        }
-
-        public static final int SFIXED64_FIELD_NUMBER = 6;
         private long sfixed64_;
-
-        @Override
-        public boolean hasSfixed64() {
-            return ((bitField0_ & 0x00000020) != 0);
-        }
-
-        @Override
-        public long getSfixed64() {
-            return sfixed64_;
-        }
-
-        private void setSfixed64(long value) {
-            bitField0_ |= 0x00000020;
-            sfixed64_ = value;
-        }
-
-        private void clearSfixed64() {
-            bitField0_ = (bitField0_ & ~0x00000020);
-            sfixed64_ = 0L;
-        }
-
-        public static final int INT64_FIELD_NUMBER = 7;
         private long int64_;
-
-        @Override
-        public boolean hasInt64() {
-            return ((bitField0_ & 0x00000040) != 0);
-        }
-
-        @Override
-        public long getInt64() {
-            return int64_;
-        }
-
-        private void setInt64(long value) {
-            bitField0_ |= 0x00000040;
-            int64_ = value;
-        }
-
-        private void clearInt64() {
-            bitField0_ = (bitField0_ & ~0x00000040);
-            int64_ = 0L;
-        }
-
-        public static final int UINT64_FIELD_NUMBER = 8;
         private long uint64_;
-
-        @Override
-        public boolean hasUint64() {
-            return ((bitField0_ & 0x00000080) != 0);
-        }
-
-        @Override
-        public long getUint64() {
-            return uint64_;
-        }
-
-        private void setUint64(long value) {
-            bitField0_ |= 0x00000080;
-            uint64_ = value;
-        }
-
-        private void clearUint64() {
-            bitField0_ = (bitField0_ & ~0x00000080);
-            uint64_ = 0L;
-        }
-
-        public static final int FLOAT_FIELD_NUMBER = 9;
         private float float_;
-
-        @Override
-        public boolean hasFloat() {
-            return ((bitField0_ & 0x00000100) != 0);
-        }
-
-        @Override
-        public float getFloat() {
-            return float_;
-        }
-
-        private void setFloat(float value) {
-            bitField0_ |= 0x00000100;
-            float_ = value;
-        }
-
-        private void clearFloat() {
-            bitField0_ = (bitField0_ & ~0x00000100);
-            float_ = 0F;
-        }
-
-        public static final int DOUBLE_FIELD_NUMBER = 10;
         private double double_;
-
-        @Override
-        public boolean hasDouble() {
-            return ((bitField0_ & 0x00000200) != 0);
-        }
-
-        @Override
-        public double getDouble() {
-            return double_;
-        }
-
-        private void setDouble(double value) {
-            bitField0_ |= 0x00000200;
-            double_ = value;
-        }
-
-        private void clearDouble() {
-            bitField0_ = (bitField0_ & ~0x00000200);
-            double_ = 0D;
-        }
-
-        public static final int BOOL_FIELD_NUMBER = 11;
         private boolean bool_;
-
-        @Override
-        public boolean hasBool() {
-            return ((bitField0_ & 0x00000400) != 0);
-        }
-
-        @Override
-        public boolean getBool() {
-            return bool_;
-        }
-
-        private void setBool(boolean value) {
-            bitField0_ |= 0x00000400;
-            bool_ = value;
-        }
-
-        private void clearBool() {
-            bitField0_ = (bitField0_ & ~0x00000400);
-            bool_ = false;
-        }
-
-        public static final int STRING_FIELD_NUMBER = 12;
         private String string_;
-
-        @Override
-        public boolean hasString() {
-            return ((bitField0_ & 0x00000800) != 0);
-        }
-
-        @Override
-        public String getString() {
-            return string_;
-        }
-
-        @Override
-        public com.google.protobuf.ByteString
-        getStringBytes() {
-            return com.google.protobuf.ByteString.copyFromUtf8(string_);
-        }
-
-        private void setString(
-                String value) {
-            Class<?> valueClass = value.getClass();
-            bitField0_ |= 0x00000800;
-            string_ = value;
-        }
-
-        private void clearString() {
-            bitField0_ = (bitField0_ & ~0x00000800);
-            string_ = getDefaultInstance().getString();
-        }
-
-        private void setStringBytes(
-                com.google.protobuf.ByteString value) {
-            string_ = value.toStringUtf8();
-            bitField0_ |= 0x00000800;
-        }
-
-        public static final int BYTES_FIELD_NUMBER = 13;
         private com.google.protobuf.ByteString bytes_;
 
-        @Override
-        public boolean hasBytes() {
-            return ((bitField0_ & 0x00001000) != 0);
-        }
-
-        @Override
-        public com.google.protobuf.ByteString getBytes() {
-            return bytes_;
-        }
-
-        private void setBytes(com.google.protobuf.ByteString value) {
-            Class<?> valueClass = value.getClass();
-            bitField0_ |= 0x00001000;
-            bytes_ = value;
-        }
-
-        private void clearBytes() {
-            bitField0_ = (bitField0_ & ~0x00001000);
-            bytes_ = getDefaultInstance().getBytes();
+        private ScalarMessage() {
+            string_ = "";
+            bytes_ = com.google.protobuf.ByteString.EMPTY;
         }
 
         public static ScalarMessage parseFrom(
@@ -666,6 +416,352 @@ public class PerformanceBenchmark implements TestProvider {
             return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
         }
 
+        public static ScalarMessage getDefaultInstance() {
+            return DEFAULT_INSTANCE;
+        }
+
+        public static com.google.protobuf.Parser<ScalarMessage> parser() {
+            return DEFAULT_INSTANCE.getParserForType();
+        }
+
+        @Override
+        public boolean hasFixed32() {
+            return ((bitField0_ & 0x00000001) != 0);
+        }
+
+        @Override
+        public int getFixed32() {
+            return fixed32_;
+        }
+
+        private void setFixed32(int value) {
+            bitField0_ |= 0x00000001;
+            fixed32_ = value;
+        }
+
+        private void clearFixed32() {
+            bitField0_ = (bitField0_ & ~0x00000001);
+            fixed32_ = 0;
+        }
+
+        @Override
+        public boolean hasSfixed32() {
+            return ((bitField0_ & 0x00000002) != 0);
+        }
+
+        @Override
+        public int getSfixed32() {
+            return sfixed32_;
+        }
+
+        private void setSfixed32(int value) {
+            bitField0_ |= 0x00000002;
+            sfixed32_ = value;
+        }
+
+        private void clearSfixed32() {
+            bitField0_ = (bitField0_ & ~0x00000002);
+            sfixed32_ = 0;
+        }
+
+        @Override
+        public boolean hasInt32() {
+            return ((bitField0_ & 0x00000004) != 0);
+        }
+
+        @Override
+        public int getInt32() {
+            return int32_;
+        }
+
+        private void setInt32(int value) {
+            bitField0_ |= 0x00000004;
+            int32_ = value;
+        }
+
+        private void clearInt32() {
+            bitField0_ = (bitField0_ & ~0x00000004);
+            int32_ = 0;
+        }
+
+        @Override
+        public boolean hasUint32() {
+            return ((bitField0_ & 0x00000008) != 0);
+        }
+
+        @Override
+        public int getUint32() {
+            return uint32_;
+        }
+
+        private void setUint32(int value) {
+            bitField0_ |= 0x00000008;
+            uint32_ = value;
+        }
+
+        private void clearUint32() {
+            bitField0_ = (bitField0_ & ~0x00000008);
+            uint32_ = 0;
+        }
+
+        @Override
+        public boolean hasFixed64() {
+            return ((bitField0_ & 0x00000010) != 0);
+        }
+
+        @Override
+        public long getFixed64() {
+            return fixed64_;
+        }
+
+        private void setFixed64(long value) {
+            bitField0_ |= 0x00000010;
+            fixed64_ = value;
+        }
+
+        private void clearFixed64() {
+            bitField0_ = (bitField0_ & ~0x00000010);
+            fixed64_ = 0L;
+        }
+
+        @Override
+        public boolean hasSfixed64() {
+            return ((bitField0_ & 0x00000020) != 0);
+        }
+
+        @Override
+        public long getSfixed64() {
+            return sfixed64_;
+        }
+
+        private void setSfixed64(long value) {
+            bitField0_ |= 0x00000020;
+            sfixed64_ = value;
+        }
+
+        private void clearSfixed64() {
+            bitField0_ = (bitField0_ & ~0x00000020);
+            sfixed64_ = 0L;
+        }
+
+        @Override
+        public boolean hasInt64() {
+            return ((bitField0_ & 0x00000040) != 0);
+        }
+
+        @Override
+        public long getInt64() {
+            return int64_;
+        }
+
+        private void setInt64(long value) {
+            bitField0_ |= 0x00000040;
+            int64_ = value;
+        }
+
+        private void clearInt64() {
+            bitField0_ = (bitField0_ & ~0x00000040);
+            int64_ = 0L;
+        }
+
+        @Override
+        public boolean hasUint64() {
+            return ((bitField0_ & 0x00000080) != 0);
+        }
+
+        @Override
+        public long getUint64() {
+            return uint64_;
+        }
+
+        private void setUint64(long value) {
+            bitField0_ |= 0x00000080;
+            uint64_ = value;
+        }
+
+        private void clearUint64() {
+            bitField0_ = (bitField0_ & ~0x00000080);
+            uint64_ = 0L;
+        }
+
+        @Override
+        public boolean hasFloat() {
+            return ((bitField0_ & 0x00000100) != 0);
+        }
+
+        @Override
+        public float getFloat() {
+            return float_;
+        }
+
+        private void setFloat(float value) {
+            bitField0_ |= 0x00000100;
+            float_ = value;
+        }
+
+        private void clearFloat() {
+            bitField0_ = (bitField0_ & ~0x00000100);
+            float_ = 0F;
+        }
+
+        @Override
+        public boolean hasDouble() {
+            return ((bitField0_ & 0x00000200) != 0);
+        }
+
+        @Override
+        public double getDouble() {
+            return double_;
+        }
+
+        private void setDouble(double value) {
+            bitField0_ |= 0x00000200;
+            double_ = value;
+        }
+
+        private void clearDouble() {
+            bitField0_ = (bitField0_ & ~0x00000200);
+            double_ = 0D;
+        }
+
+        @Override
+        public boolean hasBool() {
+            return ((bitField0_ & 0x00000400) != 0);
+        }
+
+        @Override
+        public boolean getBool() {
+            return bool_;
+        }
+
+        private void setBool(boolean value) {
+            bitField0_ |= 0x00000400;
+            bool_ = value;
+        }
+
+        private void clearBool() {
+            bitField0_ = (bitField0_ & ~0x00000400);
+            bool_ = false;
+        }
+
+        @Override
+        public boolean hasString() {
+            return ((bitField0_ & 0x00000800) != 0);
+        }
+
+        @Override
+        public String getString() {
+            return string_;
+        }
+
+        private void setString(
+                String value) {
+            Class<?> valueClass = value.getClass();
+            bitField0_ |= 0x00000800;
+            string_ = value;
+        }
+
+        @Override
+        public com.google.protobuf.ByteString
+        getStringBytes() {
+            return com.google.protobuf.ByteString.copyFromUtf8(string_);
+        }
+
+        private void setStringBytes(
+                com.google.protobuf.ByteString value) {
+            string_ = value.toStringUtf8();
+            bitField0_ |= 0x00000800;
+        }
+
+        private void clearString() {
+            bitField0_ = (bitField0_ & ~0x00000800);
+            string_ = getDefaultInstance().getString();
+        }
+
+        @Override
+        public boolean hasBytes() {
+            return ((bitField0_ & 0x00001000) != 0);
+        }
+
+        @Override
+        public com.google.protobuf.ByteString getBytes() {
+            return bytes_;
+        }
+
+        private void setBytes(com.google.protobuf.ByteString value) {
+            Class<?> valueClass = value.getClass();
+            bitField0_ |= 0x00001000;
+            bytes_ = value;
+        }
+
+        private void clearBytes() {
+            bitField0_ = (bitField0_ & ~0x00001000);
+            bytes_ = getDefaultInstance().getBytes();
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "fallthrough"})
+        protected final Object dynamicMethod(
+                MethodToInvoke method,
+                Object arg0, Object arg1) {
+            switch (method) {
+                case NEW_MUTABLE_INSTANCE: {
+                    return new ScalarMessage();
+                }
+                case NEW_BUILDER: {
+                    return new Builder();
+                }
+                case BUILD_MESSAGE_INFO: {
+                    Object[] objects = new Object[]{
+                            "bitField0_",
+                            "fixed32_",
+                            "sfixed32_",
+                            "int32_",
+                            "uint32_",
+                            "fixed64_",
+                            "sfixed64_",
+                            "int64_",
+                            "uint64_",
+                            "float_",
+                            "double_",
+                            "bool_",
+                            "string_",
+                            "bytes_",
+                    };
+                    String info =
+                            "\u0001\r\u0000\u0001\u0001\r\r\u0000\u0000\u0000\u0001\u1006\u0000\u0002\u100d\u0001" +
+                                    "\u0003\u1004\u0002\u0004\u100b\u0003\u0005\u1005\u0004\u0006\u100e\u0005\u0007\u1002" +
+                                    "\u0006\b\u1003\u0007\t\u1001\b\n\u1000\t\u000b\u1007\n\f\u1008\u000b\r\u100a\f";
+                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                }
+
+                case GET_DEFAULT_INSTANCE: {
+                    return DEFAULT_INSTANCE;
+                }
+                case GET_PARSER: {
+                    com.google.protobuf.Parser<ScalarMessage> parser = PARSER;
+                    if (parser == null) {
+                        synchronized (ScalarMessage.class) {
+                            parser = PARSER;
+                            if (parser == null) {
+                                parser =
+                                        new DefaultInstanceBasedParser<ScalarMessage>(
+                                                DEFAULT_INSTANCE);
+                                PARSER = parser;
+                            }
+                        }
+                    }
+                    return parser;
+                }
+                case GET_MEMOIZED_IS_INITIALIZED: {
+                    return (byte) 1;
+                }
+                case SET_MEMOIZED_IS_INITIALIZED: {
+                    return null;
+                }
+            }
+            throw new UnsupportedOperationException();
+        }
 
         public static final class Builder extends
                 com.google.protobuf.GeneratedMessageLite.Builder<
@@ -941,12 +1037,6 @@ public class PerformanceBenchmark implements TestProvider {
                 return instance.getString();
             }
 
-            @Override
-            public com.google.protobuf.ByteString
-            getStringBytes() {
-                return instance.getStringBytes();
-            }
-
             public Builder setString(
                     String value) {
                 copyOnWrite();
@@ -954,10 +1044,10 @@ public class PerformanceBenchmark implements TestProvider {
                 return this;
             }
 
-            public Builder clearString() {
-                copyOnWrite();
-                instance.clearString();
-                return this;
+            @Override
+            public com.google.protobuf.ByteString
+            getStringBytes() {
+                return instance.getStringBytes();
             }
 
             public Builder setStringBytes(
@@ -967,6 +1057,11 @@ public class PerformanceBenchmark implements TestProvider {
                 return this;
             }
 
+            public Builder clearString() {
+                copyOnWrite();
+                instance.clearString();
+                return this;
+            }
 
             @Override
             public boolean hasBytes() {
@@ -991,92 +1086,6 @@ public class PerformanceBenchmark implements TestProvider {
             }
 
 
-        }
-
-        @Override
-        @SuppressWarnings({"unchecked", "fallthrough"})
-        protected final Object dynamicMethod(
-                MethodToInvoke method,
-                Object arg0, Object arg1) {
-            switch (method) {
-                case NEW_MUTABLE_INSTANCE: {
-                    return new ScalarMessage();
-                }
-                case NEW_BUILDER: {
-                    return new Builder();
-                }
-                case BUILD_MESSAGE_INFO: {
-                    Object[] objects = new Object[]{
-                            "bitField0_",
-                            "fixed32_",
-                            "sfixed32_",
-                            "int32_",
-                            "uint32_",
-                            "fixed64_",
-                            "sfixed64_",
-                            "int64_",
-                            "uint64_",
-                            "float_",
-                            "double_",
-                            "bool_",
-                            "string_",
-                            "bytes_",
-                    };
-                    String info =
-                            "\u0001\r\u0000\u0001\u0001\r\r\u0000\u0000\u0000\u0001\u1006\u0000\u0002\u100d\u0001" +
-                                    "\u0003\u1004\u0002\u0004\u100b\u0003\u0005\u1005\u0004\u0006\u100e\u0005\u0007\u1002" +
-                                    "\u0006\b\u1003\u0007\t\u1001\b\n\u1000\t\u000b\u1007\n\f\u1008\u000b\r\u100a\f";
-                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-                }
-
-                case GET_DEFAULT_INSTANCE: {
-                    return DEFAULT_INSTANCE;
-                }
-                case GET_PARSER: {
-                    com.google.protobuf.Parser<ScalarMessage> parser = PARSER;
-                    if (parser == null) {
-                        synchronized (ScalarMessage.class) {
-                            parser = PARSER;
-                            if (parser == null) {
-                                parser =
-                                        new DefaultInstanceBasedParser<ScalarMessage>(
-                                                DEFAULT_INSTANCE);
-                                PARSER = parser;
-                            }
-                        }
-                    }
-                    return parser;
-                }
-                case GET_MEMOIZED_IS_INITIALIZED: {
-                    return (byte) 1;
-                }
-                case SET_MEMOIZED_IS_INITIALIZED: {
-                    return null;
-                }
-            }
-            throw new UnsupportedOperationException();
-        }
-
-
-        private static final ScalarMessage DEFAULT_INSTANCE;
-
-        static {
-            ScalarMessage defaultInstance = new ScalarMessage();
-
-
-            DEFAULT_INSTANCE = defaultInstance;
-            com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-                    ScalarMessage.class, defaultInstance);
-        }
-
-        public static ScalarMessage getDefaultInstance() {
-            return DEFAULT_INSTANCE;
-        }
-
-        private static volatile com.google.protobuf.Parser<ScalarMessage> PARSER;
-
-        public static com.google.protobuf.Parser<ScalarMessage> parser() {
-            return DEFAULT_INSTANCE.getParserForType();
         }
     }
 }

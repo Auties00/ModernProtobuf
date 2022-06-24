@@ -1,25 +1,30 @@
 # ModernProtoc
+
 A modern implementation of protoc to generate java sources from protobuf schemas
 
 ### What is ModernProtoc
 
-Protoc, the default compiler for protobuf schemas, can generate classes for Java starting from a schema. 
-The generated code, though, is really verbose and not up to date with modern versions of Java. 
-Moreover, it is not really intended to be edited, which may be necessary if you want your code to be available to other developers. 
+Protoc, the default compiler for protobuf schemas, can generate classes for Java starting from a schema.
+The generated code, though, is really verbose and not up to date with modern versions of Java.
+Moreover, it is not really intended to be edited, which may be necessary if you want your code to be available to other
+developers.
 Keeping in mind the previous points, I decided to start this project.
-The latest LTS, Java 17, and upwards is supported. 
+The latest LTS, Java 17, and upwards is supported.
 The generated code relies only on Lombok and Jackson.
-An important premise is that this library cannot currently compete with Google's implementation is terms of serialization efficiency(~5x times faster).
+An important premise is that this library cannot currently compete with Google's implementation is terms of
+serialization efficiency(~5x times faster).
 On the other hand, code size is largely reduced (~10x on average) and creating abstractions is much more simple.
-In the future, I will try my best to improve on the efficiency side of things by, for example, reducing the use of reflection.
+In the future, I will try my best to improve on the efficiency side of things by, for example, reducing the use of
+reflection.
 For now, Protobuf 3 isn't supported, but I count on adding it asap.
 
 ### Schema generation
 
-The schema generator CLI tool is developed inside the tool module. 
+The schema generator CLI tool is developed inside the tool module.
 It can be easily downloaded from the release tab or by compiling it manually using maven.
 
 To get started, run the executable from any terminal passing generate as an argument:
+
 ```
 Missing required parameter: '<protobuf>'
 Usage: <main class> generate [-hV] [-o=<output>] [-p=<pack>] <protobuf>
@@ -35,25 +40,32 @@ Generates the java classes for a protobuf file
 ```
 
 Follow the instructions to generate the files you need. For example:
+
 ```
 protoc generate ./protobufs/auth.proto --package it.auties.example --output ./src/main/java/it/auties/example
 ```
 
-You can freely edit the generated schemas. The type of each protobuf field is inferred by using reflection when decoding or the json description
-when encoding. If you want to override the type infer system, use the `@ProtobufType` annotation and pass the desired type as a parameter.
-Obviously, the type contained in an encoded protobuf should be applicable to the new field type. 
-If you want to map a particular class to another type when used as a property in a protobuf schema, apply the same procedure but to said class declaration.
-This might be useful if for example you want to create a wrapper around a common property type around your schemas, but cannot modify the behaviour of the server
+You can freely edit the generated schemas. The type of each protobuf field is inferred by using reflection when decoding
+or the json description
+when encoding. If you want to override the type infer system, use the `@ProtobufType` annotation and pass the desired
+type as a parameter.
+Obviously, the type contained in an encoded protobuf should be applicable to the new field type.
+If you want to map a particular class to another type when used as a property in a protobuf schema, apply the same
+procedure but to said class declaration.
+This might be useful if for example you want to create a wrapper around a common property type around your schemas, but
+cannot modify the behaviour of the server
 sending the encoded protobuf.
 
 ### Serialization
 
 Any Protobuf object can be serialized to an array of bytes using this piece of this code:
+
 ```java
 var result = ProtobufEncoder.encode(protobuf);
 ```
 
 Similarly, an array of bytes can be converted to any protobuf object using this piece of this code:
+
 ```java
 var result = ProtobufDecoder.forType(ProtobufObject.class)
     .decode(bytes);
@@ -62,6 +74,7 @@ var result = ProtobufDecoder.forType(ProtobufObject.class)
 ### Example Schema
 
 ModernProtoc(12 LOC):
+
 ```protobuf
 message AdReplyInfo {
     optional string advertiserName = 1;
@@ -77,6 +90,7 @@ message AdReplyInfo {
 ```
 
 Modern Protoc(42 LOC):
+
 ```java
 import com.fasterxml.jackson.annotation.*;
 import java.util.Arrays;
@@ -123,6 +137,7 @@ public class AdReplyInfo {
 ```
 
 Google's Protoc(268 LOC):
+
 ```java
 public interface AdReplyInfoOrBuilder extends
       // @@protoc_insertion_point(interface_extends:it.auties.whatsapp4j.model.AdReplyInfo)

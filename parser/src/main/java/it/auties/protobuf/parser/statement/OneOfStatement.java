@@ -4,18 +4,15 @@ import com.google.common.base.CaseFormat;
 import it.auties.protobuf.parser.object.ProtobufObject;
 import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
+
 @EqualsAndHashCode(callSuper = true)
 public final class OneOfStatement extends ProtobufObject<FieldStatement> {
     public OneOfStatement(String name) {
-        super(name);
+        super(name, new ArrayList<>());
     }
 
-    @Override
-    public String getName() {
+    public String getClassName() {
         return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, super.getName());
-    }
-
-    public String getNameAsField(){
-        return super.getName();
     }
 }

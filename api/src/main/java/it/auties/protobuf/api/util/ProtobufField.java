@@ -6,8 +6,6 @@ import it.auties.protobuf.api.model.ProtobufProperty;
 
 import java.util.Objects;
 
-import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
-
 public record ProtobufField(String name, int index, ProtobufProperty.Type type,
                             Class<? extends ProtobufMessage> messageType, Object value, boolean packed,
                             boolean required, boolean repeated, boolean requiresConversion) {

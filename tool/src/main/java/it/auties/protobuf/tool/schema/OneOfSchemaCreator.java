@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Map;
 
-public record OneOfSchemaCreator(OneOfStatement oneOfStatement, String pack, boolean imports) implements SchemaCreator{
+public record OneOfSchemaCreator(OneOfStatement oneOfStatement, String pack, boolean imports) implements SchemaCreator {
     private static final String GENERATOR = ProtobufUtils.readGenerator("OneOfTemplate");
 
     @Override

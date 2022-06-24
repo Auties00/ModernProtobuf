@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>protoc</artifactId>
         <groupId>com.github.auties00</groupId>
@@ -92,7 +93,8 @@
                     <runtimeImage>${java.home}</runtimeImage>
                     <destination>${project.build.directory}/distro</destination>
                     <input>${project.build.sourceDirectory}</input>
-                    <mainJar>${project.build.outputDirectory}/${artifactId}-${version}-jar-with-dependencies.jar</mainJar>
+                    <mainJar>${project.build.outputDirectory}/${artifactId}-${version}-jar-with-dependencies.jar
+                    </mainJar>
                     <winConsole>true</winConsole>
                     <winDirChooser>true</winDirChooser>
                     <winPerUserInstall>true</winPerUserInstall>

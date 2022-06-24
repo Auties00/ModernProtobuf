@@ -10,9 +10,6 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class MixedNotationsTest implements TestProvider {
     @Test
     @SneakyThrows

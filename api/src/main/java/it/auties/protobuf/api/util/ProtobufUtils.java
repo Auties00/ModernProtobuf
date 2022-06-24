@@ -4,31 +4,24 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import it.auties.protobuf.api.exception.ProtobufSerializationException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
-import it.auties.protobuf.api.model.ProtobufProperty.Type;
 import it.auties.protobuf.api.model.ProtobufValue;
-import lombok.Builder;
-import lombok.experimental.SuperBuilder;
 import lombok.experimental.UtilityClass;
-import lombok.extern.jackson.Jacksonized;
 
 import java.lang.reflect.Field;
-import java.util.Optional;
-
-import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
 
 @UtilityClass
 public class ProtobufUtils {
-    public String getFieldName(Field field){
+    public String getFieldName(Field field) {
         var notation = field.getAnnotation(JsonProperty.class);
         return notation == null ? field.getName() : notation.value();
     }
 
-    public boolean isProperty(Field field){
+    public boolean isProperty(Field field) {
         var annotation = field.getAnnotation(ProtobufProperty.class);
         return annotation != null && !annotation.ignore();
     }
 
-    public ProtobufProperty getProperty(Field field){
+    public ProtobufProperty getProperty(Field field) {
         var property = field.getAnnotation(ProtobufProperty.class);
         return property == null || property.ignore() ? null : property;
     }
@@ -38,17 +31,17 @@ public class ProtobufUtils {
             return null;
         }
 
-        if(property.concreteType() == null){
+        if (property.concreteType() == null) {
             throw new ProtobufSerializationException("Missing concrete type property type");
         }
 
-        if(property.concreteType().isEnum()){
+        if (property.concreteType().isEnum()) {
             return null;
         }
 
-        if(!ProtobufMessage.isMessage(property.concreteType())){
+        if (!ProtobufMessage.isMessage(property.concreteType())) {
             throw new ProtobufSerializationException("%s is not a valid message type. ".formatted(property.concreteType()) +
-                        "This usually means that there is a missing concrete type property or that said class is not a ProtobufMessage");
+                    "This usually means that there is a missing concrete type property or that said class is not a ProtobufMessage");
         }
 
         return property.concreteType()

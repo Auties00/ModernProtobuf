@@ -27,7 +27,7 @@ public class ModifierTest implements TestProvider {
         try {
             JACKSON.writeValueAsBytes(object);
             return true;
-        }catch (JsonMappingException exception){
+        } catch (JsonMappingException exception) {
             return false;
         }
     }

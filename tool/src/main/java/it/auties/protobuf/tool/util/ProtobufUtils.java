@@ -12,21 +12,21 @@ import java.util.Objects;
 @UtilityClass
 public class ProtobufUtils {
     @SneakyThrows
-    public String readGenerator(String name){
-        try(var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name))){
+    public String readGenerator(String name) {
+        try (var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name))) {
             return new String(Objects.requireNonNull(stream).readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
     // This method is used inside the Message Model generator
     @SuppressWarnings("unused")
-    public String toValidIdentifier(String identifier){
+    public String toValidIdentifier(String identifier) {
         return SourceVersion.isKeyword(identifier) ? "_%s".formatted(identifier) : identifier;
     }
 
     // This method is used inside the Message Model generator
     @SuppressWarnings("unused")
-    public String generateCondition(String oneOfName, Iterator<FieldStatement> statements){
+    public String generateCondition(String oneOfName, Iterator<FieldStatement> statements) {
         var next = statements.next();
         return """
                 if(%s != null) return %s.%s;

@@ -3,7 +3,6 @@ package it.auties.protobuf.api.jackson;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.ContentReference;
 import com.fasterxml.jackson.core.io.IOContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import it.auties.protobuf.api.model.ProtobufSchema;
 import it.auties.protobuf.api.util.VersionInfo;
 import lombok.NoArgsConstructor;

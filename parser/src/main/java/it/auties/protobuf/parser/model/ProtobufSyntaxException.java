@@ -15,8 +15,8 @@ public class ProtobufSyntaxException extends IllegalArgumentException {
         return message == null ? null : message.formatted(args);
     }
 
-    public static void check(boolean condition, String message, List<String> tokens, Object... args){
-        if(condition){
+    public static void check(boolean condition, String message, List<String> tokens, Object... args) {
+        if (condition) {
             return;
         }
 

@@ -2,10 +2,10 @@ package it.auties.protobuf.tool.schema;
 
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
-import it.auties.protobuf.parser.statement.EnumStatement;
-import it.auties.protobuf.parser.statement.MessageStatement;
 import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.parser.object.ProtobufObject;
+import it.auties.protobuf.parser.statement.EnumStatement;
+import it.auties.protobuf.parser.statement.MessageStatement;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
@@ -29,7 +29,7 @@ public record ProtobufSchemaCreator(ProtobufDocument document, String pack,
         try {
             var formattedSchema = formatter.formatSourceAndFixImports(withoutFormatting);
             writeFile(object, formattedSchema);
-        }catch (FormatterException formatterException){
+        } catch (FormatterException formatterException) {
             log.warn("Erroneous code: %s".formatted(withoutFormatting));
             throw formatterException;
         }
