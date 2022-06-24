@@ -120,8 +120,9 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
     }
 
     public void writeStringNoTag(String value) {
-        writeUInt32NoTag(value.length());
-        writeRawBytes(value.getBytes(StandardCharsets.UTF_8));
+        var bytes = value.getBytes(StandardCharsets.UTF_8);
+        writeUInt32NoTag(bytes.length);
+        writeRawBytes(bytes);
     }
 
     public void writeRaw(byte value) {
