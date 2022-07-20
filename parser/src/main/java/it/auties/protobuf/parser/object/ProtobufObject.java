@@ -21,7 +21,11 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
         permits ProtobufDocument, EnumStatement, MessageStatement, OneOfStatement {
     private final List<T> statements;
     public ProtobufObject(){
-        this(null, new LinkedList<>());
+        this(null);
+    }
+
+    public ProtobufObject(String name){
+        this(name, new LinkedList<>());
     }
 
     public ProtobufObject(String name, List<T> statements) {

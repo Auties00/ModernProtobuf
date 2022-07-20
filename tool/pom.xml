@@ -12,18 +12,6 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <javac.package>jdk.compiler/com.sun.tools.javac</javac.package>
-        <google.module>com.google.googlejavaformat</google.module>
-        <open.tree>${javac.package}.tree=${google.module}</open.tree>
-        <open.util>${javac.package}.util=${google.module}</open.util>
-        <open.code>${javac.package}.code=${google.module}</open.code>
-        <open.api>${javac.package}.api=${google.module}</open.api>
-        <open.comp>${javac.package}.comp=${google.module}</open.comp>
-        <open.jvm>${javac.package}.jvm=${google.module}</open.jvm>
-        <open.model>${javac.package}.model=${google.module}</open.model>
-        <open.processing>${javac.package}.processing=${google.module}</open.processing>
-        <open.resources>${javac.package}.resources=${google.module}</open.resources>
-        <open.main>${javac.package}.main=${google.module}</open.main>
     </properties>
 
     <build>
@@ -32,30 +20,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
-                <configuration>
-                    <compilerArgs>
-                        <arg>--add-exports</arg>
-                        <arg>${open.tree}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.util}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.code}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.api}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.comp}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.jvm}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.processing}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.model}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.resources}</arg>
-                        <arg>--add-exports</arg>
-                        <arg>${open.main}</arg>
-                    </compilerArgs>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -129,23 +93,7 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.17.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.googlejavaformat</groupId>
-            <artifactId>google-java-format</artifactId>
-            <version>1.15.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.codehaus.groovy</groupId>
-            <artifactId>groovy-templates</artifactId>
-            <version>3.0.10</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.codehaus.groovy</groupId>
-                    <artifactId>groovy-xml</artifactId>
-                </exclusion>
-            </exclusions>
+            <version>2.17.2</version>
         </dependency>
     </dependencies>
 </project>

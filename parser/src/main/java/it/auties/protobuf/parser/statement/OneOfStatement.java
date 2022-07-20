@@ -1,12 +1,10 @@
 package it.auties.protobuf.parser.statement;
 
-import com.google.common.base.CaseFormat;
 import it.auties.protobuf.parser.object.ProtobufObject;
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 
 import java.util.ArrayList;
-import java.util.stream.Collectors;
+import java.util.Locale;
 
 @EqualsAndHashCode(callSuper = true)
 public final class OneOfStatement extends ProtobufObject<FieldStatement> {
@@ -14,8 +12,9 @@ public final class OneOfStatement extends ProtobufObject<FieldStatement> {
         super(name, new ArrayList<>());
     }
 
-    public String getClassName() {
-        return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, super.getName());
+    public String className() {
+        return name().substring(0, 1).toUpperCase(Locale.ROOT)
+                + name().substring(1);
     }
 
     @Override
@@ -28,7 +27,7 @@ public final class OneOfStatement extends ProtobufObject<FieldStatement> {
         var builder = new StringBuilder()
                 .append("%soneof".formatted(INDENTATION.repeat(level)))
                 .append(" ")
-                .append(getName())
+                .append(name())
                 .append(" ")
                 .append("{")
                 .append("\n");

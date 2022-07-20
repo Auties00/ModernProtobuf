@@ -1,9 +1,11 @@
 package it.auties.protobuf.parser.statement;
 
-import com.google.common.base.CaseFormat;
 import it.auties.protobuf.parser.model.FieldModifier;
 import it.auties.protobuf.parser.model.FieldType;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 import java.util.HashMap;
@@ -12,7 +14,7 @@ import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Accessors(chain = true)
+@Accessors(fluent = true)
 @Data
 @EqualsAndHashCode(callSuper = true)
 public final class FieldStatement extends ProtobufStatement {
@@ -23,48 +25,71 @@ public final class FieldStatement extends ProtobufStatement {
     private boolean deprecated;
     private String defaultValue;
     private Scope scope;
-
-    public String getNameAsConstant() {
-        return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, getName());
+    public FieldStatement(String name){
+        super(name);
     }
 
-    public FieldType getFieldType() {
+    public String nameAsConstant() {
+        if(name().chars().allMatch(Character::isUpperCase)){
+            return name();
+        }
+
+        if(name().contains("_")){
+            return name().toUpperCase(Locale.ROOT);
+        }
+
+        var builder = new StringBuilder();
+        for(var i = 0; i < name().length(); i++){
+            var entry = name().charAt(i);
+            if (i == 0 || Character.isLowerCase(entry)) {
+                builder.append(Character.toUpperCase(entry));
+                continue;
+            }
+
+            builder.append("_");
+            builder.append(entry);
+        }
+
+        return builder.toString();
+    }
+
+    public FieldType fieldType() {
         return FieldType.forName(type)
                 .orElse(FieldType.MESSAGE);
     }
 
-    public String getJavaType() {
+    public String javaType(boolean allowPrimitives, boolean wrapRepeated) {
         if (type.equals("string")) {
-            return isRepeated() ? "List<String>" : "String";
+            return isRepeated() && wrapRepeated ? "List<String>" : "String";
         }
 
         if (type.equals("bool")) {
-            return isRepeated() ? "List<Boolean>"
-                    : isRequired() ? "boolean" : "Boolean";
+            return isRepeated() && wrapRepeated  ? "List<Boolean>"
+                    : isRequired() && allowPrimitives ? "boolean" : "Boolean";
         }
 
         if (type.equals("double")) {
-            return isRepeated() ? "List<Double>"
-                    : isRequired() ? "double" : "Double";
+            return isRepeated() && wrapRepeated  ? "List<Double>"
+                    : isRequired() && allowPrimitives ? "double" : "Double";
         }
 
         if (type.equals("float")) {
-            return isRepeated() ? "List<Float>"
-                    : isRequired() ? "float" : "Float";
+            return isRepeated() && wrapRepeated  ? "List<Float>"
+                    : isRequired() && allowPrimitives ? "float" : "Float";
         }
 
         if (type.equals("bytes")) {
-            return isRepeated() ? "List<byte[]>" : "byte[]";
+            return isRepeated() && wrapRepeated  ? "List<byte[]>" : "byte[]";
         }
 
         if (type.equals("int32") || type.equals("uint32") || type.equals("sint32") || type.equals("fixed32") || type.equals("sfixed32")) {
-            return isRepeated() ? "List<Integer>"
-                    : isRequired() ? "int" : "Integer";
+            return isRepeated() && wrapRepeated  ? "List<Integer>"
+                    : isRequired() && allowPrimitives ? "int" : "Integer";
         }
 
         if (type.equals("int64") || type.equals("uint64") || type.equals("sint64") || type.equals("fixed64") || type.equals("sfixed64")) {
-            return isRepeated() ? "List<Long>"
-                    : isRequired() ? "long" : "Long";
+            return isRepeated() && wrapRepeated  ? "List<Long>"
+                    : isRequired() && allowPrimitives ? "long" : "Long";
         }
 
         return isRepeated() ? "List<%s>".formatted(type) : type;
@@ -80,39 +105,43 @@ public final class FieldStatement extends ProtobufStatement {
         return INDENTATION.repeat(level) +
                 toPrettyModifier() +
                 toPrettyType() +
-                getName() +
+                name() +
                 " = " +
-                getIndex() +
+                index() +
                 toPrettyOptions() +
                 ";";
     }
 
     private String toPrettyType() {
-        return getType() == null ? "" : "%s ".formatted(getType());
+        return type() == null ? "" : "%s ".formatted(type());
     }
 
     private String toPrettyModifier() {
-        return getModifier() == null || getModifier() == FieldModifier.NOTHING
-                ? "" : "%s ".formatted(getModifier().name().toLowerCase(Locale.ROOT));
+        return modifier() == null || modifier() == FieldModifier.NOTHING
+                ? "" : "%s ".formatted(modifier().name().toLowerCase(Locale.ROOT));
     }
 
     private String toPrettyOptions() {
-        if (!isPacked()
-                && !isDeprecated()
-                && getDefaultValue() == null) {
+        if (!packed()
+                && !deprecated()
+                && defaultValue() == null) {
             return "";
         }
 
         var map = new HashMap<>();
-        map.put("packed", isPacked()  ? "true" : null);
-        map.put("deprecated", isDeprecated() ? "true" : null);
-        map.put("default", getDefaultValue());
+        map.put("packed", packed()  ? "true" : null);
+        map.put("deprecated", deprecated() ? "true" : null);
+        map.put("default", defaultValue());
         var entries = map.entrySet()
                 .stream()
                 .filter(entry -> entry.getValue() != null)
                 .map(entry -> "%s=%s".formatted(entry.getKey(), entry.getValue()))
                 .collect(Collectors.joining(", "));
         return entries.isEmpty() ? entries : " [%s]".formatted(entries);
+    }
+
+    public boolean isNothing(){
+        return modifier == FieldModifier.NOTHING;
     }
 
     public boolean isOptional() {

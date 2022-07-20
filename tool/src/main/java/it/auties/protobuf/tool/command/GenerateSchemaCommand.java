@@ -1,7 +1,5 @@
 package it.auties.protobuf.tool.command;
 
-import com.google.googlejavaformat.java.Formatter;
-import com.google.googlejavaformat.java.FormatterException;
 import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
@@ -84,9 +82,9 @@ public class GenerateSchemaCommand implements Callable<Integer> {
         return document;
     }
 
-    private void generateSchema(ProtobufDocument ast) throws IOException, FormatterException, ClassNotFoundException {
+    private void generateSchema(ProtobufDocument ast) {
         log.info("Generating java classes from AST...");
-        var generator = new ProtobufSchemaCreator(ast, pack, output, new Formatter());
+        var generator = new ProtobufSchemaCreator(ast, pack, output);
         generator.generateSchema();
         log.info("Generated java classes successfully at %s".formatted(output));
     }

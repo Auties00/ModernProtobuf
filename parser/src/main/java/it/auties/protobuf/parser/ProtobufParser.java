@@ -92,7 +92,10 @@ public final class ProtobufParser {
 
             case OBJECT_END -> {
                 var object = objectsQueue.pollLast();
-                ProtobufSyntaxException.check(isObjectValid(object), "Proto3 enums require a constant with index 0", tokenizer.lineno());
+                ProtobufSyntaxException.check(hasAnyConstants(object),
+                        "Illegal enum or oneof without any constants", tokenizer.lineno());
+                ProtobufSyntaxException.check(hasDefaultEnumConstant(object),
+                        "Proto3 enums require a constant with index 0", tokenizer.lineno());
                 var scope = objectsQueue.peekLast();
                 if(scope == null){
                     document.getStatements().add(object);
@@ -136,10 +139,16 @@ public final class ProtobufParser {
         }
     }
 
-    private boolean isObjectValid(ProtobufObject<?> object) {
+    private boolean hasAnyConstants(ProtobufObject<?> object) {
+        return (object instanceof EnumStatement enumStatement && !enumStatement.getStatements().isEmpty())
+                || (object instanceof OneOfStatement oneOfStatement && !oneOfStatement.getStatements().isEmpty())
+                || object instanceof MessageStatement;
+    }
+
+    private boolean hasDefaultEnumConstant(ProtobufObject<?> object) {
         return document.getVersion() != PROTOBUF_3
                 || !(object instanceof EnumStatement enumStatement)
-                || enumStatement.getStatements().stream().anyMatch(entry -> entry.getIndex() == 0);
+                || enumStatement.getStatements().stream().anyMatch(entry -> entry.index() == 0);
     }
 
     private void handleBodyState(String token, Instruction instruction) {
@@ -193,22 +202,22 @@ public final class ProtobufParser {
 
     private void attributeField(String token) {
         switch (fieldState) {
-            case MODIFIER -> field.setType(token);
+            case MODIFIER -> field.type(token);
             case TYPE -> {
                 ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
                         tokenizer.lineno(), token);
-                field.setName(token);
+                field.name(token);
             }
             case NAME ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after field type", tokenizer.lineno());
             case INDEX -> {
-                var index = parseIndex(token, field.getScope() == FieldStatement.Scope.ENUM)
+                var index = parseIndex(token, field.scope() == FieldStatement.Scope.ENUM)
                         .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));
                 ProtobufSyntaxException.check(!knowIndexes.getLast().contains(index),
                         "Duplicated index %s", tokenizer.lineno(), index);
                 knowIndexes.getLast().add(index);
-                field.setIndex(index);
+                field.index(index);
             }
             case OPTIONS_START ->
                     ProtobufSyntaxException.check(isArrayStart(token),
@@ -219,9 +228,9 @@ public final class ProtobufParser {
                             "Expected assignment operator after field option", tokenizer.lineno());
             case OPTIONS_VALUE -> {
                 switch (fieldOptionName) {
-                    case "packed" -> field.setPacked(Boolean.parseBoolean(token));
-                    case "deprecated" -> field.setDeprecated(Boolean.parseBoolean(token));
-                    case "default" -> field.setDefaultValue(token);
+                    case "packed" -> field.packed(Boolean.parseBoolean(token));
+                    case "deprecated" -> field.deprecated(Boolean.parseBoolean(token));
+                    case "default" -> field.defaultValue(token);
                     default ->
                             LOGGER.log(System.Logger.Level.WARNING, "Unrecognized field option: %s=%s%n".formatted(fieldOptionName, token));
                 }
@@ -243,8 +252,8 @@ public final class ProtobufParser {
         var modifier = FieldModifier.forName(token);
         var scopeType = createFieldScope(scope, modifier);
         this.field = new FieldStatement()
-                .setModifier(modifier)
-                .setScope(scopeType);
+                .modifier(modifier)
+                .scope(scopeType);
         this.fieldState = FieldState.MODIFIER;
         if (modifier != FieldModifier.NOTHING) {
             return;
@@ -253,16 +262,16 @@ public final class ProtobufParser {
         switch (scopeType) {
             case MESSAGE -> {
                 if (document.getVersion() == PROTOBUF_3) {
-                    field.setType(token);
+                    field.type(token);
                     this.fieldState = FieldState.TYPE;
                 }
             }
             case ONE_OF -> {
-                field.setType(token);
+                field.type(token);
                 this.fieldState = FieldState.TYPE;
             }
             case ENUM -> {
-                field.setName(token);
+                field.name(token);
                 this.fieldState = FieldState.NAME;
             }
         }
@@ -314,7 +323,7 @@ public final class ProtobufParser {
 
     private void addFieldToScope() {
         var scope = objectsQueue.getLast();
-        switch (field.getScope()) {
+        switch (field.scope()) {
             case MESSAGE -> ((MessageStatement) scope).getStatements().add(field);
             case ONE_OF -> ((OneOfStatement) scope).getStatements().add(field);
             case ENUM -> ((EnumStatement) scope).getStatements().add(field);

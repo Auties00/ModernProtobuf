@@ -9,7 +9,7 @@ import java.util.ArrayList;
 @EqualsAndHashCode(callSuper = true)
 public final class EnumStatement extends ProtobufObject<FieldStatement> {
     public EnumStatement(String name) {
-        super(name, new ArrayList<>());
+        super(name);
     }
 
     @Override
@@ -22,7 +22,7 @@ public final class EnumStatement extends ProtobufObject<FieldStatement> {
         var builder = new StringBuilder()
                 .append("%senum".formatted(INDENTATION.repeat(level)))
                 .append(" ")
-                .append(getName())
+                .append(name())
                 .append(" ")
                 .append("{")
                 .append("\n");

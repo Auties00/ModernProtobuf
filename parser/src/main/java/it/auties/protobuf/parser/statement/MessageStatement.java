@@ -22,7 +22,7 @@ public final class MessageStatement extends ProtobufObject<ProtobufStatement> {
         var builder = new StringBuilder()
                 .append("%smessage".formatted(INDENTATION.repeat(level)))
                 .append(" ")
-                .append(getName())
+                .append(name())
                 .append(" ")
                 .append("{")
                 .append("\n");

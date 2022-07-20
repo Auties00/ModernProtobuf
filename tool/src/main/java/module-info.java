@@ -5,10 +5,6 @@ open module it.auties.protoc.tool {
     requires com.fasterxml.jackson.core;
     requires com.fasterxml.jackson.databind;
 
-    requires org.codehaus.groovy;
-    requires org.codehaus.groovy.templates;
-
-    requires com.google.googlejavaformat;
     requires java.compiler;
     requires jdk.unsupported;
     requires jdk.compiler;

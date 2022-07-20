@@ -1,36 +1,45 @@
 package it.auties.protobuf.tool.util;
 
 import it.auties.protobuf.parser.statement.FieldStatement;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 
 import javax.lang.model.SourceVersion;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Objects;
+import java.util.stream.Collectors;
 
 @UtilityClass
 public class ProtobufUtils {
-    @SneakyThrows
-    public String readGenerator(String name) {
-        try (var stream = ProtobufUtils.class.getClassLoader().getResourceAsStream("%s.java".formatted(name))) {
-            return new String(Objects.requireNonNull(stream).readAllBytes(), StandardCharsets.UTF_8);
+    private final String INDENT = "    ";
+
+    public String indentLines(String input, int level){
+        if(level == 0){
+            return input;
         }
+
+        return Arrays.stream(input.split("\n"))
+                .map(entry -> indentLine(entry, level))
+                .collect(Collectors.joining("\n"));
     }
 
-    // This method is used inside the Message Model generator
-    @SuppressWarnings("unused")
+    public String indentLine(String entry, int level) {
+        return INDENT.repeat(level) + entry;
+    }
+
     public String toValidIdentifier(String identifier) {
         return SourceVersion.isKeyword(identifier) ? "_%s".formatted(identifier) : identifier;
     }
 
-    // This method is used inside the Message Model generator
-    @SuppressWarnings("unused")
     public String generateCondition(String oneOfName, Iterator<FieldStatement> statements) {
         var next = statements.next();
+        var nextString = statements.hasNext() ? generateCondition(oneOfName, statements)
+                : "return %s.UNKNOWN;".formatted(oneOfName);
         return """
-                if(%s != null) return %s.%s;
+                if(%s != null) {
+                    return %s.%s;
+                }
+                
                 %s
-                """.formatted(next.getName(), oneOfName, next.getNameAsConstant(), statements.hasNext() ? generateCondition(oneOfName, statements) : "return %s.UNKNOWN;".formatted(oneOfName));
+                """.formatted(next.name(), oneOfName, next.nameAsConstant(), nextString);
     }
 }
