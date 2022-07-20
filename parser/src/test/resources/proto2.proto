@@ -1,0 +1,9 @@
+syntax = "proto2";
+option java_generate_equals_and_hash = true;
+
+package it.auties.protobuf;
+
+message Example {
+  required string required = 1 [deprecated = true, packed = true];
+  optional string optional = 2;
+}

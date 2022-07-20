@@ -8,7 +8,6 @@ public class ArrayInputStream {
     private final byte[] buffer;
     private final int limit;
     private int pos;
-    private int lastTag;
 
     public ArrayInputStream(byte[] buffer) {
         this.buffer = buffer;
@@ -18,31 +17,18 @@ public class ArrayInputStream {
 
     public int readTag() {
         if (isAtEnd()) {
-            this.lastTag = 0;
             return 0;
         }
 
-        this.lastTag = readRawVarint32();
-        if (getTagFieldNumber(lastTag) == 0) {
+        var lastTag = readInt32();
+        if (lastTag >>> 3 == 0) {
             throw ProtobufDeserializationException.invalidTag(0);
         }
 
         return lastTag;
     }
 
-    public void checkLastTagWas(final int value) throws ProtobufDeserializationException {
-        if (lastTag == value) {
-            return;
-        }
-
-        throw ProtobufDeserializationException.invalidTag(lastTag);
-    }
-
-    private int getTagFieldNumber(int tag) {
-        return tag >>> 3;
-    }
-
-    public int readRawVarint32() {
+    public int readInt32() {
         fspath:
         {
             int tempPos = pos;
@@ -51,7 +37,7 @@ public class ArrayInputStream {
                 break fspath;
             }
 
-            final byte[] buffer = this.buffer;
+            byte[] buffer = this.buffer;
             int x;
             if ((x = buffer[tempPos++]) >= 0) {
                 pos = tempPos;
@@ -81,35 +67,10 @@ public class ArrayInputStream {
             return x;
         }
 
-        return (int) readRawVarint64SlowPath();
-    }
-
-    long readRawVarint64SlowPath() {
-        long result = 0;
-        for (int shift = 0; shift < 64; shift += 7) {
-            final byte b = readRawByte();
-            result |= (long) (b & 0x7F) << shift;
-            if ((b & 0x80) == 0) {
-                return result;
-            }
-        }
-
-        throw ProtobufDeserializationException.malformedVarInt();
-    }
-
-    public byte readRawByte() {
-        if (pos == limit) {
-            throw ProtobufDeserializationException.truncatedMessage();
-        }
-
-        return buffer[pos++];
+        return (int) readVarInt64Slow();
     }
 
     public long readInt64() {
-        return this.readRawVarint64();
-    }
-
-    public long readRawVarint64() {
         fspath:
         {
             int tempPos = pos;
@@ -118,7 +79,7 @@ public class ArrayInputStream {
                 break fspath;
             }
 
-            final byte[] buffer = this.buffer;
+            byte[] buffer = this.buffer;
             long x;
             int y;
             if ((y = buffer[tempPos++]) >= 0) {
@@ -168,14 +129,34 @@ public class ArrayInputStream {
             return x;
         }
 
-        return readRawVarint64SlowPath();
+        return readVarInt64Slow();
+    }
+
+    private long readVarInt64Slow() {
+        long result = 0;
+        for (int shift = 0; shift < 64; shift += 7) {
+            byte b = readByte();
+            result |= (long) (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) {
+                return result;
+            }
+        }
+
+        throw ProtobufDeserializationException.malformedVarInt();
+    }
+
+    public int readFixed32() {
+        int tempPos = this.pos;
+        if (this.limit - tempPos < 4) {
+            throw ProtobufDeserializationException.truncatedMessage();
+        }
+
+        byte[] buffer = this.buffer;
+        this.pos = tempPos + 4;
+        return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
     }
 
     public long readFixed64() {
-        return this.readRawLittleEndian64();
-    }
-
-    public long readRawLittleEndian64() {
         int tempPos = this.pos;
         if (this.limit - tempPos < 8) {
             throw ProtobufDeserializationException.truncatedMessage();
@@ -186,8 +167,16 @@ public class ArrayInputStream {
         return (long) buffer[tempPos] & 255L | ((long) buffer[tempPos + 1] & 255L) << 8 | ((long) buffer[tempPos + 2] & 255L) << 16 | ((long) buffer[tempPos + 3] & 255L) << 24 | ((long) buffer[tempPos + 4] & 255L) << 32 | ((long) buffer[tempPos + 5] & 255L) << 40 | ((long) buffer[tempPos + 6] & 255L) << 48 | ((long) buffer[tempPos + 7] & 255L) << 56;
     }
 
+    public byte readByte() {
+        if (pos == limit) {
+            throw ProtobufDeserializationException.truncatedMessage();
+        }
+
+        return buffer[pos++];
+    }
+
     public byte[] readBytes() {
-        int size = this.readRawVarint32();
+        int size = this.readInt32();
         if (size > 0 && size <= this.limit - this.pos) {
             var result = new byte[size];
             System.arraycopy(buffer, pos, result, 0, size);
@@ -195,12 +184,12 @@ public class ArrayInputStream {
             return result;
         }
 
-        return size == 0 ? new byte[0] : this.readRawBytes(size);
+        return size == 0 ? new byte[0] : this.readBytes(size);
     }
 
-    public byte[] readRawBytes(final int length) {
+    private byte[] readBytes(int length) {
         if (length > 0 && length <= (limit - pos)) {
-            final int tempPos = pos;
+            int tempPos = pos;
             pos += length;
             return Arrays.copyOfRange(buffer, tempPos, pos);
         }
@@ -214,21 +203,6 @@ public class ArrayInputStream {
         }
 
         throw ProtobufDeserializationException.truncatedMessage();
-    }
-
-    public int readFixed32() {
-        return this.readRawLittleEndian32();
-    }
-
-    public int readRawLittleEndian32() {
-        int tempPos = this.pos;
-        if (this.limit - tempPos < 4) {
-            throw ProtobufDeserializationException.truncatedMessage();
-        }
-
-        byte[] buffer = this.buffer;
-        this.pos = tempPos + 4;
-        return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
     }
 
     public boolean isAtEnd() {

@@ -9,6 +9,8 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
+
 public class EnumTest implements TestProvider {
     @Test
     @SneakyThrows
@@ -32,18 +34,12 @@ public class EnumTest implements TestProvider {
         private final int index;
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufProperty.Type.MESSAGE,
-                concreteType = Type.class
-        )
+        @ProtobufProperty(index = 1, type = MESSAGE)
         private Type content;
     }
 }

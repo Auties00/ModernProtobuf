@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.STRING;
+
 public class ModifierTest implements TestProvider {
     @Test
     @SneakyThrows
@@ -32,25 +34,16 @@ public class ModifierTest implements TestProvider {
         }
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class RequiredMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufProperty.Type.STRING,
-                required = true
-        )
+        @ProtobufProperty(index = 1, type = STRING, required = true)
         // @NonNull (Removed for testing purposes)
         private String required;
 
-        @ProtobufProperty(
-                index = 2,
-                type = ProtobufProperty.Type.STRING
-        )
+        @ProtobufProperty(index = 2, type = STRING)
         private String optional;
     }
 }

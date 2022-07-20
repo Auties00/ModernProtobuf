@@ -6,7 +6,11 @@ public interface ProtobufMessage {
         return clazz != null && ProtobufMessage.class.isAssignableFrom(clazz);
     }
 
-    default Object value() {
+    default boolean isValueBased(){
+        return false;
+    }
+
+    default Object toValue() {
         return null;
     }
 }

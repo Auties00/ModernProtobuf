@@ -1,9 +1,9 @@
 package it.auties.protobuf;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
+import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
 import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
@@ -18,6 +18,9 @@ import org.openjdk.jmh.annotations.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -27,32 +30,39 @@ import java.util.concurrent.TimeUnit;
 public class PerformanceBenchmark implements TestProvider {
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;
-    private static final ObjectReader READER;
+    private static final ObjectReader MODERN_READER;
+    private static final ObjectReader JACKSON_READER;
 
     static {
-        var modernScalarMessage = ModernScalarMessage.builder()
-                .fixed32(Integer.MAX_VALUE)
-                .sfixed32(Integer.MAX_VALUE)
-                .int32(Integer.MAX_VALUE)
-                .uint32(Integer.MAX_VALUE)
-                .fixed64(Integer.MAX_VALUE)
-                .sfixed64(Integer.MAX_VALUE)
-                .int64(Integer.MAX_VALUE)
-                .uint64(Integer.MAX_VALUE)
-                ._float(Float.MAX_VALUE)
-                ._double(Double.MAX_VALUE)
-                .bool(true)
-                .string("Hello, this is an automated test!")
-                .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
-                .build();
-
         try {
+            var modernScalarMessage = ModernScalarMessage.builder()
+                    .fixed32(Integer.MAX_VALUE)
+                    .sfixed32(Integer.MAX_VALUE)
+                    .int32(Integer.MAX_VALUE)
+                    .uint32(Integer.MAX_VALUE)
+                    .fixed64(Integer.MAX_VALUE)
+                    .sfixed64(Integer.MAX_VALUE)
+                    .int64(Integer.MAX_VALUE)
+                    .uint64(Integer.MAX_VALUE)
+                    ._float(Float.MAX_VALUE)
+                    ._double(Double.MAX_VALUE)
+                    .bool(true)
+                    .string("Hello, this is an automated test!")
+                    .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
+                    .build();
             SERIALIZED_INPUT = JACKSON.writeValueAsBytes(modernScalarMessage);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+            MODERN_READER = JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
 
-        READER = JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
+            var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
+            Objects.requireNonNull(protoSource, "Missing scalar proto");
+            var protoSchema = Files.readString(Path.of(protoSource.toURI()));
+            var schema = ProtobufSchemaLoader.std.parse(protoSchema);
+            JACKSON_READER = new ProtobufMapper()
+                    .readerFor(JacksonScalarMessage.class)
+                    .with(schema);
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Cannot initialize benchmark", throwable);
+        }
     }
 
     @Benchmark
@@ -60,7 +70,16 @@ public class PerformanceBenchmark implements TestProvider {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void modernProtobuf() throws IOException {
         for (var i = 0; i < ITERATIONS; ++i) {
-            READER.readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
+            MODERN_READER.readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void jacksonProtobuf() throws IOException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            JACKSON_READER.readValue(SERIALIZED_INPUT);
         }
     }
 
@@ -73,118 +92,45 @@ public class PerformanceBenchmark implements TestProvider {
         }
     }
 
-    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
-        boolean hasFixed32();
-
-        int getFixed32();
-
-        boolean hasSfixed32();
-
-        int getSfixed32();
-
-        boolean hasInt32();
-
-        int getInt32();
-
-        boolean hasUint32();
-
-        int getUint32();
-
-        boolean hasFixed64();
-
-        long getFixed64();
-
-        boolean hasSfixed64();
-
-        long getSfixed64();
-
-        boolean hasInt64();
-
-        long getInt64();
-
-        boolean hasUint64();
-
-        long getUint64();
-
-        boolean hasFloat();
-
-        float getFloat();
-
-        boolean hasDouble();
-
-        double getDouble();
-
-        boolean hasBool();
-
-        boolean getBool();
-
-        boolean hasString();
-
-        String getString();
-
-        com.google.protobuf.ByteString getStringBytes();
-
-        boolean hasBytes();
-
-        com.google.protobuf.ByteString getBytes();
-    }
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class LegacyScalarMessage {
-        @JsonProperty("1")
-        @JsonPropertyDescription("fixed32")
+    @SuppressWarnings("unused")
+    public static class JacksonScalarMessage {
+        @JsonProperty("fixed32")
         private int fixed32;
 
-        @JsonProperty("2")
-        @JsonPropertyDescription("sfixed32")
+        @JsonProperty("sfixed32")
         private int sfixed32;
 
-        @JsonProperty("3")
-        @JsonPropertyDescription("fixed32")
+        @JsonProperty("int32")
         private int int32;
 
-        @JsonProperty("4")
-        @JsonPropertyDescription("uint32")
+        @JsonProperty("uint32")
         private int uint32;
 
-        @JsonProperty("5")
-        @JsonPropertyDescription("fixed64")
+        @JsonProperty("fixed64")
         private long fixed64;
 
-        @JsonProperty("6")
-        @JsonPropertyDescription("sfixed64")
+        @JsonProperty("sfixed64")
         private long sfixed64;
 
-        @JsonProperty("7")
-        @JsonPropertyDescription("int64")
+        @JsonProperty("int64")
         private long int64;
 
-        @JsonProperty("8")
-        @JsonPropertyDescription("uint64")
+        @JsonProperty("uint64")
         private long uint64;
 
-        @JsonProperty("9")
-        @JsonPropertyDescription("float")
+        @JsonProperty("float")
         private float _float;
 
-        @JsonProperty("10")
-        @JsonPropertyDescription("double")
+        @JsonProperty("double")
         private double _double;
 
-        @JsonProperty("11")
-        @JsonPropertyDescription("bool")
+        @JsonProperty("bool")
         private boolean bool;
 
-        @JsonProperty("12")
-        @JsonPropertyDescription("string")
+        @JsonProperty("string")
         private String string;
 
-        @JsonProperty("13")
-        @JsonPropertyDescription("bytes")
+        @JsonProperty("bytes")
         private byte[] bytes;
     }
 
@@ -272,6 +218,62 @@ public class PerformanceBenchmark implements TestProvider {
                 type = ProtobufProperty.Type.BYTES
         )
         private byte[] bytes;
+    }
+
+    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
+        boolean hasFixed32();
+
+        int getFixed32();
+
+        boolean hasSfixed32();
+
+        int getSfixed32();
+
+        boolean hasInt32();
+
+        int getInt32();
+
+        boolean hasUint32();
+
+        int getUint32();
+
+        boolean hasFixed64();
+
+        long getFixed64();
+
+        boolean hasSfixed64();
+
+        long getSfixed64();
+
+        boolean hasInt64();
+
+        long getInt64();
+
+        boolean hasUint64();
+
+        long getUint64();
+
+        boolean hasFloat();
+
+        float getFloat();
+
+        boolean hasDouble();
+
+        double getDouble();
+
+        boolean hasBool();
+
+        boolean getBool();
+
+        boolean hasString();
+
+        String getString();
+
+        com.google.protobuf.ByteString getStringBytes();
+
+        boolean hasBytes();
+
+        com.google.protobuf.ByteString getBytes();
     }
 
     public static final class ScalarMessage extends

@@ -10,7 +10,6 @@ import it.auties.protobuf.api.util.ArrayOutputStream;
 import it.auties.protobuf.api.util.ProtobufField;
 import it.auties.protobuf.api.util.ProtobufUtils;
 import it.auties.reflection.Reflection;
-import lombok.SneakyThrows;
 import lombok.experimental.ExtensionMethod;
 
 import java.io.IOException;
@@ -181,7 +180,7 @@ class ProtobufGenerator extends GeneratorBase {
                     .map(Reflection::open)
                     .filter(ProtobufUtils::isProperty)
                     .map(field -> createField(object, field))
-                    .filter(ProtobufField::valid)
+                    .filter(ProtobufField::isValid)
                     .forEach(field -> encodeField(output, field));
             return output.buffer().toByteArray();
         } catch (ProtobufException exception) {
@@ -204,30 +203,20 @@ class ProtobufGenerator extends GeneratorBase {
 
     private ProtobufField createField(Object object, Field field) {
         var property = ProtobufUtils.getProperty(field);
-        return new ProtobufField(
-                ProtobufUtils.getFieldName(field),
-                property.index(),
-                property.type(),
-                getFieldValue(object, field),
-                property.packed(),
-                property.required(),
-                property.repeated(),
-                property.requiresConversion()
-        );
+        var name = ProtobufUtils.getFieldName(field);
+        var value = getFieldValue(object, field);
+        return new ProtobufField(name, value, property);
     }
 
-    @SneakyThrows
     private Object getFieldValue(Object object, Field field) {
-        var value = field.get(object);
-        if (value == null) {
-            return null;
+        try {
+            var value = field.get(object);
+            return value instanceof ProtobufMessage message && message.isValueBased()
+                    ? message.toValue() : value;
+        } catch (ReflectiveOperationException exception) {
+            throw new ProtobufSerializationException("Cannot access field %s inside class %s"
+                    .formatted(field.getName(), field.getDeclaringClass().getName()), exception);
         }
-
-        if (!ProtobufMessage.isMessage(field.getType()) || !ProtobufUtils.hasValue(field.getType())) {
-            return value;
-        }
-
-        return ((ProtobufMessage) value).value();
     }
 
     private void encodeField(ArrayOutputStream output, ProtobufField field) {
@@ -238,20 +227,20 @@ class ProtobufGenerator extends GeneratorBase {
             }
 
             switch (field.type()) {
-                case BOOLEAN -> output.writeBool(field.index(), field.valueAs());
-                case STRING -> output.writeString(field.index(), field.valueAs());
-                case BYTES -> output.writeByteArray(field.index(), field.valueAs());
+                case BOOLEAN -> output.writeBool(field.index(), field.dynamicValue());
+                case STRING -> output.writeString(field.index(), field.dynamicValue());
+                case BYTES -> output.writeByteArray(field.index(), field.dynamicValue());
 
-                case FLOAT -> output.writeFixed32(field.index(), Float.floatToRawIntBits(field.valueAs()));
-                case DOUBLE -> output.writeFixed64(field.index(), Double.doubleToRawLongBits(field.valueAs()));
+                case FLOAT -> output.writeFixed32(field.index(), Float.floatToRawIntBits(field.dynamicValue()));
+                case DOUBLE -> output.writeFixed64(field.index(), Double.doubleToRawLongBits(field.dynamicValue()));
 
-                case INT32, SINT32 -> output.writeInt32(field.index(), field.valueAs());
-                case UINT32 -> output.writeUInt32(field.index(), field.valueAs());
-                case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), field.valueAs());
+                case INT32, SINT32 -> output.writeInt32(field.index(), field.dynamicValue());
+                case UINT32 -> output.writeUInt32(field.index(), field.dynamicValue());
+                case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), field.dynamicValue());
 
-                case INT64, SINT64 -> output.writeInt64(field.index(), field.valueAs());
-                case UINT64 -> output.writeUInt64(field.index(), field.valueAs());
-                case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), field.valueAs());
+                case INT64, SINT64 -> output.writeInt64(field.index(), field.dynamicValue());
+                case UINT64 -> output.writeUInt64(field.index(), field.dynamicValue());
+                case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), field.dynamicValue());
 
                 default -> encodeFieldFallback(field.index(), field.value(), output);
             }
@@ -261,9 +250,9 @@ class ProtobufGenerator extends GeneratorBase {
     }
 
     private void encodeRepeatedFields(ArrayOutputStream output, ProtobufField field) {
-        field.<Collection<?>>valueAs()
+        field.<Collection<?>>dynamicValue()
                 .stream()
-                .map(field::withValue)
+                .map(field::toSingleField)
                 .forEach(entry -> encodeField(output, entry));
     }
 

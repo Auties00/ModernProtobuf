@@ -2,232 +2,380 @@ package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.model.FieldModifier;
 import it.auties.protobuf.parser.model.ProtobufSyntaxException;
+import it.auties.protobuf.parser.model.ProtobufVersion;
 import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.parser.object.ProtobufObject;
 import it.auties.protobuf.parser.statement.*;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.experimental.Accessors;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.StreamTokenizer;
 import java.io.StringReader;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
-@AllArgsConstructor
+import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_2;
+import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_3;
+import static java.util.Objects.requireNonNullElse;
+
 public final class ProtobufParser {
-    private static final Set<String> IGNORE = Set.of("syntax", "option", "package");
-    private static final char STATEMENT_END = ';';
-    private static final char OBJECT_START = '{';
-    private static final char OBJECT_END = '}';
+    private static final String STATEMENT_END = ";";
+    private static final String OBJECT_START = "{";
+    private static final String OBJECT_END = "}";
+    private static final String ASSIGNMENT_OPERATOR = "=";
+    private static final String ARRAY_START = "[";
+    private static final String ARRAY_END = "]";
+    private static final String COMMA = ",";
+    private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
 
+    private final ProtobufDocument document;
     private final StreamTokenizer tokenizer;
-    private final LinkedList<String> tokensCache;
     private final Deque<ProtobufObject<?>> objectsQueue;
+    private final Deque<Instruction> instructions;
+    private final Deque<Set<Integer>> knowIndexes;
+    private InstructionState instructionState;
+    private FieldStatement field;
+    private FieldState fieldState;
+    private String optionName;
+    private String fieldOptionName;
 
-    public ProtobufParser(String input) {
-        this(new StreamTokenizer(new StringReader(input)), new LinkedList<>(), new LinkedList<>());
+    public ProtobufParser(@NonNull File file) throws IOException {
+        this(file.toPath());
     }
 
-    public ProtobufParser(File input) throws IOException {
-        this(Files.readString(input.toPath()));
+    public ProtobufParser(@NonNull Path input) throws IOException {
+        this(Files.readString(input));
     }
 
-    public ProtobufDocument tokenizeAndParse() throws IOException {
+    public ProtobufParser(@NonNull String input) {
+        this.document = new ProtobufDocument();
+        this.tokenizer = new StreamTokenizer(new StringReader(input));
+        this.objectsQueue = new LinkedList<>();
+        this.instructions = new LinkedList<>();
+        this.instructionState = InstructionState.DECLARATION;
+        this.knowIndexes = new LinkedList<>();
         tokenizer.wordChars('_', '_');
         tokenizer.wordChars('"', '"');
+        tokenizer.wordChars('\'', '\'');
+    }
 
-        var results = new ArrayList<ProtobufObject<?>>();
-        var token = -1;
-        while ((token = tokenizer.nextToken()) != StreamTokenizer.TT_EOF) {
-            if (token == STATEMENT_END) {
-                parseField();
-                continue;
+    public ProtobufDocument tokenizeAndParse() {
+        String token;
+        while ((token = nextToken()) != null) {
+            handleToken(token);
+        }
+
+        return document;
+    }
+
+    private void handleToken(String token) {
+        switch (token) {
+            case STATEMENT_END -> {
+                if (field != null) {
+                    addFieldToScope();
+                }
+
+                var instruction = instructions.getLast();
+                if (instruction.hasBody()) {
+                    return;
+                }
+
+                instructions.removeLast();
+                knowIndexes.removeLast();
+                this.instructionState = InstructionState.DECLARATION;
             }
 
-            if (token == OBJECT_START) {
-                parseObjectStart();
-                continue;
+            case OBJECT_END -> {
+                var object = objectsQueue.pollLast();
+                ProtobufSyntaxException.check(isObjectValid(object), "Proto3 enums require a constant with index 0", tokenizer.lineno());
+                var scope = objectsQueue.peekLast();
+                if(scope == null){
+                    document.getStatements().add(object);
+                }else if(scope instanceof MessageStatement messageStatement){
+                    messageStatement.getStatements().add(object);
+                }else {
+                    throw new ProtobufSyntaxException("Incorrect scope", tokenizer.lineno());
+                }
+
+                instructions.removeLast();
+                knowIndexes.removeLast();
+                this.instructionState = InstructionState.OPTIONS;
             }
 
-            if (token == OBJECT_END) {
-                parseObjectEnd(results);
-                continue;
+            default -> {
+                var instruction = requireNonNullElse(instructions.peekLast(), Instruction.UNKNOWN);
+                switch (instruction) {
+                    case UNKNOWN -> openInstruction(token);
+
+                    case PACKAGE -> {
+                        createPackageOption(token);
+                        nextInstructionState();
+                    }
+
+                    case SYNTAX -> {
+                        handleSyntaxState(token);
+                        nextInstructionState();
+                    }
+
+                    case OPTION -> {
+                        handleOptionState(token);
+                        nextInstructionState();
+                    }
+
+                    case MESSAGE, ENUM, ONE_OF -> {
+                        handleBodyState(token, instruction);
+                        nextInstructionState();
+                    }
+                }
             }
-
-            parseToken(token);
         }
-
-        return new ProtobufDocument(results);
     }
 
-    private void parseToken(int token) {
-        var content = switch (token) {
-            case StreamTokenizer.TT_WORD -> tokenizer.sval;
-            case StreamTokenizer.TT_NUMBER -> String.valueOf((int) tokenizer.nval);
-            default -> String.valueOf((char) token);
-        };
-
-        tokensCache.add(content);
+    private boolean isObjectValid(ProtobufObject<?> object) {
+        return document.getVersion() != PROTOBUF_3
+                || !(object instanceof EnumStatement enumStatement)
+                || enumStatement.getStatements().stream().anyMatch(entry -> entry.getIndex() == 0);
     }
 
-    private void parseObjectEnd(List<ProtobufObject<?>> results) {
-        ProtobufSyntaxException.check(!objectsQueue.isEmpty(),
-                "Illegal character: cannot close a body that doesn't exist", tokensCache);
-        ProtobufSyntaxException.check(tokensCache.isEmpty(),
-                "Illegal character: cannot close object with %s", tokensCache);
-        var removed = objectsQueue.removeLast();
-        if (objectsQueue.isEmpty()) {
-            results.add(removed);
-        }
+    private void handleBodyState(String token, Instruction instruction) {
+        switch (instructionState) {
+            case DECLARATION -> createBody(instruction, token);
+            case VALUE -> ProtobufSyntaxException.check(isObjectStart(token),
+                    "Expected message initializer after message declaration", tokenizer.lineno());
+            case OPTIONS -> {
+                var nestedInstruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
+                if (nestedInstruction == Instruction.UNKNOWN) {
+                    createField(token);
+                    return;
+                }
 
-        tokensCache.clear();
+                createBody(nestedInstruction, nextToken());
+                instructions.add(nestedInstruction);
+                knowIndexes.add(new HashSet<>());
+                this.instructionState = InstructionState.DECLARATION;
+            }
+            case BODY -> {
+                attributeField(token);
+                nextFieldState();
+            }
+        }
     }
 
-    private void parseObjectStart() {
-        ProtobufSyntaxException.check(tokensCache.size() == 2,
-                "Illegal object declaration: expected an instruction and a name", tokensCache);
-        var instruction = tokensCache.getFirst();
-        var name = tokensCache.getLast();
-        var statement = switch (instruction) {
-            case "message" -> new MessageStatement(name);
-            case "oneof" -> new OneOfStatement(name);
-            case "enum" -> new EnumStatement(name);
-            default ->
-                    throw new ProtobufSyntaxException("Illegal object declaration: %s is not a valid instruction", tokensCache, instruction);
-        };
-
-        var last = objectsQueue.peekLast();
-        if (last == null) {
-            objectsQueue.add(statement);
-            tokensCache.clear();
-            return;
+    private FieldStatement.Scope createFieldScope(ProtobufStatement scope, FieldModifier modifier) {
+        if (modifier != FieldModifier.NOTHING) {
+            ProtobufSyntaxException.check(document.getVersion() == PROTOBUF_2 || modifier != FieldModifier.REQUIRED,
+                    "Support for the required label was dropped in proto3", tokenizer.lineno());
+            ProtobufSyntaxException.check(scope instanceof MessageStatement,
+                    "Expected message scope for field declaration", tokenizer.lineno());
+            return FieldStatement.Scope.MESSAGE;
         }
 
-        if (last instanceof MessageStatement messageStatement) {
-            objectsQueue.add(statement);
-            messageStatement.getStatements().add(statement);
-            tokensCache.clear();
-            return;
+        if (document.getVersion() == PROTOBUF_3 && scope instanceof MessageStatement) {
+            return FieldStatement.Scope.MESSAGE;
         }
 
-        throw new ProtobufSyntaxException("Illegal object declaration: only messages can be nested", tokensCache);
+        if (scope instanceof EnumStatement) {
+            return FieldStatement.Scope.ENUM;
+        }
+
+        if (scope instanceof OneOfStatement) {
+            return FieldStatement.Scope.ONE_OF;
+        }
+
+        throw new ProtobufSyntaxException("Expected enum or one of scope for field declaration without label",
+                tokenizer.lineno());
     }
 
-    private void parseField() {
-        var header = tokensCache.peekFirst();
-        if (header == null || IGNORE.contains(header)) {
-            tokensCache.clear();
-            return;
+    private void attributeField(String token) {
+        switch (fieldState) {
+            case MODIFIER -> field.setType(token);
+            case TYPE -> {
+                ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
+                        tokenizer.lineno(), token);
+                field.setName(token);
+            }
+            case NAME ->
+                    ProtobufSyntaxException.check(isAssignmentOperator(token),
+                            "Expected assignment operator after field type", tokenizer.lineno());
+            case INDEX -> {
+                var index = parseIndex(token, field.getScope() == FieldStatement.Scope.ENUM)
+                        .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));
+                ProtobufSyntaxException.check(!knowIndexes.getLast().contains(index),
+                        "Duplicated index %s", tokenizer.lineno(), index);
+                knowIndexes.getLast().add(index);
+                field.setIndex(index);
+            }
+            case OPTIONS_START ->
+                    ProtobufSyntaxException.check(isArrayStart(token),
+                            "Expected array start operator to initialize field options", tokenizer.lineno());
+            case OPTIONS_NAME -> this.fieldOptionName = token;
+            case OPTION_ASSIGNMENT ->
+                    ProtobufSyntaxException.check(isAssignmentOperator(token),
+                            "Expected assignment operator after field option", tokenizer.lineno());
+            case OPTIONS_VALUE -> {
+                switch (fieldOptionName) {
+                    case "packed" -> field.setPacked(Boolean.parseBoolean(token));
+                    case "deprecated" -> field.setDeprecated(Boolean.parseBoolean(token));
+                    case "default" -> field.setDefaultValue(token);
+                    default ->
+                            LOGGER.log(System.Logger.Level.WARNING, "Unrecognized field option: %s=%s%n".formatted(fieldOptionName, token));
+                }
+            }
+            case OPTIONS_END -> {
+                switch (token) {
+                    case ARRAY_END -> {}
+                    case COMMA -> this.fieldState = FieldState.OPTIONS_START;
+                    default ->
+                            throw new ProtobufSyntaxException("Expected comma or array end after field options declaration",
+                                    tokenizer.lineno());
+                }
+            }
         }
-
-        switch (tokensCache.size()) {
-            case 3 -> parseEnumConstant(header);
-            case 4, 5, 10 -> parseStandardField(header);
-            default -> throw new ProtobufSyntaxException("Illegal field declaration: invalid instruction", tokensCache);
-        }
-
-        tokensCache.clear();
     }
 
-    private void parseStandardField(String header) {
-        var modifier = FieldModifier.forName(header);
-        var offset = modifier.isPresent() ? 1 : 0;
-        var operator = tokensCache.get(2 + offset);
-        ProtobufSyntaxException.check(isAssignmentOperator(operator),
-                "Illegal field declaration: expected an assignment operator", tokensCache);
-
-        var type = tokensCache.get(offset);
-        var name = tokensCache.get(1 + offset);
-        ProtobufSyntaxException.check(isLegalEnumName(name),
-                "Illegal field declaration: expected a non-empty name that doesn't start with a number", tokensCache);
-
-        var index = parseIndex(tokensCache.get(3 + offset))
-                .orElseThrow(() -> new ProtobufSyntaxException("Illegal field declaration: expected an unsigned index", tokensCache));
-
+    private void createField(String token) {
         var scope = objectsQueue.peekLast();
-        if (scope instanceof MessageStatement messageStatement) {
-            ProtobufSyntaxException.check(modifier.isPresent(),
-                    "Illegal field declaration: expected a valid modifier", tokensCache);
-            var fieldStatement = new FieldStatement(name, type, index, modifier.get(), isPacked());
-            messageStatement.getStatements()
-                    .add(fieldStatement);
+        var modifier = FieldModifier.forName(token);
+        var scopeType = createFieldScope(scope, modifier);
+        this.field = new FieldStatement()
+                .setModifier(modifier)
+                .setScope(scopeType);
+        this.fieldState = FieldState.MODIFIER;
+        if (modifier != FieldModifier.NOTHING) {
             return;
         }
 
-        if (scope instanceof OneOfStatement oneOfStatement) {
-            var oneOfOption = new FieldStatement(name, type, index, null, false);
-            oneOfStatement.getStatements()
-                    .add(oneOfOption);
-            return;
+        switch (scopeType) {
+            case MESSAGE -> {
+                if (document.getVersion() == PROTOBUF_3) {
+                    field.setType(token);
+                    this.fieldState = FieldState.TYPE;
+                }
+            }
+            case ONE_OF -> {
+                field.setType(token);
+                this.fieldState = FieldState.TYPE;
+            }
+            case ENUM -> {
+                field.setName(token);
+                this.fieldState = FieldState.NAME;
+            }
         }
-
-        throw new ProtobufSyntaxException("Illegal field declaration: invalid scope", tokensCache);
     }
 
-    private void parseEnumConstant(String header) {
-        ProtobufSyntaxException.check(isLegalEnumName(header),
-                "Illegal enum constant declaration: expected a non-empty name that doesn't start with a number", tokensCache);
+    private void handleOptionState(String token) {
+        switch (instructionState) {
+            case DECLARATION -> this.optionName = token;
+            case VALUE -> ProtobufSyntaxException.check(isAssignmentOperator(token),
+                    "Expected assignment operator after option declaration", tokenizer.lineno());
+            case OPTIONS -> {
+                document.getOptions().put(optionName, token);
+                this.optionName = null;
+            }
+            case BODY ->
+                    ProtobufSyntaxException.check(isAssignmentOperator(token),
+                            "Unsupported options for syntax declaration", tokenizer.lineno());
+        }
+    }
 
-        var operator = tokensCache.get(1);
-        ProtobufSyntaxException.check(isAssignmentOperator(operator),
-                "Illegal enum constant declaration: expected an assignment operator", tokensCache);
+    private void handleSyntaxState(String token) {
+        switch (instructionState) {
+            case DECLARATION ->
+                    ProtobufSyntaxException.check(isAssignmentOperator(token),
+                            "Expected assignment operator after syntax declaration", tokenizer.lineno());
+            case VALUE -> document.setVersion(ProtobufVersion.forName(token)
+                    .orElseThrow(() -> new ProtobufSyntaxException("Illegal syntax declaration: %s is not a valid version".formatted(token),
+                            tokenizer.lineno())));
+            case OPTIONS, BODY ->
+                    ProtobufSyntaxException.check(isAssignmentOperator(token),
+                            "Unsupported options for syntax declaration", tokenizer.lineno());
+        }
+    }
 
-        var context = objectsQueue.peekLast();
-        if (!(context instanceof EnumStatement enumStatement)) {
-            throw new ProtobufSyntaxException("Illegal enum constant declaration: invalid scope", tokensCache);
+    private void createPackageOption(String token) {
+        ProtobufSyntaxException.check(instructionState == InstructionState.DECLARATION,
+                "Illegal options specified for package declaration", tokenizer.lineno());
+        document.setPackageName(token);
+    }
+
+    private void openInstruction(String token) {
+        var instruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
+        ProtobufSyntaxException.check(instruction != Instruction.UNKNOWN,
+                "Unknown instruction: %s", tokenizer.lineno(), token);
+        instructions.add(instruction);
+        knowIndexes.add(new HashSet<>());
+        this.instructionState = InstructionState.DECLARATION;
+    }
+
+    private void addFieldToScope() {
+        var scope = objectsQueue.getLast();
+        switch (field.getScope()) {
+            case MESSAGE -> ((MessageStatement) scope).getStatements().add(field);
+            case ONE_OF -> ((OneOfStatement) scope).getStatements().add(field);
+            case ENUM -> ((EnumStatement) scope).getStatements().add(field);
+            default -> throw new ProtobufSyntaxException("Invalid scope for field", tokenizer.lineno());
         }
 
-        var index = parseIndex(tokensCache.get(2), true)
-                .orElseThrow(() -> new ProtobufSyntaxException("Illegal enum constant declaration: expected an unsigned index", tokensCache));
-        var constant = new EnumConstantStatement(header, index);
-        enumStatement.getStatements()
-                .add(constant);
+        this.instructionState = InstructionState.OPTIONS;
+        this.fieldState = null;
+    }
+
+    private String nextToken() {
+        try {
+            var token = tokenizer.nextToken();
+            if (token == StreamTokenizer.TT_EOF) {
+                return null;
+            }
+
+            return switch (token) {
+                case StreamTokenizer.TT_WORD -> tokenizer.sval;
+                case StreamTokenizer.TT_NUMBER -> String.valueOf((int) tokenizer.nval);
+                default -> String.valueOf((char) token);
+            };
+        } catch (IOException exception) {
+            return null;
+        }
+    }
+
+    private void createBody(Instruction instruction, String name) {
+        var body = switch (instruction) {
+            case MESSAGE -> new MessageStatement(name);
+            case ENUM -> new EnumStatement(name);
+            case ONE_OF -> new OneOfStatement(name);
+            default -> throw new ProtobufSyntaxException("Illegal state", tokenizer.lineno());
+        };
+        objectsQueue.add(body);
+    }
+
+    private void nextInstructionState() {
+        this.instructionState = instructionState.next();
+    }
+
+    private void nextFieldState() {
+        this.fieldState = fieldState.next();
     }
 
     private boolean isAssignmentOperator(String operator) {
-        return Objects.equals(operator, "=");
+        return Objects.equals(operator, ASSIGNMENT_OPERATOR);
     }
 
-    private boolean isLegalEnumName(String instruction) {
+    private boolean isObjectStart(String operator) {
+        return Objects.equals(operator, OBJECT_START);
+    }
+
+    private boolean isArrayStart(String operator) {
+        return Objects.equals(operator, ARRAY_START);
+    }
+
+    private boolean isLegalName(String instruction) {
         return !instruction.isBlank()
                 && !instruction.isEmpty()
                 && !Character.isDigit(instruction.charAt(0));
-    }
-
-    // Find a better way lol
-    private boolean isPacked() {
-        if (tokensCache.size() != 10) {
-            return false;
-        }
-
-        var groupStart = tokensCache.get(tokensCache.size() - 5);
-        ProtobufSyntaxException.check(Objects.equals(groupStart, "["),
-                "Illegal options declaration: expected array start", tokensCache);
-
-        var modifier = tokensCache.get(tokensCache.size() - 4);
-        if (!Objects.equals(modifier, "packed")) {
-            return false;
-        }
-
-        var operator = tokensCache.get(tokensCache.size() - 3);
-        if (!Objects.equals(operator, "=")) {
-            return false;
-        }
-
-        var value = tokensCache.get(tokensCache.size() - 2);
-        if (!Objects.equals(value, "true")) {
-            return false;
-        }
-
-        var closeGroup = tokensCache.get(tokensCache.size() - 1);
-        ProtobufSyntaxException.check(Objects.equals(closeGroup, "]"),
-                "Illegal options declaration: expected array end", tokensCache);
-        return true;
-    }
-
-    private Optional<Integer> parseIndex(String parse) {
-        return parseIndex(parse, false);
     }
 
     private Optional<Integer> parseIndex(String parse, boolean acceptZero) {
@@ -236,6 +384,55 @@ public final class ProtobufParser {
                     .filter(value -> acceptZero || value != 0);
         } catch (NumberFormatException ex) {
             return Optional.empty();
+        }
+    }
+
+    @AllArgsConstructor
+    @Accessors(fluent = true)
+    private enum Instruction {
+        UNKNOWN(false),
+        PACKAGE(false),
+        SYNTAX(false),
+        OPTION(false),
+        MESSAGE(true),
+        ENUM(true),
+        ONE_OF(true);
+
+        @Getter
+        private final boolean hasBody;
+
+        public static Instruction forName(@NonNull String name) {
+            return Arrays.stream(values())
+                    .filter(entry -> entry.name().replaceAll("_", "").equalsIgnoreCase(name))
+                    .findFirst()
+                    .orElse(UNKNOWN);
+        }
+    }
+
+    private enum InstructionState {
+        DECLARATION,
+        VALUE,
+        OPTIONS,
+        BODY;
+
+        public InstructionState next() {
+            return ordinal() + 1 >= values().length ? BODY : values()[ordinal() + 1];
+        }
+    }
+
+    private enum FieldState {
+        MODIFIER,
+        TYPE,
+        NAME,
+        INDEX,
+        OPTIONS_START,
+        OPTIONS_NAME,
+        OPTION_ASSIGNMENT,
+        OPTIONS_VALUE,
+        OPTIONS_END;
+
+        public FieldState next() {
+            return ordinal() + 1 >= values().length ? OPTIONS_END : values()[ordinal() + 1];
         }
     }
 }

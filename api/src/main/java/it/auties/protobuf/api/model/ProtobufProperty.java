@@ -18,7 +18,7 @@ public @interface ProtobufProperty {
 
     Type type();
 
-    Class<?> concreteType() default Object.class;
+    Class<? extends ProtobufMessage> implementation() default ProtobufMessage.class;
 
     boolean required() default false;
 
@@ -28,31 +28,33 @@ public @interface ProtobufProperty {
 
     boolean repeated() default false;
 
-    boolean requiresConversion() default false;
-
     @AllArgsConstructor
     @Accessors(fluent = true)
     enum Type {
-        MESSAGE(ProtobufMessage.class),
-        FLOAT(float.class),
-        DOUBLE(double.class),
-        BOOLEAN(boolean.class),
-        STRING(String.class),
-        BYTES(byte[].class),
-        INT32(int.class),
-        SINT32(int.class),
-        UINT32(int.class),
-        FIXED32(int.class),
-        SFIXED32(int.class),
-        INT64(long.class),
-        SINT64(long.class),
-        UINT64(long.class),
-        FIXED64(long.class),
-        SFIXED64(long.class);
+        MESSAGE(ProtobufMessage.class, ProtobufMessage.class),
+        FLOAT(float.class, Float.class),
+        DOUBLE(double.class, Double.class),
+        BOOLEAN(boolean.class, Boolean.class),
+        STRING(String.class, String.class),
+        BYTES(byte[].class, byte[].class),
+        INT32(int.class, Integer.class),
+        SINT32(int.class, Integer.class),
+        UINT32(int.class, Integer.class),
+        FIXED32(int.class, Integer.class),
+        SFIXED32(int.class, Integer.class),
+        INT64(long.class, Long.class),
+        SINT64(long.class, Long.class),
+        UINT64(long.class, Long.class),
+        FIXED64(long.class, Long.class),
+        SFIXED64(long.class, Long.class);
 
         @Getter
         @NonNull
-        public final Class<?> javaType;
+        public final Class<?> primitiveType;
+
+        @Getter
+        @NonNull
+        public final Class<?> wrappedType;
 
         public boolean isInt() {
             return this == INT32

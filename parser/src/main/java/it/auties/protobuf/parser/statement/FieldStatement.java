@@ -3,43 +3,34 @@ package it.auties.protobuf.parser.statement;
 import com.google.common.base.CaseFormat;
 import it.auties.protobuf.parser.model.FieldModifier;
 import it.auties.protobuf.parser.model.FieldType;
+import lombok.*;
+import lombok.experimental.Accessors;
 
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Accessors(chain = true)
+@Data
+@EqualsAndHashCode(callSuper = true)
 public final class FieldStatement extends ProtobufStatement {
-    private final String type;
-    private final int index;
-    private final FieldModifier modifier;
-    private final boolean packed;
-
-    public FieldStatement(String name, String type, int index, FieldModifier modifier, boolean packed) {
-        super(name);
-        this.type = type;
-        this.index = index;
-        this.modifier = modifier;
-        this.packed = packed;
-    }
-
-    public int getIndex() {
-        return index;
-    }
-
-    public boolean isPacked() {
-        return packed;
-    }
-
-    public FieldModifier getModifier() {
-        return modifier;
-    }
-
-    public String getType() {
-        return type;
-    }
+    private String type;
+    private Integer index;
+    private FieldModifier modifier;
+    private boolean packed;
+    private boolean deprecated;
+    private String defaultValue;
+    private Scope scope;
 
     public String getNameAsConstant() {
         return CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, getName());
     }
 
     public FieldType getFieldType() {
-        return FieldType.forName(type);
+        return FieldType.forName(type)
+                .orElse(FieldType.MESSAGE);
     }
 
     public String getJavaType() {
@@ -79,6 +70,51 @@ public final class FieldStatement extends ProtobufStatement {
         return isRepeated() ? "List<%s>".formatted(type) : type;
     }
 
+    @Override
+    public String toString() {
+        return toString(0);
+    }
+
+    @Override
+    public String toString(int level) {
+        return INDENTATION.repeat(level) +
+                toPrettyModifier() +
+                toPrettyType() +
+                getName() +
+                " = " +
+                getIndex() +
+                toPrettyOptions() +
+                ";";
+    }
+
+    private String toPrettyType() {
+        return getType() == null ? "" : "%s ".formatted(getType());
+    }
+
+    private String toPrettyModifier() {
+        return getModifier() == null || getModifier() == FieldModifier.NOTHING
+                ? "" : "%s ".formatted(getModifier().name().toLowerCase(Locale.ROOT));
+    }
+
+    private String toPrettyOptions() {
+        if (!isPacked()
+                && !isDeprecated()
+                && getDefaultValue() == null) {
+            return "";
+        }
+
+        var map = new HashMap<>();
+        map.put("packed", isPacked()  ? "true" : null);
+        map.put("deprecated", isDeprecated() ? "true" : null);
+        map.put("default", getDefaultValue());
+        var entries = map.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue() != null)
+                .map(entry -> "%s=%s".formatted(entry.getKey(), entry.getValue()))
+                .collect(Collectors.joining(", "));
+        return entries.isEmpty() ? entries : " [%s]".formatted(entries);
+    }
+
     public boolean isOptional() {
         return modifier == FieldModifier.OPTIONAL;
     }
@@ -89,5 +125,11 @@ public final class FieldStatement extends ProtobufStatement {
 
     public boolean isRequired() {
         return modifier == FieldModifier.REQUIRED;
+    }
+
+    public enum Scope {
+        MESSAGE,
+        ONE_OF,
+        ENUM
     }
 }

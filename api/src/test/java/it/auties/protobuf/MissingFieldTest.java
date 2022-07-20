@@ -9,6 +9,8 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.STRING;
+
 public class MissingFieldTest implements TestProvider {
     @Test
     @SneakyThrows
@@ -21,33 +23,30 @@ public class MissingFieldTest implements TestProvider {
         Assertions.assertEquals(someMessage.content2(), decoded.content2());
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class Serializable implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = ProtobufProperty.Type.STRING)
+        @ProtobufProperty(index = 1, type = STRING)
         private String content;
 
-        @ProtobufProperty(index = 2, type = ProtobufProperty.Type.STRING)
+        @ProtobufProperty(index = 2, type = STRING)
         private String content1;
 
-        @ProtobufProperty(index = 3, type = ProtobufProperty.Type.STRING)
+        @ProtobufProperty(index = 3, type = STRING)
         private String content2;
 
-        @ProtobufProperty(index = 4, type = ProtobufProperty.Type.STRING)
+        @ProtobufProperty(index = 4, type = STRING)
         private String content3;
     }
 
-    @AllArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class Deserializable implements ProtobufMessage {
-        @ProtobufProperty(index = 3, type = ProtobufProperty.Type.STRING)
+        @ProtobufProperty(index = 3, type = STRING)
         private String content2;
     }
 }

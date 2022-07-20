@@ -9,6 +9,8 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.STRING;
+
 public class Utf8MessageTest implements TestProvider {
     @Test
     @SneakyThrows
@@ -32,17 +34,12 @@ public class Utf8MessageTest implements TestProvider {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class UtfMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufProperty.Type.STRING
-        )
+        @ProtobufProperty(index = 1, type = STRING)
         private String content;
     }
 }

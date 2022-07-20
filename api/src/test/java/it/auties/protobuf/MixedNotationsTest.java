@@ -22,11 +22,9 @@ public class MixedNotationsTest implements TestProvider {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class SomeMessage implements ProtobufMessage {
         @JsonProperty("1")

@@ -38,7 +38,7 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufProperty.Type.MESSAGE,
-                concreteType = AnotherMessage.class,
+                implementation = AnotherMessage.class,
                 repeated = true
         )
         private List<AnotherMessage> content;
@@ -62,7 +62,7 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufProperty.Type.MESSAGE,
-                concreteType = FinalMessage.class,
+                implementation = FinalMessage.class,
                 repeated = true
         )
         private List<FinalMessage> content;

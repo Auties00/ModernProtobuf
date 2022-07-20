@@ -3,6 +3,8 @@ package it.auties.protobuf.api.util;
 import lombok.SneakyThrows;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 import static it.auties.protobuf.api.util.WireType.*;
@@ -13,7 +15,7 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
     }
 
     static int makeTag(int fieldNumber, int wireType) {
-        return (fieldNumber << TAG_TYPE_BITS) | wireType;
+        return (fieldNumber << 3) | wireType;
     }
 
     public void writeTag(int fieldNumber, int wireType) {
@@ -129,8 +131,11 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
         buffer.write(value);
     }
 
-    @SneakyThrows
     private void writeRawBytes(byte[] value) {
-        buffer.write(value);
+        try {
+            buffer.write(value);
+        }catch (IOException exception){
+            throw new UncheckedIOException("Cannot write bytes to stream", exception);
+        }
     }
 }

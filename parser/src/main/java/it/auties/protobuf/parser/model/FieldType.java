@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.model;
 
 import java.util.Arrays;
+import java.util.Optional;
 
 public enum FieldType {
     MESSAGE,
@@ -20,10 +21,9 @@ public enum FieldType {
     FIXED64,
     SFIXED64;
 
-    public static FieldType forName(String name) {
+    public static Optional<FieldType> forName(String name) {
         return Arrays.stream(values())
                 .filter(entry -> entry.name().equalsIgnoreCase(name))
-                .findFirst()
-                .orElse(MESSAGE);
+                .findFirst();
     }
 }

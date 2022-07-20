@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.UINT32;
+
 public class PackedTest implements TestProvider {
     @Test
     @SneakyThrows
@@ -24,19 +26,12 @@ public class PackedTest implements TestProvider {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
     @Jacksonized
-    @Data
     @Builder
+    @Data
     @Accessors(fluent = true)
     public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufProperty.Type.UINT32,
-                repeated = true,
-                packed = true
-        )
+        @ProtobufProperty(index = 1, type = UINT32, repeated = true, packed = true)
         private List<Integer> content;
 
         public static class SomeMessageBuilder {

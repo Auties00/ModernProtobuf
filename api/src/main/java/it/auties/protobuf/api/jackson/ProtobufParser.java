@@ -6,14 +6,11 @@ import com.fasterxml.jackson.core.io.IOContext;
 import it.auties.protobuf.api.exception.ProtobufDeserializationException;
 import it.auties.protobuf.api.model.ProtobufConverter;
 import it.auties.protobuf.api.model.ProtobufMessage;
+import it.auties.protobuf.api.model.ProtobufProperty;
 import it.auties.protobuf.api.model.ProtobufSchema;
-import it.auties.protobuf.api.util.ArrayInputStream;
-import it.auties.protobuf.api.util.ProtobufField;
-import it.auties.protobuf.api.util.ProtobufUtils;
-import it.auties.protobuf.api.util.VersionInfo;
+import it.auties.protobuf.api.util.*;
 import it.auties.reflection.Reflection;
 import lombok.NonNull;
-import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -30,8 +27,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static it.auties.protobuf.api.util.WireType.*;
+
 class ProtobufParser extends ParserMinimalBase {
-    private static final Map<Class<? extends ProtobufMessage>, Map<Integer, ProtobufField>> fieldsCache
+    private static final ConcurrentMap<Class<? extends ProtobufMessage>, ConcurrentMap<Integer, ProtobufField>> fieldsCache
             = new ConcurrentHashMap<>();
 
     private final IOContext ioContext;
@@ -98,47 +97,48 @@ class ProtobufParser extends ParserMinimalBase {
         }
 
         this.type = ((ProtobufSchema) schema).messageType();
-        assertFieldsCache(type);
+        getFieldsOrCache(type);
     }
 
-    private Map<Integer, ProtobufField> assertFieldsCache(@NonNull Class<? extends ProtobufMessage> clazz) {
-        if (fieldsCache.containsKey(clazz)) {
-            return fieldsCache.get(clazz);
+    private Map<Integer, ProtobufField> getFieldsOrCache(@NonNull Class<? extends ProtobufMessage> clazz) {
+        var cached = fieldsCache.get(clazz);
+        if (cached != null) {
+            return cached;
         }
 
-        var fields = createProtobufFields(clazz);
+        var fields = createFields(clazz);
         if (clazz.getSuperclass() == null || !ProtobufMessage.isMessage(clazz.getSuperclass())) {
             fieldsCache.put(clazz, fields);
             return fields;
         }
 
-        var superFields = assertFieldsCache(clazz.getSuperclass().asSubclass(ProtobufMessage.class));
+        var superFields = getFieldsOrCache(clazz.getSuperclass().asSubclass(ProtobufMessage.class));
         superFields.forEach(fields::putIfAbsent);
         fieldsCache.put(clazz, fields);
         return fields;
     }
 
-    private ConcurrentMap<Integer, ProtobufField> createProtobufFields(Class<? extends ProtobufMessage> type) {
+    private ConcurrentMap<Integer, ProtobufField> createFields(Class<? extends ProtobufMessage> type) {
         return Stream.of(type.getDeclaredFields(), type.getFields())
                 .flatMap(Arrays::stream)
                 .filter(ProtobufUtils::isProperty)
-                .map(this::createProtobufField)
+                .map(this::createField)
                 .collect(Collectors.toConcurrentMap(ProtobufField::index, Function.identity()));
     }
 
-    private ProtobufField createProtobufField(Field field) {
+    private ProtobufField createField(Field field) {
         var property = ProtobufUtils.getProperty(field);
-        return new ProtobufField(
-                ProtobufUtils.getFieldName(field),
-                property.index(),
-                property.type(),
-                ProtobufUtils.getJavaType(property),
-                null,
-                property.packed(),
-                property.required(),
-                property.repeated(),
-                property.requiresConversion()
-        );
+        var name = ProtobufUtils.getFieldName(field);
+        var type = ProtobufUtils.getJavaType(field, property);
+        var conversion = requiresConversion(field, property);
+        return new ProtobufField(name, type, conversion, property);
+    }
+
+    private boolean requiresConversion(Field field, ProtobufProperty property) {
+        return property.implementation() != null
+                && property.implementation() != ProtobufMessage.class
+                && !property.repeated()
+                && property.implementation() != field.getType();
     }
 
     @Override
@@ -148,17 +148,12 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public JsonToken nextToken() {
-        if (type == null) {
-            throw new ProtobufDeserializationException("Cannot deserialize message, missing schema: " +
-                    "please provide one by calling with(ProtobufSchema.of(Class<?>)) on the reader");
-        }
-
         if (!hasCurrentToken()) {
             return super._currToken = JsonToken.START_OBJECT;
         }
 
         if (_currToken == JsonToken.FIELD_NAME) {
-            return super._currToken = readNextToken();
+            return super._currToken = readValueAndToken();
         }
 
         if (packedInput != null) {
@@ -167,7 +162,7 @@ class ProtobufParser extends ParserMinimalBase {
                 return super._currToken = JsonToken.END_ARRAY;
             }
 
-            this.lastValue = lastType == 1 ? packedInput.readRawVarint64() : packedInput.readRawVarint32();
+            this.lastValue = lastType == 1 ? packedInput.readInt64() : packedInput.readInt32();
             return super._currToken = JsonToken.VALUE_NUMBER_INT;
         }
 
@@ -178,7 +173,7 @@ class ProtobufParser extends ParserMinimalBase {
 
         var index = tag >>> 3;
         if (index == 0) {
-            throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, invalid wire type: 0"
+            throw new ProtobufDeserializationException("Cannot deserialize field with index %s inside %s: invalid field index"
                     .formatted(index, type.getName()));
         }
 
@@ -196,34 +191,34 @@ class ProtobufParser extends ParserMinimalBase {
         }
     }
 
-    private JsonToken readNextToken() {
+    private JsonToken readValueAndToken() {
         return switch (lastType) {
-            case 0 -> {
+            case WIRE_TYPE_VAR_INT -> {
                 this.lastValue = input.readInt64();
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
 
-            case 1 -> {
+            case WIRE_TYPE_FIXED64 -> {
                 this.lastValue = input.readFixed64();
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
 
-            case 2 -> {
+            case WIRE_TYPE_LENGTH_DELIMITED -> {
                 this.lastValue = readDelimitedWithConversion();
                 yield tokenOrNull(packedInput != null ? JsonToken.START_ARRAY : JsonToken.VALUE_EMBEDDED_OBJECT);
             }
 
-            case 3 -> {
+            case WIRE_TYPE_EMBEDDED_MESSAGE -> {
                 this.lastValue = readEmbeddedMessage(input.readBytes());
                 yield tokenOrNull(JsonToken.VALUE_EMBEDDED_OBJECT);
             }
 
-            case 4 -> {
+            case WIRE_TYPE_END_OBJECT -> {
                 this.lastValue = null;
                 yield tokenOrNull(JsonToken.END_OBJECT);
             }
 
-            case 5 -> {
+            case WIRE_TYPE_FIXED32 -> {
                 this.lastValue = input.readFixed32();
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
@@ -238,7 +233,6 @@ class ProtobufParser extends ParserMinimalBase {
         return lastField == null ? JsonToken.VALUE_NULL : token;
     }
 
-    @SneakyThrows
     private Object readDelimitedWithConversion() {
         var delimited = readDelimited();
         if (lastField == null
@@ -247,18 +241,30 @@ class ProtobufParser extends ParserMinimalBase {
             return delimited;
         }
 
-        var converter = findConverter();
+        var converter = findConverter(delimited);
         Reflection.open(converter);
-        return converter.invoke(null, delimited);
+        try {
+            return converter.invoke(null, delimited);
+        } catch (ReflectiveOperationException exception) {
+            throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot invoke converter"
+                    .formatted(lastField.index(), type.getName()), exception);
+        }
     }
 
-    private Method findConverter() {
+    private Method findConverter(Object argument) {
         return Arrays.stream(lastField.messageType().getMethods())
-                .filter(method -> Modifier.isStatic(method.getModifiers())
-                        && method.isAnnotationPresent(ProtobufConverter.class))
+                .filter(method -> isValidConverter(method, argument))
                 .findFirst()
-                .orElseThrow(() -> new ProtobufDeserializationException("Cannot deserialize field %s inside %s: no converter found for class %s"
-                        .formatted(lastField.index(), type.getName(), lastField.messageType().getName())));
+                .orElseThrow(() -> new ProtobufDeserializationException("Cannot deserialize field %s inside %s: no converter found(required explicitly)"
+                        .formatted(lastField.index(), type.getName())));
+    }
+
+    private boolean isValidConverter(Method method, Object argument) {
+        return Modifier.isStatic(method.getModifiers())
+                && method.isAnnotationPresent(ProtobufConverter.class)
+                && method.getReturnType() == type
+                && method.getParameters().length == 1
+                && (argument == null || method.getParameters()[0].getType().isAssignableFrom(argument.getClass()));
     }
 
     private Object readDelimited() {
@@ -279,14 +285,14 @@ class ProtobufParser extends ParserMinimalBase {
         }
 
         var int64 = lastField.type().isLong();
-        if (lastField.type().isInt() || int64) {
-            this.lastType = int64 ? 1 : 5;
-            this.packedInput = new ArrayInputStream(read);
-            return null;
+        if (!lastField.type().isInt() && !int64) {
+            throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected scalar type, got %s(packed field)"
+                    .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
         }
 
-        throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected scalar type, got %s(packed field)"
-                .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+        this.lastType = int64 ? 1 : 5;
+        this.packedInput = new ArrayInputStream(read);
+        return null;
     }
 
     private Object readEmbeddedMessage(byte[] bytes) {
@@ -294,21 +300,21 @@ class ProtobufParser extends ParserMinimalBase {
             return bytes;
         }
 
-        assertFieldsCache(lastField.messageType());
         var lastField = this.lastField;
         var lastType = this.type;
         var lastInput = this.input;
         var lastToken = this.currentToken();
         var lastValue = this.lastValue;
-        this.type = lastField.messageType();
-        this.input = new ArrayInputStream(bytes);
-        this._currToken = null;
-        this.lastField = null;
         try {
+            getFieldsOrCache(lastField.messageType());
+            this.type = lastField.messageType();
+            this.input = new ArrayInputStream(bytes);
+            this._currToken = null;
+            this.lastField = null;
             return readValueAs(lastField.messageType());
-        } catch (IOException exception) {
+        } catch (Throwable exception) {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot decode embedded message with type %s"
-                    .formatted(lastField.index(), lastType.getName(), lastField.messageType().getName()), exception);
+                    .formatted(lastField.index(), lastType.getName(), lastField.messageType() == null ? "unknown" : lastField.messageType().getName()), exception);
         } finally {
             this.type = lastType;
             this.input = lastInput;

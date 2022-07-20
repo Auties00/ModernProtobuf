@@ -9,18 +9,20 @@ import java.util.Objects;
 public record ProtobufField(String name, int index, ProtobufProperty.Type type,
                             Class<? extends ProtobufMessage> messageType, Object value, boolean packed,
                             boolean required, boolean repeated, boolean requiresConversion) {
-    public ProtobufField(String name, int index, ProtobufProperty.Type type, Object value,
-                         boolean packed, boolean required, boolean repeated, boolean requiresConversion) {
-        this(name, index, type, null, value, packed, required, repeated, requiresConversion);
+    public ProtobufField(String name, Object value, ProtobufProperty property) {
+        this(name, property.index(), property.type(), null, value, property.packed(), property.required(), property.repeated(), false);
     }
 
-    public ProtobufField withValue(Object value) {
-        return new ProtobufField(name, index, type, messageType,
-                value, packed, required, false, false);
+    public ProtobufField(String name, Class<? extends ProtobufMessage> type, boolean requiresConversion, ProtobufProperty property) {
+        this(name, property.index(), property.type(), type, null, property.packed(), property.required(), property.repeated(), requiresConversion);
+    }
+
+    public ProtobufField toSingleField(Object value) {
+        return new ProtobufField(name, index, type, messageType, value, packed, required, false, false);
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T valueAs() {
+    public <T> T dynamicValue() {
         try {
             return (T) value;
         } catch (ClassCastException exception) {
@@ -28,10 +30,9 @@ public record ProtobufField(String name, int index, ProtobufProperty.Type type,
         }
     }
 
-    public boolean valid() {
+    public boolean isValid() {
         if (required && value == null) {
-            throw new ProtobufSerializationException("Erroneous field at index %s with type %s(%s): missing mandatory value"
-                    .formatted(index, type, Objects.toString(messageType)));
+            throw new ProtobufSerializationException("Erroneous field at index %s with type %s(%s): missing mandatory value".formatted(index, type, Objects.toString(messageType)));
         }
 
         return value != null;

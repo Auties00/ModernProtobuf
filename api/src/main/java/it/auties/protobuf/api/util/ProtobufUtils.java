@@ -4,13 +4,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import it.auties.protobuf.api.exception.ProtobufSerializationException;
 import it.auties.protobuf.api.model.ProtobufMessage;
 import it.auties.protobuf.api.model.ProtobufProperty;
-import it.auties.protobuf.api.model.ProtobufValue;
 import lombok.experimental.UtilityClass;
 
 import java.lang.reflect.Field;
 
+import static it.auties.protobuf.api.model.ProtobufProperty.Type.MESSAGE;
+
 @UtilityClass
 public class ProtobufUtils {
+    // Needed to fix MixedNotationsTest bug
     public String getFieldName(Field field) {
         var notation = field.getAnnotation(JsonProperty.class);
         return notation == null ? field.getName() : notation.value();
@@ -26,29 +28,20 @@ public class ProtobufUtils {
         return property == null || property.ignore() ? null : property;
     }
 
-    public Class<? extends ProtobufMessage> getJavaType(ProtobufProperty property) {
-        if (property.concreteType() == Object.class) {
+    public Class<? extends ProtobufMessage> getJavaType(Field field, ProtobufProperty property) {
+        if (property.type() != MESSAGE) {
             return null;
         }
 
-        if (property.concreteType() == null) {
-            throw new ProtobufSerializationException("Missing concrete type property type");
+        if (property.implementation() != null && property.implementation() != ProtobufMessage.class) {
+            return property.implementation();
         }
 
-        if (property.concreteType().isEnum()) {
-            return null;
+        if(!ProtobufMessage.isMessage(field.getType())){
+            throw new ProtobufSerializationException("Field %s inside class %s with type %s doesn't implement ProtobufMessage"
+                    .formatted(field.getName(), field.getDeclaringClass().getName(), field.getType().getName()));
         }
 
-        if (!ProtobufMessage.isMessage(property.concreteType())) {
-            throw new ProtobufSerializationException("%s is not a valid message type. ".formatted(property.concreteType()) +
-                    "This usually means that there is a missing concrete type property or that said class is not a ProtobufMessage");
-        }
-
-        return property.concreteType()
-                .asSubclass(ProtobufMessage.class);
-    }
-
-    public boolean hasValue(Class<?> type) {
-        return type.isAnnotationPresent(ProtobufValue.class);
+        return field.getType().asSubclass(ProtobufMessage.class);
     }
 }

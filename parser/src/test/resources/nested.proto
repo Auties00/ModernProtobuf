@@ -1,0 +1,22 @@
+message Example {
+  enum Entry {
+    A = 0;
+    B = 1;
+    C = 2;
+  }
+
+  message Nested {
+    enum AnotherEntry {
+      D = 0;
+      E = 1;
+      F = 2;
+    }
+
+    message AnotherExample {
+      oneof hello {
+        string a = 1;
+        int32 b = 2;
+      }
+    }
+  }
+}
