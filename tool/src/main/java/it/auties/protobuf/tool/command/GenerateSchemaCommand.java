@@ -35,13 +35,6 @@ public class GenerateSchemaCommand implements Callable<Integer> {
     )
     private File output = new File(System.getProperty("user.home"), "/schemas");
 
-    @SuppressWarnings("FieldMayBeFinal")
-    @Option(
-            names = {"-p", "--package"},
-            description = "The package of the generated classes, by default none is specified"
-    )
-    private String pack = "";
-
     @Override
     public Integer call() {
         if (!createOutputDirectory()) {
@@ -84,7 +77,7 @@ public class GenerateSchemaCommand implements Callable<Integer> {
 
     private void generateSchema(ProtobufDocument ast) {
         log.info("Generating java classes from AST...");
-        var generator = new ProtobufSchemaCreator(ast, pack, output);
+        var generator = new ProtobufSchemaCreator(ast, ast.packageName(), output);
         generator.generateSchema();
         log.info("Generated java classes successfully at %s".formatted(output));
     }

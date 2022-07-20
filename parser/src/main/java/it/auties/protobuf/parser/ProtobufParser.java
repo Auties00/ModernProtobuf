@@ -5,6 +5,7 @@ import it.auties.protobuf.parser.model.ProtobufSyntaxException;
 import it.auties.protobuf.parser.model.ProtobufVersion;
 import it.auties.protobuf.parser.object.ProtobufDocument;
 import it.auties.protobuf.parser.object.ProtobufObject;
+import it.auties.protobuf.parser.object.ProtobufReservable;
 import it.auties.protobuf.parser.statement.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,6 +19,7 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.IntStream;
 
 import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_2;
 import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_3;
@@ -32,6 +34,7 @@ public final class ProtobufParser {
     private static final String ARRAY_END = "]";
     private static final String COMMA = ",";
     private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
+    private static final String TO_CONTEXTUAL_KEYWORD = "to";
 
     private final ProtobufDocument document;
     private final StreamTokenizer tokenizer;
@@ -43,6 +46,9 @@ public final class ProtobufParser {
     private FieldState fieldState;
     private String optionName;
     private String fieldOptionName;
+    private String reservedName;
+    private Integer reservedIndex;
+    private boolean reservedIndexRange;
 
     public ProtobufParser(@NonNull File file) throws IOException {
         this(file.toPath());
@@ -76,8 +82,28 @@ public final class ProtobufParser {
     private void handleToken(String token) {
         switch (token) {
             case STATEMENT_END -> {
+                if(reservedName != null || reservedIndex != null){
+                    var reservable = (ProtobufReservable) objectsQueue.getLast();
+                    if(reservedIndex != null) {
+                        ProtobufSyntaxException.check(reservable.reservedIndexes().add(reservedIndex),
+                                "Duplicated reserved field index(%s)", tokenizer.lineno(), reservedIndex);
+                    }
+
+                    if(reservedName != null){
+                        ProtobufSyntaxException.check(reservable.reservedNames().add(reservedName),
+                                "Duplicated reserved field name(%s)", tokenizer.lineno(), reservedName);
+                    }
+
+                    this.reservedIndex = null;
+                    this.reservedName = null;
+                    this.reservedIndexRange = false;
+                    this.instructionState = InstructionState.OPTIONS;
+                    return;
+                }
+
                 if (field != null) {
                     addFieldToScope();
+                    return;
                 }
 
                 var instruction = instructions.getLast();
@@ -96,6 +122,8 @@ public final class ProtobufParser {
                         "Illegal enum or oneof without any constants", tokenizer.lineno());
                 ProtobufSyntaxException.check(hasDefaultEnumConstant(object),
                         "Proto3 enums require a constant with index 0", tokenizer.lineno());
+                ProtobufSyntaxException.check(isValidReservable(object),
+                        "Illegal use of reserved field", tokenizer.lineno());
                 var scope = objectsQueue.peekLast();
                 if(scope == null){
                     document.getStatements().add(object);
@@ -134,9 +162,35 @@ public final class ProtobufParser {
                         handleBodyState(token, instruction);
                         nextInstructionState();
                     }
+
+                    case SERVICE -> nextInstructionState();
                 }
             }
         }
+    }
+
+    private boolean isValidReservable(ProtobufObject<?> object) {
+        if(!(object instanceof ProtobufReservable reservable)){
+            return true;
+        }
+
+        return object.getStatements()
+                .stream()
+                .filter(entry -> entry instanceof FieldStatement)
+                .map(entry -> (FieldStatement) entry)
+                .noneMatch(entry -> hasReservedFieldIndex(reservable, entry) || hasReservedFieldName(reservable, entry));
+    }
+
+    private boolean hasReservedFieldName(ProtobufReservable reservable, FieldStatement entry) {
+        return reservable.reservedNames()
+                .stream()
+                .anyMatch(reserved -> Objects.equals(reserved, entry.name()));
+    }
+
+    private boolean hasReservedFieldIndex(ProtobufReservable reservable, FieldStatement entry) {
+        return reservable.reservedIndexes()
+                .stream()
+                .anyMatch(reserved -> Objects.equals(reserved, entry.index()));
     }
 
     private boolean hasAnyConstants(ProtobufObject<?> object) {
@@ -146,7 +200,7 @@ public final class ProtobufParser {
     }
 
     private boolean hasDefaultEnumConstant(ProtobufObject<?> object) {
-        return document.getVersion() != PROTOBUF_3
+        return document.version() != PROTOBUF_3
                 || !(object instanceof EnumStatement enumStatement)
                 || enumStatement.getStatements().stream().anyMatch(entry -> entry.index() == 0);
     }
@@ -158,33 +212,107 @@ public final class ProtobufParser {
                     "Expected message initializer after message declaration", tokenizer.lineno());
             case OPTIONS -> {
                 var nestedInstruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
-                if (nestedInstruction == Instruction.UNKNOWN) {
-                    createField(token);
+                switch (nestedInstruction){
+                    case UNKNOWN -> createField(token);
+
+                    case RESERVED -> createReserved(token);
+
+                    default -> {
+                        createBody(nestedInstruction, nextToken());
+                        instructions.add(nestedInstruction);
+                        knowIndexes.add(new HashSet<>());
+                        this.instructionState = InstructionState.DECLARATION;
+                    }
+                }
+            }
+            case BODY -> {
+                if (fieldState == null) {
+                    createReserved(token);
                     return;
                 }
 
-                createBody(nestedInstruction, nextToken());
-                instructions.add(nestedInstruction);
-                knowIndexes.add(new HashSet<>());
-                this.instructionState = InstructionState.DECLARATION;
-            }
-            case BODY -> {
                 attributeField(token);
                 nextFieldState();
             }
         }
     }
 
+    private void createReserved(String token) {
+        if(Instruction.RESERVED.name().toLowerCase(Locale.ROOT).equals(token)){
+            return;
+        }
+
+        var scope = objectsQueue.peekLast();
+        ProtobufSyntaxException.check(scope instanceof ProtobufReservable,
+                "Invalid scope for reserved statement", tokenizer.lineno());
+        var reservable =  (ProtobufReservable) scope;
+        if(token.equals(COMMA)){
+            if(reservedIndexRange){
+                this.reservedIndexRange = false;
+                return;
+            }
+
+            if(reservedName != null) {
+                ProtobufSyntaxException.check(reservable.reservedNames().add(reservedName),
+                        "Duplicated reserved field name(%s)", tokenizer.lineno(), reservedName);
+                return;
+            }
+
+            if(reservedIndex != null){
+                ProtobufSyntaxException.check(reservable.reservedIndexes().add(reservedIndex),
+                        "Duplicated reserved field index(%s)", tokenizer.lineno(), reservedIndex);
+                return;
+            }
+
+            throw new ProtobufSyntaxException("Expected value before comma in reserved statement", tokenizer.lineno());
+        }
+
+        if(token.equals(TO_CONTEXTUAL_KEYWORD)) {
+            ProtobufSyntaxException.check(reservedName == null,
+                    "Illegal to keyword usage with field name in reserved statement", tokenizer.lineno());
+            ProtobufSyntaxException.check(reservedIndex != null,
+                    "Expected value before to keyword in reserved statement", tokenizer.lineno());
+            this.reservedIndexRange = true;
+            return;
+        }
+
+        if(isStringLiteral(token)){
+            ProtobufSyntaxException.check(reservedIndex == null,
+                "Illegal mixture of field names and indexes in reserved statement", tokenizer.lineno());
+            this.reservedName = token.substring(1, token.length() - 1);
+            return;
+        }
+
+        if(reservedIndexRange){
+            var end = parseIndex(token, true)
+                    .orElseThrow(() -> new ProtobufSyntaxException("Expected int or string in reserved statement", tokenizer.lineno()));
+            IntStream.rangeClosed(reservedIndex, end)
+                    .forEach(reservable.reservedIndexes()::add);
+            return;
+        }
+
+        ProtobufSyntaxException.check(reservedName == null,
+                "Illegal mixture of field names and indexes in reserved statement", tokenizer.lineno());
+        this.reservedIndex = parseIndex(token, true)
+                .orElseThrow(() -> new ProtobufSyntaxException("Expected int or string in reserved statement instead of %s",
+                        tokenizer.lineno(), token));
+    }
+
+    private boolean isStringLiteral(String token) {
+        return (token.startsWith("\"") && token.endsWith("\""))
+               || (token.startsWith("'") && token.endsWith("'"));
+    }
+
     private FieldStatement.Scope createFieldScope(ProtobufStatement scope, FieldModifier modifier) {
         if (modifier != FieldModifier.NOTHING) {
-            ProtobufSyntaxException.check(document.getVersion() == PROTOBUF_2 || modifier != FieldModifier.REQUIRED,
+            ProtobufSyntaxException.check(document.version() == PROTOBUF_2 || modifier != FieldModifier.REQUIRED,
                     "Support for the required label was dropped in proto3", tokenizer.lineno());
             ProtobufSyntaxException.check(scope instanceof MessageStatement,
                     "Expected message scope for field declaration", tokenizer.lineno());
             return FieldStatement.Scope.MESSAGE;
         }
 
-        if (document.getVersion() == PROTOBUF_3 && scope instanceof MessageStatement) {
+        if (document.version() == PROTOBUF_3 && scope instanceof MessageStatement) {
             return FieldStatement.Scope.MESSAGE;
         }
 
@@ -230,7 +358,11 @@ public final class ProtobufParser {
                 switch (fieldOptionName) {
                     case "packed" -> field.packed(Boolean.parseBoolean(token));
                     case "deprecated" -> field.deprecated(Boolean.parseBoolean(token));
-                    case "default" -> field.defaultValue(token);
+                    case "default" -> {
+                        ProtobufSyntaxException.check(document.version() != PROTOBUF_3,
+                                "Support for default values was dropped in proto3", tokenizer.lineno());
+                        field.defaultValue(token);
+                    }
                     default ->
                             LOGGER.log(System.Logger.Level.WARNING, "Unrecognized field option: %s=%s%n".formatted(fieldOptionName, token));
                 }
@@ -261,7 +393,7 @@ public final class ProtobufParser {
 
         switch (scopeType) {
             case MESSAGE -> {
-                if (document.getVersion() == PROTOBUF_3) {
+                if (document.version() == PROTOBUF_3) {
                     field.type(token);
                     this.fieldState = FieldState.TYPE;
                 }
@@ -283,7 +415,7 @@ public final class ProtobufParser {
             case VALUE -> ProtobufSyntaxException.check(isAssignmentOperator(token),
                     "Expected assignment operator after option declaration", tokenizer.lineno());
             case OPTIONS -> {
-                document.getOptions().put(optionName, token);
+                document.options().put(optionName, token);
                 this.optionName = null;
             }
             case BODY ->
@@ -297,7 +429,7 @@ public final class ProtobufParser {
             case DECLARATION ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after syntax declaration", tokenizer.lineno());
-            case VALUE -> document.setVersion(ProtobufVersion.forName(token)
+            case VALUE -> document.version(ProtobufVersion.forName(token)
                     .orElseThrow(() -> new ProtobufSyntaxException("Illegal syntax declaration: %s is not a valid version".formatted(token),
                             tokenizer.lineno())));
             case OPTIONS, BODY ->
@@ -309,11 +441,15 @@ public final class ProtobufParser {
     private void createPackageOption(String token) {
         ProtobufSyntaxException.check(instructionState == InstructionState.DECLARATION,
                 "Illegal options specified for package declaration", tokenizer.lineno());
-        document.setPackageName(token);
+        document.packageName(token);
     }
 
     private void openInstruction(String token) {
         var instruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
+        if(instruction == Instruction.SERVICE){
+            LOGGER.log(System.Logger.Level.INFO, "Service will not be parsed at line %s".formatted(tokenizer.lineno()));
+        }
+
         ProtobufSyntaxException.check(instruction != Instruction.UNKNOWN,
                 "Unknown instruction: %s", tokenizer.lineno(), token);
         instructions.add(instruction);
@@ -331,6 +467,7 @@ public final class ProtobufParser {
         }
 
         this.instructionState = InstructionState.OPTIONS;
+        this.field = null;
         this.fieldState = null;
     }
 
@@ -402,10 +539,12 @@ public final class ProtobufParser {
         UNKNOWN(false),
         PACKAGE(false),
         SYNTAX(false),
+        RESERVED(false),
         OPTION(false),
         MESSAGE(true),
         ENUM(true),
-        ONE_OF(true);
+        ONE_OF(true),
+        SERVICE(true);
 
         @Getter
         private final boolean hasBody;

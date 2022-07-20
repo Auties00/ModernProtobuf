@@ -9,7 +9,7 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 @Data
 public abstract sealed class ProtobufStatement permits ProtobufObject, FieldStatement {
-    protected static final String INDENTATION = "    ";
+    protected final String INDENTATION = "    ";
     private String name;
     public ProtobufStatement(){
         this(null);

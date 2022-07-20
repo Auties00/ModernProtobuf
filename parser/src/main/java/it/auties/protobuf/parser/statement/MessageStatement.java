@@ -1,15 +1,25 @@
 package it.auties.protobuf.parser.statement;
 
 import it.auties.protobuf.parser.object.ProtobufObject;
+import it.auties.protobuf.parser.object.ProtobufReservable;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import lombok.experimental.Accessors;
 
-import java.util.ArrayList;
+import java.util.*;
+import java.util.stream.Collectors;
 
+@Data
+@Accessors(fluent = true)
 @EqualsAndHashCode(callSuper = true)
-public final class MessageStatement extends ProtobufObject<ProtobufStatement> {
+public final class MessageStatement extends ProtobufObject<ProtobufStatement> implements ProtobufReservable {
+    private final TreeSet<String> reservedNames;
+    private final TreeSet<Integer> reservedIndexes;
     public MessageStatement(String name) {
         super(name, new ArrayList<>());
+        this.reservedNames = new TreeSet<>();
+        this.reservedIndexes = new TreeSet<>();
     }
 
     @Override
@@ -26,6 +36,8 @@ public final class MessageStatement extends ProtobufObject<ProtobufStatement> {
                 .append(" ")
                 .append("{")
                 .append("\n");
+        addReservedFields(level, builder);
+
         getStatements().forEach(statement -> {
             if (statement instanceof MessageStatement nestedMessage) {
                 builder.append(nestedMessage.toString(level + 1));

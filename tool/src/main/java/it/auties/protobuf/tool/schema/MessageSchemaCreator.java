@@ -5,6 +5,8 @@ import it.auties.protobuf.tool.util.ProtobufUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public record MessageSchemaCreator(MessageStatement message, String pack) implements SchemaCreator {
     @Override
@@ -114,11 +116,49 @@ public record MessageSchemaCreator(MessageStatement message, String pack) implem
             writeList(builder, builderMethods, level + 2, false);
             builder.append(ProtobufUtils.indentLine("}", level + 1));
             builder.append("\n");
+            if(!message.reservedIndexes().isEmpty()) {
+                builder.append("\n");
+            }
+        }
+
+        if(!message.reservedIndexes().isEmpty()){
+            addReservedFields(builder, level, "reservedFieldIndexes", reservedIndexesList(), !message.reservedNames().isEmpty());
+        }
+
+        if(!message.reservedNames().isEmpty()){
+            addReservedFields(builder, level, "reservedFieldNames", reservedNamesList(), false);
         }
 
         builder.append(ProtobufUtils.indentLine("}", level));
         builder.append("\n");
         return ProtobufUtils.indentLines(builder.toString(), level);
+    }
+
+    private void addReservedFields(StringBuilder builder, int level, String method, String reservedNamesList, boolean addNewLine) {
+        builder.append(ProtobufUtils.indentLine("@Override", level + 1));
+        builder.append("\n");
+        builder.append(ProtobufUtils.indentLine("public List<Integer> %s() {".formatted(method), level + 1));
+        builder.append("\n");
+        builder.append(ProtobufUtils.indentLine("return List.of(%s);".formatted(reservedNamesList), level + 2));
+        builder.append("\n");
+        builder.append(ProtobufUtils.indentLine("}", level + 1));
+        builder.append("\n");
+        if (!addNewLine) {
+            return;
+        }
+
+        builder.append("\n");
+    }
+
+    private String reservedIndexesList() {
+        return message.reservedIndexes()
+                .stream()
+                .map(Objects::toString)
+                .collect(Collectors.joining(", "));
+    }
+
+    private String reservedNamesList() {
+        return String.join(", ", message.reservedNames());
     }
 
     private static void writeList(StringBuilder builder, List<String> entries, int level, boolean forceNewLine) {

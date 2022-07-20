@@ -1,5 +1,7 @@
 package it.auties.protobuf.api.model;
 
+import java.util.List;
+
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
 public interface ProtobufMessage {
     static boolean isMessage(Class<?> clazz) {
@@ -11,6 +13,14 @@ public interface ProtobufMessage {
     }
 
     default Object toValue() {
+        return null;
+    }
+
+    default List<String> reservedFieldNames(){
+        return null;
+    }
+
+    default List<Integer> reservedFieldIndexes(){
         return null;
     }
 }

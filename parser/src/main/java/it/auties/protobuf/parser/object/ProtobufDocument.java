@@ -5,11 +5,13 @@ import it.auties.protobuf.parser.statement.EnumStatement;
 import it.auties.protobuf.parser.statement.MessageStatement;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Data
+@Accessors(fluent = true)
 @EqualsAndHashCode(callSuper = true)
 public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
     private final Map<String, String> options;
@@ -30,13 +32,13 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
     @Override
     public String toString(int level) {
         var builder = new StringBuilder();
-        if(getVersion() != ProtobufVersion.PROTOBUF_2){
-            builder.append("syntax = %s;".formatted(getVersion().versionCode()));
+        if(version() != ProtobufVersion.PROTOBUF_2){
+            builder.append("syntax = %s;".formatted(version().versionCode()));
             builder.append("\n");
         }
 
-        if(getPackageName() != null){
-            builder.append("package %s;".formatted(getPackageName()));
+        if(packageName() != null){
+            builder.append("package %s;".formatted(packageName()));
             builder.append("\n");
         }
 

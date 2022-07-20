@@ -16,7 +16,6 @@ public class SchemaTest {
         Objects.requireNonNull(source);
 
         var folder = Files.createTempDirectory("output");
-        ModernProtocApplication.main("generate", Path.of(source.toURI()).toString(),
-                "--package", "it.auties.example", "--output", folder.toString());
+        ModernProtocApplication.main("generate", Path.of(source.toURI()).toString(), "--output", folder.toString());
     }
 }
