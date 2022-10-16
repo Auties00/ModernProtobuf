@@ -1,12 +1,14 @@
 package it.auties.protobuf.parser;
 
-import it.auties.protobuf.parser.model.FieldModifier;
-import it.auties.protobuf.parser.model.ProtobufSyntaxException;
-import it.auties.protobuf.parser.model.ProtobufVersion;
-import it.auties.protobuf.parser.object.ProtobufDocument;
-import it.auties.protobuf.parser.object.ProtobufObject;
-import it.auties.protobuf.parser.object.ProtobufReservable;
+import it.auties.protobuf.base.ProtobufVersion;
+import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.exception.ProtobufTypeException;
+import it.auties.protobuf.parser.statement.ProtobufDocument;
+import it.auties.protobuf.parser.statement.ProtobufObject;
+import it.auties.protobuf.parser.statement.ProtobufReservable;
 import it.auties.protobuf.parser.statement.*;
+import it.auties.protobuf.parser.type.ProtobufMessageType;
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
@@ -21,8 +23,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.IntStream;
 
-import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_2;
-import static it.auties.protobuf.parser.model.ProtobufVersion.PROTOBUF_3;
+import static it.auties.protobuf.base.ProtobufVersion.PROTOBUF_2;
+import static it.auties.protobuf.base.ProtobufVersion.PROTOBUF_3;
 import static java.util.Objects.requireNonNullElse;
 
 public final class ProtobufParser {
@@ -35,14 +37,16 @@ public final class ProtobufParser {
     private static final String COMMA = ",";
     private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
     private static final String TO_CONTEXTUAL_KEYWORD = "to";
+    private static final String TYPE_SELECTOR_KEYWORD = ".";
 
     private final ProtobufDocument document;
     private final StreamTokenizer tokenizer;
+    private final Map<String, ProtobufObject<?>> types;
     private final Deque<ProtobufObject<?>> objectsQueue;
     private final Deque<Instruction> instructions;
     private final Deque<Set<Integer>> knowIndexes;
     private InstructionState instructionState;
-    private FieldStatement field;
+    private ProtobufFieldStatement field;
     private FieldState fieldState;
     private String optionName;
     private String fieldOptionName;
@@ -63,6 +67,7 @@ public final class ProtobufParser {
         this.tokenizer = new StreamTokenizer(new StringReader(input));
         this.objectsQueue = new LinkedList<>();
         this.instructions = new LinkedList<>();
+        this.types = new HashMap<>();
         this.instructionState = InstructionState.DECLARATION;
         this.knowIndexes = new LinkedList<>();
         tokenizer.wordChars('_', '_');
@@ -76,14 +81,87 @@ public final class ProtobufParser {
             handleToken(token);
         }
 
+        attribute(document);
+
         return document;
+    }
+
+    private void attribute(ProtobufStatement statement) {
+        if(statement instanceof ProtobufDocument documentStatement) {
+            documentStatement.statements()
+                    .forEach(this::attribute);
+            return;
+        }
+
+        if(statement instanceof ProtobufEnumStatement){
+            return;
+        }
+
+        if(statement instanceof ProtobufMessageStatement messageStatement){
+            messageStatement.statements()
+                    .forEach(this::attribute);
+            return;
+        }
+
+        if(statement instanceof ProtobufOneOfStatement oneOfStatement){
+            oneOfStatement.statements()
+                    .forEach(this::attribute);
+            return;
+        }
+
+        if(statement instanceof ProtobufFieldStatement fieldStatement){
+            if(!(fieldStatement.reference() instanceof ProtobufMessageType messageType)){
+                return;
+            }
+
+            if(messageType.attributed()){
+                return;
+            }
+
+            if(!messageType.name().contains(TYPE_SELECTOR_KEYWORD)){
+                var type = types.get(messageType.name());
+                if(type == null){
+                    throw new ProtobufTypeException("Cannot resolve type %s", messageType.name());
+                }
+
+                if(!hasSameParentTop(statement, type) && !hasSameParentDirect(statement, type)) {
+                    throw new ProtobufTypeException("Cannot access type %s from %s's scope", type.name(), statement.name());
+                }
+
+                messageType.attribute(type);
+            }else {
+                // TODO: Implement
+            }
+            return;
+        }
+
+        throw new ProtobufTypeException("Cannot check type of %s", statement.name());
+    }
+
+    private boolean hasSameParentTop(ProtobufStatement statement, ProtobufObject<?> type) {
+        var typeParent = type.parent();
+        var lastParent = statement.parent();
+        while (lastParent != null){
+            if(lastParent.equals(typeParent)){
+                return true;
+            }
+
+            lastParent = lastParent.parent();
+        }
+
+        return false;
+    }
+
+    private boolean hasSameParentDirect(ProtobufStatement statement, ProtobufObject<?> type) {
+        return type.parent() != null
+                && type.parent().equals(statement.parent());
     }
 
     private void handleToken(String token) {
         switch (token) {
             case STATEMENT_END -> {
                 if(reservedName != null || reservedIndex != null){
-                    var reservable = (ProtobufReservable) objectsQueue.getLast();
+                    var reservable = (ProtobufReservable<?>) objectsQueue.getLast();
                     if(reservedIndex != null) {
                         ProtobufSyntaxException.check(reservable.reservedIndexes().add(reservedIndex),
                                 "Duplicated reserved field index(%s)", tokenizer.lineno(), reservedIndex);
@@ -126,11 +204,11 @@ public final class ProtobufParser {
                         "Illegal use of reserved field", tokenizer.lineno());
                 var scope = objectsQueue.peekLast();
                 if(scope == null){
-                    document.getStatements().add(object);
-                }else if(scope instanceof MessageStatement messageStatement){
-                    messageStatement.getStatements().add(object);
+                    document.addStatement(object);
+                }else if(scope instanceof ProtobufMessageStatement message){
+                    message.addStatement(object);
                 }else {
-                    throw new ProtobufSyntaxException("Incorrect scope", tokenizer.lineno());
+                    throw new ProtobufSyntaxException("%s cannot be declared in %s as the latter should be a message", tokenizer.lineno(), object.name(), scope.name());
                 }
 
                 instructions.removeLast();
@@ -170,39 +248,39 @@ public final class ProtobufParser {
     }
 
     private boolean isValidReservable(ProtobufObject<?> object) {
-        if(!(object instanceof ProtobufReservable reservable)){
+        if(!(object instanceof ProtobufReservable<?> reservable)){
             return true;
         }
 
-        return object.getStatements()
+        return object.statements()
                 .stream()
-                .filter(entry -> entry instanceof FieldStatement)
-                .map(entry -> (FieldStatement) entry)
+                .filter(entry -> entry instanceof ProtobufFieldStatement)
+                .map(entry -> (ProtobufFieldStatement) entry)
                 .noneMatch(entry -> hasReservedFieldIndex(reservable, entry) || hasReservedFieldName(reservable, entry));
     }
 
-    private boolean hasReservedFieldName(ProtobufReservable reservable, FieldStatement entry) {
+    private boolean hasReservedFieldName(ProtobufReservable<?> reservable, ProtobufFieldStatement entry) {
         return reservable.reservedNames()
                 .stream()
                 .anyMatch(reserved -> Objects.equals(reserved, entry.name()));
     }
 
-    private boolean hasReservedFieldIndex(ProtobufReservable reservable, FieldStatement entry) {
+    private boolean hasReservedFieldIndex(ProtobufReservable<?> reservable, ProtobufFieldStatement entry) {
         return reservable.reservedIndexes()
                 .stream()
                 .anyMatch(reserved -> Objects.equals(reserved, entry.index()));
     }
 
     private boolean hasAnyConstants(ProtobufObject<?> object) {
-        return (object instanceof EnumStatement enumStatement && !enumStatement.getStatements().isEmpty())
-                || (object instanceof OneOfStatement oneOfStatement && !oneOfStatement.getStatements().isEmpty())
-                || object instanceof MessageStatement;
+        return (object instanceof ProtobufEnumStatement enumStatement && !enumStatement.statements().isEmpty())
+                || (object instanceof ProtobufOneOfStatement oneOfStatement && !oneOfStatement.statements().isEmpty())
+                || object instanceof ProtobufMessageStatement;
     }
 
     private boolean hasDefaultEnumConstant(ProtobufObject<?> object) {
         return document.version() != PROTOBUF_3
-                || !(object instanceof EnumStatement enumStatement)
-                || enumStatement.getStatements().stream().anyMatch(entry -> entry.index() == 0);
+                || !(object instanceof ProtobufEnumStatement enumStatement)
+                || enumStatement.statements().stream().anyMatch(entry -> entry.index() == 0);
     }
 
     private void handleBodyState(String token, Instruction instruction) {
@@ -245,7 +323,7 @@ public final class ProtobufParser {
         var scope = objectsQueue.peekLast();
         ProtobufSyntaxException.check(scope instanceof ProtobufReservable,
                 "Invalid scope for reserved statement", tokenizer.lineno());
-        var reservable =  (ProtobufReservable) scope;
+        var reservable =  (ProtobufReservable<?>) scope;
         if(token.equals(COMMA)){
             if(reservedIndexRange){
                 this.reservedIndexRange = false;
@@ -303,25 +381,25 @@ public final class ProtobufParser {
                || (token.startsWith("'") && token.endsWith("'"));
     }
 
-    private FieldStatement.Scope createFieldScope(ProtobufStatement scope, FieldModifier modifier) {
-        if (modifier != FieldModifier.NOTHING) {
-            ProtobufSyntaxException.check(document.version() == PROTOBUF_2 || modifier != FieldModifier.REQUIRED,
+    private ProtobufObject<?> checkFieldParent(ProtobufObject<?> scope, ProtobufFieldStatement.Modifier modifier) {
+        if (modifier != ProtobufFieldStatement.Modifier.NOTHING) {
+            ProtobufSyntaxException.check(document.version() == PROTOBUF_2 || modifier != ProtobufFieldStatement.Modifier.REQUIRED,
                     "Support for the required label was dropped in proto3", tokenizer.lineno());
-            ProtobufSyntaxException.check(scope instanceof MessageStatement,
+            ProtobufSyntaxException.check(scope instanceof ProtobufMessageStatement,
                     "Expected message scope for field declaration", tokenizer.lineno());
-            return FieldStatement.Scope.MESSAGE;
+            return scope;
         }
 
-        if (document.version() == PROTOBUF_3 && scope instanceof MessageStatement) {
-            return FieldStatement.Scope.MESSAGE;
+        if (document.version() == PROTOBUF_3 && scope instanceof ProtobufMessageStatement) {
+            return scope;
         }
 
-        if (scope instanceof EnumStatement) {
-            return FieldStatement.Scope.ENUM;
+        if (scope instanceof ProtobufEnumStatement) {
+            return scope;
         }
 
-        if (scope instanceof OneOfStatement) {
-            return FieldStatement.Scope.ONE_OF;
+        if (scope instanceof ProtobufOneOfStatement) {
+            return scope;
         }
 
         throw new ProtobufSyntaxException("Expected enum or one of scope for field declaration without label",
@@ -330,7 +408,7 @@ public final class ProtobufParser {
 
     private void attributeField(String token) {
         switch (fieldState) {
-            case MODIFIER -> field.type(token);
+            case MODIFIER -> field.reference(ProtobufTypeReference.of(token));
             case TYPE -> {
                 ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
                         tokenizer.lineno(), token);
@@ -340,7 +418,7 @@ public final class ProtobufParser {
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after field type", tokenizer.lineno());
             case INDEX -> {
-                var index = parseIndex(token, field.scope() == FieldStatement.Scope.ENUM)
+                var index = parseIndex(token, field.parent().type() == ProtobufStatementType.ENUM)
                         .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));
                 ProtobufSyntaxException.check(!knowIndexes.getLast().contains(index),
                         "Duplicated index %s", tokenizer.lineno(), index);
@@ -381,28 +459,28 @@ public final class ProtobufParser {
 
     private void createField(String token) {
         var scope = objectsQueue.peekLast();
-        var modifier = FieldModifier.forName(token);
-        var scopeType = createFieldScope(scope, modifier);
-        this.field = new FieldStatement()
-                .modifier(modifier)
-                .scope(scopeType);
+        var modifier = ProtobufFieldStatement.Modifier.forName(token);
+        var parent = checkFieldParent(scope, modifier);
+        this.field = new ProtobufFieldStatement(document.packageName(), parent);
+        field.modifier(modifier);
         this.fieldState = FieldState.MODIFIER;
-        if (modifier != FieldModifier.NOTHING) {
+        if (modifier != ProtobufFieldStatement.Modifier.NOTHING) {
             return;
         }
 
-        switch (scopeType) {
+        switch (parent.type()) {
             case MESSAGE -> {
                 if (document.version() == PROTOBUF_3) {
-                    field.type(token);
+                    field.reference(ProtobufTypeReference.of(token));
                     this.fieldState = FieldState.TYPE;
                 }
             }
             case ONE_OF -> {
-                field.type(token);
+                field.reference(ProtobufTypeReference.of(token));
                 this.fieldState = FieldState.TYPE;
             }
             case ENUM -> {
+
                 field.name(token);
                 this.fieldState = FieldState.NAME;
             }
@@ -457,15 +535,15 @@ public final class ProtobufParser {
         this.instructionState = InstructionState.DECLARATION;
     }
 
+    @SuppressWarnings("unchecked") // safe
     private void addFieldToScope() {
         var scope = objectsQueue.getLast();
-        switch (field.scope()) {
-            case MESSAGE -> ((MessageStatement) scope).getStatements().add(field);
-            case ONE_OF -> ((OneOfStatement) scope).getStatements().add(field);
-            case ENUM -> ((EnumStatement) scope).getStatements().add(field);
-            default -> throw new ProtobufSyntaxException("Invalid scope for field", tokenizer.lineno());
+        if(field.parent().type() == ProtobufStatementType.DOCUMENT){
+            throw new ProtobufSyntaxException("Field %s cannot be declared outside of a scope", tokenizer.lineno(), field.name());
         }
 
+        var safeScope = (ProtobufObject<ProtobufFieldStatement>) scope;
+        safeScope.addStatement(field);
         this.instructionState = InstructionState.OPTIONS;
         this.field = null;
         this.fieldState = null;
@@ -489,12 +567,16 @@ public final class ProtobufParser {
     }
 
     private void createBody(Instruction instruction, String name) {
+        var packageName = document.packageName();
+        var parent = Objects.requireNonNullElse(objectsQueue.peekLast(), document);
         var body = switch (instruction) {
-            case MESSAGE -> new MessageStatement(name);
-            case ENUM -> new EnumStatement(name);
-            case ONE_OF -> new OneOfStatement(name);
+            case MESSAGE -> new ProtobufMessageStatement(name, packageName, parent);
+            case ENUM -> new ProtobufEnumStatement(name, packageName, parent);
+            case ONE_OF -> new ProtobufOneOfStatement(name, packageName, parent);
             default -> throw new ProtobufSyntaxException("Illegal state", tokenizer.lineno());
         };
+
+        types.put(body.name(), body);
         objectsQueue.add(body);
     }
 

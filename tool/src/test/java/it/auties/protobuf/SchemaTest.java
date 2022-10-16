@@ -1,6 +1,6 @@
 package it.auties.protobuf;
 
-import it.auties.protobuf.tool.application.ModernProtocApplication;
+import it.auties.protobuf.tool.application.ProtobufApplication;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -16,6 +16,6 @@ public class SchemaTest {
         Objects.requireNonNull(source);
 
         var folder = Files.createTempDirectory("output");
-        ModernProtocApplication.main("generate", Path.of(source.toURI()).toString(), "--output", folder.toString());
+        ProtobufApplication.main("generate", Path.of(source.toURI()).toString(), "--output", folder.toString());
     }
 }

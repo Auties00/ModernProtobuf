@@ -4,9 +4,9 @@ import picocli.CommandLine.Command;
 
 @Command(
         mixinStandardHelpOptions = true,
-        version = "ModernProtoc 1.0",
+        version = "ModernProtobuf 1.17",
         description = "A custom implementation of protobuf written in Java 17",
-        subcommands = {GenerateSchemaCommand.class, DecodeCommand.class}
+        subcommands = {GenerateSchemaCommand.class, UpdateCommand.class}
 )
 public class BaseCommand {
 

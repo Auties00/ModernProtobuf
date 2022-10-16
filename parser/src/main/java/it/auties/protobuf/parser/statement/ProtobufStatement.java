@@ -1,19 +1,51 @@
 package it.auties.protobuf.parser.statement;
 
-import it.auties.protobuf.parser.object.ProtobufObject;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.experimental.Accessors;
+import javax.lang.model.SourceVersion;
 
-@AllArgsConstructor
-@Accessors(fluent = true)
-@Data
-public abstract sealed class ProtobufStatement permits ProtobufObject, FieldStatement {
+public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufFieldStatement {
     protected final String INDENTATION = "    ";
+
     private String name;
-    public ProtobufStatement(){
-        this(null);
+    private String packageName;
+    private final ProtobufObject<?> parent;
+    public ProtobufStatement(String name, String packageName, ProtobufObject<?> parent){
+        this.name = name;
+        this.packageName = packageName;
+        this.parent = parent;
     }
 
-    public abstract String toString(int level);
+    public String name() {
+        return SourceVersion.isKeyword(name) ? "_%s".formatted(name) : name;
+    }
+
+    public ProtobufStatement name(String name) {
+        this.name = name;
+        return this;
+    }
+
+    public String packageName() {
+        return packageName;
+    }
+
+    protected ProtobufStatement packageName(String packageName){
+        this.packageName = packageName;
+        return this;
+    }
+
+    public String qualifiedName(){
+        return nested() ? "%s$%s".formatted(parent.name(), name())
+                : "%s.%s".formatted(packageName(), name());
+    }
+
+    public ProtobufObject<?> parent() {
+        return parent;
+    }
+
+    public boolean nested(){
+        return parent() != null
+                && type() != ProtobufStatementType.DOCUMENT
+                && type() != ProtobufStatementType.FIELD;
+    }
+
+    public abstract ProtobufStatementType type();
 }

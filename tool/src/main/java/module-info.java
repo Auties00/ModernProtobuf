@@ -1,4 +1,4 @@
-open module it.auties.protoc.tool {
+open module it.auties.protobuf.tool {
     requires static lombok;
 
     requires info.picocli;
@@ -13,6 +13,9 @@ open module it.auties.protoc.tool {
     requires org.apache.logging.log4j.core;
 
     requires it.auties.reflection;
-    requires it.auties.protoc.api;
-    requires it.auties.protoc.parser;
+    requires it.auties.protobuf.parser;
+
+
+    requires spoon.core;
+    requires it.auties.protobuf.base;
 }

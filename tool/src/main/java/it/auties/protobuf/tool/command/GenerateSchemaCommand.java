@@ -1,26 +1,26 @@
 package it.auties.protobuf.tool.command;
 
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.object.ProtobufDocument;
+import it.auties.protobuf.parser.statement.ProtobufDocument;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.LoggerUtils;
-import lombok.extern.log4j.Log4j2;
+import it.auties.protobuf.tool.util.AstUtils;
+import it.auties.protobuf.tool.util.LogProvider;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import spoon.reflect.factory.Factory;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
-@Log4j2
 @Command(
         name = "generate",
         mixinStandardHelpOptions = true,
-        version = "generate 1.0",
+        version = "generate 1.17",
         description = "Generates the java classes for a protobuf file"
 )
-public class GenerateSchemaCommand implements Callable<Integer> {
+public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
     @SuppressWarnings("FieldMayBeFinal")
     @Parameters(
             index = "0",
@@ -42,9 +42,9 @@ public class GenerateSchemaCommand implements Callable<Integer> {
         }
 
         try {
-            LoggerUtils.suppressIllegalAccessWarning();
+            var launcher = AstUtils.createLauncher();
             var ast = generateAST();
-            generateSchema(ast);
+            generateSchema(ast, launcher.getFactory());
             return 0;
         } catch (Throwable ex) {
             log.error("An uncaught exception was thrown, report this incident on github if you believe this to be a bug");
@@ -75,10 +75,10 @@ public class GenerateSchemaCommand implements Callable<Integer> {
         return document;
     }
 
-    private void generateSchema(ProtobufDocument ast) {
+    private void generateSchema(ProtobufDocument ast, Factory factory) {
         log.info("Generating java classes from AST...");
-        var generator = new ProtobufSchemaCreator(ast, ast.packageName(), output);
-        generator.generateSchema();
+        var generator = new ProtobufSchemaCreator(ast, output);
+        generator.generate(factory);
         log.info("Generated java classes successfully at %s".formatted(output));
     }
 }

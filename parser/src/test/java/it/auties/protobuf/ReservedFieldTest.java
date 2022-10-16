@@ -1,7 +1,7 @@
 package it.auties.protobuf;
 
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.model.ProtobufSyntaxException;
+import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

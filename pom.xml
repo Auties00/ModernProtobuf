@@ -4,18 +4,19 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.auties00</groupId>
-    <artifactId>protoc</artifactId>
+    <artifactId>protobuf</artifactId>
     <packaging>pom</packaging>
-    <version>1.17-SNAPSHOT</version>
+    <version>1.17</version>
     <modules>
-        <module>api</module>
+        <module>base</module>
+        <module>serializer</module>
         <module>parser</module>
         <module>tool</module>
     </modules>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>A modern implementation of protoc to generate java sources from protobuf schemas</description>
-    <url>https://github.com/Auties00/ModernProtoc</url>
+    <url>https://github.com/Auties00/ModernProtobuf</url>
     <developers>
         <developer>
             <name>Alessandro Autiero</name>
@@ -25,13 +26,13 @@
     <licenses>
         <license>
             <name>MIT License</name>
-            <url>http://www.opensource.org/licenses/mit-license.php</url>
+            <url>https://www.opensource.org/licenses/mit-license.php</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
     <scm>
-        <url>https://github.com/Auties00/ModernProtoc/tree/master</url>
-        <connection>scm:git:https://github.com/Auties00/ModernProtoc.git</connection>
+        <url>https://github.com/Auties00/ModernProtobuf/tree/master</url>
+        <connection>scm:git:https://github.com/Auties00/ModernProtobuf.git</connection>
         <tag>HEAD</tag>
     </scm>
     <distributionManagement>
@@ -76,6 +77,8 @@
 
     <properties>
         <lombok.version>1.18.24</lombok.version>
+        <junit.version>5.9.0</junit.version>
+        <java.version>17</java.version>
     </properties>
 
     <build>
@@ -157,13 +160,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.8.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.8.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
