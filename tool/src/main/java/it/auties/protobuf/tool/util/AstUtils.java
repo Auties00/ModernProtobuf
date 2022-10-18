@@ -7,6 +7,7 @@ import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
+import it.auties.protobuf.parser.type.ProtobufMessageType;
 import lombok.experimental.UtilityClass;
 import spoon.Launcher;
 import spoon.reflect.CtModel;
@@ -19,6 +20,7 @@ import spoon.reflect.visitor.chain.CtQuery;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -172,13 +174,21 @@ public class AstUtils implements LogProvider {
 
     public CtTypeReference<?> createReference(ProtobufFieldStatement statement, boolean generic, Factory factory){
         if(generic && statement.repeated()){
-            var listReference = factory.createReference(AstElements.LIST);
+            var listReference = factory.Type().createReference(List.class);
             listReference.addActualTypeArgument(createReference(statement, false, factory));
             return listReference;
         }
 
         return switch (statement.reference().type()){
-            case MESSAGE -> factory.createReference(statement.qualifiedType());
+            case MESSAGE -> {
+                var reference = (ProtobufMessageType) statement.reference();
+                if(!reference.attributed()){
+                    throw new IllegalArgumentException("Cannot parse an AST node that wasn't attributed: %s".formatted(reference));
+                }
+
+                var actualType = reference.declaration();
+                yield factory.createReference(actualType.qualifiedName());
+            }
             case FLOAT -> statement.required() ? factory.Type().floatPrimitiveType() : factory.Type().floatType();
             case DOUBLE -> statement.required() ? factory.Type().doublePrimitiveType() : factory.Type().doubleType();
             case BOOL -> statement.required() ? factory.Type().booleanPrimitiveType() : factory.Type().booleanType();

@@ -5,5 +5,9 @@ public enum ProtobufStatementType {
     ENUM,
     FIELD,
     MESSAGE,
-    ONE_OF
+    ONE_OF;
+
+    public boolean canBeNested(){
+        return this == MESSAGE || this == ENUM;
+    }
 }

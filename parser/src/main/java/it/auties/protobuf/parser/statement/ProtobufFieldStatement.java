@@ -101,10 +101,6 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return builder.toString();
     }
 
-    public String qualifiedType(){
-        return "%s.%s".formatted(packageName(), reference().name());
-    }
-
     public boolean nothing(){
         return modifier == Modifier.NOTHING;
     }

@@ -2,13 +2,12 @@ package it.auties.protobuf.tool.schema;
 
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
+import it.auties.protobuf.parser.statement.ProtobufStatementType;
 import it.auties.protobuf.tool.util.AstElements;
-import spoon.reflect.code.BinaryOperatorKind;
-import spoon.reflect.code.CtConstructorCall;
-import spoon.reflect.code.CtFieldRead;
-import spoon.reflect.code.CtLiteral;
+import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
+import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.util.List;
@@ -24,13 +23,54 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         super(protoStatement, factory);
     }
 
+    public EnumSchemaCreator(CtEnum<?> ctType, CtType<?> parent, ProtobufEnumStatement protoStatement, Factory factory) {
+        super(ctType, parent, protoStatement, factory);
+    }
+
     @Override
     public CtEnum<?> createSchema() {
         this.ctType = createEnumClass();
         createEnumValues(true);
         var indexField = addIndexField(true);
+        createEnumConstructor(indexField);
         createNamedConstructor(indexField, true);
         return ctType;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void createEnumConstructor(CtField<?> ctField) {
+        var constructor = factory.createConstructor(
+                ctType,
+                Set.of(),
+                List.of(),
+                Set.of(),
+                factory.createBlock()
+        );
+
+        var parameter =  factory.createParameter(
+                constructor,
+                ctField.getType(),
+                ctField.getSimpleName()
+        );
+
+        CtFieldRead localFieldRead = factory.createFieldRead();
+        localFieldRead.setTarget(factory.createThisAccess(ctType.getReference()));
+        localFieldRead.setVariable(
+                factory.Field().createReference(
+                        ctType.getReference(),
+                        ctField.getType(),
+                        ctField.getSimpleName()
+                )
+        );
+
+        CtVariableRead parameterRead = factory.createVariableRead();
+        parameterRead.setVariable(parameter.getReference());
+
+        CtAssignment assignment = factory.createAssignment();
+        assignment.setAssigned(localFieldRead);
+        assignment.setAssignment(parameterRead);
+
+        constructor.getBody().addStatement(assignment);
     }
 
     @Override
@@ -164,36 +204,64 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     }
 
     private CtField<?> addIndexField(boolean force) {
-        if(!force){
-            var existing = getIndexField();
-            if(existing != null) {
-                return existing;
-            }
+        var existingField = ctType.getField("index");
+        var existingAccessor = ctType.getMethod("index");
+        if(!force && existingField != null && existingAccessor != null){
+            return existingField;
         }
 
-        var indexField = factory.createField(
+        if(existingField == null) {
+            existingField = createIndexField();
+        }
+
+        if(existingAccessor == null){
+            createIndexAccessor(existingField);
+        }
+
+        return existingField;
+    }
+
+    private CtField<?> createIndexField() {
+        return factory.createField(
                 ctType,
                 Set.of(ModifierKind.PRIVATE, ModifierKind.FINAL),
                 factory.Type().integerPrimitiveType(),
                 "index"
         );
-        var getter = factory.createAnnotation(factory.createReference(AstElements.GETTER));
-        indexField.addAnnotation(getter);
-        return indexField;
     }
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private CtMethod<?> createIndexAccessor(CtField<?> indexField) {
+        var accessor = factory.createMethod(
+                ctType,
+                Set.of(ModifierKind.PUBLIC),
+                indexField.getType(),
+                indexField.getSimpleName(),
+                List.of(),
+                Set.of()
+        );
 
-    private CtField<?> getIndexField() {
-        return ctType.getField("index");
+        var body = factory.createBlock();
+        accessor.setBody(body);
+        CtReturn returnStatement = factory.createReturn();
+        CtFieldRead fieldRead = factory.createFieldRead();
+        fieldRead.setType(ctType.getReference());
+        fieldRead.setVariable(indexField.getReference());
+        returnStatement.setReturnedExpression(fieldRead);
+        body.addStatement(returnStatement);
+        return accessor;
     }
 
     private CtEnum<?> createEnumClass() {
-        var enumClass = factory.createEnum(protoStatement.nested() ? protoStatement.name() : protoStatement.qualifiedName());
+        var enumClass = factory.createEnum(protoStatement.qualifiedName());
+        if(protoStatement.nested()) {
+            Objects.requireNonNull(parent, "Missing parent during AST generation");
+            enumClass.setParent(parent);
+        }
+
         enumClass.setModifiers(Set.of(ModifierKind.PUBLIC));
-        enumClass.addSuperInterface(factory.createReference(AstElements.PROTOBUF_MESSAGE));
-        enumClass.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.ALL_ARGS_CONSTRUCTOR)));
-        var accessors = factory.createAnnotation(factory.createReference(AstElements.ACCESSORS));
-        accessors.addValue("fluent", true);
-        enumClass.addAnnotation(accessors);
+        enumClass.addSuperInterface(factory.Type().createReference(AstElements.PROTOBUF_MESSAGE));
+        var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+        name.addValue("value", protoStatement.name());
         return enumClass;
     }
 

@@ -3,6 +3,7 @@ package it.auties.protobuf.parser.statement;
 import javax.lang.model.SourceVersion;
 
 public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufFieldStatement {
+    public static final String UNKNOWN_NAME = "<unknown>";
     protected final String INDENTATION = "    ";
 
     private String name;
@@ -15,7 +16,8 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
     }
 
     public String name() {
-        return SourceVersion.isKeyword(name) ? "_%s".formatted(name) : name;
+        return name == null ? UNKNOWN_NAME
+                : SourceVersion.isKeyword(name) ? "_%s".formatted(name) : name;
     }
 
     public ProtobufStatement name(String name) {
@@ -33,8 +35,11 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
     }
 
     public String qualifiedName(){
-        return nested() ? "%s$%s".formatted(parent.name(), name())
+        return name == null ? name()
+                : nested() ? "%s$%s".formatted(parent.qualifiedName(), name())
+                : packageName == null ? name()
                 : "%s.%s".formatted(packageName(), name());
+
     }
 
     public ProtobufObject<?> parent() {
@@ -43,8 +48,8 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
 
     public boolean nested(){
         return parent() != null
-                && type() != ProtobufStatementType.DOCUMENT
-                && type() != ProtobufStatementType.FIELD;
+                && parent().type().canBeNested()
+                && type().canBeNested();
     }
 
     public abstract ProtobufStatementType type();
