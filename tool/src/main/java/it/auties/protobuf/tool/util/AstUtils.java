@@ -4,9 +4,9 @@ import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufMessageName;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
-import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
+import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.type.ProtobufMessageType;
 import lombok.experimental.UtilityClass;
 import spoon.Launcher;
@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
-import static it.auties.protobuf.parser.statement.ProtobufStatementType.MESSAGE;
 
 @UtilityClass
 public class AstUtils implements LogProvider {
@@ -35,7 +34,6 @@ public class AstUtils implements LogProvider {
         launcher.getEnvironment().setPreviewFeaturesEnabled(true);
         launcher.addInputResource("C:\\Users\\alaut\\ProtocCompiler\\base\\src\\main\\java");
         launcher.getEnvironment().setAutoImports(true);
-        launcher.buildModel();
         return launcher;
     }
 

@@ -2,7 +2,6 @@ package it.auties.protobuf.tool.schema;
 
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
-import it.auties.protobuf.parser.type.ProtobufPrimitiveType;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
 import spoon.reflect.code.*;
@@ -12,7 +11,10 @@ import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.reference.CtTypeReference;
 import spoon.support.reflect.reference.CtArrayTypeReferenceImpl;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, ProtobufMessageStatement> {
@@ -31,31 +33,29 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     @Override
     public CtClass<?> createSchema() {
         this.ctType = createClass();
-        createMessage(true);
+        createMessage();
         return ctType;
     }
 
     @Override
     public CtClass<?> update() {
-        Objects.requireNonNull(ctType, "Cannot update type without it");
-        createMessage(false);
+        this.ctType = Objects.requireNonNullElseGet(ctType, this::createClass);
+        createMessage();
         return ctType;
     }
 
-    private void createMessage(boolean force) {
+    private void createMessage() {
         protoStatement.statements()
-                .forEach(statement -> createMessageStatement(statement, force));
-        createReservedMethod(true, force);
-        createReservedMethod(false, force);
+                .forEach(this::createMessageStatement);
+        createReservedMethod(true);
+        createReservedMethod(false);
     }
 
-    private void createReservedMethod(boolean indexes, boolean force){
+    private void createReservedMethod(boolean indexes){
         var methodName = indexes ? "reservedFieldIndexes" : "reservedFieldNames";
-        if(!force){
-            var existing = ctType.getMethod(methodName);
-            if(existing != null){
-                return;
-            }
+        var existing = ctType.getMethod(methodName);
+        if(existing != null){
+            return;
         }
 
         var elements = indexes ? protoStatement.reservedIndexes() : protoStatement.reservedNames();
@@ -96,27 +96,27 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         method.setBody(body);
     }
 
-    private void createMessageStatement(ProtobufStatement statement, boolean force) {
+    private void createMessageStatement(ProtobufStatement statement) {
         if (statement instanceof ProtobufMessageStatement messageStatement) {
-            createNestedMessage(messageStatement, force);
+            createNestedMessage(messageStatement);
             return;
         }
 
         if (statement instanceof ProtobufEnumStatement enumStatement) {
-            createNestedEnum(enumStatement, force);
+            createNestedEnum(enumStatement);
             return;
         }
 
         if (statement instanceof ProtobufOneOfStatement oneOfStatement) {
-            var oneOfEnum = createOneOfEnum(oneOfStatement, force);
+            var oneOfEnum = createOneOfEnum(oneOfStatement);
             oneOfStatement.statements()
-                    .forEach(fieldStatement -> createField(fieldStatement, force));
-            createOneOfMethod(oneOfStatement, oneOfEnum, force);
+                    .forEach(this::createField);
+            createOneOfMethod(oneOfStatement, oneOfEnum);
             return;
         }
 
         if (statement instanceof ProtobufFieldStatement fieldStatement) {
-            createField(fieldStatement, force);
+            createField(fieldStatement);
             return;
         }
 
@@ -124,13 +124,11 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
 
-    private void createOneOfMethod(ProtobufOneOfStatement oneOfStatement, CtEnum<?> oneOfEnum, boolean force) {
-        var methodName = "%sType".formatted(oneOfStatement.name());
-        if(!force) {
-            var existing = ctType.getMethod(methodName);
-            if (existing != null) {
-                return;
-            }
+    private void createOneOfMethod(ProtobufOneOfStatement oneOfStatement, CtEnum<?> oneOfEnum) {
+        var methodName = oneOfStatement.methodName();
+        var existing = ctType.getMethod(methodName);
+        if (existing != null) {
+            return;
         }
 
         var body = factory.createBlock();
@@ -148,8 +146,9 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
             var fieldRead = createFieldRead(entry);
             CtBinaryOperator<Boolean> condition = factory.createBinaryOperator(fieldRead, nullTarget, BinaryOperatorKind.NE);
             check.setCondition(condition);
-            var returnStatement = createReturn(oneOfEnum, entry);
-            check.setThenStatement(returnStatement);
+            var block = factory.createBlock();
+            block.addStatement(createReturn(oneOfEnum, entry));
+            check.setThenStatement(block);
             body.addStatement(check);
         }
 
@@ -164,23 +163,23 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         method.setBody(body);
     }
 
-    private void createField(ProtobufFieldStatement fieldStatement, boolean force) {
+    private void createField(ProtobufFieldStatement fieldStatement) {
         var existingField = ctType.getField(fieldStatement.name());
         var existingAccessor = ctType.getMethod(fieldStatement.name());
-        if(!force && existingField != null && existingAccessor != null){
+        if(existingField != null && existingAccessor != null){
             return;
         }
 
         if(existingField == null){
-            existingField = createClassField(fieldStatement, force);
+            existingField = createClassField(fieldStatement);
         }
 
-        if(existingAccessor != null || force){
+        if(existingAccessor == null){
             createFieldAccessor(fieldStatement, existingField);
         }
     }
 
-    private CtField<?> createClassField(ProtobufFieldStatement fieldStatement, boolean force) {
+    private CtField<?> createClassField(ProtobufFieldStatement fieldStatement) {
         CtField<?> ctField = factory.createField(
                 ctType,
                 Set.of(ModifierKind.PRIVATE),
@@ -203,7 +202,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         if(fieldStatement.repeated()){
             annotation.addValue("repeated", true);
             annotation.addValue("implementation", factory.createClassAccess(AstUtils.createReference(fieldStatement, false, factory)));
-            createBuilderMethod(fieldStatement, ctField, force);
+            createBuilderMethod(fieldStatement, ctField);
         }
 
         if(fieldStatement.packed()){
@@ -273,16 +272,14 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void createBuilderMethod(ProtobufFieldStatement fieldStatement, CtField<?> ctField, boolean force) {
+    private void createBuilderMethod(ProtobufFieldStatement fieldStatement, CtField<?> ctField) {
         var builderClass = getOrCreateBuilder();
-        if(!force){
-            var existing = builderClass.getMethod(fieldStatement.name());
-            if(existing != null){
-                return;
-            }
+        var existing = builderClass.getMethod(fieldStatement.name());
+        if(existing != null){
+            return;
         }
 
-        var existing = factory.createMethod(
+        var method = factory.createMethod(
                 builderClass,
                 Set.of(ModifierKind.PUBLIC),
                 builderClass.getReference(),
@@ -292,7 +289,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         );
 
         var parameter = factory.createParameter(
-                existing,
+                method,
                 ctField.getType(),
                 fieldStatement.name()
         );
@@ -350,7 +347,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         returnStatement.setReturnedExpression(factory.createThisAccess(builderClass.getReference()));
         body.addStatement(returnStatement);
 
-        existing.setBody(body);
+        method.setBody(body);
     }
 
     private CtClass<?> getOrCreateBuilder() {
@@ -372,37 +369,25 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         ctField.setDefaultExpression(literal);
     }
 
-    private CtEnum<?> createOneOfEnum(ProtobufOneOfStatement oneOfStatement, boolean force) {
+    private CtEnum<?> createOneOfEnum(ProtobufOneOfStatement oneOfStatement) {
         var enumStatement = new ProtobufEnumStatement(oneOfStatement.className(), oneOfStatement.packageName(), oneOfStatement.parent());
         enumStatement.addStatement(new ProtobufFieldStatement("unknown", enumStatement.packageName(), oneOfStatement.parent()).index(0));
         oneOfStatement.statements().forEach(enumStatement::addStatement);
-        return createNestedEnum(enumStatement, force);
+        return createNestedEnum(enumStatement);
     }
 
-    private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement, boolean force) {
-        if(!force){
-            var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
-            if(existing != null) {
-                return existing;
-            }
-        }
-
-        var creator = new EnumSchemaCreator(null, ctType, enumStatement, factory);
-        var result = creator.createSchema();
+    private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement) {
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
+        var creator = new EnumSchemaCreator(existing, ctType, enumStatement, factory);
+        var result = creator.update();
         ctType.addNestedType(result);
         return result;
     }
 
-    private void createNestedMessage(ProtobufMessageStatement messageStatement, boolean force) {
-        if(!force){
-            var existing = AstUtils.getProtobufClass(ctType, messageStatement);
-            if(existing != null) {
-                return;
-            }
-        }
-
-        var creator = new MessageSchemaCreator(null, ctType, messageStatement, factory);
-        var result = creator.createSchema();
+    private void createNestedMessage(ProtobufMessageStatement messageStatement) {
+        var existing = AstUtils.getProtobufClass(ctType, messageStatement);
+        var creator = new MessageSchemaCreator(existing, ctType, messageStatement, factory);
+        var result = creator.update();
         ctType.addNestedType(result);
     }
 

@@ -2,12 +2,10 @@ package it.auties.protobuf.tool.schema;
 
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
-import it.auties.protobuf.parser.statement.ProtobufStatementType;
 import it.auties.protobuf.tool.util.AstElements;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
-import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.util.List;
@@ -30,15 +28,34 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     @Override
     public CtEnum<?> createSchema() {
         this.ctType = createEnumClass();
-        createEnumValues(true);
-        var indexField = addIndexField(true);
+        createEnumValues();
+        var indexField = addIndexField();
         createEnumConstructor(indexField);
-        createNamedConstructor(indexField, true);
+        createNamedConstructor(indexField);
+        return ctType;
+    }
+
+    @Override
+    public CtEnum<?> update() {
+        this.ctType = Objects.requireNonNullElseGet(ctType, this::createEnumClass);
+        createEnumValues();
+        var indexField = addIndexField();
+        createEnumConstructor(indexField);
+        createNamedConstructor(indexField);
         return ctType;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void createEnumConstructor(CtField<?> ctField) {
+        var existing = ctType.getConstructors()
+                .stream()
+                .filter(entry -> !entry.getParameters().isEmpty() && entry.getParameters().get(0).getType().equals(factory.Type().integerPrimitiveType()))
+                .findFirst()
+                .orElse(null);
+        if(existing != null)  {
+            return;
+        }
+
         var constructor = factory.createConstructor(
                 ctType,
                 Set.of(),
@@ -73,21 +90,10 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         constructor.getBody().addStatement(assignment);
     }
 
-    @Override
-    public CtEnum<?> update() {
-        Objects.requireNonNull(ctType, "Cannot update type without it");
-        createEnumValues(false);
-        var indexField = addIndexField(false);
-        createNamedConstructor(indexField, false);
-        return ctType;
-    }
-
-    private void createNamedConstructor(CtField<?> indexField, boolean force) {
-        if(!force){
-            var existing = getNamedConstructor();
-            if(existing != null){
-                return;
-            }
+    private void createNamedConstructor(CtField<?> indexField) {
+        var existing = ctType.getMethodsByName("of");
+        if(existing != null){
+            return;
         }
 
         CtMethod<?> method = factory.createMethod(
@@ -192,10 +198,6 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         method.setBody(body);
     }
 
-    private List<CtMethod<?>> getNamedConstructor() {
-        return ctType.getMethodsByName("of");
-    }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     private CtFieldRead<?> createFieldRead(Factory factory, CtField<?> indexField) {
         CtFieldRead indexRead = factory.createFieldRead();
@@ -203,10 +205,10 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         return indexRead;
     }
 
-    private CtField<?> addIndexField(boolean force) {
+    private CtField<?> addIndexField() {
         var existingField = ctType.getField("index");
         var existingAccessor = ctType.getMethod("index");
-        if(!force && existingField != null && existingAccessor != null){
+        if(existingField != null && existingAccessor != null){
             return existingField;
         }
 
@@ -229,7 +231,7 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
                 "index"
         );
     }
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes", "UnusedReturnValue"})
     private CtMethod<?> createIndexAccessor(CtField<?> indexField) {
         var accessor = factory.createMethod(
                 ctType,
@@ -265,10 +267,10 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         return enumClass;
     }
 
-    private void createEnumValues(boolean force) {
+    private void createEnumValues() {
         protoStatement.statements()
                 .stream()
-                .filter(entry -> force || getEnumValue(entry) == null)
+                .filter(entry -> getEnumValue(entry) == null)
                 .map(entry -> createEnumValue(entry, factory))
                 .forEach(ctType::addEnumValue);
     }

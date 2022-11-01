@@ -1,13 +1,18 @@
 package it.auties.protobuf.tool.schema;
 
 import it.auties.protobuf.parser.statement.ProtobufDocument;
-import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
+import it.auties.protobuf.parser.statement.ProtobufObject;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtEnum;
+import spoon.reflect.declaration.CtEnumValue;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
+import spoon.support.reflect.declaration.CtClassImpl;
+import spoon.support.reflect.declaration.CtEnumImpl;
+import spoon.support.reflect.declaration.CtFieldImpl;
+import spoon.support.reflect.declaration.CtMethodImpl;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,13 +20,23 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
 public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
+    private static final List<Class<?>> ORDER = List.of(
+            CtFieldImpl.class,
+            CtEnumValue.class,
+            CtMethodImpl.class,
+            CtEnumImpl.class,
+            CtClassImpl.class
+    );
+
     public ProtobufSchemaCreator(ProtobufDocument document){
         this(document, null);
     }
+
     public List<Path> generate(Factory factory) {
         return document.statements()
                 .stream()
@@ -38,6 +53,7 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     public Path generate(ProtobufObject<?> object, Factory factory, Path path) {
         var schemaCreator = findGenerator(object, factory);
         var schema = schemaCreator.createSchema();
+        sortMembers(schema);
         return writeFile(path, schema.toStringWithImports());
     }
 
@@ -56,7 +72,7 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     public void update(CtType<?> element, ProtobufObject<?> statement, Path path) {
         var schemaCreator = findSchemaUpdater(element, statement);
         var schema = schemaCreator.update();
-        schema.compileAndReplaceSnippets();
+        sortMembers(schema);
         writeFile(path, schema.toStringWithImports());
     }
 
@@ -72,7 +88,6 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         throw new IllegalArgumentException("Cannot find a schema updater for statement");
     }
 
-
     private Path writeFile(Path path, String formattedSchema) {
         try {
             Files.createDirectories(path.getParent());
@@ -82,5 +97,13 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         }catch (IOException exception){
             throw new UncheckedIOException("Cannot write schema to file", exception);
         }
+    }
+
+    private void sortMembers(CtType<?> schema) {
+        var parsed = schema.getTypeMembers()
+                .stream()
+                .sorted(Comparator.comparingInt((entry) -> ORDER.indexOf(entry.getClass())))
+                .toList();
+        schema.setTypeMembers(parsed);
     }
 }

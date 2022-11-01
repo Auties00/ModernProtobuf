@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.io.IOContext;
 import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serializer.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serializer.util.ArrayInputStream;
 import it.auties.protobuf.serializer.util.ProtobufField;
@@ -137,10 +138,10 @@ class ProtobufParser extends ParserMinimalBase {
     }
 
     private boolean requiresConversion(Field field, ProtobufProperty property) {
-        return property.implementation() != null
-                && property.implementation() != ProtobufMessage.class
-                && !property.repeated()
-                && property.implementation() != field.getType();
+        return property.implementation() != ProtobufMessage.class
+                && property.type() != ProtobufType.MESSAGE
+                || property.implementation() != field.getType()
+                && !property.repeated();
     }
 
     @Override
@@ -258,15 +259,15 @@ class ProtobufParser extends ParserMinimalBase {
         return Arrays.stream(lastField.messageType().getMethods())
                 .filter(method -> isValidConverter(method, argument))
                 .findFirst()
-                .orElseThrow(() -> new ProtobufDeserializationException("Cannot deserialize field %s inside %s: no converter found(required explicitly)"
-                        .formatted(lastField.index(), type.getName())));
+                .orElseThrow(() -> new ProtobufDeserializationException("Cannot deserialize field %s(%s) in %s: no converter found from %s to %s"
+                        .formatted(lastField.name(), lastField.index(), type.getName(), argument.getClass().getName(), lastField.messageType().getName())));
     }
 
     private boolean isValidConverter(Method method, Object argument) {
         return Modifier.isStatic(method.getModifiers())
                 && method.isAnnotationPresent(ProtobufConverter.class)
-                && method.getReturnType() == type
-                && method.getParameters().length == 1
+                && method.getReturnType() == lastField.messageType()
+                && method.getParameters().length >= 1
                 && (argument == null || method.getParameters()[0].getType().isAssignableFrom(argument.getClass()));
     }
 
