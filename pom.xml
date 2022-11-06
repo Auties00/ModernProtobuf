@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.auties00</groupId>
     <artifactId>protobuf</artifactId>
     <packaging>pom</packaging>
-    <version>1.17-SNAPSHOT</version>
+    <version>1.17</version>
     <modules>
         <module>base</module>
         <module>serializer</module>
@@ -33,7 +32,7 @@
     <scm>
         <url>https://github.com/Auties00/ModernProtobuf/tree/master</url>
         <connection>scm:git:https://github.com/Auties00/ModernProtobuf.git</connection>
-        <tag>HEAD</tag>
+        <tag>protobuf-1.17</tag>
     </scm>
     <distributionManagement>
         <snapshotRepository>
