@@ -17,7 +17,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "generate",
         mixinStandardHelpOptions = true,
-        version = "generate 1.17",
+        version = "generate 1.17-SNAPSHOT",
         description = "Generates the java classes for a protobuf file"
 )
 public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
