@@ -63,20 +63,18 @@ public class AstUtils implements LogProvider {
     }
 
     private boolean hasClassName(ProtobufObject<?> statement, CtClass<?> element) {
-        return hasClassAnnotationName(element)
-                || element.getSimpleName().equals(statement.name());
-    }
-
-    private boolean hasClassAnnotationName(CtClass<?> element){
         try {
             var annotation = element.getAnnotation(ProtobufMessageName.class);
-            return annotation != null
-                    && annotation.value() != null
-                    && annotation.value().equals(element.getSimpleName());
+            if(annotation != null && annotation.value() != null){
+                return annotation.value().equals(statement.name());
+            }
         }catch (Throwable throwable){
             return false;
         }
+
+        return element.getSimpleName().equals(statement.name());
     }
+
     public void check(CtType<?> owner, CtField<?> field, ProtobufFieldStatement statement) {
         var annotation = field.getAnnotations()
                 .stream()

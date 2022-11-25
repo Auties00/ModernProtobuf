@@ -2,24 +2,31 @@ package it.auties.protobuf.tool.command;
 
 import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.parser.statement.ProtobufDocument;
+import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
+import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.AstUtils;
-import it.auties.protobuf.tool.util.LogProvider;
+import it.auties.protobuf.tool.util.*;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import spoon.reflect.CtModel;
+import spoon.reflect.declaration.CtAnnotation;
 import spoon.reflect.declaration.CtClass;
+import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
+import spoon.reflect.reference.CtTypeReference;
+import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 @Command(
         name = "update",
@@ -49,6 +56,13 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     )
     private File output = null;
 
+    @SuppressWarnings("FieldMayBeFinal")
+    @Option(
+            names = {"-a", "--accessors"},
+            description = "Whether accessors should be generated"
+    )
+    private boolean accessors;
+
     private ProtobufSchemaCreator generator;
     private ProtobufDocument document;
     private CtModel model;
@@ -56,6 +70,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     @Override
     public Integer call() {
         try {
+            AccessorsSettings.accessors(accessors);
             createDocument();
             createSchemaCreator();
             createSpoonModel();
@@ -75,15 +90,54 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         log.info("Finished update successfully");
     }
 
+    @SuppressWarnings("unchecked")
     private void update(ProtobufObject<?> statement) {
-        var javaClass = AstUtils.getProtobufClass(model, statement);
-        var file = getFileOrGenerateSource(statement, javaClass);
-        if(file.isEmpty()){
+        var creator = new ProtobufSchemaCreator(document);
+        var matched = AstUtils.getProtobufClass(model, statement);
+        if (matched != null) {
+            var matchingFile = output.toPath()
+                    .resolve("%s.java".formatted(matched.getQualifiedName().replaceAll("\\.", "/")));
+            if (Files.exists(matchingFile)) {
+                creator.update(matched, statement, matchingFile);
+                return;
+            }
+        }
+
+        log.info("Schema %s doesn't have a model. Type its name or click enter to generate it:".formatted(statement.name()));
+        var suggestedNames = model.getElements(new TypeFilter<>(CtClass.class))
+                .stream()
+                .map(CtType::getSimpleName)
+                .filter(simpleName -> StringUtils.similarity(statement.name(), simpleName) > 0.5)
+                .collect(Collectors.joining(", "));
+        log.info("Suggested names: %s".formatted(suggestedNames));
+
+        var scanner = new Scanner(System.in);
+        var newName = scanner.nextLine();
+        if (newName.isBlank()) {
+            var matchingFile = output.toPath()
+                    .resolve(document.packageName().replaceAll("\\.", "/"))
+                    .resolve("%s.java".formatted(statement.name()));
+            createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
             return;
         }
 
-        var creator = new ProtobufSchemaCreator(document);
-        creator.update(javaClass, statement, file.get());
+        var dummyStatement = statement instanceof ProtobufEnumStatement
+                ? new ProtobufEnumStatement(newName, statement.packageName(), statement.parent())
+                : new ProtobufMessageStatement(newName, statement.packageName(), statement.parent());
+        var newJavaClass = AstUtils.getProtobufClass(model, dummyStatement);
+        if (newJavaClass != null) {
+            var matchingFile = output.toPath()
+                    .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
+            if (Files.exists(matchingFile)) {
+                var annotation = createMessageAnnotation(newJavaClass);
+                annotation.setElementValues(Map.of("value", newName));
+                creator.update(newJavaClass, statement, matchingFile);
+                return;
+            }
+        }
+
+        log.info("Model %s doesn't exist, try again".formatted(newName));
+        update(statement);
     }
 
     private void createSpoonModel() {
@@ -117,23 +171,18 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         }
     }
 
-    private Optional<Path> getFileOrGenerateSource(ProtobufObject<?> statement, CtClass<?> matched) {
-        if(matched == null){
-            var matchingFile = output.toPath()
-                    .resolve(document.packageName().replaceAll("\\.", "/"))
-                    .resolve("%s.java".formatted(statement.name()));
-            createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
-            return Optional.empty();
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private CtAnnotation createMessageAnnotation(CtClass<?> newJavaClass) {
+        CtTypeReference reference = newJavaClass.getFactory()
+                .createReference(AstElements.PROTOBUF_MESSAGE_NAME);
+        var annotation = newJavaClass.getAnnotation(reference);
+        if (annotation != null) {
+            return annotation;
         }
 
-        var matchingFile = output.toPath()
-                .resolve("%s.java".formatted(matched.getQualifiedName().replaceAll("\\.", "/")));
-        if (Files.exists(matchingFile)){
-            return Optional.of(matchingFile);
-        }
-
-        createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
-        return Optional.empty();
+        var newAnnotation = newJavaClass.getFactory().createAnnotation(reference);
+        newJavaClass.addAnnotation(newAnnotation);
+        return newAnnotation;
     }
 
     private void createNewSource(ProtobufObject<?> statement, Factory factory, Path path) {

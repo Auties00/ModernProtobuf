@@ -441,12 +441,16 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public byte[] getBinaryValue(Base64Variant decoder) {
-        return switch (getCurrentValue()) {
-            case String string -> decoder.decode(string);
-            case byte[] bytes -> bytes;
-            default ->
-                    throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected String or byte[], got %s"
-                            .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
-        };
+        var value = getCurrentValue();
+        if(value instanceof String string){
+            return decoder.decode(string);
+        }
+
+        if(value instanceof byte[] bytes){
+            return bytes;
+        }
+
+        throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected String or byte[], got %s"
+                .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
     }
 }

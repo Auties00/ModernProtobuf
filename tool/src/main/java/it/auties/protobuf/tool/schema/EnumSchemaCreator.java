@@ -28,21 +28,37 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     @Override
     public CtEnum<?> createSchema() {
         this.ctType = createEnumClass();
-        createEnumValues();
-        var indexField = addIndexField();
-        createEnumConstructor(indexField);
-        createNamedConstructor(indexField);
+        createEnum();
         return ctType;
     }
 
     @Override
     public CtEnum<?> update() {
         this.ctType = Objects.requireNonNullElseGet(ctType, this::createEnumClass);
+        createEnum();
+        return ctType;
+    }
+
+    private void createEnum() {
         createEnumValues();
         var indexField = addIndexField();
-        createEnumConstructor(indexField);
+        if(!hasAllArgsConstructor()) {
+            createEnumConstructor(indexField);
+        }
+
         createNamedConstructor(indexField);
-        return ctType;
+    }
+
+    private boolean hasAllArgsConstructor() {
+        return ctType.getAnnotations()
+                .stream()
+                .anyMatch(entry -> Objects.equals(entry.getName(), "AllArgsConstructor"));
+    }
+
+    private boolean hasGetter(CtField<?> field) {
+        return field.getAnnotations()
+                .stream()
+                .anyMatch(entry -> Objects.equals(entry.getName(), "Getter"));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -207,16 +223,12 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
 
     private CtField<?> addIndexField() {
         var existingField = ctType.getField("index");
-        var existingAccessor = ctType.getMethod("index");
-        if(existingField != null && existingAccessor != null){
-            return existingField;
-        }
-
         if(existingField == null) {
             existingField = createIndexField();
         }
 
-        if(existingAccessor == null){
+        var existingAccessor = ctType.getMethod("index");
+        if(existingAccessor == null && !hasGetter(existingField)){
             createIndexAccessor(existingField);
         }
 

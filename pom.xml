@@ -5,7 +5,7 @@
     <groupId>com.github.auties00</groupId>
     <artifactId>protobuf</artifactId>
     <packaging>pom</packaging>
-    <version>1.18-SNAPSHOT</version>
+    <version>1.17</version>
     <modules>
         <module>base</module>
         <module>serializer</module>
@@ -16,12 +16,14 @@
     <name>${project.groupId}:${project.artifactId}</name>
     <description>A modern implementation of protoc to generate java sources from protobuf schemas</description>
     <url>https://github.com/Auties00/ModernProtobuf</url>
+
     <developers>
         <developer>
             <name>Alessandro Autiero</name>
             <email>alautiero@gmail.com</email>
         </developer>
     </developers>
+
     <licenses>
         <license>
             <name>MIT License</name>
@@ -29,11 +31,14 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
     <scm>
         <url>https://github.com/Auties00/ModernProtobuf/tree/master</url>
         <connection>scm:git:https://github.com/Auties00/ModernProtobuf.git</connection>
+        <developerConnection>scm:ssh:https://github.com/Auties00/ModernProtobuf.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
+
     <distributionManagement>
         <snapshotRepository>
             <id>ossrh</id>
@@ -44,6 +49,7 @@
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
+
     <profiles>
         <profile>
             <id>sign</id>
@@ -93,8 +99,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <target>17</target>
-                    <source>17</source>
+                    <target>${java.version}</target>
+                    <source>${java.version}</source>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>org.projectlombok</groupId>
@@ -123,6 +129,19 @@
                 <executions>
                     <execution>
                         <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>jar</goal>
                         </goals>

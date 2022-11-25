@@ -1,7 +1,9 @@
 package it.auties.protobuf.tool.schema;
 
+import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
+import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
 import spoon.reflect.code.*;
@@ -11,13 +13,17 @@ import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.reference.CtTypeReference;
 import spoon.support.reflect.reference.CtArrayTypeReferenceImpl;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, ProtobufMessageStatement> {
+    private static final List<Class<? extends ProtobufStatement>> ORDER = List.of(
+            ProtobufFieldStatement.class,
+            ProtobufOneOfStatement.class,
+            ProtobufMessageStatement.class,
+            ProtobufEnumStatement.class
+    );
+
     public MessageSchemaCreator(CtClass<?> ctType, ProtobufMessageStatement protoStatement, Factory factory) {
         super(ctType, protoStatement, factory);
     }
@@ -46,6 +52,8 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
 
     private void createMessage() {
         protoStatement.statements()
+                .stream()
+                .sorted(Comparator.comparingInt(entry -> ORDER.indexOf(entry.getClass())))
                 .forEach(this::createMessageStatement);
         createReservedMethod(true);
         createReservedMethod(false);
@@ -164,19 +172,36 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private void createField(ProtobufFieldStatement fieldStatement) {
-        var existingField = ctType.getField(fieldStatement.name());
-        var existingAccessor = ctType.getMethod(fieldStatement.name());
-        if(existingField != null && existingAccessor != null){
-            return;
-        }
-
+        var existingField = getExistingField(fieldStatement);
         if(existingField == null){
             existingField = createClassField(fieldStatement);
+        } else if(fieldStatement.reference().type().isMessage()){
+            var expectedName = fieldStatement.reference().name();
+            var actualName = existingField.getType().getSimpleName();
+            if(!Objects.equals(expectedName, actualName)){
+                var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+                name.addValue("value", expectedName);
+                existingField.getType()
+                        .getDeclaration()
+                        .addAnnotation(name);
+            }
         }
 
+        var existingAccessor = ctType.getMethod(fieldStatement.name());
         if(existingAccessor == null){
             createFieldAccessor(fieldStatement, existingField);
         }
+    }
+
+    private CtField<?> getExistingField(ProtobufFieldStatement fieldStatement) {
+        return ctType.getFields()
+                .stream()
+                .filter(entry -> {
+                    var annotation = entry.getAnnotation(ProtobufProperty.class);
+                    return annotation != null && annotation.index() == fieldStatement.index();
+                })
+                .findFirst()
+                .orElse(null);
     }
 
     private CtField<?> createClassField(ProtobufFieldStatement fieldStatement) {
@@ -227,6 +252,10 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void createFieldAccessor(ProtobufFieldStatement fieldStatement, CtField<?> ctField) {
+        if(!AccessorsSettings.accessors()){
+            return;
+        }
+
         var returnType = createFieldAccessorType(fieldStatement, ctField);
         var accessor = factory.createMethod(
                 ctType,
@@ -409,7 +438,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     private CtFieldRead createFieldRead(ProtobufFieldStatement entry) {
         CtFieldRead fieldRead = factory.createFieldRead();
         fieldRead.setType(ctType.getReference());
-        fieldRead.setVariable(ctType.getField(entry.name()).getReference());
+        fieldRead.setVariable(getExistingField(entry).getReference());
         return fieldRead;
     }
 

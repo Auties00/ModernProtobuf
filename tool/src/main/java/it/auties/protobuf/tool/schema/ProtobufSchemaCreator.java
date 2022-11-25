@@ -70,10 +70,35 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     }
 
     public void update(CtType<?> element, ProtobufObject<?> statement, Path path) {
+        var originalType = element.clone();
         var schemaCreator = findSchemaUpdater(element, statement);
         var schema = schemaCreator.update();
+        if(Objects.equals(originalType, schema)){
+            return;
+        }
+
         sortMembers(schema);
-        writeFile(path, schema.toStringWithImports());
+        var result = schema.toStringWithImports();
+        writeFile(path, fixResult(result));
+    }
+
+    // Temp fix until https://github.com/I-Al-Istannen/spoon/tree/fix/static-imports is merged
+    private String fixResult(String result) {
+        if (result.contains("import static it.auties.protobuf.base.ProtobufType.*;")) {
+            return result;
+        }
+
+        var importIndex = result.lastIndexOf("import ");
+        if(importIndex == -1){
+            return "import static it.auties.protobuf.base.ProtobufType.*;\n%s".formatted(result);
+        }
+
+        var endImportIndex = result.indexOf(";", importIndex);
+        return result.substring(0, endImportIndex + 1)
+                + "\n"
+                + "\n"
+                + "import static it.auties.protobuf.base.ProtobufType.*;\n"
+                + result.substring(endImportIndex + 1);
     }
 
     private SchemaCreator<?, ?> findSchemaUpdater(CtType<?> element, ProtobufObject<?> statement) {
