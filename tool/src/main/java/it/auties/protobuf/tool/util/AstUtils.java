@@ -69,7 +69,7 @@ public class AstUtils implements LogProvider {
                 return annotation.value().equals(statement.name());
             }
         }catch (Throwable throwable){
-            return false;
+            // Ignored
         }
 
         return element.getSimpleName().equals(statement.name());

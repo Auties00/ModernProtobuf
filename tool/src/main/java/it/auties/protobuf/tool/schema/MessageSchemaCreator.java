@@ -1,11 +1,13 @@
 package it.auties.protobuf.tool.schema;
 
+import it.auties.protobuf.base.ProtobufMessageName;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
+import it.auties.protobuf.tool.util.StringUtils;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
@@ -116,10 +118,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         }
 
         if (statement instanceof ProtobufOneOfStatement oneOfStatement) {
-            var oneOfEnum = createOneOfEnum(oneOfStatement);
-            oneOfStatement.statements()
-                    .forEach(this::createField);
-            createOneOfMethod(oneOfStatement, oneOfEnum);
+            createOneOfStatement(oneOfStatement);
             return;
         }
 
@@ -131,10 +130,13 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         throw new UnsupportedOperationException("Cannot create schema for statement: " + statement);
     }
 
-
     private void createOneOfMethod(ProtobufOneOfStatement oneOfStatement, CtEnum<?> oneOfEnum) {
         var methodName = oneOfStatement.methodName();
-        var existing = ctType.getMethod(methodName);
+        var existing = ctType.getMethods()
+                .stream()
+                .filter(entry -> entry.getType().getSimpleName().equals(oneOfStatement.className()))
+                .findFirst()
+                .orElse(null);
         if (existing != null) {
             return;
         }
@@ -171,19 +173,21 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         method.setBody(body);
     }
 
-    private void createField(ProtobufFieldStatement fieldStatement) {
+    private boolean createField(ProtobufFieldStatement fieldStatement) {
         var existingField = getExistingField(fieldStatement);
+        var override = existingField != null;
         if(existingField == null){
             existingField = createClassField(fieldStatement);
         } else if(fieldStatement.reference().type().isMessage()){
             var expectedName = fieldStatement.reference().name();
             var actualName = existingField.getType().getSimpleName();
             if(!Objects.equals(expectedName, actualName)){
-                var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
-                name.addValue("value", expectedName);
-                existingField.getType()
-                        .getDeclaration()
-                        .addAnnotation(name);
+                var target = existingField.getType();
+                if(target.getDeclaration() != null && !hasProtobufMessageName(target.getDeclaration())){
+                    var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+                    name.addValue("value", expectedName);
+                    target.getDeclaration().addAnnotation(name);
+                }
             }
         }
 
@@ -191,6 +195,14 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         if(existingAccessor == null){
             createFieldAccessor(fieldStatement, existingField);
         }
+
+        return override;
+    }
+
+    private boolean hasProtobufMessageName(CtType<?> target) {
+        return target.getAnnotations()
+                .stream()
+                .anyMatch(entry -> entry.getName().equalsIgnoreCase(ProtobufMessageName.class.getSimpleName()));
     }
 
     private CtField<?> getExistingField(ProtobufFieldStatement fieldStatement) {
@@ -398,15 +410,111 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         ctField.setDefaultExpression(literal);
     }
 
-    private CtEnum<?> createOneOfEnum(ProtobufOneOfStatement oneOfStatement) {
+    private void createOneOfStatement(ProtobufOneOfStatement oneOfStatement) {
+        var hasExistingFields = oneOfStatement.statements()
+                .stream()
+                .anyMatch(this::createField);
+        var enumStatement = createOneOfEnumDescriptor(oneOfStatement);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
+        if (existing != null || !hasExistingFields) {
+            createNestedEnum(enumStatement);
+            return;
+        }
+
+        var possibleEnumType = findOneOfEnumDescriptor(enumStatement);
+        if (possibleEnumType == null) {
+            createOneOfEnumDescriptor(oneOfStatement, enumStatement);
+            return;
+        }
+
+        log.info("Enum type %s for oneof statement %s in %s is missing even though the fields were already generated. ".formatted(oneOfStatement.className(), oneOfStatement.name(), oneOfStatement.parent().name()) +
+                "%s looks like the missing enum, but no name override was specified using @ProtobufMessageName so this is just speculation. ".formatted(ctType.getSimpleName()) +
+                "Type yes to use this enum, otherwise type enter to generate a new one");
+        var scanner = new Scanner(System.in);
+        if (scanner.nextLine().equalsIgnoreCase("yes")) {
+            var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+            name.addValue("value", oneOfStatement.className());
+            possibleEnumType.addAnnotation(name);
+            createNestedEnum(enumStatement, possibleEnumType);
+            return;
+        }
+
+        createNestedEnum(enumStatement);
+    }
+
+    private void createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, ProtobufEnumStatement enumStatement) {
+        log.info("Oneof statement %s in %s doesn't have an enum descriptor. Type its name or click enter to generate it:".formatted(oneOfStatement.name(), oneOfStatement.parent().name()));
+        var suggestedNames = ctType.getNestedTypes()
+                .stream()
+                .map(CtType::getSimpleName)
+                .filter(simpleName -> StringUtils.similarity(oneOfStatement.className(), simpleName) > 0.5)
+                .collect(Collectors.joining(", "));
+        log.info("Suggested names: %s".formatted(suggestedNames));
+        var scanner = new Scanner(System.in);
+        var newName = scanner.nextLine();
+        if (newName.isBlank()) {
+            createNestedEnum(enumStatement);
+            return;
+        }
+
+        var dummyStatement = new ProtobufEnumStatement(newName, oneOfStatement.packageName(), oneOfStatement.parent());
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, dummyStatement);
+        if(existing != null){
+            var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+            name.addValue("value", oneOfStatement.className());
+            existing.addAnnotation(name);
+            createNestedEnum(enumStatement, existing);
+            return;
+        }
+
+        log.info("Enum %s doesn't exist, try again".formatted(newName));
+        createOneOfEnumDescriptor(oneOfStatement, enumStatement);
+    }
+
+    private CtEnum<?> findOneOfEnumDescriptor(ProtobufEnumStatement enumStatement) {
+        return ctType.getNestedTypes()
+                .stream()
+                .filter(CtTypeInformation::isEnum)
+                .map(entry -> (CtEnum<?>) entry)
+                .filter(entry -> inferMatchingEnum(enumStatement, entry))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ProtobufEnumStatement createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement) {
         var enumStatement = new ProtobufEnumStatement(oneOfStatement.className(), oneOfStatement.packageName(), oneOfStatement.parent());
-        enumStatement.addStatement(new ProtobufFieldStatement("unknown", enumStatement.packageName(), oneOfStatement.parent()).index(0));
+        if(enumStatement.statements().stream().noneMatch(entry -> entry.index() == 0)) {
+            var defaultStatement = new ProtobufFieldStatement(
+                    "unknown",
+                    enumStatement.packageName(),
+                    oneOfStatement.parent()
+            );
+            enumStatement.addStatement(defaultStatement.index(0));
+        }
         oneOfStatement.statements().forEach(enumStatement::addStatement);
-        return createNestedEnum(enumStatement);
+        return enumStatement;
+    }
+
+    private boolean inferMatchingEnum(ProtobufEnumStatement enumStatement, CtEnum<?> entry) {
+        var enumStatementEntries = enumStatement.statements()
+                .stream()
+                .map(ProtobufFieldStatement::name)
+                .collect(Collectors.toUnmodifiableSet());
+        var success = entry.getEnumValues()
+                .stream()
+                .filter(enumValue -> enumStatementEntries.contains(enumValue.getSimpleName()
+                        .toLowerCase()
+                        .replaceAll("_", "")))
+                .count();
+        return ((float) success / enumStatementEntries.size()) > 0.5;
     }
 
     private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement) {
         var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
+        return createNestedEnum(enumStatement, existing);
+    }
+
+    private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement, CtEnum<?> existing) {
         var creator = new EnumSchemaCreator(existing, ctType, enumStatement, factory);
         var result = creator.update();
         ctType.addNestedType(result);

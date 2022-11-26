@@ -98,12 +98,14 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
             var matchingFile = output.toPath()
                     .resolve("%s.java".formatted(matched.getQualifiedName().replaceAll("\\.", "/")));
             if (Files.exists(matchingFile)) {
-                creator.update(matched, statement, matchingFile);
+                creator.update(matched, statement, matchingFile, false);
                 return;
             }
         }
 
-        log.info("Schema %s doesn't have a model. Type its name or click enter to generate it:".formatted(statement.name()));
+        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()) +
+                "click enter to generate it, " +
+                "or write ignore to ignore this file");
         var suggestedNames = model.getElements(new TypeFilter<>(CtClass.class))
                 .stream()
                 .map(CtType::getSimpleName)
@@ -118,26 +120,28 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
                     .resolve(document.packageName().replaceAll("\\.", "/"))
                     .resolve("%s.java".formatted(statement.name()));
             createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
-            return;
-        }
 
-        var dummyStatement = statement instanceof ProtobufEnumStatement
-                ? new ProtobufEnumStatement(newName, statement.packageName(), statement.parent())
-                : new ProtobufMessageStatement(newName, statement.packageName(), statement.parent());
-        var newJavaClass = AstUtils.getProtobufClass(model, dummyStatement);
-        if (newJavaClass != null) {
-            var matchingFile = output.toPath()
-                    .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
-            if (Files.exists(matchingFile)) {
-                var annotation = createMessageAnnotation(newJavaClass);
-                annotation.setElementValues(Map.of("value", newName));
-                creator.update(newJavaClass, statement, matchingFile);
-                return;
+        }else if(newName.equalsIgnoreCase("ignore")){
+           log.info("Skipping model %s".formatted(statement.name()));
+        }else {
+            var dummyStatement = statement instanceof ProtobufEnumStatement
+                    ? new ProtobufEnumStatement(newName, statement.packageName(), statement.parent())
+                    : new ProtobufMessageStatement(newName, statement.packageName(), statement.parent());
+            var newJavaClass = AstUtils.getProtobufClass(model, dummyStatement);
+            if (newJavaClass != null) {
+                var matchingFile = output.toPath()
+                        .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
+                if (Files.exists(matchingFile)) {
+                    var annotation = createMessageAnnotation(newJavaClass);
+                    annotation.setElementValues(Map.of("value", statement.name()));
+                    creator.update(newJavaClass, statement, matchingFile, true);
+                    return;
+                }
             }
-        }
 
-        log.info("Model %s doesn't exist, try again".formatted(newName));
-        update(statement);
+            log.info("Model %s doesn't exist, try again".formatted(newName));
+            update(statement);
+        }
     }
 
     private void createSpoonModel() {

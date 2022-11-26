@@ -4,6 +4,7 @@ import it.auties.protobuf.parser.statement.ProtobufDocument;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufObject;
+import lombok.SneakyThrows;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtEnum;
 import spoon.reflect.declaration.CtEnumValue;
@@ -20,9 +21,13 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
 
 public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     private static final List<Class<?>> ORDER = List.of(
@@ -69,21 +74,23 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.name(), object.getClass().getName()));
     }
 
-    public void update(CtType<?> element, ProtobufObject<?> statement, Path path) {
+    @SneakyThrows
+    public void update(CtType<?> element, ProtobufObject<?> statement, Path path, boolean forceUpdate) {
         var originalType = element.clone();
+        originalType.setAnnotations(new ArrayList<>(originalType.getAnnotations()));
         var schemaCreator = findSchemaUpdater(element, statement);
         var schema = schemaCreator.update();
-        if(Objects.equals(originalType, schema)){
+        if(Objects.equals(originalType, schema) && !forceUpdate){
             return;
         }
 
         sortMembers(schema);
         var result = schema.toStringWithImports();
-        writeFile(path, fixResult(result));
+        writeFile(path, addBackOldImports(Files.readString(path), addStaticImportType(result)));
     }
 
     // Temp fix until https://github.com/I-Al-Istannen/spoon/tree/fix/static-imports is merged
-    private String fixResult(String result) {
+    private String addStaticImportType(String result) {
         if (result.contains("import static it.auties.protobuf.base.ProtobufType.*;")) {
             return result;
         }
@@ -99,6 +106,23 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
                 + "\n"
                 + "import static it.auties.protobuf.base.ProtobufType.*;\n"
                 + result.substring(endImportIndex + 1);
+    }
+
+    // Spoon obviously can't know about types that aren't in the classpath
+    // Making the user specify the classpath in this case is too hard though
+    // So we just add back all the old imports that lombok removed erroneously
+    private String addBackOldImports(String oldMeta, String newMeta){
+        var matcher = Pattern.compile("(?<=import )(.*)(?=;)");
+        var importIndex = new AtomicInteger(Math.max(0, newMeta.lastIndexOf("import ")));
+        var stringBuilder = new StringBuilder(newMeta);
+        matcher.matcher(oldMeta)
+                .results()
+                .map(MatchResult::group)
+                .map("import %s;"::formatted)
+                .filter(entry -> !newMeta.contains(entry))
+                .map("%s\n"::formatted)
+                .forEach(entry -> stringBuilder.insert(importIndex.getAndAdd(entry.length()), entry.toCharArray()));
+        return stringBuilder.toString();
     }
 
     private SchemaCreator<?, ?> findSchemaUpdater(CtType<?> element, ProtobufObject<?> statement) {
