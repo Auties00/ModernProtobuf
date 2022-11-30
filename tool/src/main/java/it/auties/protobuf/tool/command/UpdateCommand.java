@@ -6,17 +6,18 @@ import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.*;
+import it.auties.protobuf.tool.util.AccessorsSettings;
+import it.auties.protobuf.tool.util.AstElements;
+import it.auties.protobuf.tool.util.AstUtils;
+import it.auties.protobuf.tool.util.LogProvider;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtAnnotation;
 import spoon.reflect.declaration.CtClass;
-import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
 import spoon.reflect.reference.CtTypeReference;
-import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,7 +27,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 @Command(
         name = "update",
@@ -106,11 +106,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()) +
                 "click enter to generate it, " +
                 "or write ignore to ignore this file");
-        var suggestedNames = model.getElements(new TypeFilter<>(CtClass.class))
-                .stream()
-                .map(CtType::getSimpleName)
-                .filter(simpleName -> StringUtils.similarity(statement.name(), simpleName) > 0.5)
-                .collect(Collectors.joining(", "));
+        var suggestedNames = AstUtils.getSuggestedNames(model, statement.name());
         log.info("Suggested names: %s".formatted(suggestedNames));
 
         var scanner = new Scanner(System.in);
@@ -165,7 +161,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     private CtModel createModel() {
         try (var stream = Files.walk(input.toPath())) {
-            var launcher = AstUtils.createLauncher();
+            var launcher = AstUtils.createLauncher(input.getPath());
             stream.filter(Files::isRegularFile)
                     .filter(entry -> entry.toString().endsWith(".java"))
                     .forEach(entry -> launcher.addInputResource(entry.toString()));

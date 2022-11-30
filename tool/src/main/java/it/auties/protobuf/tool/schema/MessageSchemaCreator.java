@@ -7,7 +7,6 @@ import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
-import it.auties.protobuf.tool.util.StringUtils;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
@@ -444,11 +443,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
 
     private void createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, ProtobufEnumStatement enumStatement) {
         log.info("Oneof statement %s in %s doesn't have an enum descriptor. Type its name or click enter to generate it:".formatted(oneOfStatement.name(), oneOfStatement.parent().name()));
-        var suggestedNames = ctType.getNestedTypes()
-                .stream()
-                .map(CtType::getSimpleName)
-                .filter(simpleName -> StringUtils.similarity(oneOfStatement.className(), simpleName) > 0.5)
-                .collect(Collectors.joining(", "));
+        var suggestedNames = AstUtils.getSuggestedNames(factory.getModel(), oneOfStatement.className());
         log.info("Suggested names: %s".formatted(suggestedNames));
         var scanner = new Scanner(System.in);
         var newName = scanner.nextLine();

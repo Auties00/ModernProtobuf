@@ -19,20 +19,20 @@ import spoon.reflect.reference.CtTypeReference;
 import spoon.reflect.visitor.chain.CtQuery;
 import spoon.reflect.visitor.filter.TypeFilter;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
+import static it.auties.protobuf.parser.statement.ProtobufStatementType.MESSAGE;
 
 @UtilityClass
 public class AstUtils implements LogProvider {
-    public Launcher createLauncher() {
+    public Launcher createLauncher(String input) {
         var launcher = new Launcher();
         launcher.getEnvironment().setComplianceLevel(17);
         launcher.getEnvironment().setPreviewFeaturesEnabled(true);
         launcher.addInputResource("C:\\Users\\alaut\\ProtocCompiler\\base\\src\\main\\java");
+        launcher.addInputResource("C:\\Users\\alaut\\NativeWhatsapp4j\\src\\main\\java");
         launcher.getEnvironment().setAutoImports(true);
         return launcher;
     }
@@ -182,8 +182,11 @@ public class AstUtils implements LogProvider {
                     throw new IllegalArgumentException("Cannot parse an AST node that wasn't attributed: %s".formatted(reference));
                 }
 
-                var actualType = reference.declaration();
-                yield factory.createReference(actualType.qualifiedName());
+                var dummyStatement = new ProtobufMessageStatement(reference.name(), statement.packageName(), statement.parent());
+                var knownType = AstUtils.getProtobufClass(factory.getModel(), dummyStatement);
+                yield knownType == null && statement.parent().type() == MESSAGE ? factory.createReference(reference.name())
+                        : knownType != null ? knownType.getReference()
+                        : factory.createReference(reference.declaration().qualifiedName());
             }
             case FLOAT -> statement.required() ? factory.Type().floatPrimitiveType() : factory.Type().floatType();
             case DOUBLE -> statement.required() ? factory.Type().doublePrimitiveType() : factory.Type().doubleType();
@@ -193,5 +196,23 @@ public class AstUtils implements LogProvider {
             case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> statement.required() ? factory.Type().integerPrimitiveType() : factory.Type().integerType();
             case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> statement.required() ? factory.Type().longPrimitiveType() : factory.Type().longType();
         };
+    }
+
+    public Object getSuggestedNames(CtModel model, String originalName) {
+        record StringEntry(String name, double similarity) { }
+        return model.getElements(new TypeFilter<>(CtClass.class))
+                .stream()
+                .map(AstUtils::getClassName)
+                .map(simpleName -> new StringEntry(simpleName, StringUtils.similarity(originalName, simpleName)))
+                .filter(entry -> entry.similarity() > 0.5)
+                .sorted(Comparator.comparingDouble(StringEntry::similarity).reversed())
+                .map(StringEntry::name)
+                .collect(Collectors.joining(", "));
+    }
+
+    private String getClassName(CtClass<?> ctClass) {
+        return Optional.ofNullable(ctClass.getAnnotation(ProtobufMessageName.class))
+                .map(ProtobufMessageName::value)
+                .orElseGet(ctClass::getSimpleName);
     }
 }

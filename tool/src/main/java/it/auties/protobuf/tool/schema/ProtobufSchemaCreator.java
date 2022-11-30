@@ -86,7 +86,17 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
 
         sortMembers(schema);
         var result = schema.toStringWithImports();
-        writeFile(path, addBackOldImports(Files.readString(path), addStaticImportType(result)));
+        writeFile(
+                path,
+                fixVarImport(
+                        addBackOldImports(Files.readString(path), addStaticImportType(result))
+                )
+        );
+    }
+
+    // Temp fix for spoon importing var for some reason
+    private String fixVarImport(String result){
+        return result.replace("import var;", "");
     }
 
     // Temp fix until https://github.com/I-Al-Istannen/spoon/tree/fix/static-imports is merged
