@@ -2,24 +2,22 @@ package it.auties.protobuf.tool.util;
 
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufMessageName;
-import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
-import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
-import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.type.ProtobufMessageType;
 import lombok.experimental.UtilityClass;
 import spoon.Launcher;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtClass;
-import spoon.reflect.declaration.CtField;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
 import spoon.reflect.reference.CtTypeReference;
 import spoon.reflect.visitor.chain.CtQuery;
 import spoon.reflect.visitor.filter.TypeFilter;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
@@ -27,12 +25,11 @@ import static it.auties.protobuf.parser.statement.ProtobufStatementType.MESSAGE;
 
 @UtilityClass
 public class AstUtils implements LogProvider {
-    public Launcher createLauncher(String input) {
+    public Launcher createLauncher() {
         var launcher = new Launcher();
         launcher.getEnvironment().setComplianceLevel(17);
         launcher.getEnvironment().setPreviewFeaturesEnabled(true);
         launcher.addInputResource("C:\\Users\\alaut\\ProtocCompiler\\base\\src\\main\\java");
-        launcher.addInputResource("C:\\Users\\alaut\\NativeWhatsapp4j\\src\\main\\java");
         launcher.getEnvironment().setAutoImports(true);
         return launcher;
     }
@@ -43,103 +40,31 @@ public class AstUtils implements LogProvider {
                 .first(CtClass.class);
     }
 
-    public CtClass<?> getProtobufClass(CtModel model, ProtobufObject<?> object){
-        return getProtobufClass(model.filterChildren(new TypeFilter<>(CtClass.class)), object);
+    public CtClass<?> getProtobufClass(CtModel model, String name, boolean enumType) {
+        return getProtobufClass(model.filterChildren(new TypeFilter<>(CtClass.class)), name, enumType);
     }
 
-    public CtClass<?> getProtobufClass(CtType<?> type, ProtobufObject<?> object){
-        return getProtobufClass(type.filterChildren(new TypeFilter<>(CtClass.class)), object);
+    public CtClass<?> getProtobufClass(CtType<?> type, String name, boolean enumType){
+        return getProtobufClass(type.filterChildren(new TypeFilter<>(CtClass.class)), name, enumType);
     }
 
-    private CtClass<?> getProtobufClass(CtQuery query, ProtobufObject<?> object) {
-        return query.filterChildren((CtClass<?> element) -> isContainingClass(object, element))
-                .filterChildren((CtClass<?> element) -> hasClassName(object, element))
+    private CtClass<?> getProtobufClass(CtQuery query, String name, boolean enumType) {
+        return query.filterChildren((CtClass<?> element) -> enumType ? element.isEnum() : isProtobufMessage(element))
+                .filterChildren((CtClass<?> element) -> hasClassName(name, element))
                 .first(CtClass.class);
     }
 
-    private boolean isContainingClass(ProtobufObject<?> statement, CtClass<?> element) {
-        return statement instanceof ProtobufMessageStatement ?
-                element.isClass() && AstUtils.isProtobufMessage(element) : element.isEnum();
-    }
-
-    private boolean hasClassName(ProtobufObject<?> statement, CtClass<?> element) {
+    private boolean hasClassName(String name, CtClass<?> element) {
         try {
             var annotation = element.getAnnotation(ProtobufMessageName.class);
             if(annotation != null && annotation.value() != null){
-                return annotation.value().equals(statement.name());
+                return annotation.value().equals(name);
             }
         }catch (Throwable throwable){
             // Ignored
         }
 
-        return element.getSimpleName().equals(statement.name());
-    }
-
-    public void check(CtType<?> owner, CtField<?> field, ProtobufFieldStatement statement) {
-        var annotation = field.getAnnotations()
-                .stream()
-                .filter(entry -> ProtobufProperty.class.isAssignableFrom(entry.getActualAnnotation().getClass()))
-                .findFirst()
-                .orElse(null);
-        if(annotation == null){
-            return;
-        }
-
-        var name = getName(field, statement);
-        var index = annotation.getValueAsInt("index");
-        if(index != statement.index()){
-            log.warn("Wrong index for field {} in {}: expected {}, got {}",
-                    name, owner.getSimpleName(), statement.index(), index);
-            annotation.addValue("index", statement.index());
-        }
-
-        var required = (boolean) annotation.getValueAsObject("required");
-        if(required != statement.required()){
-            log.warn("Erroneous required flag for field {} in {}: expected {}, got {}",
-                    name, owner.getSimpleName(), statement.required(), required);
-            annotation.addValue("index", statement.index());
-        }
-
-        var repeated = (boolean) annotation.getValueAsObject("repeated");
-        if(repeated != statement.repeated()){
-            log.warn("Erroneous repeated flag for field {} in {}: expected {}, got {}",
-                    name, owner.getSimpleName(), statement.repeated(), repeated);
-            annotation.addValue("repeated", statement.repeated());
-        }
-
-        var packed = (boolean) annotation.getValueAsObject("packed");
-        if(packed != statement.packed()){
-            log.warn("Erroneous packed flag for field {} in {}: expected {}, got {}",
-                    name, owner.getSimpleName(), statement.packed(), packed);
-            annotation.addValue("packed", statement.packed());
-        }
-
-        var fieldType = (ProtobufType) annotation.getValueAsObject("type");
-        if(fieldType != statement.reference().type()){
-            log.warn("Erroneous type for field {} in {}: expected {}, got {}",
-                    name, owner.getSimpleName(), statement.reference().type(), fieldType);
-            annotation.addValue("type", statement.reference().type());
-        }
-    }
-
-    private String getName(CtField<?> ctField, ProtobufFieldStatement fieldStatement) {
-        if(ctField == null){
-            return getName(fieldStatement);
-        }
-
-        var property = ctField.getAnnotation(ProtobufProperty.class);
-        return hasCustomName(property) ? property.name() : new ProtobufFieldStatement(ctField.getSimpleName(), null).name();
-    }
-
-    private static String getName(ProtobufFieldStatement fieldStatement) {
-        return fieldStatement.parent().type() == ENUM ? fieldStatement.nameAsConstant()
-                : fieldStatement.name();
-    }
-
-    private boolean hasCustomName(ProtobufProperty property) {
-        return property != null
-                && property.name() != null
-                && !property.name().equals(ProtobufProperty.DEFAULT_NAME);
+        return element.getSimpleName().equals(name);
     }
 
     public boolean isProtobufMessage(CtType<?> element){
@@ -178,15 +103,24 @@ public class AstUtils implements LogProvider {
         return switch (statement.reference().type()){
             case MESSAGE -> {
                 var reference = (ProtobufMessageType) statement.reference();
-                if(!reference.attributed()){
-                    throw new IllegalArgumentException("Cannot parse an AST node that wasn't attributed: %s".formatted(reference));
+                var knownType = getProtobufClass(factory.getModel(), reference.name(), reference.declaration().type() == ENUM);
+                if (knownType == null && statement.parent().type() == MESSAGE) {
+                    yield factory.createReference(reference.name());
                 }
 
-                var dummyStatement = new ProtobufMessageStatement(reference.name(), statement.packageName(), statement.parent());
-                var knownType = AstUtils.getProtobufClass(factory.getModel(), dummyStatement);
-                yield knownType == null && statement.parent().type() == MESSAGE ? factory.createReference(reference.name())
-                        : knownType != null ? knownType.getReference()
-                        : factory.createReference(reference.declaration().qualifiedName());
+                if (knownType != null) {
+                    yield knownType.getReference();
+                }
+
+                var annotatedType = factory.getModel()
+                        .filterChildren(new TypeFilter<>(CtClass.class))
+                        .filterChildren((CtClass<?> entry) -> hasClassName(reference.name(), entry))
+                        .first(CtClass.class);
+                if(annotatedType != null){
+                    yield annotatedType.getReference();
+                }
+
+                yield factory.createReference(reference.declaration().qualifiedName());
             }
             case FLOAT -> statement.required() ? factory.Type().floatPrimitiveType() : factory.Type().floatType();
             case DOUBLE -> statement.required() ? factory.Type().doublePrimitiveType() : factory.Type().doubleType();
@@ -198,21 +132,56 @@ public class AstUtils implements LogProvider {
         };
     }
 
-    public Object getSuggestedNames(CtModel model, String originalName) {
-        record StringEntry(String name, double similarity) { }
-        return model.getElements(new TypeFilter<>(CtClass.class))
+    public Object getSuggestedNames(CtClass<?> ctType, String originalName, boolean enumType) {
+        var elements = ctType.getElements(new TypeFilter<>(CtClass.class))
                 .stream()
-                .map(AstUtils::getClassName)
-                .map(simpleName -> new StringEntry(simpleName, StringUtils.similarity(originalName, simpleName)))
-                .filter(entry -> entry.similarity() > 0.5)
-                .sorted(Comparator.comparingDouble(StringEntry::similarity).reversed())
-                .map(StringEntry::name)
+                .filter(ctEntry -> ctEntry.isEnum() == enumType)
+                .toList();
+        return getSuggestedNames(originalName, elements);
+    }
+
+    public Object getSuggestedNames(CtModel model, String originalName, boolean enumType) {
+        var elements = model.getElements(new TypeFilter<>(CtClass.class))
+                .stream()
+                .filter(ctType -> ctType.isEnum() == enumType)
+                .toList();
+        return getSuggestedNames(originalName, elements);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private String getSuggestedNames(String originalName, List<CtClass> result) {
+        return result.stream()
+                .map(entry -> getClassName(entry, originalName))
+                .filter(SimilarString::isSuggestion)
+                .sorted()
+                .map(SimilarString::toString)
                 .collect(Collectors.joining(", "));
     }
 
-    private String getClassName(CtClass<?> ctClass) {
-        return Optional.ofNullable(ctClass.getAnnotation(ProtobufMessageName.class))
-                .map(ProtobufMessageName::value)
-                .orElseGet(ctClass::getSimpleName);
+    private SimilarString getClassName(CtClass<?> ctClass, String comparable) {
+        var annotation = ctClass.getAnnotation(ProtobufMessageName.class);
+        return annotation == null ? new SimilarString(comparable, ctClass.getSimpleName(), null)
+                : new SimilarString(comparable, annotation.value(), ctClass.getSimpleName());
+    }
+
+    private record SimilarString(String name, String oldName, double similarity) implements Comparable<SimilarString> {
+        private SimilarString(String comparable, String name, String oldName){
+            this(name, oldName, StringUtils.similarity(comparable, name));
+        }
+
+        public boolean isSuggestion(){
+            return similarity > 0.5;
+        }
+
+        @Override
+        public String toString() {
+            return oldName == null ? name
+                    : "%s(old name: %s)".formatted(name, oldName);
+        }
+
+        @Override
+        public int compareTo(SimilarString o) {
+            return Double.compare(o.similarity(), similarity());
+        }
     }
 }

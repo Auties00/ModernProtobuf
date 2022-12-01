@@ -1,10 +1,7 @@
 package it.auties.protobuf.tool.command;
 
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.statement.ProtobufDocument;
-import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
-import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
-import it.auties.protobuf.parser.statement.ProtobufObject;
+import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
 import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
@@ -85,15 +82,15 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     private void doUpdate() {
         log.info("Starting update...");
-        document.statements()
-                .forEach(this::update);
+        document.statements().forEach(this::update);
         log.info("Finished update successfully");
     }
 
     @SuppressWarnings("unchecked")
     private void update(ProtobufObject<?> statement) {
+        log.info("Updating %s".formatted(statement.name()));
         var creator = new ProtobufSchemaCreator(document);
-        var matched = AstUtils.getProtobufClass(model, statement);
+        var matched = AstUtils.getProtobufClass(model, statement.name(), statement.type() == ProtobufStatementType.ENUM);
         if (matched != null) {
             var matchingFile = output.toPath()
                     .resolve("%s.java".formatted(matched.getQualifiedName().replaceAll("\\.", "/")));
@@ -103,11 +100,10 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
             }
         }
 
-        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()) +
-                "click enter to generate it, " +
-                "or write ignore to ignore this file");
-        var suggestedNames = AstUtils.getSuggestedNames(model, statement.name());
-        log.info("Suggested names: %s".formatted(suggestedNames));
+        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()));
+        log.info("Suggested names: %s".formatted(AstUtils.getSuggestedNames(model, statement.name(), statement.type() == ProtobufStatementType.ENUM)));
+        log.info("If you want to generate a new model click enter");
+        log.info("Otherwise, writer ignore to skip this file");
 
         var scanner = new Scanner(System.in);
         var newName = scanner.nextLine();
@@ -116,28 +112,29 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
                     .resolve(document.packageName().replaceAll("\\.", "/"))
                     .resolve("%s.java".formatted(statement.name()));
             createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
-
-        }else if(newName.equalsIgnoreCase("ignore")){
-           log.info("Skipping model %s".formatted(statement.name()));
-        }else {
-            var dummyStatement = statement instanceof ProtobufEnumStatement
-                    ? new ProtobufEnumStatement(newName, statement.packageName(), statement.parent())
-                    : new ProtobufMessageStatement(newName, statement.packageName(), statement.parent());
-            var newJavaClass = AstUtils.getProtobufClass(model, dummyStatement);
-            if (newJavaClass != null) {
-                var matchingFile = output.toPath()
-                        .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
-                if (Files.exists(matchingFile)) {
-                    var annotation = createMessageAnnotation(newJavaClass);
-                    annotation.setElementValues(Map.of("value", statement.name()));
-                    creator.update(newJavaClass, statement, matchingFile, true);
-                    return;
-                }
-            }
-
-            log.info("Model %s doesn't exist, try again".formatted(newName));
-            update(statement);
+            return;
         }
+
+        if(newName.equalsIgnoreCase("ignore")) {
+
+           log.info("Skipping model %s".formatted(statement.name()));
+           return;
+        }
+
+        var newJavaClass = AstUtils.getProtobufClass(model, newName, statement.type() == ProtobufStatementType.ENUM);
+        if (newJavaClass != null) {
+            var matchingFile = output.toPath()
+                    .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
+            if (Files.exists(matchingFile)) {
+                var annotation = createMessageAnnotation(newJavaClass);
+                annotation.setElementValues(Map.of("value", statement.name()));
+                creator.update(newJavaClass, statement, matchingFile, true);
+                return;
+            }
+        }
+
+        log.info("Model %s doesn't exist, try again".formatted(newName));
+        update(statement);
     }
 
     private void createSpoonModel() {
@@ -161,7 +158,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     private CtModel createModel() {
         try (var stream = Files.walk(input.toPath())) {
-            var launcher = AstUtils.createLauncher(input.getPath());
+            var launcher = AstUtils.createLauncher();
             stream.filter(Files::isRegularFile)
                     .filter(entry -> entry.toString().endsWith(".java"))
                     .forEach(entry -> launcher.addInputResource(entry.toString()));

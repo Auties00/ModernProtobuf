@@ -42,7 +42,7 @@ public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
         }
 
         try {
-            var launcher = AstUtils.createLauncher(null);
+            var launcher = AstUtils.createLauncher();
             launcher.buildModel();
             var ast = generateAST();
             generateSchema(ast, launcher.getFactory());

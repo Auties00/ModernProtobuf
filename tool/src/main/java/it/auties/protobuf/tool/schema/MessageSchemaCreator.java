@@ -117,7 +117,8 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         }
 
         if (statement instanceof ProtobufOneOfStatement oneOfStatement) {
-            createOneOfStatement(oneOfStatement);
+            var enumDescriptor = createOneOfStatement(oneOfStatement);
+            createOneOfMethod(oneOfStatement, enumDescriptor);
             return;
         }
 
@@ -409,61 +410,59 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         ctField.setDefaultExpression(literal);
     }
 
-    private void createOneOfStatement(ProtobufOneOfStatement oneOfStatement) {
+    private CtEnum<?> createOneOfStatement(ProtobufOneOfStatement oneOfStatement) {
         var hasExistingFields = oneOfStatement.statements()
                 .stream()
                 .anyMatch(this::createField);
         var enumStatement = createOneOfEnumDescriptor(oneOfStatement);
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement.name(), true);
         if (existing != null || !hasExistingFields) {
-            createNestedEnum(enumStatement);
-            return;
+            return createNestedEnum(enumStatement);
         }
 
         var possibleEnumType = findOneOfEnumDescriptor(enumStatement);
         if (possibleEnumType == null) {
-            createOneOfEnumDescriptor(oneOfStatement, enumStatement);
-            return;
+            return createOneOfEnumDescriptor(oneOfStatement, enumStatement);
         }
 
-        log.info("Enum type %s for oneof statement %s in %s is missing even though the fields were already generated. ".formatted(oneOfStatement.className(), oneOfStatement.name(), oneOfStatement.parent().name()) +
-                "%s looks like the missing enum, but no name override was specified using @ProtobufMessageName so this is just speculation. ".formatted(ctType.getSimpleName()) +
-                "Type yes to use this enum, otherwise type enter to generate a new one");
+        log.info("Enum type %s for oneof statement %s in %s is missing even though the fields were already generated."
+                .formatted(oneOfStatement.className(), oneOfStatement.name(), oneOfStatement.parent().name()));
+        log.info("%s looks like the missing enum, but no name override was specified using @ProtobufMessageName so this is just speculation."
+                .formatted(ctType.getSimpleName()));
+        log.info("Type yes to use this enum, otherwise type enter to generate a new one");
         var scanner = new Scanner(System.in);
-        if (scanner.nextLine().equalsIgnoreCase("yes")) {
-            var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
-            name.addValue("value", oneOfStatement.className());
-            possibleEnumType.addAnnotation(name);
-            createNestedEnum(enumStatement, possibleEnumType);
-            return;
+        if (!scanner.nextLine().equalsIgnoreCase("yes")) {
+            return createNestedEnum(enumStatement);
         }
 
-        createNestedEnum(enumStatement);
+        var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+        name.addValue("value", oneOfStatement.className());
+        possibleEnumType.addAnnotation(name);
+        return createNestedEnum(enumStatement, possibleEnumType);
     }
 
-    private void createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, ProtobufEnumStatement enumStatement) {
-        log.info("Oneof statement %s in %s doesn't have an enum descriptor. Type its name or click enter to generate it:".formatted(oneOfStatement.name(), oneOfStatement.parent().name()));
-        var suggestedNames = AstUtils.getSuggestedNames(factory.getModel(), oneOfStatement.className());
+    private CtEnum<?> createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, ProtobufEnumStatement enumStatement) {
+        log.info("Oneof statement %s in %s doesn't have an enum descriptor."
+                .formatted(oneOfStatement.name(), oneOfStatement.parent().name()));
+        log.info("Type its name or click enter to generate it:");
+        var suggestedNames = AstUtils.getSuggestedNames(ctType, oneOfStatement.className(), true);
         log.info("Suggested names: %s".formatted(suggestedNames));
         var scanner = new Scanner(System.in);
         var newName = scanner.nextLine();
         if (newName.isBlank()) {
-            createNestedEnum(enumStatement);
-            return;
+            return createNestedEnum(enumStatement);
         }
 
-        var dummyStatement = new ProtobufEnumStatement(newName, oneOfStatement.packageName(), oneOfStatement.parent());
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, dummyStatement);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, newName, true);
         if(existing != null){
             var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
             name.addValue("value", oneOfStatement.className());
             existing.addAnnotation(name);
-            createNestedEnum(enumStatement, existing);
-            return;
+            return createNestedEnum(enumStatement, existing);
         }
 
         log.info("Enum %s doesn't exist, try again".formatted(newName));
-        createOneOfEnumDescriptor(oneOfStatement, enumStatement);
+        return createOneOfEnumDescriptor(oneOfStatement, enumStatement);
     }
 
     private CtEnum<?> findOneOfEnumDescriptor(ProtobufEnumStatement enumStatement) {
@@ -505,7 +504,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement) {
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement.name(), true);
         return createNestedEnum(enumStatement, existing);
     }
 
@@ -517,7 +516,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private void createNestedMessage(ProtobufMessageStatement messageStatement) {
-        var existing = AstUtils.getProtobufClass(ctType, messageStatement);
+        var existing = AstUtils.getProtobufClass(ctType, messageStatement.name(), false);
         var creator = new MessageSchemaCreator(existing, ctType, messageStatement, factory);
         var result = creator.update();
         ctType.addNestedType(result);
