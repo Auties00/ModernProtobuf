@@ -3,9 +3,9 @@ package it.auties.protobuf.base;
 import java.util.List;
 
 public interface ProtobufMessage {
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     static boolean isMessage(Class<?> clazz) {
-        return clazz != null && ProtobufMessage.class.isAssignableFrom(clazz);
+        return clazz != null
+                && ProtobufMessage.class.isAssignableFrom(clazz);
     }
 
     default boolean isValueBased(){
@@ -16,11 +16,13 @@ public interface ProtobufMessage {
         return null;
     }
 
+    @SuppressWarnings("unused") // It will be used by the decoder
     default List<String> reservedFieldNames(){
-        return null;
+        return List.of();
     }
 
+    @SuppressWarnings("unused") // It will be used by the decoder
     default List<Integer> reservedFieldIndexes(){
-        return null;
+        return List.of();
     }
 }

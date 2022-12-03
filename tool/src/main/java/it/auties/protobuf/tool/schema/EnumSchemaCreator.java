@@ -6,10 +6,12 @@ import it.auties.protobuf.tool.util.AstElements;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
+import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStatement> {
@@ -222,11 +224,9 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     }
 
     private CtField<?> addIndexField() {
-        var existingField = ctType.getField("index");
-        if(existingField == null) {
-            existingField = createIndexField();
-        }
-
+        var existingField = Optional.ofNullable(ctType.getDeclaredOrInheritedField("index"))
+                .<CtField<?>>map(CtFieldReference::getFieldDeclaration)
+                .orElseGet(this::createIndexField);
         var existingAccessor = ctType.getMethod("index");
         if(existingAccessor == null && !hasGetter(existingField)){
             createIndexAccessor(existingField);
@@ -243,6 +243,7 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
                 "index"
         );
     }
+
     @SuppressWarnings({"unchecked", "rawtypes", "UnusedReturnValue"})
     private CtMethod<?> createIndexAccessor(CtField<?> indexField) {
         var accessor = factory.createMethod(

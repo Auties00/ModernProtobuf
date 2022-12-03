@@ -17,6 +17,8 @@ public abstract class SchemaCreator<T extends CtType<?>, V extends ProtobufObjec
     @NonNull
     protected Factory factory;
 
+    protected boolean updating;
+
     protected SchemaCreator(T ctType, V protoStatement, Factory factory) {
         this(ctType, null, protoStatement, factory);
     }
@@ -30,6 +32,7 @@ public abstract class SchemaCreator<T extends CtType<?>, V extends ProtobufObjec
         this.protoStatement = protoStatement;
         this.parent = parent;
         this.factory = factory;
+        this.updating = ctType != null;
     }
 
     public abstract T createSchema();

@@ -103,7 +103,6 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()));
         log.info("Suggested names: %s".formatted(AstUtils.getSuggestedNames(model, statement.name(), statement.type() == ProtobufStatementType.ENUM)));
         log.info("If you want to generate a new model click enter");
-        log.info("Otherwise, writer ignore to skip this file");
 
         var scanner = new Scanner(System.in);
         var newName = scanner.nextLine();
@@ -113,12 +112,6 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
                     .resolve("%s.java".formatted(statement.name()));
             createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
             return;
-        }
-
-        if(newName.equalsIgnoreCase("ignore")) {
-
-           log.info("Skipping model %s".formatted(statement.name()));
-           return;
         }
 
         var newJavaClass = AstUtils.getProtobufClass(model, newName, statement.type() == ProtobufStatementType.ENUM);

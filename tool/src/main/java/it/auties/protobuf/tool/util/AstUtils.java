@@ -176,7 +176,7 @@ public class AstUtils implements LogProvider {
         @Override
         public String toString() {
             return oldName == null ? name
-                    : "%s(old name: %s)".formatted(name, oldName);
+                    : "%s(java name: %s)".formatted(name, oldName);
         }
 
         @Override
