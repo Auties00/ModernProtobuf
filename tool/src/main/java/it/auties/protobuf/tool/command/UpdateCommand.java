@@ -1,9 +1,9 @@
 package it.auties.protobuf.tool.command;
 
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.statement.*;
+import it.auties.protobuf.parser.statement.ProtobufDocument;
+import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
 import it.auties.protobuf.tool.util.LogProvider;
@@ -24,6 +24,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
+
+import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
 
 @Command(
         name = "update",
@@ -67,7 +69,6 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     @Override
     public Integer call() {
         try {
-            AccessorsSettings.accessors(accessors);
             createDocument();
             createSchemaCreator();
             createSpoonModel();
@@ -82,52 +83,56 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     private void doUpdate() {
         log.info("Starting update...");
-        document.statements().forEach(this::update);
+        document.statements()
+                .forEach(entry -> update(entry, entry.name(), entry.type() == ENUM, false));
         log.info("Finished update successfully");
     }
 
     @SuppressWarnings("unchecked")
-    private void update(ProtobufObject<?> statement) {
-        log.info("Updating %s".formatted(statement.name()));
+    private void update(ProtobufObject<?> statement, String name, boolean enumType, boolean annotate) {
+        log.info("Updating %s".formatted(name));
         var creator = new ProtobufSchemaCreator(document);
-        var matched = AstUtils.getProtobufClass(model, statement.name(), statement.type() == ProtobufStatementType.ENUM);
+        var matched = AstUtils.getProtobufClass(model, name, enumType);
         if (matched != null) {
+            var ctClass = getTopClass(matched);
+            var ctClassPath = ctClass.getQualifiedName()
+                    .replaceAll("\\.", "/");
             var matchingFile = output.toPath()
-                    .resolve("%s.java".formatted(matched.getQualifiedName().replaceAll("\\.", "/")));
-            if (Files.exists(matchingFile)) {
-                creator.update(matched, statement, matchingFile, false);
+                    .resolve("%s.java".formatted(ctClassPath));
+            if (Files.notExists(matchingFile)) {
+                log.warn("Skipping %s because file %s doesn't exist"
+                        .formatted(name, matchingFile));
                 return;
             }
-        }
 
-        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(statement.name()));
-        log.info("Suggested names: %s".formatted(AstUtils.getSuggestedNames(model, statement.name(), statement.type() == ProtobufStatementType.ENUM)));
-        log.info("If you want to generate a new model click enter");
+            if(annotate) {
+                var annotation = createMessageAnnotation(matched);
+                annotation.setElementValues(Map.of("value", statement.name()));
+            }
 
-        var scanner = new Scanner(System.in);
-        var newName = scanner.nextLine();
-        if (newName.isBlank()) {
-            var matchingFile = output.toPath()
-                    .resolve(document.packageName().replaceAll("\\.", "/"))
-                    .resolve("%s.java".formatted(statement.name()));
-            createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
+            creator.update(matched, statement, matchingFile, accessors, annotate);
             return;
         }
 
-        var newJavaClass = AstUtils.getProtobufClass(model, newName, statement.type() == ProtobufStatementType.ENUM);
-        if (newJavaClass != null) {
-            var matchingFile = output.toPath()
-                    .resolve("%s.java".formatted(newJavaClass.getQualifiedName().replaceAll("\\.", "/")));
-            if (Files.exists(matchingFile)) {
-                var annotation = createMessageAnnotation(newJavaClass);
-                annotation.setElementValues(Map.of("value", statement.name()));
-                creator.update(newJavaClass, statement, matchingFile, true);
-                return;
-            }
+        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(name));
+        log.info("Suggested names: %s".formatted(AstUtils.getSuggestedNames(model, name, enumType)));
+        log.info("If you want to generate a new model click enter");
+        var scanner = new Scanner(System.in);
+        var newName = scanner.nextLine();
+        if (!newName.isBlank()) {
+            update(statement, newName, enumType, true);
+            return;
         }
 
-        log.info("Model %s doesn't exist, try again".formatted(newName));
-        update(statement);
+        var matchingFile = output.toPath()
+                .resolve(document.packageName() == null ? "." : document.packageName().replaceAll("\\.", "/"))
+                .resolve("%s.java".formatted(name));
+        createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
+    }
+
+    private CtClass<?> getTopClass(CtClass<?> ctClass){
+        var parent = ctClass.getParent();
+        return parent instanceof CtClass<?> newClass ? getTopClass(newClass) : ctClass;
     }
 
     private void createSpoonModel() {
@@ -177,7 +182,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     private void createNewSource(ProtobufObject<?> statement, Factory factory, Path path) {
         log.info("Generating model for %s...".formatted(statement.name()));
-        generator.generate(statement, factory, path);
+        generator.generate(statement, accessors, factory, path);
         log.info("Generated model successfully");
     }
 }

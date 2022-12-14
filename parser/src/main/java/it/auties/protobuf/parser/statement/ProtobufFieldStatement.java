@@ -3,7 +3,7 @@ package it.auties.protobuf.parser.statement;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -131,7 +131,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return INDENTATION.repeat(level) +
                 toPrettyModifier() +
                 toPrettyType() +
-                name() +
+                rawName() +
                 " = " +
                 index() +
                 toPrettyOptions() +
@@ -154,7 +154,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
             return "";
         }
 
-        var map = new HashMap<>();
+        var map = new LinkedHashMap<>();
         map.put("packed", packed()  ? "true" : null);
         map.put("deprecated", deprecated() ? "true" : null);
         map.put("default", defaultValue());
@@ -172,7 +172,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         OPTIONAL,
         REPEATED;
 
-        public static Modifier forName(String name) {
+        public static Modifier of(String name) {
             return Arrays.stream(values())
                     .filter(entry -> entry.name().toLowerCase().equals(name))
                     .findAny()

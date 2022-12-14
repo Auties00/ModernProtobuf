@@ -35,6 +35,13 @@ public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
     )
     private File output = new File(System.getProperty("user.home"), "/schemas");
 
+    @SuppressWarnings("FieldMayBeFinal")
+    @Option(
+            names = {"-a", "--accessors"},
+            description = "Whether accessors should be generated"
+    )
+    private boolean accessors;
+
     @Override
     public Integer call() {
         if (!createOutputDirectory()) {
@@ -79,7 +86,7 @@ public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
     private void generateSchema(ProtobufDocument ast, Factory factory) {
         log.info("Generating java classes from AST...");
         var generator = new ProtobufSchemaCreator(ast, output);
-        generator.generate(factory);
+        generator.generate(factory, accessors);
         log.info("Generated java classes successfully at %s".formatted(output));
     }
 }

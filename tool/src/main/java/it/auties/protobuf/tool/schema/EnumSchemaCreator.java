@@ -15,16 +15,16 @@ import java.util.Optional;
 import java.util.Set;
 
 public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStatement> {
-    public EnumSchemaCreator(CtEnum<?> ctType, ProtobufEnumStatement protoStatement, Factory factory) {
-        super(ctType, protoStatement, factory);
+    public EnumSchemaCreator(CtEnum<?> ctType, ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
+        super(ctType, protoStatement, accessors, factory);
     }
 
-    public EnumSchemaCreator(ProtobufEnumStatement protoStatement, Factory factory) {
-        super(protoStatement, factory);
+    public EnumSchemaCreator(ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
+        super(protoStatement, accessors, factory);
     }
 
-    public EnumSchemaCreator(CtEnum<?> ctType, CtType<?> parent, ProtobufEnumStatement protoStatement, Factory factory) {
-        super(ctType, parent, protoStatement, factory);
+    public EnumSchemaCreator(CtEnum<?> ctType, CtType<?> parent, ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
+        super(ctType, parent, protoStatement, accessors, factory);
     }
 
     @Override
@@ -44,8 +44,10 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     private void createEnum() {
         createEnumValues();
         var indexField = addIndexField();
-        if(!hasAllArgsConstructor()) {
-            createEnumConstructor(indexField);
+        if(!updating || !hasAllArgsConstructor()) {
+            ctType.addAnnotation(
+                    factory.createAnnotation(factory.createReference(AstElements.ALL_ARGS_CONSTRUCTOR))
+            );
         }
 
         createNamedConstructor(indexField);
@@ -61,51 +63,6 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         return field.getAnnotations()
                 .stream()
                 .anyMatch(entry -> Objects.equals(entry.getName(), "Getter"));
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void createEnumConstructor(CtField<?> ctField) {
-        var existing = ctType.getConstructors()
-                .stream()
-                .filter(entry -> !entry.getParameters().isEmpty() && entry.getParameters().get(0).getType().equals(factory.Type().integerPrimitiveType()))
-                .findFirst()
-                .orElse(null);
-        if(existing != null)  {
-            return;
-        }
-
-        var constructor = factory.createConstructor(
-                ctType,
-                Set.of(),
-                List.of(),
-                Set.of(),
-                factory.createBlock()
-        );
-
-        var parameter =  factory.createParameter(
-                constructor,
-                ctField.getType(),
-                ctField.getSimpleName()
-        );
-
-        CtFieldRead localFieldRead = factory.createFieldRead();
-        localFieldRead.setTarget(factory.createThisAccess(ctType.getReference()));
-        localFieldRead.setVariable(
-                factory.Field().createReference(
-                        ctType.getReference(),
-                        ctField.getType(),
-                        ctField.getSimpleName()
-                )
-        );
-
-        CtVariableRead parameterRead = factory.createVariableRead();
-        parameterRead.setVariable(parameter.getReference());
-
-        CtAssignment assignment = factory.createAssignment();
-        assignment.setAssigned(localFieldRead);
-        assignment.setAssignment(parameterRead);
-
-        constructor.getBody().addStatement(assignment);
     }
 
     private void createNamedConstructor(CtField<?> indexField) {
@@ -227,21 +184,28 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         var existingField = Optional.ofNullable(ctType.getDeclaredOrInheritedField("index"))
                 .<CtField<?>>map(CtFieldReference::getFieldDeclaration)
                 .orElseGet(this::createIndexField);
-        var existingAccessor = ctType.getMethod("index");
-        if(existingAccessor == null && !hasGetter(existingField)){
-            createIndexAccessor(existingField);
+        if(accessors) {
+            var existingAccessor = ctType.getMethod("index");
+            if (existingAccessor == null && !hasGetter(existingField)) {
+                createIndexAccessor(existingField);
+            }
         }
 
         return existingField;
     }
 
     private CtField<?> createIndexField() {
-        return factory.createField(
+        var field = factory.createField(
                 ctType,
                 Set.of(ModifierKind.PRIVATE, ModifierKind.FINAL),
                 factory.Type().integerPrimitiveType(),
                 "index"
         );
+        if(!accessors){
+            field.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.GETTER)));
+        }
+
+        return field;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes", "UnusedReturnValue"})
@@ -267,12 +231,7 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
     }
 
     private CtEnum<?> createEnumClass() {
-        var enumClass = factory.createEnum(protoStatement.qualifiedName());
-        if(protoStatement.nested()) {
-            Objects.requireNonNull(parent, "Missing parent during AST generation");
-            enumClass.setParent(parent);
-        }
-
+        var enumClass = factory.createEnum(protoStatement.staticallyQualifiedName());
         enumClass.setModifiers(Set.of(ModifierKind.PUBLIC));
         enumClass.addSuperInterface(factory.Type().createReference(AstElements.PROTOBUF_MESSAGE));
         var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));

@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.statement;
 
 import it.auties.protobuf.base.ProtobufVersion;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
@@ -12,7 +12,7 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
     public ProtobufDocument() {
         super(null, null,null);
         this.version = ProtobufVersion.defaultVersion();
-        this.options = new HashMap<>();
+        this.options = new LinkedHashMap<>();
     }
 
     public Map<String, String> options() {

@@ -1,0 +1,9 @@
+message Wrapper {
+  message Nested {
+
+  }
+}
+
+message Another {
+  optional Nested nested = 1;
+}

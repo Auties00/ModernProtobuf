@@ -3,9 +3,6 @@ package it.auties.protobuf.parser;
 import it.auties.protobuf.base.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
-import it.auties.protobuf.parser.statement.ProtobufDocument;
-import it.auties.protobuf.parser.statement.ProtobufObject;
-import it.auties.protobuf.parser.statement.ProtobufReservable;
 import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.parser.type.ProtobufMessageType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
@@ -38,10 +35,10 @@ public final class ProtobufParser {
     private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
     private static final String TO_CONTEXTUAL_KEYWORD = "to";
     private static final String TYPE_SELECTOR_KEYWORD = ".";
+    private static final String TYPE_SELECTOR_KEYWORD_SPLITTER = "\\.";
 
     private final ProtobufDocument document;
     private final StreamTokenizer tokenizer;
-    private final Map<String, ProtobufObject<?>> types;
     private final Deque<ProtobufObject<?>> objectsQueue;
     private final Deque<Instruction> instructions;
     private final Deque<Set<Integer>> knowIndexes;
@@ -67,7 +64,6 @@ public final class ProtobufParser {
         this.tokenizer = new StreamTokenizer(new StringReader(input));
         this.objectsQueue = new LinkedList<>();
         this.instructions = new LinkedList<>();
-        this.types = new HashMap<>();
         this.instructionState = InstructionState.DECLARATION;
         this.knowIndexes = new LinkedList<>();
         tokenizer.wordChars('_', '_');
@@ -118,43 +114,51 @@ public final class ProtobufParser {
                 return;
             }
 
-            if(!messageType.name().contains(TYPE_SELECTOR_KEYWORD)){
-                var type = types.get(messageType.name());
-                if(type == null){
-                    throw new ProtobufTypeException("Cannot resolve type %s", messageType.name());
-                }
-
-                if(!hasSameParentTop(statement, type) && !hasSameParentDirect(statement, type)) {
-                    throw new ProtobufTypeException("Cannot access type %s from %s's scope", type.name(), statement.name());
-                }
-
-                messageType.attribute(type);
-            }else {
-                // TODO: Implement
+            var type = getReferencedType(fieldStatement, messageType);
+            if(type == null){
+                throw new ProtobufTypeException("Cannot resolve type in field %s inside %s",
+                        fieldStatement, fieldStatement.parent().name());
             }
+
+            messageType.attribute(type);
             return;
         }
 
         throw new ProtobufTypeException("Cannot check type of %s", statement.name());
     }
 
-    private boolean hasSameParentTop(ProtobufStatement statement, ProtobufObject<?> type) {
-        var typeParent = type.parent();
-        var lastParent = statement.parent();
-        while (lastParent != null){
-            if(lastParent.equals(typeParent)){
-                return true;
-            }
-
-            lastParent = lastParent.parent();
+    private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, ProtobufMessageType messageType) {
+        if (!messageType.name().contains(TYPE_SELECTOR_KEYWORD)) {
+            return getReferencedType(fieldStatement, messageType.name());
         }
 
-        return false;
+        var types = messageType.name().split(TYPE_SELECTOR_KEYWORD_SPLITTER);
+        if(types.length == 0){
+            throw new ProtobufTypeException("Cannot resolve type in field %s inside %s",
+                    fieldStatement, fieldStatement.parent().name());
+        }
+
+        var type = getReferencedType(fieldStatement, types[0]);
+        for(var index = 1; index < types.length; index++){
+            type = (ProtobufObject<?>) type.getStatement(types[index])
+                    .orElseThrow(() -> new ProtobufTypeException("Cannot resolve type in field %s inside %s", fieldStatement, fieldStatement.parent().name()));
+        }
+
+        return type;
     }
 
-    private boolean hasSameParentDirect(ProtobufStatement statement, ProtobufObject<?> type) {
-        return type.parent() != null
-                && type.parent().equals(statement.parent());
+    // This can be optimized with a map
+    // TODO: Look into it
+    private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, String accessed) {
+        ProtobufObject<?> parent = fieldStatement.parent();
+        ProtobufObject<?> innerType = null;
+        while (parent != null && innerType == null){
+            innerType = parent.getStatement(accessed, ProtobufObject.class)
+                    .orElse(null);
+            parent = parent.parent();
+        }
+
+        return innerType;
     }
 
     private void handleToken(String token) {
@@ -289,7 +293,7 @@ public final class ProtobufParser {
             case VALUE -> ProtobufSyntaxException.check(isObjectStart(token),
                     "Expected message initializer after message declaration", tokenizer.lineno());
             case OPTIONS -> {
-                var nestedInstruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
+                var nestedInstruction = Instruction.of(token.toUpperCase(Locale.ROOT));
                 switch (nestedInstruction){
                     case UNKNOWN -> createField(token);
 
@@ -459,7 +463,7 @@ public final class ProtobufParser {
 
     private void createField(String token) {
         var scope = objectsQueue.peekLast();
-        var modifier = ProtobufFieldStatement.Modifier.forName(token);
+        var modifier = ProtobufFieldStatement.Modifier.of(token);
         var parent = checkFieldParent(scope, modifier);
         this.field = new ProtobufFieldStatement(document.packageName(), parent);
         field.modifier(modifier);
@@ -507,7 +511,7 @@ public final class ProtobufParser {
             case DECLARATION ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after syntax declaration", tokenizer.lineno());
-            case VALUE -> document.version(ProtobufVersion.forName(token)
+            case VALUE -> document.version(ProtobufVersion.of(token)
                     .orElseThrow(() -> new ProtobufSyntaxException("Illegal syntax declaration: %s is not a valid version".formatted(token),
                             tokenizer.lineno())));
             case OPTIONS, BODY ->
@@ -523,7 +527,7 @@ public final class ProtobufParser {
     }
 
     private void openInstruction(String token) {
-        var instruction = Instruction.forName(token.toUpperCase(Locale.ROOT));
+        var instruction = Instruction.of(token.toUpperCase(Locale.ROOT));
         if(instruction == Instruction.SERVICE){
             LOGGER.log(System.Logger.Level.INFO, "Service will not be parsed at line %s".formatted(tokenizer.lineno()));
         }
@@ -576,7 +580,6 @@ public final class ProtobufParser {
             default -> throw new ProtobufSyntaxException("Illegal state", tokenizer.lineno());
         };
 
-        types.put(body.name(), body);
         objectsQueue.add(body);
     }
 
@@ -631,7 +634,7 @@ public final class ProtobufParser {
         @Getter
         private final boolean hasBody;
 
-        public static Instruction forName(@NonNull String name) {
+        public static Instruction of(@NonNull String name) {
             return Arrays.stream(values())
                     .filter(entry -> entry.name().replaceAll("_", "").equalsIgnoreCase(name))
                     .findFirst()

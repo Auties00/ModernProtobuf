@@ -20,6 +20,10 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
                 : SourceVersion.isKeyword(name) ? "_%s".formatted(name) : name;
     }
 
+    public String rawName(){
+        return name;
+    }
+
     public ProtobufStatement name(String name) {
         this.name = name;
         return this;
@@ -39,7 +43,12 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
                 : nested() ? "%s$%s".formatted(parent.qualifiedName(), name())
                 : packageName == null ? name()
                 : "%s.%s".formatted(packageName(), name());
+    }
 
+    public String staticallyQualifiedName(){
+        return name == null ? name()
+                : packageName == null ? name()
+                : "%s.%s".formatted(packageName(), name());
     }
 
     public ProtobufObject<?> parent() {

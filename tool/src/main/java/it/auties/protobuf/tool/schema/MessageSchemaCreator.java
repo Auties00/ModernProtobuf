@@ -1,10 +1,9 @@
 package it.auties.protobuf.tool.schema;
 
-import it.auties.protobuf.base.ProtobufMessageName;
+import it.auties.protobuf.base.ProtobufName;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
-import it.auties.protobuf.tool.util.AccessorsSettings;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
 import spoon.reflect.code.*;
@@ -25,16 +24,16 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
             ProtobufEnumStatement.class
     );
 
-    public MessageSchemaCreator(CtClass<?> ctType, ProtobufMessageStatement protoStatement, Factory factory) {
-        super(ctType, protoStatement, factory);
+    public MessageSchemaCreator(CtClass<?> ctType, ProtobufMessageStatement protoStatement, boolean accessors, Factory factory) {
+        super(ctType, protoStatement, accessors, factory);
     }
 
-    public MessageSchemaCreator(ProtobufMessageStatement protoStatement, Factory factory) {
-        super(protoStatement, factory);
+    public MessageSchemaCreator(ProtobufMessageStatement protoStatement, boolean accessors, Factory factory) {
+        super(protoStatement, accessors, factory);
     }
 
-    public MessageSchemaCreator(CtClass<?> ctType, CtType<?> parent, ProtobufMessageStatement protoStatement, Factory factory) {
-        super(ctType, parent, protoStatement, factory);
+    public MessageSchemaCreator(CtClass<?> ctType, CtType<?> parent, ProtobufMessageStatement protoStatement, boolean accessors, Factory factory) {
+        super(ctType, parent, protoStatement, accessors, factory);
     }
 
     @Override
@@ -171,7 +170,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     private boolean hasProtobufMessageName(CtType<?> target) {
         return target.getAnnotations()
                 .stream()
-                .anyMatch(entry -> entry.getName().equalsIgnoreCase(ProtobufMessageName.class.getSimpleName()));
+                .anyMatch(entry -> entry.getName().equalsIgnoreCase(ProtobufName.class.getSimpleName()));
     }
 
     private CtField<?> getExistingField(ProtobufFieldStatement fieldStatement) {
@@ -233,7 +232,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void createFieldAccessor(ProtobufFieldStatement fieldStatement, CtField<?> ctField) {
-        if(!AccessorsSettings.accessors()){
+        if(!accessors){
             return;
         }
 
@@ -253,7 +252,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         if(fieldStatement.required() || fieldStatement.repeated()) {
             returnStatement.setReturnedExpression(createFieldRead(fieldStatement));
         }else {
-            var optionalType = factory.createReference(AstElements.OPTIONAL);;
+            var optionalType = factory.createReference(AstElements.OPTIONAL);
             var ofMethod = factory.Method().createReference(
                     optionalType,
                     optionalType,
@@ -434,7 +433,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private CtEnum<?> createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, boolean updatingInnerScope) {
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, oneOfStatement.className(), true);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(factory.getModel(), oneOfStatement.className(), true);
         if (existing != null) {
             return existing;
         }
@@ -448,7 +447,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         if (possibleEnumType != null) {
             log.info("Oneof statement %s in %s doesn't have an enum descriptor(expected %s)."
                     .formatted(oneOfStatement.name(), oneOfStatement.parent().name(), oneOfStatement.className()));
-            log.info("%s looks like the missing descriptor, but no name override was specified using @ProtobufMessageName so this is just speculation."
+            log.info("%s looks like the missing descriptor, but no name override was specified using @ProtobufName so this is just speculation."
                     .formatted(ctType.getSimpleName()));
             log.info("Type yes to use this enum, otherwise type enter to continue");
             var scanner = new Scanner(System.in);
@@ -520,35 +519,50 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private void createNestedEnumWithLookup(ProtobufEnumStatement enumStatement) {
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(ctType, enumStatement.name(), true);
+        var existing = (CtEnum<?>) AstUtils.getProtobufClass(factory.getModel(), enumStatement.name(), true);
         createNestedEnum(enumStatement, existing);
     }
 
     private CtEnum<?> createNestedEnum(ProtobufEnumStatement enumStatement, CtEnum<?> existing) {
-        var creator = new EnumSchemaCreator(existing, ctType, enumStatement, factory);
+        var creator = new EnumSchemaCreator(existing, ctType, enumStatement, accessors, factory);
         var result = creator.update();
-        ctType.addNestedType(result);
+        if(existing == null) {
+            result.setParent(parent);
+            ctType.addNestedType(result);
+        }
+
         return result;
     }
 
     private void createNestedMessageWithLookup(ProtobufMessageStatement messageStatement) {
-        var existing = AstUtils.getProtobufClass(ctType, messageStatement.name(), false);
-        var creator = new MessageSchemaCreator(existing, ctType, messageStatement, factory);
+        var existing = AstUtils.getProtobufClass(factory.getModel(), messageStatement.name(), false);
+        var creator = new MessageSchemaCreator(existing, ctType, messageStatement, accessors, factory);
         var result = creator.update();
-        ctType.addNestedType(result);
+        if(existing == null) {
+            result.setParent(parent);
+            ctType.addNestedType(result);
+        }
     }
 
     private CtClass<?> createClass() {
-        CtClass<?> ctClass = factory.createClass(protoStatement.qualifiedName());
-        if(protoStatement.nested()) {
-            Objects.requireNonNull(parent, "Missing parent during AST generation");
-            ctClass.setParent(parent);
+        CtClass<?> ctClass = factory.createClass(protoStatement.staticallyQualifiedName());
+        ctClass.setModifiers(Set.of(ModifierKind.PUBLIC));
+        if(protoStatement.nested()){
+            ctClass.addModifier(ModifierKind.STATIC);
         }
 
-        ctClass.setModifiers(Set.of(ModifierKind.PUBLIC));
         ctClass.addSuperInterface(factory.createReference(AstElements.PROTOBUF_MESSAGE));
+        ctClass.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.ALL_ARGS_CONSTRUCTOR)));
+        if(!accessors){
+            ctClass.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.DATA)));
+        }
+
         ctClass.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.JACKSONIZED)));
         ctClass.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.BUILDER)));
+        var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
+        name.addValue("value", protoStatement.name());
+        ctClass.addAnnotation(name);
+
         return ctClass;
     }
 
@@ -560,17 +574,50 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         return fieldRead;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private CtReturn createReturn(CtEnum<?> javaEnum, ProtobufFieldStatement entry) {
-        CtEnumValue constant = javaEnum.getEnumValue(entry.nameAsConstant());
-        Objects.requireNonNull(constant, "Missing constant %s from enum".formatted(entry.nameAsConstant()));
-        constant.setType(javaEnum.getReference());
+    private CtReturn<?> createReturn(CtEnum<?> javaEnum, ProtobufFieldStatement entry) {
+        return createReturn(javaEnum, entry, entry.nameAsConstant(), false);
+    }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private CtReturn createReturn(CtEnum javaEnum, ProtobufFieldStatement entry, String constantName, boolean annotate) {
+        CtEnumValue constant = javaEnum.getEnumValue(constantName);
+        if(constant == null){
+            log.info("Enum constant %s doesn't exist inside %s".formatted(constantName, javaEnum.getSimpleName()));
+            log.info("Known constants: %s".formatted(javaEnum.getEnumValues()
+                    .stream()
+                    .map(element -> ((CtNamedElement) element).getSimpleName())
+                    .collect(Collectors.joining(", "))));
+            log.info("Type the correct name or hit enter to generate it");
+
+            var scanner = new Scanner(System.in);
+            var newName = scanner.nextLine();
+            if (!newName.isBlank()) {
+                return createReturn(javaEnum, entry, newName, true);
+            }
+
+            var enumInitializer = factory.createConstructorCall();
+            enumInitializer.addArgument(factory.createLiteral(entry.index()));
+            var enumValue = factory.createEnumValue();
+            enumValue.setSimpleName(entry.nameAsConstant());
+            enumValue.setAssignment(enumInitializer);
+            enumValue.setType(javaEnum.getReference());
+            enumValue.setParent(javaEnum);
+            constant = enumValue;
+        }
+
+        if(annotate) {
+            var name = factory.createAnnotation(
+                    factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME)
+            );
+            name.addValue("value", entry.nameAsConstant());
+            constant.addAnnotation(name);
+        }
+
+        constant.setType(javaEnum.getReference());
         CtFieldRead fieldRead = factory.createFieldRead();
         fieldRead.setType(javaEnum.getReference());
         fieldRead.setVariable(constant.getReference());
         fieldRead.setTarget(factory.Code().createTypeAccess(javaEnum.getReference()));
-
         return factory.createReturn()
                 .setReturnedExpression(fieldRead);
     }

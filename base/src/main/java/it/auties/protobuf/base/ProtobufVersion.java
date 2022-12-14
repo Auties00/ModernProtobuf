@@ -21,7 +21,7 @@ public enum ProtobufVersion {
         return PROTOBUF_2;
     }
 
-    public static Optional<ProtobufVersion> forName(@NonNull String name) {
+    public static Optional<ProtobufVersion> of(@NonNull String name) {
         return Arrays.stream(values())
                 .filter(entry -> name.contains(entry.versionCode()))
                 .findFirst();

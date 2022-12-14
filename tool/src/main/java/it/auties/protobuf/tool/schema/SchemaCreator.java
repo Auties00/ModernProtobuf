@@ -17,21 +17,24 @@ public abstract class SchemaCreator<T extends CtType<?>, V extends ProtobufObjec
     @NonNull
     protected Factory factory;
 
+    protected boolean accessors;
+
     protected boolean updating;
 
-    protected SchemaCreator(T ctType, V protoStatement, Factory factory) {
-        this(ctType, null, protoStatement, factory);
+    protected SchemaCreator(T ctType, V protoStatement, boolean accessors, Factory factory) {
+        this(ctType, null, protoStatement, accessors, factory);
     }
 
-    protected SchemaCreator(V protoStatement, Factory factory) {
-        this(null, protoStatement, factory);
+    protected SchemaCreator(V protoStatement, boolean accessors, Factory factory) {
+        this(null, protoStatement, accessors, factory);
     }
 
-    protected SchemaCreator(T ctType, CtType<?> parent, V protoStatement, Factory factory) {
+    protected SchemaCreator(T ctType, CtType<?> parent, V protoStatement, boolean accessors, Factory factory) {
         this.ctType = ctType;
         this.protoStatement = protoStatement;
         this.parent = parent;
         this.factory = factory;
+        this.accessors = accessors;
         this.updating = ctType != null;
     }
 
