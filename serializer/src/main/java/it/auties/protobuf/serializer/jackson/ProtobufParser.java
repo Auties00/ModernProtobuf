@@ -138,9 +138,13 @@ class ProtobufParser extends ParserMinimalBase {
     }
 
     private boolean requiresConversion(Field field, ProtobufProperty property) {
+        if(property.type() != ProtobufType.MESSAGE){
+            return !property.type().wrappedType().isAssignableFrom(field.getType())
+                    && !property.type().primitiveType().isAssignableFrom(field.getType());
+        }
+
         return property.implementation() != ProtobufMessage.class
-                && property.type() != ProtobufType.MESSAGE
-                || property.implementation() != field.getType()
+                && property.implementation() != field.getType()
                 && !property.repeated();
     }
 
