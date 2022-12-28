@@ -107,11 +107,11 @@ public class AstUtils implements LogProvider {
             return listReference;
         }
 
-        return switch (statement.reference().type()){
+        return switch (statement.type().type()){
             case MESSAGE -> {
-                var reference = (ProtobufMessageType) statement.reference();
-                var knownType = getProtobufClass(factory.getModel(), reference.name(), reference.declaration().type() == ENUM);
-                if (knownType == null && statement.parent().type() == MESSAGE) {
+                var reference = (ProtobufMessageType) statement.type();
+                var knownType = getProtobufClass(factory.getModel(), reference.name(), reference.declaration().statementType() == ENUM);
+                if (knownType == null && statement.parent().statementType() == MESSAGE) {
                     yield factory.createReference(reference.name());
                 }
 

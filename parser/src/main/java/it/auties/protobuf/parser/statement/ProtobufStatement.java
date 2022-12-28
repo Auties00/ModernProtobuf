@@ -57,9 +57,9 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
 
     public boolean nested(){
         return parent() != null
-                && parent().type().canBeNested()
-                && type().canBeNested();
+                && parent().statementType().canBeNested()
+                && statementType().canBeNested();
     }
 
-    public abstract ProtobufStatementType type();
+    public abstract ProtobufStatementType statementType();
 }

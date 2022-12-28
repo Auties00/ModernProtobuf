@@ -9,8 +9,8 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"UnusedReturnValue", "unused"})
 public final class ProtobufFieldStatement extends ProtobufStatement {
-    private ProtobufTypeReference reference;
-    private Integer index;
+    private ProtobufTypeReference type;
+    private int index;
     private Modifier modifier;
     private boolean packed;
     private boolean deprecated;
@@ -20,23 +20,28 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
     }
 
     public ProtobufFieldStatement(String name, String packageName, ProtobufObject<?> parent){
+        this(0, name, packageName, parent);
+    }
+
+    public ProtobufFieldStatement(int index, String name, String packageName, ProtobufObject<?> parent){
         super(name, packageName, parent);
+        this.index = index;
     }
 
-    public ProtobufTypeReference reference() {
-        return reference;
+    public ProtobufTypeReference type() {
+        return type;
     }
 
-    public ProtobufFieldStatement reference(ProtobufTypeReference type) {
-        this.reference = type;
+    public ProtobufFieldStatement type(ProtobufTypeReference type) {
+        this.type = type;
         return this;
     }
 
-    public Integer index() {
+    public int index() {
         return index;
     }
 
-    public ProtobufFieldStatement index(Integer index) {
+    public ProtobufFieldStatement index(int index) {
         this.index = index;
         return this;
     }
@@ -123,7 +128,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
     }
 
     @Override
-    public ProtobufStatementType type() {
+    public ProtobufStatementType statementType() {
         return ProtobufStatementType.FIELD;
     }
 
@@ -139,7 +144,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
     }
 
     private String toPrettyType() {
-        return reference() == null ? "" : "%s ".formatted(reference().name());
+        return type() == null ? "" : "%s ".formatted(type().name());
     }
 
     private String toPrettyModifier() {

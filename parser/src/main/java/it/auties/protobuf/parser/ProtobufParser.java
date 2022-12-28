@@ -106,7 +106,7 @@ public final class ProtobufParser {
         }
 
         if(statement instanceof ProtobufFieldStatement fieldStatement){
-            if(!(fieldStatement.reference() instanceof ProtobufMessageType messageType)){
+            if(!(fieldStatement.type() instanceof ProtobufMessageType messageType)){
                 return;
             }
 
@@ -412,7 +412,7 @@ public final class ProtobufParser {
 
     private void attributeField(String token) {
         switch (fieldState) {
-            case MODIFIER -> field.reference(ProtobufTypeReference.of(token));
+            case MODIFIER -> field.type(ProtobufTypeReference.of(token));
             case TYPE -> {
                 ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
                         tokenizer.lineno(), token);
@@ -422,7 +422,7 @@ public final class ProtobufParser {
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after field type", tokenizer.lineno());
             case INDEX -> {
-                var index = parseIndex(token, field.parent().type() == ProtobufStatementType.ENUM)
+                var index = parseIndex(token, field.parent().statementType() == ProtobufStatementType.ENUM)
                         .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));
                 ProtobufSyntaxException.check(!knowIndexes.getLast().contains(index),
                         "Duplicated index %s", tokenizer.lineno(), index);
@@ -472,15 +472,15 @@ public final class ProtobufParser {
             return;
         }
 
-        switch (parent.type()) {
+        switch (parent.statementType()) {
             case MESSAGE -> {
                 if (document.version() == PROTOBUF_3) {
-                    field.reference(ProtobufTypeReference.of(token));
+                    field.type(ProtobufTypeReference.of(token));
                     this.fieldState = FieldState.TYPE;
                 }
             }
             case ONE_OF -> {
-                field.reference(ProtobufTypeReference.of(token));
+                field.type(ProtobufTypeReference.of(token));
                 this.fieldState = FieldState.TYPE;
             }
             case ENUM -> {
@@ -542,7 +542,7 @@ public final class ProtobufParser {
     @SuppressWarnings("unchecked") // safe
     private void addFieldToScope() {
         var scope = objectsQueue.getLast();
-        if(field.parent().type() == ProtobufStatementType.DOCUMENT){
+        if(field.parent().statementType() == ProtobufStatementType.DOCUMENT){
             throw new ProtobufSyntaxException("Field %s cannot be declared outside of a scope", tokenizer.lineno(), field.name());
         }
 

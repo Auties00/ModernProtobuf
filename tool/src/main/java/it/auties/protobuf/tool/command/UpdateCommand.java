@@ -84,7 +84,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     private void doUpdate() {
         log.info("Starting update...");
         document.statements()
-                .forEach(entry -> update(entry, entry.name(), entry.type() == ENUM, false));
+                .forEach(entry -> update(entry, entry.name(), entry.statementType() == ENUM, false));
         log.info("Finished update successfully");
     }
 

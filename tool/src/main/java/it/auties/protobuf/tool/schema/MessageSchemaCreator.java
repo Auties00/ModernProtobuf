@@ -144,11 +144,11 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
             return createProtobufProperty(fieldStatement);
         }
 
-        if (!fieldStatement.reference().type().isMessage()) {
+        if (!fieldStatement.type().type().isMessage()) {
             return existingField;
         }
 
-        var expectedName = fieldStatement.reference().name();
+        var expectedName = fieldStatement.type().name();
         var actualName = existingField.getType().getSimpleName();
         if (Objects.equals(expectedName, actualName)) {
             return existingField;
@@ -191,13 +191,13 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
                 AstUtils.createReference(fieldStatement, true, factory),
                 fieldStatement.name()
         );
-        if(fieldStatement.reference().type() == ProtobufType.BYTES){
+        if(fieldStatement.type().type() == ProtobufType.BYTES){
             ctField.getType().putMetadata("DeclarationKind", CtArrayTypeReferenceImpl.DeclarationKind.TYPE);
         }
 
         var annotation = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_PROPERTY));
         annotation.addValue("index", fieldStatement.index());
-        annotation.addValue("type", fieldStatement.reference().type());
+        annotation.addValue("type", fieldStatement.type().type());
         if(fieldStatement.required()){
             annotation.addValue("required", true);
             var nonNull = factory.createAnnotation(factory.createReference(AstElements.NON_NULL));
@@ -433,7 +433,7 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private CtEnum<?> createOneOfEnumDescriptor(ProtobufOneOfStatement oneOfStatement, boolean updatingInnerScope) {
-        var existing = (CtEnum<?>) AstUtils.getProtobufClass(factory.getModel(), oneOfStatement.className(), true);
+        var existing = !updating ? null : (CtEnum<?>) AstUtils.getProtobufClass(factory.getModel(), oneOfStatement.className(), true);
         if (existing != null) {
             return existing;
         }
@@ -507,14 +507,24 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
     }
 
     private ProtobufEnumStatement createOneOfEnum(ProtobufOneOfStatement oneOfStatement) {
+        var fieldsCounter = 0;
         var enumStatement = new ProtobufEnumStatement(oneOfStatement.className(), oneOfStatement.packageName(), oneOfStatement.parent());
         var defaultStatement = new ProtobufFieldStatement(
-                "unknown",
+                fieldsCounter++,
+                "UNKNOWN",
                 enumStatement.packageName(),
                 oneOfStatement.parent()
         );
-        enumStatement.addStatement(defaultStatement.index(0));
-        oneOfStatement.statements().forEach(enumStatement::addStatement);
+        enumStatement.addStatement(defaultStatement);
+        for (var fieldStatement : oneOfStatement.statements()) {
+            enumStatement.addStatement(new ProtobufFieldStatement(
+                    fieldsCounter++,
+                    fieldStatement.nameAsConstant(),
+                    enumStatement.packageName(),
+                    oneOfStatement.parent()
+            ));
+        }
+        
         return enumStatement;
     }
 

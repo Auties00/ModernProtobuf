@@ -40,7 +40,7 @@ public final class ProtobufOneOfStatement extends ProtobufObject<ProtobufFieldSt
     }
 
     @Override
-    public ProtobufStatementType type() {
+    public ProtobufStatementType statementType() {
         return ProtobufStatementType.ONE_OF;
     }
 }

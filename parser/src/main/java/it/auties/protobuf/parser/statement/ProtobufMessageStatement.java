@@ -39,7 +39,7 @@ public final class ProtobufMessageStatement extends ProtobufReservable<ProtobufS
     }
 
     @Override
-    public ProtobufStatementType type() {
+    public ProtobufStatementType statementType() {
         return ProtobufStatementType.MESSAGE;
     }
 }

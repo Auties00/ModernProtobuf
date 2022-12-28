@@ -270,7 +270,9 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
             return false;
         }
 
-        return fieldStatement.index() == literal.getValue();
+        var value = literal.getValue();
+        return value instanceof Number number
+                && fieldStatement.index() == number.intValue();
     }
 
     private CtEnumValue<Object> createEnumValue(ProtobufFieldStatement entry, Factory factory) {

@@ -39,7 +39,7 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
     }
 
     @Override
-    public ProtobufStatementType type() {
+    public ProtobufStatementType statementType() {
         return ProtobufStatementType.DOCUMENT;
     }
 
