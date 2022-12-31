@@ -33,12 +33,6 @@ public class AstUtils implements LogProvider {
         return launcher;
     }
 
-    public CtClass<?> getBuilderClass(CtType<?> type){
-        return type.filterChildren(new TypeFilter<>(CtClass.class))
-                .filterChildren((CtClass<?> element) -> element.isClass() && element.getSimpleName().equals("%sBuilder".formatted(type.getSimpleName())))
-                .first(CtClass.class);
-    }
-
     public CtClass<?> getProtobufClass(CtModel model, String name, boolean enumType) {
         var result = model.getElements(new TypeFilter<>(CtClass.class))
                 .stream()

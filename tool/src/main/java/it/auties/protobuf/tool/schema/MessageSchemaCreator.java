@@ -6,10 +6,12 @@ import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
-import spoon.reflect.code.*;
+import spoon.reflect.code.BinaryOperatorKind;
+import spoon.reflect.code.CtBinaryOperator;
+import spoon.reflect.code.CtFieldRead;
+import spoon.reflect.code.CtReturn;
 import spoon.reflect.declaration.*;
 import spoon.reflect.factory.Factory;
-import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.reference.CtTypeReference;
 import spoon.support.reflect.reference.CtArrayTypeReferenceImpl;
 
@@ -55,53 +57,18 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
                 .stream()
                 .sorted(Comparator.comparingInt(entry -> ORDER.indexOf(entry.getClass())))
                 .forEach(this::createMessageStatement);
-        createReservedMethod(true);
-        createReservedMethod(false);
+        createReservedAnnotation();
     }
 
-    private void createReservedMethod(boolean indexes){
-        var methodName = indexes ? "reservedFieldIndexes" : "reservedFieldNames";
-        var existing = ctType.getMethod(methodName);
-        if(existing != null){
+    private void createReservedAnnotation() {
+        if (protoStatement.reservedIndexes().isEmpty() && protoStatement.reservedNames().isEmpty()) {
             return;
         }
 
-        var elements = indexes ? protoStatement.reservedIndexes() : protoStatement.reservedNames();
-        if(elements.isEmpty()){
-            return;
-        }
-
-        var returnType = factory.Type().createReference(AstElements.LIST);
-        var returnTypeArg = indexes ? factory.Type().integerType() : factory.Type().stringType();
-        returnType.addActualTypeArgument(returnTypeArg);
-        var method = factory.createMethod(
-                ctType,
-                Set.of(ModifierKind.PUBLIC),
-                returnType,
-                methodName,
-                List.of(),
-                Set.of()
-        );
-        method.addAnnotation(factory.createAnnotation(factory.createReference(AstElements.OVERRIDE)));
-        var body = factory.createBlock();
-        var returnStatement = factory.createReturn();
-        var ofMethod = factory.Method().createReference(
-                factory.createReference(AstElements.LIST),
-                factory.createReference(AstElements.LIST),
-                "of",
-                factory.createArrayTypeReference()
-        );
-        var literals = elements.stream()
-                .map(factory::createLiteral)
-                .collect(Collectors.toCollection(ArrayList<CtExpression<?>>::new));
-        var ofInvocation = factory.createInvocation(
-                factory.createTypeAccess(factory.createReference(AstElements.ARRAYS)),
-                ofMethod,
-                literals
-        );
-        returnStatement.setReturnedExpression(ofInvocation);
-        body.addStatement(returnStatement);
-        method.setBody(body);
+        var annotation = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_RESERVED));
+        annotation.addValue("names", protoStatement.reservedNames().toArray(String[]::new));
+        annotation.addValue("indexes", protoStatement.reservedIndexes().stream().mapToInt(entry -> entry).toArray());
+        ctType.addAnnotation(annotation);
     }
 
     private void createMessageStatement(ProtobufStatement statement) {
@@ -207,7 +174,6 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         if(fieldStatement.repeated()){
             annotation.addValue("repeated", true);
             annotation.addValue("implementation", factory.createClassAccess(AstUtils.createReference(fieldStatement, false, factory)));
-            createBuilderMethod(fieldStatement, ctField);
         }
 
         if(fieldStatement.packed()){
@@ -278,98 +244,6 @@ public final class MessageSchemaCreator extends SchemaCreator<CtClass<?>, Protob
         var returnType = factory.createReference(AstElements.OPTIONAL);
         returnType.addActualTypeArgument(ctField.getType());
         return returnType;
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void createBuilderMethod(ProtobufFieldStatement fieldStatement, CtField<?> ctField) {
-        var builderClass = getOrCreateBuilder();
-        var existing = builderClass.getMethod(fieldStatement.name());
-        if(existing != null){
-            return;
-        }
-
-        var method = factory.createMethod(
-                builderClass,
-                Set.of(ModifierKind.PUBLIC),
-                builderClass.getReference(),
-                fieldStatement.name(),
-                List.of(),
-                Set.of()
-        );
-
-        var parameter = factory.createParameter(
-                method,
-                ctField.getType(),
-                fieldStatement.name()
-        );
-
-        var body = factory.createBlock();
-
-        CtFieldReference localFieldReference = factory.Field().createReference(
-                builderClass.getReference(),
-                ctField.getType(),
-                fieldStatement.name()
-        );
-
-        var localFieldRead = factory.createFieldRead();
-        localFieldRead.setTarget(factory.createThisAccess(builderClass.getReference()));
-        localFieldRead.setVariable(localFieldReference);
-
-        CtBinaryOperator<Boolean> isNullCondition = factory.createBinaryOperator(
-                localFieldRead,
-                factory.createLiteral(null),
-                BinaryOperatorKind.EQ
-        );
-
-        var newArrayList = factory.createConstructorCall(
-                factory.createReference(AstElements.ARRAY_LIST)
-        );
-        var newArrayListDiamond = AstUtils.createReference(fieldStatement, false, factory);
-        newArrayListDiamond.setImplicit(true);
-        newArrayList.getType().addActualTypeArgument(newArrayListDiamond);
-
-        var isNullThen = factory.createVariableAssignment(
-                localFieldReference,
-                false,
-                newArrayList
-        );
-
-        var isNullIf = factory.createIf();
-        isNullIf.setCondition(isNullCondition);
-        isNullIf.setThenStatement(isNullThen);
-        body.addStatement(isNullIf);
-
-        var addAllMethod = factory.Method().createReference(
-                builderClass.getReference(),
-                localFieldRead.getType(),
-                "addAll",
-                factory.createReference(AstElements.COLLECTION)
-        );
-        var addAllInvocation = factory.createInvocation(
-                localFieldRead,
-                addAllMethod,
-                factory.createVariableRead(factory.createParameterReference(parameter), false)
-        );
-        body.addStatement(addAllInvocation);
-
-        CtReturn returnStatement = factory.createReturn();
-        returnStatement.setReturnedExpression(factory.createThisAccess(builderClass.getReference()));
-        body.addStatement(returnStatement);
-
-        method.setBody(body);
-    }
-
-    private CtClass<?> getOrCreateBuilder() {
-        var existing = AstUtils.getBuilderClass(ctType);
-        if (existing != null) {
-            return existing;
-        }
-
-        CtClass<?> builderClass = factory.createClass("%sBuilder".formatted(ctType.getSimpleName()));
-        builderClass.setModifiers(Set.of(ModifierKind.PUBLIC, ModifierKind.STATIC));
-        builderClass.setParent(ctType);
-        ctType.addNestedType(builderClass);
-        return builderClass;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

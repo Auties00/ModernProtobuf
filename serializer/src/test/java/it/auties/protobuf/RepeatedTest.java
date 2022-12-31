@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
 import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serializer.jackson.ProtobufSchema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,7 +13,6 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class RepeatedTest implements TestProvider {
@@ -23,20 +22,12 @@ public class RepeatedTest implements TestProvider {
         var repeatedMessage = new ModernRepeatedMessage(List.of(1, 2, 3));
         var encoded = JACKSON.writeValueAsBytes(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
-        var modernDecoded = JACKSON
-                .reader()
+        var modernDecoded = JACKSON.reader()
                 .with(ProtobufSchema.of(ModernRepeatedMessage.class))
                 .readValue(encoded, ModernRepeatedMessage.class);
+        System.out.println(modernDecoded);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
         Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.content());
-    }
-
-    public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
-        List<Integer> getContentList();
-
-        int getContentCount();
-
-        int getContent(int index);
     }
 
     @AllArgsConstructor
@@ -51,14 +42,14 @@ public class RepeatedTest implements TestProvider {
                 repeated = true
         )
         private List<Integer> content;
+    }
 
-        public static class ModernRepeatedMessageBuilder {
-            public ModernRepeatedMessageBuilder content(List<Integer> content) {
-                if (this.content == null) this.content = new ArrayList<>();
-                this.content.addAll(content);
-                return this;
-            }
-        }
+    public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
+        List<Integer> getContentList();
+
+        int getContentCount();
+
+        int getContent(int index);
     }
 
     public static final class RepeatedMessage extends
@@ -334,8 +325,6 @@ public class RepeatedTest implements TestProvider {
                 instance.clearContent();
                 return this;
             }
-
-
         }
     }
 }

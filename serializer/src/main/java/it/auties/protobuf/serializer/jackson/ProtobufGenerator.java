@@ -9,8 +9,6 @@ import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.serializer.util.ArrayOutputStream;
 import it.auties.protobuf.serializer.util.ProtobufField;
 import it.auties.protobuf.serializer.util.ProtobufUtils;
-import it.auties.reflection.Reflection;
-import lombok.experimental.ExtensionMethod;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -23,7 +21,6 @@ import java.util.Collection;
 import java.util.List;
 
 
-@ExtensionMethod(Reflection.class)
 class ProtobufGenerator extends GeneratorBase {
     private final OutputStream output;
 
@@ -177,8 +174,8 @@ class ProtobufGenerator extends GeneratorBase {
             var output = new ArrayOutputStream();
             findFields(object.getClass())
                     .stream()
-                    .map(Reflection::open)
                     .filter(ProtobufUtils::isProperty)
+                    .peek(field -> field.setAccessible(true))
                     .map(field -> createField(object, field))
                     .filter(ProtobufField::isValid)
                     .forEach(field -> encodeField(output, field));
@@ -186,7 +183,7 @@ class ProtobufGenerator extends GeneratorBase {
         } catch (ProtobufException exception) {
             throw exception;
         } catch (Throwable throwable) {
-            throw new ProtobufSerializationException("An unknown exception occured while serializing", throwable);
+            throw new ProtobufSerializationException("An unknown exception occurred while serializing", throwable);
         }
     }
 
@@ -267,10 +264,9 @@ class ProtobufGenerator extends GeneratorBase {
 
     private int findEnumIndex(Object object) {
         try {
-            return (int) object.getClass()
-                    .getMethod("index")
-                    .open()
-                    .invoke(object);
+            var method = object.getClass().getMethod("index");
+            method.setAccessible(true);
+            return (int) method.invoke(object);
         } catch (Throwable throwable) {
             return findEnumIndexFallback(object);
         }
@@ -278,10 +274,9 @@ class ProtobufGenerator extends GeneratorBase {
 
     private int findEnumIndexFallback(Object object) {
         try {
-            return (int) object.getClass()
-                    .getMethod("ordinal")
-                    .open()
-                    .invoke(object);
+            var method = object.getClass().getMethod("ordinal");
+            method.setAccessible(true);
+            return (int) method.invoke(object);
         } catch (Throwable throwable) {
             throw new RuntimeException("An exception occurred while invoking the index method for the enum", throwable);
         }

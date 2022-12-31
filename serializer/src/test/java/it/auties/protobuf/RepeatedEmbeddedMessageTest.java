@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
 import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,7 +12,6 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class RepeatedEmbeddedMessageTest implements TestProvider {
@@ -43,14 +42,6 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
                 repeated = true
         )
         private List<AnotherMessage> content;
-
-        public static class SomeMessageBuilder {
-            public SomeMessageBuilder content(List<AnotherMessage> content) {
-                if (this.content == null) this.content = new ArrayList<>();
-                this.content.addAll(content);
-                return this;
-            }
-        }
     }
 
 
@@ -67,14 +58,6 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
                 repeated = true
         )
         private List<FinalMessage> content;
-
-        public static class AnotherMessageBuilder {
-            public AnotherMessageBuilder content(List<FinalMessage> content) {
-                if (this.content == null) this.content = new ArrayList<>();
-                this.content.addAll(content);
-                return this;
-            }
-        }
     }
 
     @AllArgsConstructor
@@ -89,13 +72,5 @@ public class RepeatedEmbeddedMessageTest implements TestProvider {
                 repeated = true
         )
         private List<Integer> content;
-
-        public static class FinalMessageBuilder {
-            public FinalMessageBuilder content(List<Integer> content) {
-                if (this.content == null) this.content = new ArrayList<>();
-                this.content.addAll(content);
-                return this;
-            }
-        }
     }
 }

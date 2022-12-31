@@ -78,11 +78,6 @@
     <dependencies>
         <dependency>
             <groupId>com.github.auties00</groupId>
-            <artifactId>reflection</artifactId>
-            <version>1.2</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
             <version>1.18</version>
         </dependency>

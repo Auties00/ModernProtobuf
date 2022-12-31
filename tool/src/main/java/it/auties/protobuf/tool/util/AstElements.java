@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufName;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufReserved;
 import lombok.experimental.UtilityClass;
 
 import java.util.*;
@@ -15,6 +16,7 @@ public class AstElements {
     public final String PROTOBUF_MESSAGE = ProtobufMessage.class.getName();
     public final String PROTOBUF_MESSAGE_NAME = ProtobufName.class.getName();
     public final String PROTOBUF_PROPERTY = ProtobufProperty.class.getName();
+    public final String PROTOBUF_RESERVED = ProtobufReserved.class.getName();
     public final String JSON_CREATOR = JsonCreator.class.getName();
     public final String ARRAYS = Arrays.class.getName();
     public final String STREAM = Stream.class.getName();

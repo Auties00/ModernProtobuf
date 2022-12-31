@@ -3,16 +3,12 @@ package it.auties.protobuf.serializer.jackson;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
-import it.auties.protobuf.base.ProtobufConverter;
-import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.base.*;
 import it.auties.protobuf.serializer.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serializer.util.ArrayInputStream;
 import it.auties.protobuf.serializer.util.ProtobufField;
 import it.auties.protobuf.serializer.util.ProtobufUtils;
 import it.auties.protobuf.serializer.util.VersionInfo;
-import it.auties.reflection.Reflection;
 import lombok.NonNull;
 
 import java.io.IOException;
@@ -24,6 +20,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -41,16 +39,19 @@ class ProtobufParser extends ParserMinimalBase {
     private ArrayInputStream input;
     private ArrayInputStream packedInput;
     private Class<? extends ProtobufMessage> type;
+    private ProtobufReserved reservedType;
     private boolean closed;
     private ProtobufField lastField;
     private int lastType;
     private Object lastValue;
+    private UUID uuid;
 
     public ProtobufParser(IOContext ioContext, int parserFeatures, ObjectCodec codec, byte[] input) {
         super(parserFeatures);
         this.input = new ArrayInputStream(input);
         this.ioContext = ioContext;
         this.codec = codec;
+        this.uuid = UUID.randomUUID();
     }
 
     @Override
@@ -100,6 +101,7 @@ class ProtobufParser extends ParserMinimalBase {
         }
 
         this.type = ((ProtobufSchema) schema).messageType();
+        this.reservedType = type.getAnnotation(ProtobufReserved.class);
         getFieldsOrCache(type);
     }
 
@@ -169,7 +171,7 @@ class ProtobufParser extends ParserMinimalBase {
                 return super._currToken = JsonToken.END_ARRAY;
             }
 
-            this.lastValue = lastType == 1 ? packedInput.readInt64() : packedInput.readInt32();
+            this.lastValue = lastType == WIRE_TYPE_FIXED64 ? packedInput.readInt64() : packedInput.readInt32();
             return super._currToken = JsonToken.VALUE_NUMBER_INT;
         }
 
@@ -184,8 +186,17 @@ class ProtobufParser extends ParserMinimalBase {
                     .formatted(index, type.getName()));
         }
 
-        // TODO: 20/07/2022 handle reserved fields
+        if(reservedType != null && Arrays.binarySearch(reservedType.indexes(), index) >= 0) {
+            throw new ProtobufDeserializationException("Cannot deserialize field with index %s inside %s: reserved field(by index)"
+                    .formatted(index, type.getName()));
+        }
+
         this.lastField = findField(index);
+        if(reservedType != null && Set.of(reservedType.names()).contains(lastField.name())) {
+            throw new ProtobufDeserializationException("Cannot deserialize field with index %s inside %s: reserved field(by name)"
+                    .formatted(index, type.getName()));
+        }
+
         this.lastType = tag & 7;
         return super._currToken = JsonToken.FIELD_NAME;
     }
@@ -250,8 +261,8 @@ class ProtobufParser extends ParserMinimalBase {
         }
 
         var converter = findConverter(delimited);
-        Reflection.open(converter);
         try {
+            converter.setAccessible(true);
             return converter.invoke(null, delimited);
         } catch (ReflectiveOperationException exception) {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot invoke converter"
@@ -308,14 +319,19 @@ class ProtobufParser extends ParserMinimalBase {
             return bytes;
         }
 
+        // No new object allocation to save performance (no kidding it's much faster somehow)
         var lastField = this.lastField;
         var lastType = this.type;
+        var lastReservedType = this.reservedType;
         var lastInput = this.input;
         var lastToken = this.currentToken();
         var lastValue = this.lastValue;
+        var lastUuid = this.uuid;
         try {
             getFieldsOrCache(lastField.messageType());
+            this.uuid = UUID.randomUUID();
             this.type = lastField.messageType();
+            this.reservedType = type.getAnnotation(ProtobufReserved.class);
             this.input = new ArrayInputStream(bytes);
             this._currToken = null;
             this.lastField = null;
@@ -324,7 +340,9 @@ class ProtobufParser extends ParserMinimalBase {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot decode embedded message with type %s"
                     .formatted(lastField.index(), lastType.getName(), lastField.messageType() == null ? "unknown" : lastField.messageType().getName()), exception);
         } finally {
+            this.uuid = lastUuid;
             this.type = lastType;
+            this.reservedType = lastReservedType;
             this.input = lastInput;
             this._currToken = lastToken;
             this.lastField = lastField;
@@ -339,6 +357,22 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Object getCurrentValue() {
+        if(lastField.type().isInt()){
+            return getIntValue();
+        }
+
+        if(lastField.type().isLong()){
+            return getLongValue();
+        }
+
+        if(lastField.type() == ProtobufType.FLOAT){
+            return getFloatValue();
+        }
+
+        if(lastField.type() == ProtobufType.DOUBLE){
+            return getDoubleValue();
+        }
+
         return lastValue;
     }
 
@@ -387,12 +421,12 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Number getNumberValue() {
-        if (getCurrentValue() instanceof Number number) {
+        if (lastValue instanceof Number number) {
             return number;
         }
 
         throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected Number, got %s"
-                .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+                .formatted(lastField.index(), type.getName(), (lastValue == null ? null : getCurrentValue().getClass().getSimpleName())));
     }
 
     @Override
@@ -456,5 +490,17 @@ class ProtobufParser extends ParserMinimalBase {
 
         throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s, type mismatch: expected String or byte[], got %s"
                 .formatted(lastField.index(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+    }
+
+    protected ProtobufField lastField() {
+        return lastField;
+    }
+
+    protected UUID uuid() {
+        return uuid;
+    }
+
+    protected Class<? extends ProtobufMessage> type() {
+        return type;
     }
 }

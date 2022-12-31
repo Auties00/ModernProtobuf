@@ -19,6 +19,7 @@ public class ProtobufMapper extends ObjectMapper {
 
     private ProtobufMapper(ProtobufFactory factory) {
         super(factory);
+        registerModule(new RepeatedCollectionModule());
     }
 
     protected ProtobufMapper(ProtobufMapper src) {

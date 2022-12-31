@@ -7,9 +7,9 @@ import it.auties.protobuf.serializer.exception.ProtobufSerializationException;
 
 import java.util.Objects;
 
-public record ProtobufField(String name, int index, ProtobufType type,
-                            Class<? extends ProtobufMessage> messageType, Object value, boolean packed,
-                            boolean required, boolean repeated, boolean requiresConversion) {
+public record ProtobufField(String name, int index, ProtobufType type, Class<? extends ProtobufMessage> messageType,
+                            Object value, boolean packed, boolean required, boolean repeated,
+                            boolean requiresConversion) {
     public ProtobufField(String name, Object value, ProtobufProperty property) {
         this(name, property.index(), property.type(), null, value, property.packed(), property.required(), property.repeated(), false);
     }
