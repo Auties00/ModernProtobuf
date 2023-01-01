@@ -9,17 +9,28 @@ import com.fasterxml.jackson.databind.deser.std.CollectionDeserializer;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.CollectionType;
-import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 class RepeatedCollectionModule extends SimpleModule {
-    public RepeatedCollectionModule(){
-        setDeserializerModifier(new RepeatedCollectionDeserializerModifier());
+    private final RepeatedCollectionDeserializerModifier modifier;
+
+    protected RepeatedCollectionModule(){
+        this.modifier = new RepeatedCollectionDeserializerModifier();
+        setDeserializerModifier(modifier);
+    }
+
+    protected Collection<Object> entries() {
+        return modifier.deserializer() != null ? modifier.deserializer().entries() : null;
+    }
+
+    protected void setEntries(Collection<Object> entries) {
+        if(modifier.deserializer() == null){
+            return;
+        }
+
+        modifier.deserializer().setEntries(entries);
     }
 
     @Override
@@ -27,39 +38,49 @@ class RepeatedCollectionModule extends SimpleModule {
         return getClass().getSimpleName();
     }
 
-    public static class RepeatedCollectionDeserializerModifier extends BeanDeserializerModifier {
+    private static class RepeatedCollectionDeserializerModifier extends BeanDeserializerModifier {
+        private RepeatedCollectionDeserializer deserializer;
+
         @Override
         public JsonDeserializer<?> modifyCollectionDeserializer(DeserializationConfig config, CollectionType type, BeanDescription beanDesc, JsonDeserializer<?> deserializer) {
-            return new RepeatedCollectionDeserializer(type, deserializer);
+            return this.deserializer = new RepeatedCollectionDeserializer(type, deserializer);
+        }
+
+        private RepeatedCollectionDeserializer deserializer() {
+            return deserializer;
         }
     }
 
-    public static class RepeatedCollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
+    protected static class RepeatedCollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
         private final ValueInstantiator valueInitiator;
-        private final Map<UUID, Collection<Object>> entries;
+        private Collection<Object> entries;
         private JsonDeserializer<?> defaultDeserializer;
+        private DeserializationContext context;
 
         public RepeatedCollectionDeserializer(CollectionType type, JsonDeserializer<?> defaultDeserializer) {
             super(type);
             this.defaultDeserializer = defaultDeserializer;
             this.valueInitiator = ((CollectionDeserializer) defaultDeserializer).getValueInstantiator();
-            this.entries = new HashMap<>();
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public Collection<Object> deserialize(JsonParser parser, DeserializationContext context) throws IOException {
-            if(!(parser instanceof ProtobufParser protobufParser)){
+            if (!(parser instanceof ProtobufParser protobufParser)) {
                 throw new IllegalArgumentException("Cannot use non-protobuf parser to deserialize a repeated collection");
             }
 
-            if(protobufParser.lastField() == null || !protobufParser.lastField().repeated()){
+            if (protobufParser.lastField() == null || !protobufParser.lastField().repeated()) {
                 return (Collection<Object>) defaultDeserializer.deserialize(parser, context);
             }
 
-            var entry = getEntry(protobufParser, context);
-            entry.add(protobufParser.getCurrentValue());
-            return entry;
+            this.context = context;
+            if(entries == null) {
+                createEntries();
+            }
+
+            entries.add(protobufParser.getCurrentValue());
+            return entries;
         }
 
         @Override
@@ -68,17 +89,17 @@ class RepeatedCollectionModule extends SimpleModule {
             return this;
         }
 
-        @SneakyThrows
         @SuppressWarnings("unchecked")
-        private Collection<Object> getEntry(ProtobufParser parser, DeserializationContext context) {
-            var result = entries.get(parser.uuid());
-            if(result != null){
-                return result;
-            }
+        protected void createEntries() throws IOException {
+            this.entries = (Collection<Object>) valueInitiator.createUsingDefault(context);
+        }
 
-            var entry = (Collection<Object>) valueInitiator.createUsingDefault(context);
-            entries.put(parser.uuid(), entry);
-            return entry;
+        private Collection<Object> entries() {
+            return entries;
+        }
+
+        private void setEntries(Collection<Object> entries) {
+            this.entries = entries;
         }
     }
 }

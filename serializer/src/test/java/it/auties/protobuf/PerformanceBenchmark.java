@@ -4,10 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
 import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
-import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serializer.jackson.ProtobufSchema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -75,23 +74,6 @@ public class PerformanceBenchmark implements TestProvider {
         }
     }
 
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void jacksonProtobuf() throws IOException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            JACKSON_READER.readValue(SERIALIZED_INPUT);
-        }
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void googleProtobuf() throws InvalidProtocolBufferException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            ScalarMessage.parseFrom(SERIALIZED_INPUT);
-        }
-    }
 
     @SuppressWarnings("unused")
     public static class JacksonScalarMessage {

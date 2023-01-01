@@ -25,9 +25,40 @@ public class RepeatedTest implements TestProvider {
         var modernDecoded = JACKSON.reader()
                 .with(ProtobufSchema.of(ModernRepeatedMessage.class))
                 .readValue(encoded, ModernRepeatedMessage.class);
-        System.out.println(modernDecoded);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
         Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.content());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testMultipleModifiers(){
+        var repeatedMessage = new ModernBetaRepeatedMessage(List.of(1, 2, 3), List.of("abc", "def"));
+        var encoded = JACKSON.writeValueAsBytes(repeatedMessage);
+        var modernDecoded = JACKSON.reader()
+                .with(ProtobufSchema.of(ModernRepeatedMessage.class))
+                .readValue(encoded, ModernRepeatedMessage.class);
+        Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
+    }
+
+    @AllArgsConstructor
+    @Jacksonized
+    @Data
+    @Builder
+    @Accessors(fluent = true)
+    public static class ModernBetaRepeatedMessage implements ProtobufMessage {
+        @ProtobufProperty(
+                index = 1,
+                type = ProtobufType.INT32,
+                repeated = true
+        )
+        private List<Integer> content;
+
+        @ProtobufProperty(
+                index = 2,
+                type = ProtobufType.STRING,
+                repeated = true
+        )
+        private List<String> content2;
     }
 
     @AllArgsConstructor

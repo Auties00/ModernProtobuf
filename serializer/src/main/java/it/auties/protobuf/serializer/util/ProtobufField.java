@@ -23,7 +23,7 @@ public record ProtobufField(String name, int index, ProtobufType type, Class<? e
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T dynamicValue() {
+    public <T> T valueAs() {
         try {
             return (T) value;
         } catch (ClassCastException exception) {

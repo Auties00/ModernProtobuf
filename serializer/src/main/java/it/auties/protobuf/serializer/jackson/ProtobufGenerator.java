@@ -224,20 +224,20 @@ class ProtobufGenerator extends GeneratorBase {
             }
 
             switch (field.type()) {
-                case BOOL -> output.writeBool(field.index(), field.dynamicValue());
-                case STRING -> output.writeString(field.index(), field.dynamicValue());
-                case BYTES -> output.writeByteArray(field.index(), field.dynamicValue());
+                case BOOL -> output.writeBool(field.index(), field.valueAs());
+                case STRING -> output.writeString(field.index(), field.valueAs());
+                case BYTES -> output.writeByteArray(field.index(), field.valueAs());
 
-                case FLOAT -> output.writeFixed32(field.index(), Float.floatToRawIntBits(field.dynamicValue()));
-                case DOUBLE -> output.writeFixed64(field.index(), Double.doubleToRawLongBits(field.dynamicValue()));
+                case FLOAT -> output.writeFixed32(field.index(), Float.floatToRawIntBits(field.valueAs()));
+                case DOUBLE -> output.writeFixed64(field.index(), Double.doubleToRawLongBits(field.valueAs()));
 
-                case INT32, SINT32 -> output.writeInt32(field.index(), field.dynamicValue());
-                case UINT32 -> output.writeUInt32(field.index(), field.dynamicValue());
-                case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), field.dynamicValue());
+                case INT32, SINT32 -> output.writeInt32(field.index(), field.valueAs());
+                case UINT32 -> output.writeUInt32(field.index(), field.valueAs());
+                case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), field.valueAs());
 
-                case INT64, SINT64 -> output.writeInt64(field.index(), field.dynamicValue());
-                case UINT64 -> output.writeUInt64(field.index(), field.dynamicValue());
-                case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), field.dynamicValue());
+                case INT64, SINT64 -> output.writeInt64(field.index(), field.valueAs());
+                case UINT64 -> output.writeUInt64(field.index(), field.valueAs());
+                case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), field.valueAs());
 
                 default -> encodeFieldFallback(field.index(), field.value(), output);
             }
@@ -247,7 +247,7 @@ class ProtobufGenerator extends GeneratorBase {
     }
 
     private void encodeRepeatedFields(ArrayOutputStream output, ProtobufField field) {
-        field.<Collection<?>>dynamicValue()
+        field.<Collection<?>>valueAs()
                 .stream()
                 .map(field::toSingleField)
                 .forEach(entry -> encodeField(output, entry));

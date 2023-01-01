@@ -4,16 +4,21 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.ContentReference;
 import com.fasterxml.jackson.core.io.IOContext;
 import it.auties.protobuf.serializer.util.VersionInfo;
-import lombok.NoArgsConstructor;
 
 import java.io.*;
 import java.net.URL;
 import java.util.Arrays;
 
-@NoArgsConstructor
 class ProtobufFactory extends JsonFactory {
+    private RepeatedCollectionModule module;
+
+    public ProtobufFactory() {
+
+    }
+
     protected ProtobufFactory(ProtobufFactory src, ObjectCodec oc) {
         super(src, oc);
+        this.module = src.module();
     }
 
     @Override
@@ -99,7 +104,7 @@ class ProtobufFactory extends JsonFactory {
     @Override
     protected ProtobufParser _createParser(InputStream in, IOContext context) {
         var buf = context.allocReadIOBuffer();
-        return new ProtobufParser(context, _parserFeatures, _objectCodec, buf);
+        return new ProtobufParser(context, module, _parserFeatures, _objectCodec, buf);
     }
 
     @Override
@@ -118,7 +123,7 @@ class ProtobufFactory extends JsonFactory {
     }
 
     protected ProtobufParser _createParser(byte[] data, int offset, int len, IOContext context, ProtobufSchema schema) {
-        var parser = new ProtobufParser(context, _parserFeatures, _objectCodec, Arrays.copyOfRange(data, offset, offset + len));
+        var parser = new ProtobufParser(context, module, _parserFeatures, _objectCodec, Arrays.copyOfRange(data, offset, offset + len));
         parser.setSchema(schema);
         return parser;
     }
@@ -161,5 +166,13 @@ class ProtobufFactory extends JsonFactory {
     @Override
     public boolean canUseSchema(FormatSchema schema) {
         return schema instanceof ProtobufSchema;
+    }
+
+    protected RepeatedCollectionModule module() {
+        return module;
+    }
+
+    public void registerModule(RepeatedCollectionModule module) {
+        this.module = module;
     }
 }

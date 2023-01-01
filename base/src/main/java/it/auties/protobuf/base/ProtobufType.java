@@ -60,4 +60,20 @@ public enum ProtobufType {
                 || this == FIXED64
                 || this == SFIXED64;
     }
+
+    public boolean isFloat(){
+        return this == FLOAT;
+    }
+
+    public boolean isDouble(){
+        return this == DOUBLE;
+    }
+
+    public boolean isFloatingPoint(){
+        return isFloat() || isDouble();
+    }
+
+    public boolean isBool() {
+        return this == BOOL;
+    }
 }
