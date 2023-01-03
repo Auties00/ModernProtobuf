@@ -8,9 +8,9 @@
     <version>1.18</version>
     <modules>
         <module>base</module>
-        <module>serializer</module>
         <module>parser</module>
         <module>tool</module>
+        <module>serialization</module>
     </modules>
 
     <name>${project.groupId}:${project.artifactId}</name>

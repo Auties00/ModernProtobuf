@@ -83,7 +83,7 @@
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
-            <artifactId>protobuf-serializer</artifactId>
+            <artifactId>protobuf-serialization</artifactId>
             <version>1.18</version>
         </dependency>
         <dependency>
