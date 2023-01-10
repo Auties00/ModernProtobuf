@@ -3,7 +3,7 @@ package it.auties.protobuf;
 import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.serialization.jackson.api.ProtobufSchema;
+import it.auties.protobuf.serialization.jackson.ProtobufSchema;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;

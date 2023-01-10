@@ -1,138 +1,88 @@
-package it.auties.protobuf;
+/*
+package performance;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectReader;
+import it.auties.protobuf.TestProvider;
 import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.jackson.ProtobufSchema;
-import lombok.*;
+import it.auties.protobuf.serialization.stream.ArrayInputStream;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.openjdk.jmh.annotations.*;
 
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-public class ScalarTest implements TestProvider {
-    @Test
-    @SneakyThrows
-    public void encodeScalarTypes() {
-        var modernScalarMessage = ModernScalarMessage.builder()
-                .fixed32(Integer.MAX_VALUE)
-                .sfixed32(Integer.MAX_VALUE)
-                .int32(Integer.MAX_VALUE)
-                .uint32(Integer.MAX_VALUE)
-                .fixed64(Integer.MAX_VALUE)
-                .sfixed64(Integer.MAX_VALUE)
-                .int64(Integer.MAX_VALUE)
-                .uint64(Integer.MAX_VALUE)
-                ._float(Float.MAX_VALUE)
-                ._double(Double.MAX_VALUE)
-                .bool(true)
-                .string("Hello, this is an automated test!")
-                .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
-                .build();
+@State(Scope.Benchmark)
+@Fork(1)
+@Warmup(iterations = 1)
+@Measurement(iterations = 3)
+public class PerformanceBenchmark {
+    private static final byte[] SERIALIZED_INPUT = new byte[]{13, -1, -1, -1, 127, 21, -1, -1, -1, 127, 24, -1, -1, -1, -1, 7, 32, -1, -1, -1, -1, 7, 41, -1, -1, -1, 127, 0, 0, 0, 0, 49, -1, -1, -1, 127, 0, 0, 0, 0, 56, -1, -1, -1, -1, 7, 64, -1, -1, -1, -1, 7, 77, -1, -1, 127, 127, 81, -1, -1, -1, -1, -1, -1, -17, 127, 88, 1};
 
-        var modernEncoded = JACKSON.writeValueAsBytes(modernScalarMessage);
-        var modernDecoded = JACKSON.readerFor(ModernScalarMessage.class)
-                .with(ProtobufSchema.of(ModernScalarMessage.class))
-                .readValue(modernEncoded, ModernScalarMessage.class);
-        equals(modernScalarMessage, modernDecoded);
 
-        var oldDecoded = ScalarMessage.parseFrom(modernEncoded);
-        equals(modernDecoded, oldDecoded);
-
-        var modernFromOldDecoded = JACKSON.readerFor(ModernScalarMessage.class)
-                .with(ProtobufSchema.of(ModernScalarMessage.class))
-                .readValue(oldDecoded.toByteArray(), ModernScalarMessage.class);
-        equals(modernDecoded, modernFromOldDecoded);
+    static {
+        try {
+            MODERN_READER = TestProvider.JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Cannot initialize benchmark", throwable);
+        }
     }
 
-    private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
-        Assertions.assertEquals(modernScalarMessage.fixed32(), modernDecoded.fixed32());
-        Assertions.assertEquals(modernScalarMessage.sfixed32(), modernDecoded.sfixed32());
-        Assertions.assertEquals(modernScalarMessage.int32(), modernDecoded.int32());
-        Assertions.assertEquals(modernScalarMessage.uint32(), modernDecoded.uint32());
-        Assertions.assertEquals(modernScalarMessage.fixed64(), modernDecoded.fixed64());
-        Assertions.assertEquals(modernScalarMessage.sfixed64(), modernDecoded.sfixed64());
-        Assertions.assertEquals(modernScalarMessage.int64(), modernDecoded.int64());
-        Assertions.assertEquals(modernScalarMessage.uint64(), modernDecoded.uint64());
-        Assertions.assertEquals(modernScalarMessage._float(), modernDecoded._float());
-        Assertions.assertEquals(modernScalarMessage._double(), modernDecoded._double());
-        Assertions.assertEquals(modernScalarMessage.bool(), modernDecoded.bool());
-        Assertions.assertEquals(modernScalarMessage.string(), modernDecoded.string());
-        Assertions.assertArrayEquals(modernScalarMessage.bytes(), modernDecoded.bytes());
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void modernProtobuf2() throws IOException {
+        SimpleParser.decode(new ArrayInputStream(SERIALIZED_INPUT), ExampleObject.class);
     }
 
-    private void equals(ModernScalarMessage modernDecoded, ScalarMessage oldDecoded) {
-        Assertions.assertEquals(modernDecoded.fixed32(), oldDecoded.getFixed32());
-        Assertions.assertEquals(modernDecoded.sfixed32(), oldDecoded.getSfixed32());
-        Assertions.assertEquals(modernDecoded.int32(), oldDecoded.getInt32());
-        Assertions.assertEquals(modernDecoded.uint32(), oldDecoded.getUint32());
-        Assertions.assertEquals(modernDecoded.fixed64(), oldDecoded.getFixed64());
-        Assertions.assertEquals(modernDecoded.sfixed64(), oldDecoded.getSfixed64());
-        Assertions.assertEquals(modernDecoded.int64(), oldDecoded.getInt64());
-        Assertions.assertEquals(modernDecoded.uint64(), oldDecoded.getUint64());
-        Assertions.assertEquals(modernDecoded._float(), oldDecoded.getFloat());
-        Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
-        Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
-        Assertions.assertEquals(modernDecoded.string(), oldDecoded.getString());
-        Assertions.assertArrayEquals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
-    }
+    @SuppressWarnings("unused")
+    public static class JacksonScalarMessage {
+        @JsonProperty("fixed32")
+        private int fixed32;
 
-    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
-        boolean hasFixed32();
+        @JsonProperty("sfixed32")
+        private int sfixed32;
 
-        int getFixed32();
+        @JsonProperty("int32")
+        private int int32;
 
-        boolean hasSfixed32();
+        @JsonProperty("uint32")
+        private int uint32;
 
-        int getSfixed32();
+        @JsonProperty("fixed64")
+        private long fixed64;
 
-        boolean hasInt32();
+        @JsonProperty("sfixed64")
+        private long sfixed64;
 
-        int getInt32();
+        @JsonProperty("int64")
+        private long int64;
 
-        boolean hasUint32();
+        @JsonProperty("uint64")
+        private long uint64;
 
-        int getUint32();
+        @JsonProperty("float")
+        private float _float;
 
-        boolean hasFixed64();
+        @JsonProperty("double")
+        private double _double;
 
-        long getFixed64();
+        @JsonProperty("bool")
+        private boolean bool;
 
-        boolean hasSfixed64();
+        @JsonProperty("string")
+        private String string;
 
-        long getSfixed64();
-
-        boolean hasInt64();
-
-        long getInt64();
-
-        boolean hasUint64();
-
-        long getUint64();
-
-        boolean hasFloat();
-
-        float getFloat();
-
-        boolean hasDouble();
-
-        double getDouble();
-
-        boolean hasBool();
-
-        boolean getBool();
-
-        boolean hasString();
-
-        String getString();
-
-        com.google.protobuf.ByteString getStringBytes();
-
-        boolean hasBytes();
-
-        com.google.protobuf.ByteString getBytes();
+        @JsonProperty("bytes")
+        private byte[] bytes;
     }
 
     @AllArgsConstructor
@@ -219,6 +169,62 @@ public class ScalarTest implements TestProvider {
                 type = ProtobufType.BYTES
         )
         private byte[] bytes;
+    }
+
+    public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
+        boolean hasFixed32();
+
+        int getFixed32();
+
+        boolean hasSfixed32();
+
+        int getSfixed32();
+
+        boolean hasInt32();
+
+        int getInt32();
+
+        boolean hasUint32();
+
+        int getUint32();
+
+        boolean hasFixed64();
+
+        long getFixed64();
+
+        boolean hasSfixed64();
+
+        long getSfixed64();
+
+        boolean hasInt64();
+
+        long getInt64();
+
+        boolean hasUint64();
+
+        long getUint64();
+
+        boolean hasFloat();
+
+        float getFloat();
+
+        boolean hasDouble();
+
+        double getDouble();
+
+        boolean hasBool();
+
+        boolean getBool();
+
+        boolean hasString();
+
+        String getString();
+
+        com.google.protobuf.ByteString getStringBytes();
+
+        boolean hasBytes();
+
+        com.google.protobuf.ByteString getBytes();
     }
 
     public static final class ScalarMessage extends
@@ -330,14 +336,14 @@ public class ScalarTest implements TestProvider {
 
         public static ScalarMessage parseDelimitedFrom(java.io.InputStream input)
                 throws java.io.IOException {
-            return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            return GeneratedMessageLite.parseDelimitedFrom(DEFAULT_INSTANCE, input);
         }
 
         public static ScalarMessage parseDelimitedFrom(
                 java.io.InputStream input,
                 com.google.protobuf.ExtensionRegistryLite extensionRegistry)
                 throws java.io.IOException {
-            return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            return GeneratedMessageLite.parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
         }
 
         public static ScalarMessage parseFrom(
@@ -652,13 +658,13 @@ public class ScalarTest implements TestProvider {
                 MethodToInvoke method,
                 Object arg0, Object arg1) {
             switch (method) {
-                case NEW_MUTABLE_INSTANCE: {
+                case MethodToInvoke.NEW_MUTABLE_INSTANCE: {
                     return new ScalarMessage();
                 }
-                case NEW_BUILDER: {
+                case MethodToInvoke.NEW_BUILDER: {
                     return new Builder();
                 }
-                case BUILD_MESSAGE_INFO: {
+                case MethodToInvoke.BUILD_MESSAGE_INFO: {
                     Object[] objects = new Object[]{
                             "bitField0_",
                             "fixed32_",
@@ -679,13 +685,13 @@ public class ScalarTest implements TestProvider {
                             "\u0001\r\u0000\u0001\u0001\r\r\u0000\u0000\u0000\u0001\u1006\u0000\u0002\u100d\u0001" +
                                     "\u0003\u1004\u0002\u0004\u100b\u0003\u0005\u1005\u0004\u0006\u100e\u0005\u0007\u1002" +
                                     "\u0006\b\u1003\u0007\t\u1001\b\n\u1000\t\u000b\u1007\n\f\u1008\u000b\r\u100a\f";
-                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                    return GeneratedMessageLite.newMessageInfo(DEFAULT_INSTANCE, info, objects);
                 }
 
-                case GET_DEFAULT_INSTANCE: {
+                case MethodToInvoke.GET_DEFAULT_INSTANCE: {
                     return DEFAULT_INSTANCE;
                 }
-                case GET_PARSER: {
+                case MethodToInvoke.GET_PARSER: {
                     com.google.protobuf.Parser<ScalarMessage> parser = PARSER;
                     if (parser == null) {
                         synchronized (ScalarMessage.class) {
@@ -700,10 +706,10 @@ public class ScalarTest implements TestProvider {
                     }
                     return parser;
                 }
-                case GET_MEMOIZED_IS_INITIALIZED: {
+                case MethodToInvoke.GET_MEMOIZED_IS_INITIALIZED: {
                     return (byte) 1;
                 }
-                case SET_MEMOIZED_IS_INITIALIZED: {
+                case MethodToInvoke.SET_MEMOIZED_IS_INITIALIZED: {
                     return null;
                 }
             }
@@ -1036,3 +1042,4 @@ public class ScalarTest implements TestProvider {
         }
     }
 }
+ */

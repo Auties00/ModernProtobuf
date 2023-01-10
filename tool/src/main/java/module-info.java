@@ -12,10 +12,7 @@ open module it.auties.protobuf.tool {
     requires org.apache.logging.log4j;
     requires org.apache.logging.log4j.core;
 
-    requires it.auties.reflection;
     requires it.auties.protobuf.parser;
-
-
     requires spoon.core;
     requires it.auties.protobuf.base;
 }

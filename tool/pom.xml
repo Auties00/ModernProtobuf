@@ -3,7 +3,7 @@
     <parent>
         <artifactId>protobuf</artifactId>
         <groupId>com.github.auties00</groupId>
-        <version>1.18</version>
+        <version>1.19</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <packaging>jar</packaging>
@@ -13,13 +13,6 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
 
     <build>
         <plugins>
@@ -79,17 +72,17 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>1.18</version>
+            <version>1.19</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
-            <artifactId>protobuf-serialization</artifactId>
-            <version>1.18</version>
+            <artifactId>protobuf-serialization-base</artifactId>
+            <version>1.19</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-parser</artifactId>
-            <version>1.18</version>
+            <version>1.19</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
@@ -105,6 +98,11 @@
             <groupId>fr.inria.gforge.spoon</groupId>
             <artifactId>spoon-core</artifactId>
             <version>10.2.0-beta-11</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.14.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

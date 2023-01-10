@@ -1,15 +1,19 @@
 package it.auties.protobuf;
 
+import static it.auties.protobuf.base.ProtobufType.MESSAGE;
+
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.serialization.jackson.api.ProtobufSchema;
-import lombok.*;
+import it.auties.protobuf.serialization.jackson.ProtobufSchema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import static it.auties.protobuf.base.ProtobufType.MESSAGE;
 
 public class EmbeddedEnumTest implements TestProvider {
     @Test
