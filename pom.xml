@@ -147,6 +147,13 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <release>${java.version}</release>
+                    <failOnError>true</failOnError>
+                    <additionalOptions>--enable-preview</additionalOptions>
+                    <debug>true</debug>
+                    <verbose>true</verbose>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
