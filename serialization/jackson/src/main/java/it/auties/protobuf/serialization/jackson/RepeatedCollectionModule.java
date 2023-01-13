@@ -1,15 +1,19 @@
 package it.auties.protobuf.serialization.jackson;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.BeanProperty;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
 import com.fasterxml.jackson.databind.deser.ValueInstantiator;
-import com.fasterxml.jackson.databind.deser.std.CollectionDeserializer;
+import com.fasterxml.jackson.databind.deser.impl.JDKValueInstantiators;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.CollectionType;
-
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
@@ -28,20 +32,20 @@ class RepeatedCollectionModule extends SimpleModule {
     private static class RepeatedCollectionDeserializerModifier extends BeanDeserializerModifier {
         @Override
         public JsonDeserializer<?> modifyCollectionDeserializer(DeserializationConfig config, CollectionType type, BeanDescription beanDesc, JsonDeserializer<?> defaultDeserializer) {
-            return new RepeatedCollectionDeserializer(type, defaultDeserializer);
+            return new RepeatedCollectionDeserializer(config, type, defaultDeserializer);
         }
     }
 
     protected static class RepeatedCollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
         private final ValueInstantiator valueInitiator;
-        private final Map<Long, Collection<Object>> entriesMap;
+        private final Map<Integer, Collection<Object>> entriesMap;
         private JsonDeserializer<?> defaultDeserializer;
         private DeserializationContext context;
 
-        public RepeatedCollectionDeserializer(CollectionType type, JsonDeserializer<?> defaultDeserializer) {
+        public RepeatedCollectionDeserializer(DeserializationConfig config, CollectionType type, JsonDeserializer<?> defaultDeserializer) {
             super(type);
             this.defaultDeserializer = defaultDeserializer;
-            this.valueInitiator = ((CollectionDeserializer) defaultDeserializer).getValueInstantiator();
+            this.valueInitiator = JDKValueInstantiators.findStdValueInstantiator(config, type.getRawClass());
             this.entriesMap = new ConcurrentHashMap<>();
         }
 
@@ -64,7 +68,7 @@ class RepeatedCollectionModule extends SimpleModule {
         }
 
         @SuppressWarnings("unchecked")
-        private Collection<Object> getEntries(long id) throws IOException {
+        private Collection<Object> getEntries(int id) throws IOException {
             var entries = entriesMap.get(id);
             if (entries != null) {
                 return entries;
