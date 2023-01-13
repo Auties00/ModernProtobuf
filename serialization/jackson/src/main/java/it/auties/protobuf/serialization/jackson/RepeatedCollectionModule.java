@@ -38,7 +38,7 @@ class RepeatedCollectionModule extends SimpleModule {
 
     protected static class RepeatedCollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
         private final ValueInstantiator valueInitiator;
-        private final Map<Integer, Collection<Object>> entriesMap;
+        private final Map<Long, Collection<Object>> entriesMap;
         private JsonDeserializer<?> defaultDeserializer;
         private DeserializationContext context;
 
@@ -68,7 +68,7 @@ class RepeatedCollectionModule extends SimpleModule {
         }
 
         @SuppressWarnings("unchecked")
-        private Collection<Object> getEntries(int id) throws IOException {
+        private Collection<Object> getEntries(long id) throws IOException {
             var entries = entriesMap.get(id);
             if (entries != null) {
                 return entries;
