@@ -86,7 +86,7 @@ public class GenerateSchemaCommand implements Callable<Integer>, LogProvider {
     private void generateSchema(ProtobufDocument ast, Factory factory) {
         log.info("Generating java classes from AST...");
         var generator = new ProtobufSchemaCreator(ast, output);
-        generator.generate(factory, accessors);
+        generator.generate(factory, accessors);;
         log.info("Generated java classes successfully at %s".formatted(output));
     }
 }

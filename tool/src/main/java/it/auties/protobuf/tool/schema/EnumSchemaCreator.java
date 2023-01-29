@@ -3,40 +3,69 @@ package it.auties.protobuf.tool.schema;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.tool.util.AstElements;
-import spoon.reflect.code.*;
-import spoon.reflect.declaration.*;
+import it.auties.protobuf.tool.util.AstUtils;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Scanner;
+import java.util.Set;
+import spoon.reflect.code.BinaryOperatorKind;
+import spoon.reflect.code.CtFieldRead;
+import spoon.reflect.code.CtReturn;
+import spoon.reflect.declaration.CtEnum;
+import spoon.reflect.declaration.CtEnumValue;
+import spoon.reflect.declaration.CtField;
+import spoon.reflect.declaration.CtMethod;
+import spoon.reflect.declaration.CtType;
+import spoon.reflect.declaration.ModifierKind;
 import spoon.reflect.factory.Factory;
 import spoon.reflect.reference.CtFieldReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
 public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStatement> {
-    public EnumSchemaCreator(CtEnum<?> ctType, ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
-        super(ctType, protoStatement, accessors, factory);
-    }
-
     public EnumSchemaCreator(ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
         super(protoStatement, accessors, factory);
     }
 
-    public EnumSchemaCreator(CtEnum<?> ctType, CtType<?> parent, ProtobufEnumStatement protoStatement, boolean accessors, Factory factory) {
-        super(ctType, parent, protoStatement, accessors, factory);
+    public EnumSchemaCreator(CtEnum<?> ctType, ProtobufEnumStatement protoStatement, boolean accessors) {
+        super(ctType, protoStatement, accessors);
+    }
+
+    public EnumSchemaCreator(CtEnum<?> ctType, CtType<?> parent, ProtobufEnumStatement protoStatement, boolean accessors) {
+        super(ctType, parent, protoStatement, accessors);
     }
 
     @Override
-    public CtEnum<?> createSchema() {
+    public CtEnum<?> generate() {
         this.ctType = createEnumClass();
         createEnum();
         return ctType;
     }
 
     @Override
-    public CtEnum<?> update() {
-        this.ctType = Objects.requireNonNullElseGet(ctType, this::createEnumClass);
+    public CtEnum<?> update(boolean force) {
+        if(ctType == null){
+            if(!force){
+                log.info("Schema %s doesn't have a model".formatted(protoStatement.name()));
+                log.info("Type its name if it already exists, ignored if you want to skip it or click enter to generate a new one");
+                log.info("Suggested names: %s".formatted(
+                    AstUtils.getSuggestedNames(factory.getModel(), protoStatement.name(), true)));
+                var scanner = new Scanner(System.in);
+                var newName = scanner.nextLine();
+                if(newName.equals("ignored")){
+                    return ctType;
+                }
+
+                if (!newName.isBlank()) {
+                    this.ctType = (CtEnum<?>) AstUtils.getProtobufClass(factory.getModel(), newName, true);
+                    this.updating = ctType != null;
+                    return update(false);
+                }
+            }
+
+            this.ctType = createEnumClass();
+        }
+
         createEnum();
         return ctType;
     }
@@ -236,6 +265,11 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         enumClass.addSuperInterface(factory.Type().createReference(AstElements.PROTOBUF_MESSAGE));
         var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
         name.addValue("value", protoStatement.name());
+        if(parent != null) {
+            enumClass.setParent(parent);
+            parent.addNestedType(enumClass);
+        }
+
         return enumClass;
     }
 
@@ -249,33 +283,13 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
 
     private CtEnumValue<?> getEnumValue(ProtobufFieldStatement fieldStatement){
         return ctType.filterChildren(new TypeFilter<>(CtEnumValue.class))
-                .filterChildren((CtEnumValue<?> entry) -> hasFieldEnumIndex(fieldStatement, entry))
+                .filterChildren((CtEnumValue<?> entry) -> AstUtils.hasFieldEnumIndex(fieldStatement, entry))
                 .first(CtEnumValue.class);
     }
 
-    // Assume to be first in position
-    private boolean hasFieldEnumIndex(ProtobufFieldStatement fieldStatement, CtField<?> element) {
-        var expression = element.getDefaultExpression();
-        if (!(expression instanceof CtConstructorCall<?> constructor)) {
-            return false;
-        }
-
-        var arguments = constructor.getArguments();
-        if (arguments.isEmpty()) {
-            return false;
-        }
-
-        var assumedIndex = arguments.get(0);
-        if (!(assumedIndex instanceof CtLiteral<?> literal)) {
-            return false;
-        }
-
-        var value = literal.getValue();
-        return value instanceof Number number
-                && fieldStatement.index() == number.intValue();
-    }
-
     private CtEnumValue<Object> createEnumValue(ProtobufFieldStatement entry, Factory factory) {
+        log.info("Creating enum value(%s) inside %s"
+            .formatted(entry, entry.parent().name()));
         var enumInitializer = factory.createConstructorCall();
         enumInitializer.addArgument(factory.createLiteral(entry.index()));
         var enumValue = factory.createEnumValue();

@@ -2,8 +2,10 @@ package it.auties.protobuf.parser.statement;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends ProtobufStatement
         permits ProtobufDocument, ProtobufReservable, ProtobufOneOfStatement {
@@ -42,5 +44,21 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 .map(entry -> (ProtobufObject<?>) entry)
                 .flatMap(entry -> entry.getStatement(name, clazz).stream())
                 .findFirst();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V extends ProtobufStatement> List<V> getStatementsRecursive(Class<V> clazz){
+        return statements().stream()
+            .mapMulti((T entry, Consumer<V> consumer) -> {
+                if(clazz.isAssignableFrom(entry.getClass())){
+                    consumer.accept((V) entry);
+                }
+
+                if(entry instanceof ProtobufObject<?> object){
+                    object.getStatementsRecursive(clazz)
+                        .forEach(consumer);
+                }
+            })
+            .toList();
     }
 }

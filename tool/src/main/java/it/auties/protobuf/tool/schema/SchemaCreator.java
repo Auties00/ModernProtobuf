@@ -2,6 +2,7 @@ package it.auties.protobuf.tool.schema;
 
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.util.LogProvider;
+import java.util.Objects;
 import lombok.NonNull;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.factory.Factory;
@@ -21,12 +22,17 @@ public abstract class SchemaCreator<T extends CtType<?>, V extends ProtobufObjec
 
     protected boolean updating;
 
-    protected SchemaCreator(T ctType, V protoStatement, boolean accessors, Factory factory) {
-        this(ctType, null, protoStatement, accessors, factory);
+    protected SchemaCreator(V protoStatement, boolean accessors, Factory factory) {
+        this(null, null, protoStatement, accessors, factory);
     }
 
-    protected SchemaCreator(V protoStatement, boolean accessors, Factory factory) {
-        this(null, protoStatement, accessors, factory);
+
+    protected SchemaCreator(T ctType, V protoStatement, boolean accessors) {
+        this(ctType, null, protoStatement, accessors);
+    }
+
+    protected SchemaCreator(T ctType, CtType<?> parent, V protoStatement, boolean accessors) {
+        this(ctType, parent, protoStatement, accessors, Objects.requireNonNullElse(ctType, parent).getFactory());
     }
 
     protected SchemaCreator(T ctType, CtType<?> parent, V protoStatement, boolean accessors, Factory factory) {
@@ -38,6 +44,6 @@ public abstract class SchemaCreator<T extends CtType<?>, V extends ProtobufObjec
         this.updating = ctType != null;
     }
 
-    public abstract T createSchema();
-    public abstract T update();
+    public abstract T generate();
+    public abstract T update(boolean force);
 }

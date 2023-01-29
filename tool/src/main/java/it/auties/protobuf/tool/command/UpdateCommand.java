@@ -1,21 +1,15 @@
 package it.auties.protobuf.tool.command;
 
+import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
+
 import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.parser.statement.ProtobufDocument;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
 import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
+import it.auties.protobuf.tool.util.AstWriter;
 import it.auties.protobuf.tool.util.LogProvider;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-import spoon.reflect.CtModel;
-import spoon.reflect.declaration.CtAnnotation;
-import spoon.reflect.declaration.CtClass;
-import spoon.reflect.factory.Factory;
-import spoon.reflect.reference.CtTypeReference;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,8 +18,14 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
-
-import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import spoon.reflect.CtModel;
+import spoon.reflect.declaration.CtAnnotation;
+import spoon.reflect.declaration.CtClass;
+import spoon.reflect.factory.Factory;
+import spoon.reflect.reference.CtTypeReference;
 
 @Command(
         name = "update",
@@ -94,31 +94,24 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         var creator = new ProtobufSchemaCreator(document);
         var matched = AstUtils.getProtobufClass(model, name, enumType);
         if (matched != null) {
-            var ctClass = getTopClass(matched);
-            var ctClassPath = ctClass.getQualifiedName()
-                    .replaceAll("\\.", "/");
-            var matchingFile = output.toPath()
-                    .resolve("%s.java".formatted(ctClassPath));
-            if (Files.notExists(matchingFile)) {
-                log.warn("Skipping %s because file %s doesn't exist"
-                        .formatted(name, matchingFile));
-                return;
-            }
-
             if(annotate) {
                 var annotation = createMessageAnnotation(matched);
                 annotation.setElementValues(Map.of("value", statement.name()));
             }
 
-            creator.update(matched, statement, matchingFile, accessors, annotate);
+            creator.update(matched, statement, accessors, output.toPath());
             return;
         }
 
-        log.info("Schema %s doesn't have a model. Type its name if it already exists, ".formatted(name));
+        log.info("Schema %s doesn't have a model".formatted(name));
+        log.info("Type its name if it already exists, ignored if you want to skip it or click enter to generate a new one");
         log.info("Suggested names: %s".formatted(AstUtils.getSuggestedNames(model, name, enumType)));
-        log.info("If you want to generate a new model click enter");
         var scanner = new Scanner(System.in);
         var newName = scanner.nextLine();
+        if(newName.equals("ignored")){
+            return;
+        }
+
         if (!newName.isBlank()) {
             update(statement, newName, enumType, true);
             return;
@@ -130,14 +123,10 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         createNewSource(statement, model.getUnnamedModule().getFactory(), matchingFile);
     }
 
-    private CtClass<?> getTopClass(CtClass<?> ctClass){
-        var parent = ctClass.getParent();
-        return parent instanceof CtClass<?> newClass ? getTopClass(newClass) : ctClass;
-    }
-
     private void createSpoonModel() {
         log.info("Creating AST model from existing Java classes...");
         this.model = createModel();
+        AstWriter.cacheTypes(model);
         log.info("Created AST model from existing Java classes");
     }
 

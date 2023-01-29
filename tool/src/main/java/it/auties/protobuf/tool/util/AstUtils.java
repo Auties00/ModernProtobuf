@@ -1,32 +1,34 @@
 package it.auties.protobuf.tool.util;
 
+import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
+import static it.auties.protobuf.parser.statement.ProtobufStatementType.MESSAGE;
+
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufName;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.type.ProtobufMessageType;
-import lombok.experimental.UtilityClass;
-import spoon.Launcher;
-import spoon.reflect.CtModel;
-import spoon.reflect.declaration.CtClass;
-import spoon.reflect.declaration.CtType;
-import spoon.reflect.factory.Factory;
-import spoon.reflect.reference.CtTypeReference;
-import spoon.reflect.visitor.filter.TypeFilter;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static it.auties.protobuf.parser.statement.ProtobufStatementType.ENUM;
-import static it.auties.protobuf.parser.statement.ProtobufStatementType.MESSAGE;
+import lombok.experimental.UtilityClass;
+import spoon.Launcher;
+import spoon.reflect.CtModel;
+import spoon.reflect.code.CtConstructorCall;
+import spoon.reflect.code.CtLiteral;
+import spoon.reflect.declaration.CtClass;
+import spoon.reflect.declaration.CtField;
+import spoon.reflect.declaration.CtType;
+import spoon.reflect.factory.Factory;
+import spoon.reflect.reference.CtTypeReference;
+import spoon.reflect.visitor.filter.TypeFilter;
 
 @UtilityClass
 public class AstUtils implements LogProvider {
     public Launcher createLauncher() {
         var launcher = new Launcher();
-        launcher.getEnvironment().setComplianceLevel(17);
+        launcher.getEnvironment().setComplianceLevel(18);
         launcher.getEnvironment().setPreviewFeaturesEnabled(true);
         launcher.addInputResource("C:\\Users\\alaut\\ProtocCompiler\\base\\src\\main\\java");
         launcher.getEnvironment().setAutoImports(true);
@@ -34,64 +36,47 @@ public class AstUtils implements LogProvider {
     }
 
     public CtClass<?> getProtobufClass(CtModel model, String name, boolean enumType) {
-        var result = model.getElements(new TypeFilter<>(CtClass.class))
-                .stream()
-                .filter(element -> enumType ? element.isEnum() : isProtobufMessage(element))
-                .map(element -> getCtClassQueryResult(name, element))
-                .filter(QueryResult::match)
-                .toList();
-        return switch (result.size()){
-            case 0 -> null;
-            case 1 -> result.get(0).ctClass();
-            default -> result.stream()
-                    .filter(QueryResult::annotation)
-                    .findFirst()
-                    .orElseGet(() -> result.get(0))
-                    .ctClass();
-        };
+        return model.getElements(new TypeFilter<>(CtClass.class))
+            .stream()
+            .filter(element -> isProtobufMessage(element, enumType))
+            .filter(element -> {
+                var annotation = element.getAnnotation(ProtobufName.class);
+                return Objects.equals(element.getSimpleName(), name)
+                    || (annotation != null && Objects.equals(annotation.value(), name));
+            })
+            .findFirst()
+            .orElse(null);
     }
 
-    private QueryResult getCtClassQueryResult(String name, CtClass<?> element) {
-        try {
-            var annotation = element.getAnnotation(ProtobufName.class);
-            if(annotation != null && annotation.value() != null ){
-                return new QueryResult(element, annotation.value().equals(name), true);
-            }
-        }catch (Throwable throwable){
-            // Ignored
-        }
-
-        return new QueryResult(element, element.getSimpleName().equals(name), false);
-    }
-
-    record QueryResult(CtClass<?> ctClass, boolean match, boolean annotation){
-
-    }
-
-    public boolean isProtobufMessage(CtType<?> element){
+    public boolean isProtobufMessage(CtType<?> element, boolean isEnum){
         if(element.isEnum()){
             return true;
         }
 
+        var entries = getAllSuperClasses(element);
+        return element.isEnum() == isEnum
+            && entries.stream().anyMatch(entry -> entry.getSimpleName().equals(ProtobufMessage.class.getSimpleName()));
+    }
+
+    public Set<CtTypeReference<?>> getAllSuperClasses(CtType<?> element){
         var entries = new HashSet<CtTypeReference<?>>();
+        if(element == null){
+            return entries;
+        }
+
+        entries.add(element.getReference());
         if(element.getSuperclass() != null) {
             entries.add(element.getSuperclass());
+            entries.addAll(getAllSuperClasses(element.getSuperclass().getTypeDeclaration()));
         }
 
         entries.addAll(element.getSuperInterfaces());
-        return hasProtobufMessage(entries) || hasProtobufMessageDeep(entries);
-    }
-
-    public boolean hasProtobufMessageDeep(Set<CtTypeReference<?>> entries) {
-        return entries.stream()
-                .map(CtTypeReference::getTypeDeclaration)
-                .filter(Objects::nonNull)
-                .anyMatch(AstUtils::isProtobufMessage);
-    }
-
-    public boolean hasProtobufMessage(Set<CtTypeReference<?>> entries) {
-        return entries.stream()
-                .anyMatch(entry -> entry.getSimpleName().equals(ProtobufMessage.class.getSimpleName()));
+        element.getSuperInterfaces()
+            .stream()
+            .map(CtTypeReference::getTypeDeclaration)
+            .map(AstUtils::getAllSuperClasses)
+            .forEach(entries::addAll);
+        return entries;
     }
 
     public CtTypeReference<?> createReference(ProtobufFieldStatement statement, boolean generic, Factory factory){
@@ -113,10 +98,7 @@ public class AstUtils implements LogProvider {
                     yield knownType.getReference();
                 }
 
-                var annotatedType = factory.getModel()
-                        .filterChildren(new TypeFilter<>(CtClass.class))
-                        .filterChildren((CtClass<?> entry) -> getCtClassQueryResult(reference.name(), entry).match())
-                        .first(CtClass.class);
+                var annotatedType = getProtobufClass(factory.getModel(), reference.name(), false);
                 if(annotatedType != null){
                     yield annotatedType.getReference();
                 }
@@ -135,20 +117,20 @@ public class AstUtils implements LogProvider {
 
     public Object getSuggestedNames(CtModel model, String originalName, boolean enumType) {
         var elements = model.getElements(new TypeFilter<>(CtClass.class))
-                .stream()
-                .filter(ctType -> enumType ? ctType.isEnum() : isProtobufMessage(ctType))
-                .toList();
+            .stream()
+            .filter(ctType -> isProtobufMessage(ctType, enumType))
+            .toList();
         return getSuggestedNames(originalName, elements);
     }
 
     @SuppressWarnings("rawtypes")
     private String getSuggestedNames(String originalName, List<CtClass> result) {
         return result.stream()
-                .map(entry -> getClassName(entry, originalName))
-                .filter(SimilarString::isSuggestion)
-                .sorted()
-                .map(SimilarString::toString)
-                .collect(Collectors.joining(", "));
+            .map(entry -> getClassName(entry, originalName))
+            .filter(SimilarString::isSuggestion)
+            .sorted()
+            .map(SimilarString::toString)
+            .collect(Collectors.joining(", "));
     }
 
     private SimilarString getClassName(CtClass<?> ctClass, String comparable) {
@@ -176,12 +158,33 @@ public class AstUtils implements LogProvider {
         @Override
         public String toString() {
             return oldName == null ? name
-                    : "%s(java name: %s)".formatted(name, oldName);
+                : "%s(java name: %s)".formatted(name, oldName);
         }
 
         @Override
         public int compareTo(SimilarString o) {
             return Double.compare(o.similarity(), similarity());
         }
+    }
+
+    public boolean hasFieldEnumIndex(ProtobufFieldStatement fieldStatement, CtField<?> element) {
+        var expression = element.getDefaultExpression();
+        if (!(expression instanceof CtConstructorCall<?> constructor)) {
+            return false;
+        }
+
+        var arguments = constructor.getArguments();
+        if (arguments.isEmpty()) {
+            return false;
+        }
+
+        var assumedIndex = arguments.get(0);
+        if (!(assumedIndex instanceof CtLiteral<?> literal)) {
+            return false;
+        }
+
+        var value = literal.getValue();
+        return value instanceof Number number
+            && fieldStatement.index() == number.intValue();
     }
 }
