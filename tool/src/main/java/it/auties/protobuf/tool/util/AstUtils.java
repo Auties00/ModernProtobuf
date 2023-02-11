@@ -9,7 +9,9 @@ import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.type.ProtobufMessageType;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
@@ -186,5 +188,27 @@ public class AstUtils implements LogProvider {
         var value = literal.getValue();
         return value instanceof Number number
             && fieldStatement.index() == number.intValue();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void addProtobufName(CtType<?> ctClass, String name){
+        CtTypeReference reference = ctClass.getFactory()
+            .createReference(AstElements.PROTOBUF_MESSAGE_NAME);
+        var annotation = ctClass.getAnnotation(reference);
+        if (annotation != null) {
+            annotation.setElementValues(Map.of("value", name));
+            return;
+        }
+
+        var newAnnotation = ctClass.getFactory().createAnnotation(reference);
+        ctClass.addAnnotation(newAnnotation);
+        newAnnotation.setElementValues(Map.of("value", name));
+    }
+
+    public String getProtobufName(CtType<?> type){
+        return Optional.of(type)
+            .map(entry -> entry.getAnnotation(ProtobufName.class))
+            .map(ProtobufName::value)
+            .orElseGet(type::getSimpleName);
     }
 }

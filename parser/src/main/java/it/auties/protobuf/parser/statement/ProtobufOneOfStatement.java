@@ -13,7 +13,6 @@ public final class ProtobufOneOfStatement extends ProtobufObject<ProtobufFieldSt
         return "%sType".formatted(className);
     }
 
-
     public String methodName() {
         return "%sType".formatted(name());
     }

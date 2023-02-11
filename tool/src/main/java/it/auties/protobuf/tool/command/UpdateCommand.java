@@ -6,7 +6,6 @@ import it.auties.protobuf.parser.ProtobufParser;
 import it.auties.protobuf.parser.statement.ProtobufDocument;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.AstElements;
 import it.auties.protobuf.tool.util.AstUtils;
 import it.auties.protobuf.tool.util.AstWriter;
 import it.auties.protobuf.tool.util.LogProvider;
@@ -15,17 +14,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import spoon.reflect.CtModel;
-import spoon.reflect.declaration.CtAnnotation;
-import spoon.reflect.declaration.CtClass;
 import spoon.reflect.factory.Factory;
-import spoon.reflect.reference.CtTypeReference;
 
 @Command(
         name = "update",
@@ -95,8 +90,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         var matched = AstUtils.getProtobufClass(model, name, enumType);
         if (matched != null) {
             if(annotate) {
-                var annotation = createMessageAnnotation(matched);
-                annotation.setElementValues(Map.of("value", statement.name()));
+                AstUtils.addProtobufName(matched, statement.name());
             }
 
             creator.update(matched, statement, accessors, output.toPath());
@@ -153,20 +147,6 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         }catch (IOException exception){
             throw new UncheckedIOException("Cannot create model", exception);
         }
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private CtAnnotation createMessageAnnotation(CtClass<?> newJavaClass) {
-        CtTypeReference reference = newJavaClass.getFactory()
-                .createReference(AstElements.PROTOBUF_MESSAGE_NAME);
-        var annotation = newJavaClass.getAnnotation(reference);
-        if (annotation != null) {
-            return annotation;
-        }
-
-        var newAnnotation = newJavaClass.getFactory().createAnnotation(reference);
-        newJavaClass.addAnnotation(newAnnotation);
-        return newAnnotation;
     }
 
     private void createNewSource(ProtobufObject<?> statement, Factory factory, Path path) {

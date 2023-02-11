@@ -263,8 +263,7 @@ public class EnumSchemaCreator extends SchemaCreator<CtEnum<?>, ProtobufEnumStat
         var enumClass = factory.createEnum(protoStatement.staticallyQualifiedName());
         enumClass.setModifiers(Set.of(ModifierKind.PUBLIC));
         enumClass.addSuperInterface(factory.Type().createReference(AstElements.PROTOBUF_MESSAGE));
-        var name = factory.createAnnotation(factory.createReference(AstElements.PROTOBUF_MESSAGE_NAME));
-        name.addValue("value", protoStatement.name());
+        AstUtils.addProtobufName(enumClass, protoStatement.name());
         if(parent != null) {
             enumClass.setParent(parent);
             parent.addNestedType(enumClass);
