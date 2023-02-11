@@ -96,14 +96,15 @@ class ProtobufField {
     }
 
     private static boolean requiresConversion(Field field, ProtobufProperty property) {
-        if(property.type() != ProtobufType.MESSAGE){
-            return !property.type().wrappedType().isAssignableFrom(field.getType())
-                    && !property.type().primitiveType().isAssignableFrom(field.getType());
+        if(property.repeated()){
+            return false;
         }
 
-        return property.implementation() != ProtobufMessage.class
-                && property.implementation() != field.getType()
-                && !property.repeated();
+        if(property.type() != ProtobufType.MESSAGE){
+            return !property.type().isAssignableFrom(field.getType());
+        }
+
+        return property.implementation() != ProtobufMessage.class && property.implementation() != field.getType();
     }
     
     @SuppressWarnings("unchecked")
@@ -184,5 +185,23 @@ class ProtobufField {
                 return repeated;
             }
         };
+    }
+
+    @Override
+    public String toString() {
+        return "ProtobufField{" +
+            "value=" + value +
+            ", messageType=" + messageType +
+            ", metadata=" +
+            "{index=" + metadata.index() +
+            ", implementation=" + (metadata.implementation() == null ? null : metadata.implementation().getName()) +
+            ", name=" + metadata.name() +
+            ", required=" + metadata.required() +
+            ", ignore=" + metadata.ignore() +
+            ", packed=" + metadata.packed() +
+            ", repeated=" + metadata.repeated() +
+            "}" +
+            ", convert=" + convert +
+            '}';
     }
 }

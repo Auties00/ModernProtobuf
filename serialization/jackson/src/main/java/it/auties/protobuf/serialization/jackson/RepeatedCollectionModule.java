@@ -16,12 +16,10 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 class RepeatedCollectionModule extends SimpleModule {
     protected RepeatedCollectionModule(){
-        setDeserializerModifier(new RepeatedCollectionDeserializerModifier());
+        setDeserializerModifier(new CollectionModifier());
     }
 
     @Override
@@ -29,24 +27,21 @@ class RepeatedCollectionModule extends SimpleModule {
         return getClass().getSimpleName();
     }
 
-    private static class RepeatedCollectionDeserializerModifier extends BeanDeserializerModifier {
+    private static class CollectionModifier extends BeanDeserializerModifier {
         @Override
         public JsonDeserializer<?> modifyCollectionDeserializer(DeserializationConfig config, CollectionType type, BeanDescription beanDesc, JsonDeserializer<?> defaultDeserializer) {
-            return new RepeatedCollectionDeserializer(config, type, defaultDeserializer);
+            return new CollectionDeserializer(config, type, defaultDeserializer);
         }
     }
 
-    protected static class RepeatedCollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
+    protected static class CollectionDeserializer extends StdDeserializer<Collection<Object>> implements ContextualDeserializer {
         private final ValueInstantiator valueInitiator;
-        private final Map<Long, Collection<Object>> entriesMap;
         private JsonDeserializer<?> defaultDeserializer;
-        private DeserializationContext context;
 
-        public RepeatedCollectionDeserializer(DeserializationConfig config, CollectionType type, JsonDeserializer<?> defaultDeserializer) {
+        public CollectionDeserializer(DeserializationConfig config, CollectionType type, JsonDeserializer<?> defaultDeserializer) {
             super(type);
             this.defaultDeserializer = defaultDeserializer;
             this.valueInitiator = JDKValueInstantiators.findStdValueInstantiator(config, type.getRawClass());
-            this.entriesMap = new ConcurrentHashMap<>();
         }
 
         @Override
@@ -56,27 +51,26 @@ class RepeatedCollectionModule extends SimpleModule {
                 throw new IllegalArgumentException("Cannot use non-protobuf parser to deserialize a repeated collection");
             }
 
-            if (protobufParser.lastField() == null || !protobufParser.lastField().repeated()) {
+            var field = protobufParser.lastField();
+            if (field == null || !field.repeated()) {
                 return (Collection<Object>) defaultDeserializer.deserialize(parser, context);
             }
 
-            this.context = context;
-            var entries = getEntries(protobufParser.id());
-            entries.add(protobufParser.getCurrentValue());
-            entriesMap.put(protobufParser.id(), entries);
-            return entries;
+            var attribute = getCollection(context, field);
+            attribute.add(protobufParser.getCurrentValue());
+            return attribute;
         }
 
         @SuppressWarnings("unchecked")
-        private Collection<Object> getEntries(long id) throws IOException {
-            var entries = entriesMap.get(id);
-            if (entries != null) {
-                return entries;
+        private Collection<Object> getCollection(DeserializationContext context, ProtobufField field) throws IOException {
+            var attribute = (Collection<Object>) context.getAttribute(field.name());
+            if (attribute != null) {
+                return attribute;
             }
 
-            var newEntries =  (Collection<Object>) valueInitiator.createUsingDefault(context);
-            entriesMap.put(id, newEntries);
-            return newEntries;
+            var collection = (Collection<Object>) valueInitiator.createUsingDefault(context);
+            context.setAttribute(field.name(), collection);
+            return collection;
         }
 
         @Override

@@ -45,35 +45,7 @@ public enum ProtobufType {
         return this == MESSAGE;
     }
 
-    public boolean isInt() {
-        return this == INT32
-            || this == SINT32
-            || this == UINT32
-            || this == FIXED32
-            || this == SFIXED32;
-    }
-
-    public boolean isLong() {
-        return this == INT64
-            || this == SINT64
-            || this == UINT64
-            || this == FIXED64
-            || this == SFIXED64;
-    }
-
-    public boolean isFloat(){
-        return this == FLOAT;
-    }
-
-    public boolean isDouble(){
-        return this == DOUBLE;
-    }
-
-    public boolean isFloatingPoint(){
-        return isFloat() || isDouble();
-    }
-
-    public boolean isBool() {
-        return this == BOOL;
+    public boolean isAssignableFrom(Class<?> clazz){
+        return primitiveType().isAssignableFrom(clazz) || wrappedType.isAssignableFrom(clazz);
     }
 }

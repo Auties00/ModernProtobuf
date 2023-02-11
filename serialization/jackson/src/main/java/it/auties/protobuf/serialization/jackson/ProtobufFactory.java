@@ -33,11 +33,6 @@ class ProtobufFactory extends JsonFactory {
     }
 
     @Override
-    public boolean requiresPropertyOrdering() {
-        return false;
-    }
-
-    @Override
     public boolean canHandleBinaryNatively() {
         return true;
     }
