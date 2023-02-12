@@ -2,89 +2,37 @@ package it.auties.protobuf;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
-import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
-import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.jackson.ProtobufSchema;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
 
-@State(Scope.Benchmark)
-@Fork(1)
-@Warmup(iterations = 5)
-@Measurement(iterations = 5)
-public class PerformanceBenchmark implements TestProvider {
+public class PerformanceBenchmarkTest implements TestProvider {
   private static final int ITERATIONS = 1_000;
   private static final byte[] SERIALIZED_INPUT;
   private static final ObjectReader MODERN_READER;
-  private static final ObjectReader JACKSON_READER;
 
   static {
     try {
-      SERIALIZED_INPUT = ScalarMessage.newBuilder()
-          .setString("Hello, this is an automated test!")
-          .setFloat(Float.MAX_VALUE)
-          .build()
-          .toByteArray();
+      var modernScalarMessage = ModernScalarMessage.builder()
+          .string("Hello, this is an automated test!")
+          .build();
+      SERIALIZED_INPUT = JACKSON.writeValueAsBytes(modernScalarMessage);
       MODERN_READER = JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
-      var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
-      Objects.requireNonNull(protoSource, "Missing scalar proto");
-      var protoSchema = Files.readString(Path.of(protoSource.toURI()));
-      var schema = ProtobufSchemaLoader.std.parse(protoSchema);
-      JACKSON_READER = new ProtobufMapper()
-          .readerFor(JacksonScalarMessage.class)
-          .with(schema);
     } catch (Throwable throwable) {
       throw new RuntimeException("Cannot initialize benchmark", throwable);
     }
   }
 
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void modernProtobuf() throws IOException {
-    for (var i = 0; i < ITERATIONS; ++i) {
-      MODERN_READER.readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
-    }
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void jacksonProtobuf() throws IOException {
-    for (var i = 0; i < ITERATIONS; ++i) {
-      JACKSON_READER.readValue(SERIALIZED_INPUT);
-    }
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void googleProtobuf() throws InvalidProtocolBufferException {
-    for (var i = 0; i < ITERATIONS; ++i) {
-      ScalarMessage.parseFrom(SERIALIZED_INPUT);
-    }
+  public static void main(String[] args) throws IOException {
+    MODERN_READER.readValue(SERIALIZED_INPUT, ModernScalarMessage.class);
   }
 
   @SuppressWarnings("unused")
@@ -365,7 +313,7 @@ public class PerformanceBenchmark implements TestProvider {
     }
 
     public static ScalarMessage parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
+        throws IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
@@ -373,26 +321,26 @@ public class PerformanceBenchmark implements TestProvider {
     public static ScalarMessage parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
+        throws IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
     public static ScalarMessage parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
+        throws IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input);
     }
 
     public static ScalarMessage parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
+        throws IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
     public static ScalarMessage parseFrom(
         com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
+        throws IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
@@ -400,7 +348,7 @@ public class PerformanceBenchmark implements TestProvider {
     public static ScalarMessage parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
+        throws IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input, extensionRegistry);
     }

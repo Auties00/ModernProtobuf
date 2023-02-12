@@ -141,40 +141,39 @@ class ProtobufParser extends ParserMinimalBase {
         return JsonToken.VALUE_NUMBER_INT;
     }
 
+    @SuppressWarnings("RedundantLabeledSwitchRuleCodeBlock")
     private JsonToken readValueAndToken() {
         return switch (lastType) {
             case WIRE_TYPE_VAR_INT -> {
-                saveNumber(input.readInt64());
+                var value = input.readInt64();
+                switch (lastField.type()){
+                    case INT32, SINT32, UINT32, FIXED32, SFIXED32, FLOAT, BOOL, MESSAGE -> this.lastValueInt = (int) value;
+                    case INT64, SINT64, UINT64, FIXED64, SFIXED64, DOUBLE -> this.lastValueLong = value;
+                }
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
             case WIRE_TYPE_FIXED64 -> {
-                saveNumber(input.readFixed64());
+                this.lastValueLong = input.readFixed64();
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
             case WIRE_TYPE_FIXED32 -> {
-                saveNumber(input.readFixed32());
+                this.lastValueInt = input.readFixed32();
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }
-            case WIRE_TYPE_LENGTH_DELIMITED -> tokenOrNull(readDelimitedWithConversion());
+            case WIRE_TYPE_LENGTH_DELIMITED -> {
+                yield tokenOrNull(readDelimitedWithConversion());
+            }
             case WIRE_TYPE_EMBEDDED_MESSAGE -> {
                 readEmbeddedMessage(input.readBytes());
                 yield tokenOrNull(JsonToken.VALUE_EMBEDDED_OBJECT);
             }
-            case WIRE_TYPE_END_OBJECT -> tokenOrNull(JsonToken.END_OBJECT);
+            case WIRE_TYPE_END_OBJECT -> {
+                yield tokenOrNull(JsonToken.END_OBJECT);
+            }
             default ->
                     throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: invalid wire type %s"
                             .formatted(lastFieldIndex(), type.getName(), lastType));
         };
-    }
-
-    private void saveNumber(long value){
-        switch (lastField.type()){
-            case INT32, SINT32, UINT32, FIXED32, SFIXED32, FLOAT, BOOL, MESSAGE -> this.lastValueInt = (int) value;
-            case INT64, SINT64, UINT64, FIXED64, SFIXED64, DOUBLE -> this.lastValueLong = value;
-            default ->
-                throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: invalid number type: %s"
-                    .formatted(lastFieldIndex(), type.getName(), lastType));
-        }
     }
 
     private JsonToken tokenOrNull(JsonToken token) {
@@ -305,8 +304,8 @@ class ProtobufParser extends ParserMinimalBase {
     public Object getCurrentValue() {
         return switch (lastField.type()){
             case MESSAGE, BYTES, STRING -> lastValueObject;
-            case FLOAT -> Float.intBitsToFloat(lastValueInt);
-            case DOUBLE -> Double.longBitsToDouble(lastValueLong);
+            case FLOAT -> getFloatValue();
+            case DOUBLE -> getDoubleValue();
             case BOOL, INT32, FIXED32, UINT32, SFIXED32, SINT32 -> lastValueInt;
             case INT64, SINT64, FIXED64, UINT64, SFIXED64 -> lastValueLong;
         };

@@ -6,6 +6,5 @@ open module it.auties.protobuf.serializer.jackson {
     requires com.fasterxml.jackson.datatype.jdk8;
     requires com.fasterxml.jackson.databind;
     requires jdk.unsupported;
-
     exports it.auties.protobuf.serialization.jackson;
 }
