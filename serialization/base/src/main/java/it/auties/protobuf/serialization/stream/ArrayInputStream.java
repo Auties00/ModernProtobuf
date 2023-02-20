@@ -58,7 +58,7 @@ public class ArrayInputStream {
             return x;
         }
 
-        return readVarInt64Slow();
+        return (int) readVarInt64Slow();
     }
 
     public long readInt64() {
@@ -123,10 +123,10 @@ public class ArrayInputStream {
         return readVarInt64Slow();
     }
 
-    private int readVarInt64Slow() {
-        var result = 0;
+    private long readVarInt64Slow() {
+        var result = 0L;
         for (int shift = 0; shift < 64; shift += 7) {
-            var b = readByte();
+            byte b = readByte();
             result |= (long) (b & 0x7F) << shift;
             if ((b & 0x80) == 0) {
                 return result;
@@ -137,23 +137,21 @@ public class ArrayInputStream {
     }
 
     public int readFixed32() {
-        this.pos += 4;
-        return buffer[pos - 4] & 255
-            | (buffer[pos - 3] & 255) << 8
-            | (buffer[pos - 2] & 255) << 16
-            | (buffer[pos - 1] & 255) << 24;
+        var tempPos = this.pos;
+        byte[] buffer = this.buffer;
+        this.pos = tempPos + 4;
+        return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
     }
 
     public long readFixed64() {
-        this.pos += 8;
-        return buffer[pos - 8] & 255L
-            | (buffer[pos - 7] & 255L) << 8
-            | (buffer[pos - 6] & 255L) << 16
-            | (buffer[pos - 5] & 255L) << 24
-            | (buffer[pos - 4] & 255L) << 32
-            | (buffer[pos - 3] & 255L) << 40
-            | (buffer[pos - 2] & 255L) << 48
-            | (buffer[pos - 1] & 255L) << 56;
+        int tempPos = this.pos;
+        if (this.limit - tempPos < 8) {
+            throw ProtobufDeserializationException.truncatedMessage();
+        }
+
+        byte[] buffer = this.buffer;
+        this.pos = tempPos + 8;
+        return (long) buffer[tempPos] & 255L | ((long) buffer[tempPos + 1] & 255L) << 8 | ((long) buffer[tempPos + 2] & 255L) << 16 | ((long) buffer[tempPos + 3] & 255L) << 24 | ((long) buffer[tempPos + 4] & 255L) << 32 | ((long) buffer[tempPos + 5] & 255L) << 40 | ((long) buffer[tempPos + 6] & 255L) << 48 | ((long) buffer[tempPos + 7] & 255L) << 56;
     }
 
     public byte readByte() {
@@ -162,8 +160,18 @@ public class ArrayInputStream {
 
     public byte[] readBytes() {
         var size = this.readInt32();
-        this.pos += size;
-        return Arrays.copyOfRange(buffer, pos - size, pos);
+        if (size > 0 && size <= this.limit - this.pos) {
+            this.pos += size;
+            return Arrays.copyOfRange(buffer, pos - size, pos);
+        }
+
+        return size == 0 ? new byte[0] : this.readBytes(size);
+    }
+
+    private byte[] readBytes(int length) {
+        var tempPos = pos;
+        pos += length;
+        return Arrays.copyOfRange(buffer, tempPos, pos);
     }
 
     public boolean isAtEnd() {

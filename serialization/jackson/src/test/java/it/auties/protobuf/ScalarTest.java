@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
 import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.jackson.ProtobufSchema;
 import lombok.*;
 import lombok.experimental.Accessors;

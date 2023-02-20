@@ -1,14 +1,15 @@
-/*
-package performance;
+package it.auties.protobuf;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectReader;
-import it.auties.protobuf.TestProvider;
+import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
+import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
-import it.auties.protobuf.serialization.jackson.ProtobufSchema;
-import it.auties.protobuf.serialization.stream.ArrayInputStream;
+import it.auties.protobuf.serialization.performance.ProtobufDecoder;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,19 +19,57 @@ import lombok.extern.jackson.Jacksonized;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 1)
-@Measurement(iterations = 3)
+@Warmup(iterations = 0)
+@Measurement(iterations = 1)
 public class PerformanceBenchmark {
-    private static final byte[] SERIALIZED_INPUT = new byte[]{13, -1, -1, -1, 127, 21, -1, -1, -1, 127, 24, -1, -1, -1, -1, 7, 32, -1, -1, -1, -1, 7, 41, -1, -1, -1, 127, 0, 0, 0, 0, 49, -1, -1, -1, 127, 0, 0, 0, 0, 56, -1, -1, -1, -1, 7, 64, -1, -1, -1, -1, 7, 77, -1, -1, 127, 127, 81, -1, -1, -1, -1, -1, -1, -17, 127, 88, 1};
-
-
+    private static final int ITERATIONS = 1_000;
+    private static final byte[] SERIALIZED_INPUT;
+    private static final ProtobufDecoder<ModernScalarMessage> MODERN_READER;
+    private static final ObjectReader JACKSON_READER;
     static {
         try {
-            MODERN_READER = TestProvider.JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
+            // FIXED32, SFIXED32
+            // Google -> 37.133 ModerProtobuf -> 17.110
+            // INT32, UINT32
+            // Google -> 36.089 ModerProtobuf -> 20.649
+            // FIXED64, SFIXED64
+            // Google -> 37.583 ModerProtobuf -> 18.422
+            // INT64, UINT64
+            // Google -> 41.620 ModerProtobuf -> 24.025
+            // FLOAT, DOUBLE, BOOL
+            // Google -> 38.100 ModerProtobuf -> 16.671
+            // STRING
+            // Google -> 51.210 ModerProtobuf -> 33.821
+            SERIALIZED_INPUT = ScalarMessage.newBuilder()
+                    .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
+                    .setFixed32(Integer.MAX_VALUE)
+                    .setSfixed32(Integer.MAX_VALUE)
+                    .setInt32(Integer.MAX_VALUE)
+                    .setUint32(Integer.MAX_VALUE)
+                    .setFixed64(Long.MAX_VALUE)
+                    .setSfixed64(Long.MAX_VALUE)
+                    .build()
+                    .toByteArray();
+            MODERN_READER = ProtobufDecoder.of(ModernScalarMessage.class, ModernScalarMessage.BUILDER, ModernScalarMessage.SETTERS);
+            var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
+            Objects.requireNonNull(protoSource, "Missing scalar proto");
+            var protoSchema = Files.readString(Path.of(protoSource.toURI()));
+            var schema = ProtobufSchemaLoader.std.parse(protoSchema);
+            JACKSON_READER = new ProtobufMapper()
+                    .readerFor(JacksonScalarMessage.class)
+                    .with(schema);
         } catch (Throwable throwable) {
             throw new RuntimeException("Cannot initialize benchmark", throwable);
         }
@@ -39,8 +78,19 @@ public class PerformanceBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void modernProtobuf2() throws IOException {
-        SimpleParser.decode(new ArrayInputStream(SERIALIZED_INPUT), ExampleObject.class);
+    public void modernProtobuf() throws IOException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            MODERN_READER.decode(SERIALIZED_INPUT);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleProtobuf() throws InvalidProtocolBufferException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            ScalarMessage.parseFrom(SERIALIZED_INPUT);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -92,80 +142,116 @@ public class PerformanceBenchmark {
     @Builder
     @Accessors(fluent = true)
     public static class ModernScalarMessage implements ProtobufMessage {
+        public static final Supplier<ModernScalarMessageBuilder> BUILDER;
+        public static final Map<Integer, BiConsumer> SETTERS;
+        static {
+            BUILDER = ModernScalarMessageBuilder::new;
+            SETTERS = new HashMap<>(){
+                {
+                    put(1, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::fixed32);
+                    put(2, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::sfixed32);
+                    put(3, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::int32);
+                    put(4, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::uint32);
+                    put(5, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::fixed64);
+                    put(6, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::sfixed64);
+                    put(7, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::int64);
+                    put(8, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::uint64);
+                    put(9, (BiConsumer<ModernScalarMessageBuilder, Float>) ModernScalarMessageBuilder::_float);
+                    put(10, (BiConsumer<ModernScalarMessageBuilder, Double>) ModernScalarMessageBuilder::_double);
+                    put(11, (BiConsumer<ModernScalarMessageBuilder, Boolean>) ModernScalarMessageBuilder::bool);
+                    put(12, (BiConsumer<ModernScalarMessageBuilder, String>) ModernScalarMessageBuilder::string);
+                    put(13, (BiConsumer<ModernScalarMessageBuilder, byte[]>) ModernScalarMessageBuilder::bytes);
+                }
+            };
+        }
+
         @ProtobufProperty(
                 index = 1,
+                name = "fixed32",
                 type = ProtobufType.FIXED32
         )
         private int fixed32;
 
         @ProtobufProperty(
                 index = 2,
+                name = "sfixed32",
                 type = ProtobufType.SFIXED32
         )
         private int sfixed32;
 
         @ProtobufProperty(
                 index = 3,
+                name = "int32",
                 type = ProtobufType.INT32
         )
         private int int32;
 
         @ProtobufProperty(
                 index = 4,
+                name = "uint32",
                 type = ProtobufType.UINT32
         )
         private int uint32;
 
         @ProtobufProperty(
                 index = 5,
+                name = "fixed64",
                 type = ProtobufType.FIXED64
         )
         private long fixed64;
 
         @ProtobufProperty(
                 index = 6,
+                name = "sfixed64",
                 type = ProtobufType.SFIXED64
         )
         private long sfixed64;
 
         @ProtobufProperty(
                 index = 7,
+                name = "int64",
                 type = ProtobufType.INT64
         )
         private long int64;
 
         @ProtobufProperty(
                 index = 8,
+                name = "uint64",
                 type = ProtobufType.UINT64
         )
         private long uint64;
 
         @ProtobufProperty(
                 index = 9,
+                name = "_float",
                 type = ProtobufType.FLOAT
         )
         private float _float;
 
         @ProtobufProperty(
                 index = 10,
+                name = "_double",
                 type = ProtobufType.DOUBLE
         )
         private double _double;
 
         @ProtobufProperty(
                 index = 11,
+                name = "bool",
                 type = ProtobufType.BOOL
         )
         private boolean bool;
 
         @ProtobufProperty(
                 index = 12,
+                name = "string",
                 type = ProtobufType.STRING
         )
         private String string;
 
         @ProtobufProperty(
                 index = 13,
+                name = "bytes",
                 type = ProtobufType.BYTES
         )
         private byte[] bytes;
@@ -336,14 +422,14 @@ public class PerformanceBenchmark {
 
         public static ScalarMessage parseDelimitedFrom(java.io.InputStream input)
                 throws java.io.IOException {
-            return GeneratedMessageLite.parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            return parseDelimitedFrom(DEFAULT_INSTANCE, input);
         }
 
         public static ScalarMessage parseDelimitedFrom(
                 java.io.InputStream input,
                 com.google.protobuf.ExtensionRegistryLite extensionRegistry)
                 throws java.io.IOException {
-            return GeneratedMessageLite.parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
         }
 
         public static ScalarMessage parseFrom(
@@ -658,13 +744,13 @@ public class PerformanceBenchmark {
                 MethodToInvoke method,
                 Object arg0, Object arg1) {
             switch (method) {
-                case MethodToInvoke.NEW_MUTABLE_INSTANCE: {
+                case NEW_MUTABLE_INSTANCE: {
                     return new ScalarMessage();
                 }
-                case MethodToInvoke.NEW_BUILDER: {
+                case NEW_BUILDER: {
                     return new Builder();
                 }
-                case MethodToInvoke.BUILD_MESSAGE_INFO: {
+                case BUILD_MESSAGE_INFO: {
                     Object[] objects = new Object[]{
                             "bitField0_",
                             "fixed32_",
@@ -685,13 +771,13 @@ public class PerformanceBenchmark {
                             "\u0001\r\u0000\u0001\u0001\r\r\u0000\u0000\u0000\u0001\u1006\u0000\u0002\u100d\u0001" +
                                     "\u0003\u1004\u0002\u0004\u100b\u0003\u0005\u1005\u0004\u0006\u100e\u0005\u0007\u1002" +
                                     "\u0006\b\u1003\u0007\t\u1001\b\n\u1000\t\u000b\u1007\n\f\u1008\u000b\r\u100a\f";
-                    return GeneratedMessageLite.newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                    return newMessageInfo(DEFAULT_INSTANCE, info, objects);
                 }
 
-                case MethodToInvoke.GET_DEFAULT_INSTANCE: {
+                case GET_DEFAULT_INSTANCE: {
                     return DEFAULT_INSTANCE;
                 }
-                case MethodToInvoke.GET_PARSER: {
+                case GET_PARSER: {
                     com.google.protobuf.Parser<ScalarMessage> parser = PARSER;
                     if (parser == null) {
                         synchronized (ScalarMessage.class) {
@@ -706,10 +792,10 @@ public class PerformanceBenchmark {
                     }
                     return parser;
                 }
-                case MethodToInvoke.GET_MEMOIZED_IS_INITIALIZED: {
+                case GET_MEMOIZED_IS_INITIALIZED: {
                     return (byte) 1;
                 }
-                case MethodToInvoke.SET_MEMOIZED_IS_INITIALIZED: {
+                case SET_MEMOIZED_IS_INITIALIZED: {
                     return null;
                 }
             }
@@ -1037,9 +1123,6 @@ public class PerformanceBenchmark {
                 instance.clearBytes();
                 return this;
             }
-
-
         }
     }
 }
- */

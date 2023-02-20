@@ -1,197 +1,168 @@
 package it.auties.protobuf.serialization.performance;
 
+import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.serialization.exception.ProtobufDeserializationException;
+import it.auties.protobuf.serialization.stream.ArrayInputStream;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
 import lombok.extern.java.Log;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 @RequiredArgsConstructor(staticName = "of")
 @Accessors(fluent = true, chain = true)
 @Log
 public class ProtobufDecoder<T> {
-  /*
+    private static final ConcurrentMap<Class<?>, HashMap<Integer, ProtobufProperty>> fieldsCache = new ConcurrentHashMap<>();
+
     @NonNull
     private final Class<? extends T> modelClass;
 
-    @Setter
-    private boolean warnUnknownFields;
+    @NonNull
+    public final Supplier<?> builder;
+
+    @NonNull
+    public final Map<Integer, BiConsumer> setters;
 
     private final LinkedList<Class<?>> classes = new LinkedList<>();
 
-    public Map<Integer, Object> decode(byte[] input) throws IOException {
+    public Object decode(byte[] input) throws IOException {
         return decode(new ArrayInputStream(input));
     }
 
-    private Map<Integer, Object> decode(ArrayInputStream input) throws IOException {
-        var results = new ArrayList<Map.Entry<Integer, Object>>();
+    @SneakyThrows
+    private Object decode(ArrayInputStream input) throws IOException {
+        var instance = builder.get();
         while (true) {
             var tag = input.readTag();
             if (tag == 0) {
                 break;
             }
 
-            var current = parseField(input, tag);
-            if (current.isEmpty()) {
-                break;
+            var number = tag >>> 3;
+            if (number == 0) {
+                throw ProtobufDeserializationException.invalidTag(tag);
             }
 
-            results.add(current.get());
+            setters.get(number).accept(instance, readFieldContent(input, tag, number));
         }
 
-        return results.stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, this::handleDuplicatedFields));
-    }
-
-    private <F, S> List<?> handleDuplicatedFields(F first, S second) {
-        return Stream.of(first, second)
-                .map(entry -> entry instanceof Collection<?> collection ? collection : List.of(entry))
-                .flatMap(Collection::stream)
-                .toList();
-    }
-
-    private Optional<Map.Entry<Integer, Object>> parseField(ArrayInputStream input, int tag) throws IOException {
-        var number = tag >>> 3;
-        if (number == 0) {
-            throw ProtobufDeserializationException.invalidTag(tag);
-        }
-
-        var content = readFieldContent(input, tag, number);
-        return Optional.ofNullable(content)
-                .map(parsed -> Map.entry(number, parsed));
+        return instance;
     }
 
     private Object readFieldContent(ArrayInputStream input, int tag, int number) throws IOException {
-        var type = tag & 7;
-        return switch (type) {
-            case 0 -> input.readInt64();
-            case 1 -> input.readFixed64();
-            case 2 -> readDelimited(input, number);
-            case 3 -> readGroup(input);
-            case 4 -> endGroup();
-            case 5 -> input.readFixed32();
-            default -> throw new ProtobufDeserializationException("Protocol message(%s) had invalid wire type(%s)".formatted(number, type));
+        var protobufProperty = getFields().get(number);
+        return switch (tag & 7) {
+            case 0 -> {
+                var value = input.readInt64();
+                yield switch (protobufProperty.type()) {
+                    case INT32, SINT32, UINT32, MESSAGE -> (int) value;
+                    case INT64, SINT64, UINT64 -> value;
+                    case BOOL -> value == 1;
+                    default -> throw new IllegalStateException("Unexpected value: " + protobufProperty.type());
+                };
+            }
+            case 1 -> {
+                var value = input.readFixed64();
+                if (protobufProperty.type() == ProtobufType.DOUBLE) {
+                    yield Double.longBitsToDouble(value);
+                }
+
+                yield value;
+            }
+            case 2 -> {
+                var read = input.readBytes();
+                if(protobufProperty == null){
+                    yield read;
+                }
+
+                if(protobufProperty.packed()){
+                    var stream = new ArrayInputStream(read);
+                    yield stream.readInt64();
+                }
+
+                yield switch (protobufProperty.type()) {
+                    case BYTES -> read;
+                    case STRING -> new String(read, StandardCharsets.UTF_8);
+                    default -> {
+                        try {
+                            classes.push(protobufProperty.implementation());
+                            var stream = new ArrayInputStream(read);
+                            yield decode(stream);
+                        } catch (IOException ex) {
+                            yield new String(read, StandardCharsets.UTF_8);
+                        }finally {
+                            classes.poll();
+                        }
+                    }
+                };
+            }
+            case 3 -> {
+                var read = input.readBytes();
+                var stream = new ArrayInputStream(read);
+                yield decode(stream);
+            }
+            case 4 -> {
+                classes.poll();
+                yield null;
+            }
+            case 5 -> {
+                var value = input.readFixed32();
+                if (protobufProperty.type() == ProtobufType.FLOAT) {
+                    yield Float.intBitsToFloat(value);
+                }
+
+                yield value;
+            }
+            default -> throw new ProtobufDeserializationException("Protocol message had invalid wire type");
         };
     }
 
-    private Object endGroup() {
-        classes.poll();
-        return null;
-    }
-
-    private Object readGroup(ArrayInputStream input) throws IOException {
-        var read = input.readBytes();
-        var stream = new ArrayInputStream(read);
-        return decode(stream);
-    }
-
-    private Object readDelimited(ArrayInputStream input, int fieldNumber) throws IOException {
-        var read = input.readBytes();
-        var type = findPropertyType(fieldNumber)
-                .orElse(ProtobufType.BYTES);
-        return convertValueToObject(read, type);
-    }
-
-    private Object convertValueToObject(byte[] read, ProtobufProperty value) throws IOException{
-        if(value.packed()){
-            var stream = new ArrayInputStream(read);
-            return stream.readInt64();
-        }
-
-        if(value.type() == ProtobufType.BYTES){
-            return read;
-        }
-
-        if(value.type() == ProtobufType.STRING){
-            return new String(read, StandardCharsets.UTF_8);
-        }
-
-        return readDelimited(value.implementation(), read);
-    }
-
-    private Object readDelimited(Class<?> currentClass, byte[] read){
-        try {
-            classes.push(currentClass);
-            var stream = new ArrayInputStream(read);
-            return decode(stream);
-        } catch (IOException ex) {
-            return new String(read, StandardCharsets.UTF_8);
-        }finally {
-            classes.poll();
-        }
-    }
-
-    private ProtobufProperty findPropertyType(int fieldNumber) {
-        var result = findFields()
-                .stream()
-                .filter(field -> isProperty(field, fieldNumber))
-                .map(field -> new ProtobufValue(foldType(field), isPacked(field)))
-                .findAny();
-
-        if(result.isEmpty() && warnUnknownFields){
-            log.info("Detected unknown field at index %s inside class %s"
-                    .formatted(fieldNumber, requireNonNullElse(classes.peekFirst(), modelClass).getName()));
-        }
-
-        return result;
-    }
-
-    private Class<?> foldType(Field field) {
-        if(!Collection.class.isAssignableFrom(field.getType())){
-            return field.getType();
-        }
-
-        var genericType = field.getGenericType();
-        if(genericType instanceof ParameterizedType parameterizedType){
-            return (Class<?>) parameterizedType.getActualTypeArguments()[0];
-        }
-
-        var superClass = field.getType().getGenericSuperclass();
-        return foldSuperClass(superClass);
-    }
-
-    private Class<?> foldSuperClass(Type superClass) {
-        Objects.requireNonNull(superClass,
-                "Serialization issue: cannot deduce generic type of field through class hierarchy");
-        if (superClass instanceof ParameterizedType parameterizedType) {
-            return (Class<?>) parameterizedType.getActualTypeArguments()[0];
-        }
-
-        var concreteSuperClass = (Class<?>) superClass;
-        return foldSuperClass(concreteSuperClass.getGenericSuperclass());
-    }
-
-    private List<Field> findFields(){
+    private Map<Integer, ProtobufProperty> getFields(){
         return Optional.ofNullable(classes.peekFirst())
-                .map(this::findFields)
-                .orElse(Arrays.asList(modelClass.getDeclaredFields()));
+                .map(ProtobufDecoder::getField)
+                .orElseGet(() -> getField(modelClass));
     }
 
-    private List<Field> findFields(Class<?> clazz){
+    private static HashMap<Integer, ProtobufProperty> getField(Class<?> clazz){
         if(clazz == null){
-            return List.of();
+            return new HashMap<>();
         }
 
-        if(cachedFields.containsKey(clazz)){
-            return cachedFields.get(clazz);
+        if(fieldsCache.containsKey(clazz)){
+            return fieldsCache.get(clazz);
         }
 
-        var fields = new ArrayList<>(Arrays.asList(clazz.getDeclaredFields()));
-        fields.addAll(findFields(clazz.getSuperclass()));
-        cachedFields.put(clazz, fields);
+        var fields = getProtobufFields(clazz);
+        fields.putAll(getField(clazz.getSuperclass()));
+        fieldsCache.put(clazz, fields);
         return fields;
     }
 
-    private boolean isProperty(Field field, int fieldNumber) {
-        return Optional.ofNullable(field.getAnnotation(JsonProperty.class))
-                .map(JsonProperty::value)
-                .filter(entry -> Objects.equals(entry, String.valueOf(fieldNumber)))
-                .isPresent();
+    private static HashMap<Integer, ProtobufProperty> getProtobufFields(Class<?> clazz) {
+        var map = new HashMap<Integer, ProtobufProperty>();
+        for (var fields : Arrays.asList(clazz.getFields(), clazz.getDeclaredFields())) {
+            for (var entry : fields) {
+                var annotation = entry.getAnnotation(it.auties.protobuf.base.ProtobufProperty.class);
+                if(annotation == null){
+                    continue;
+                }
+                var protobufProperty = new ProtobufProperty(annotation.index(), annotation.type(), annotation.implementation(), annotation.name(), annotation.required(), annotation.ignore(), annotation.packed(), annotation.repeated());
+                map.putIfAbsent(protobufProperty.index(), protobufProperty);
+            }
+        }
+        return map;
     }
 
-    private boolean isPacked(Field field) {
-        return Optional.ofNullable(field.getAnnotation(JsonPropertyDescription.class))
-                .map(JsonPropertyDescription::value)
-                .filter(entry -> entry.contains("[packed]"))
-                .isPresent();
+    private record ProtobufProperty(int index, ProtobufType type, Class<?> implementation, String name, boolean required, boolean ignore, boolean packed, boolean repeated) {
+
     }
-   */
 }

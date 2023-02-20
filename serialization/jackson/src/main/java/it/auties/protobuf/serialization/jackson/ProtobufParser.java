@@ -1,31 +1,21 @@
 package it.auties.protobuf.serialization.jackson;
 
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_EMBEDDED_MESSAGE;
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_END_OBJECT;
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_FIXED32;
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_FIXED64;
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_LENGTH_DELIMITED;
-import static it.auties.protobuf.serialization.model.WireType.WIRE_TYPE_VAR_INT;
-
-import com.fasterxml.jackson.core.Base64Variant;
-import com.fasterxml.jackson.core.FormatSchema;
-import com.fasterxml.jackson.core.JsonLocation;
-import com.fasterxml.jackson.core.JsonStreamContext;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.Version;
+import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
 import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.serialization.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serialization.stream.ArrayInputStream;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+
+import static it.auties.protobuf.serialization.model.WireType.*;
 
 class ProtobufParser extends ParserMinimalBase {
     private final IOContext ioContext;
@@ -146,9 +136,11 @@ class ProtobufParser extends ParserMinimalBase {
         return switch (lastType) {
             case WIRE_TYPE_VAR_INT -> {
                 var value = input.readInt64();
-                switch (lastField.type()){
-                    case INT32, SINT32, UINT32, FIXED32, SFIXED32, FLOAT, BOOL, MESSAGE -> this.lastValueInt = (int) value;
-                    case INT64, SINT64, UINT64, FIXED64, SFIXED64, DOUBLE -> this.lastValueLong = value;
+                if(lastField != null) {
+                    switch (lastField.type()) {
+                        case INT32, SINT32, UINT32, FIXED32, SFIXED32, FLOAT, BOOL, MESSAGE -> this.lastValueInt = (int) value;
+                        case INT64, SINT64, UINT64, FIXED64, SFIXED64, DOUBLE -> this.lastValueLong = value;
+                    }
                 }
                 yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
             }

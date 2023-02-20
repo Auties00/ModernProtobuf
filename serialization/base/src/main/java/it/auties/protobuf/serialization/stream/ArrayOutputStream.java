@@ -1,11 +1,11 @@
 package it.auties.protobuf.serialization.stream;
 
-import it.auties.protobuf.serialization.model.WireType;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+
+import static it.auties.protobuf.serialization.model.WireType.*;
 
 public record ArrayOutputStream(ByteArrayOutputStream buffer) {
     public ArrayOutputStream() {
@@ -21,17 +21,17 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
     }
 
     public void writeInt32(int fieldNumber, int value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_VAR_INT);
+        writeTag(fieldNumber, WIRE_TYPE_VAR_INT);
         writeInt32NoTag(value);
     }
 
     public void writeUInt32(int fieldNumber, int value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_VAR_INT);
+        writeTag(fieldNumber, WIRE_TYPE_VAR_INT);
         writeUInt32NoTag(value);
     }
 
     public void writeFixed32(int fieldNumber, int value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_FIXED32);
+        writeTag(fieldNumber, WIRE_TYPE_FIXED32);
         writeFixed32NoTag(value);
     }
 
@@ -40,27 +40,27 @@ public record ArrayOutputStream(ByteArrayOutputStream buffer) {
     }
 
     public void writeUInt64(int fieldNumber, long value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_VAR_INT);
+        writeTag(fieldNumber, WIRE_TYPE_VAR_INT);
         writeUInt64NoTag(value);
     }
 
     public void writeFixed64(int fieldNumber, long value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_FIXED64);
+        writeTag(fieldNumber, WIRE_TYPE_FIXED64);
         writeFixed64NoTag(value);
     }
 
     public void writeBool(int fieldNumber, boolean value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_VAR_INT);
+        writeTag(fieldNumber, WIRE_TYPE_VAR_INT);
         writeRaw((byte) (value ? 1 : 0));
     }
 
     public void writeString(int fieldNumber, String value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeTag(fieldNumber, WIRE_TYPE_LENGTH_DELIMITED);
         writeStringNoTag(value);
     }
 
     public void writeByteArray(int fieldNumber, byte[] value) {
-        writeTag(fieldNumber, WireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeTag(fieldNumber, WIRE_TYPE_LENGTH_DELIMITED);
         writeBytesNoTag(value);
     }
 
