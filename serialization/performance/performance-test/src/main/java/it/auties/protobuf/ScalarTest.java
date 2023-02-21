@@ -1,260 +1,77 @@
 package it.auties.protobuf;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
-import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
-import it.auties.protobuf.serialization.performance.ProtobufDecoder;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
-import org.openjdk.jmh.annotations.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
-@State(Scope.Benchmark)
-@Fork(1)
-@Warmup(iterations = 0)
-@Measurement(iterations = 1)
-public class PerformanceBenchmark {
-    private static final int ITERATIONS = 1_000;
-    private static final byte[] SERIALIZED_INPUT;
-    private static final ProtobufDecoder<ModernScalarMessage> MODERN_READER;
-    private static final ObjectReader JACKSON_READER;
-    static {
-        try {
-            // FIXED32, SFIXED32
-            // Google -> 37.133 ModerProtobuf -> 17.110
-            // INT32, UINT32
-            // Google -> 36.089 ModerProtobuf -> 20.649
-            // FIXED64, SFIXED64
-            // Google -> 37.583 ModerProtobuf -> 18.422
-            // INT64, UINT64
-            // Google -> 41.620 ModerProtobuf -> 24.025
-            // FLOAT, DOUBLE, BOOL
-            // Google -> 38.100 ModerProtobuf -> 16.671
-            // STRING
-            // Google -> 51.210 ModerProtobuf -> 33.821
-            SERIALIZED_INPUT = ScalarMessage.newBuilder()
-                    .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
-                    .setFixed32(Integer.MAX_VALUE)
-                    .setSfixed32(Integer.MAX_VALUE)
-                    .setInt32(Integer.MAX_VALUE)
-                    .setUint32(Integer.MAX_VALUE)
-                    .setFixed64(Long.MAX_VALUE)
-                    .setSfixed64(Long.MAX_VALUE)
-                    .build()
-                    .toByteArray();
-            MODERN_READER = ProtobufDecoder.of(ModernScalarMessage.class, ModernScalarMessage.BUILDER, ModernScalarMessage.SETTERS);
-            var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
-            Objects.requireNonNull(protoSource, "Missing scalar proto");
-            var protoSchema = Files.readString(Path.of(protoSource.toURI()));
-            var schema = ProtobufSchemaLoader.std.parse(protoSchema);
-            JACKSON_READER = new ProtobufMapper()
-                    .readerFor(JacksonScalarMessage.class)
-                    .with(schema);
-        } catch (Throwable throwable) {
-            throw new RuntimeException("Cannot initialize benchmark", throwable);
-        }
+public class ScalarTest implements TestProvider {
+    @Test
+    @SneakyThrows
+    public void encodeScalarTypes() {
+        var modernScalarMessage = ModernScalarMessage.builder()
+                .fixed32(Integer.MAX_VALUE)
+                .sfixed32(Integer.MAX_VALUE)
+                .int32(Integer.MAX_VALUE)
+                .uint32(Integer.MAX_VALUE)
+                .fixed64(Integer.MAX_VALUE)
+                .sfixed64(Integer.MAX_VALUE)
+                .int64(Integer.MAX_VALUE)
+                .uint64(Integer.MAX_VALUE)
+                ._float(Float.MAX_VALUE)
+                ._double(Double.MAX_VALUE)
+                .bool(true)
+                .string("Hello, this is an automated test!")
+                .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
+                .build();
+
+        var modernEncoded = writeValueAsBytes(modernScalarMessage);
+        var modernDecoded = readMessage(modernEncoded, ModernScalarMessage.class);
+        equals(modernScalarMessage, modernDecoded);
+
+        var oldDecoded = ScalarMessage.parseFrom(modernEncoded);
+        equals(modernDecoded, oldDecoded);
+
+        var modernFromOldDecoded = readMessage(oldDecoded.toByteArray(), ModernScalarMessage.class);
+        equals(modernDecoded, modernFromOldDecoded);
     }
 
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void modernProtobuf() throws IOException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            MODERN_READER.decode(SERIALIZED_INPUT);
-        }
+    private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
+        Assertions.assertEquals(modernScalarMessage.fixed32(), modernDecoded.fixed32());
+        Assertions.assertEquals(modernScalarMessage.sfixed32(), modernDecoded.sfixed32());
+        Assertions.assertEquals(modernScalarMessage.int32(), modernDecoded.int32());
+        Assertions.assertEquals(modernScalarMessage.uint32(), modernDecoded.uint32());
+        Assertions.assertEquals(modernScalarMessage.fixed64(), modernDecoded.fixed64());
+        Assertions.assertEquals(modernScalarMessage.sfixed64(), modernDecoded.sfixed64());
+        Assertions.assertEquals(modernScalarMessage.int64(), modernDecoded.int64());
+        Assertions.assertEquals(modernScalarMessage.uint64(), modernDecoded.uint64());
+        Assertions.assertEquals(modernScalarMessage._float(), modernDecoded._float());
+        Assertions.assertEquals(modernScalarMessage._double(), modernDecoded._double());
+        Assertions.assertEquals(modernScalarMessage.bool(), modernDecoded.bool());
+        Assertions.assertEquals(modernScalarMessage.string(), modernDecoded.string());
+        Assertions.assertArrayEquals(modernScalarMessage.bytes(), modernDecoded.bytes());
     }
 
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void googleProtobuf() throws InvalidProtocolBufferException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            ScalarMessage.parseFrom(SERIALIZED_INPUT);
-        }
-    }
-
-    @SuppressWarnings("unused")
-    public static class JacksonScalarMessage {
-        @JsonProperty("fixed32")
-        private int fixed32;
-
-        @JsonProperty("sfixed32")
-        private int sfixed32;
-
-        @JsonProperty("int32")
-        private int int32;
-
-        @JsonProperty("uint32")
-        private int uint32;
-
-        @JsonProperty("fixed64")
-        private long fixed64;
-
-        @JsonProperty("sfixed64")
-        private long sfixed64;
-
-        @JsonProperty("int64")
-        private long int64;
-
-        @JsonProperty("uint64")
-        private long uint64;
-
-        @JsonProperty("float")
-        private float _float;
-
-        @JsonProperty("double")
-        private double _double;
-
-        @JsonProperty("bool")
-        private boolean bool;
-
-        @JsonProperty("string")
-        private String string;
-
-        @JsonProperty("bytes")
-        private byte[] bytes;
-    }
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class ModernScalarMessage implements ProtobufMessage {
-        public static final Supplier<ModernScalarMessageBuilder> BUILDER;
-        public static final Map<Integer, BiConsumer> SETTERS;
-        static {
-            BUILDER = ModernScalarMessageBuilder::new;
-            SETTERS = new HashMap<>(){
-                {
-                    put(1, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::fixed32);
-                    put(2, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::sfixed32);
-                    put(3, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::int32);
-                    put(4, (BiConsumer<ModernScalarMessageBuilder, Integer>) ModernScalarMessageBuilder::uint32);
-                    put(5, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::fixed64);
-                    put(6, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::sfixed64);
-                    put(7, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::int64);
-                    put(8, (BiConsumer<ModernScalarMessageBuilder, Long>) ModernScalarMessageBuilder::uint64);
-                    put(9, (BiConsumer<ModernScalarMessageBuilder, Float>) ModernScalarMessageBuilder::_float);
-                    put(10, (BiConsumer<ModernScalarMessageBuilder, Double>) ModernScalarMessageBuilder::_double);
-                    put(11, (BiConsumer<ModernScalarMessageBuilder, Boolean>) ModernScalarMessageBuilder::bool);
-                    put(12, (BiConsumer<ModernScalarMessageBuilder, String>) ModernScalarMessageBuilder::string);
-                    put(13, (BiConsumer<ModernScalarMessageBuilder, byte[]>) ModernScalarMessageBuilder::bytes);
-                }
-            };
-        }
-
-        @ProtobufProperty(
-                index = 1,
-                name = "fixed32",
-                type = ProtobufType.FIXED32
-        )
-        private int fixed32;
-
-        @ProtobufProperty(
-                index = 2,
-                name = "sfixed32",
-                type = ProtobufType.SFIXED32
-        )
-        private int sfixed32;
-
-        @ProtobufProperty(
-                index = 3,
-                name = "int32",
-                type = ProtobufType.INT32
-        )
-        private int int32;
-
-        @ProtobufProperty(
-                index = 4,
-                name = "uint32",
-                type = ProtobufType.UINT32
-        )
-        private int uint32;
-
-        @ProtobufProperty(
-                index = 5,
-                name = "fixed64",
-                type = ProtobufType.FIXED64
-        )
-        private long fixed64;
-
-        @ProtobufProperty(
-                index = 6,
-                name = "sfixed64",
-                type = ProtobufType.SFIXED64
-        )
-        private long sfixed64;
-
-        @ProtobufProperty(
-                index = 7,
-                name = "int64",
-                type = ProtobufType.INT64
-        )
-        private long int64;
-
-        @ProtobufProperty(
-                index = 8,
-                name = "uint64",
-                type = ProtobufType.UINT64
-        )
-        private long uint64;
-
-        @ProtobufProperty(
-                index = 9,
-                name = "_float",
-                type = ProtobufType.FLOAT
-        )
-        private float _float;
-
-        @ProtobufProperty(
-                index = 10,
-                name = "_double",
-                type = ProtobufType.DOUBLE
-        )
-        private double _double;
-
-        @ProtobufProperty(
-                index = 11,
-                name = "bool",
-                type = ProtobufType.BOOL
-        )
-        private boolean bool;
-
-        @ProtobufProperty(
-                index = 12,
-                name = "string",
-                type = ProtobufType.STRING
-        )
-        private String string;
-
-        @ProtobufProperty(
-                index = 13,
-                name = "bytes",
-                type = ProtobufType.BYTES
-        )
-        private byte[] bytes;
+    private void equals(ModernScalarMessage modernDecoded, ScalarMessage oldDecoded) {
+        Assertions.assertEquals(modernDecoded.fixed32(), oldDecoded.getFixed32());
+        Assertions.assertEquals(modernDecoded.sfixed32(), oldDecoded.getSfixed32());
+        Assertions.assertEquals(modernDecoded.int32(), oldDecoded.getInt32());
+        Assertions.assertEquals(modernDecoded.uint32(), oldDecoded.getUint32());
+        Assertions.assertEquals(modernDecoded.fixed64(), oldDecoded.getFixed64());
+        Assertions.assertEquals(modernDecoded.sfixed64(), oldDecoded.getSfixed64());
+        Assertions.assertEquals(modernDecoded.int64(), oldDecoded.getInt64());
+        Assertions.assertEquals(modernDecoded.uint64(), oldDecoded.getUint64());
+        Assertions.assertEquals(modernDecoded._float(), oldDecoded.getFloat());
+        Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
+        Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
+        Assertions.assertEquals(modernDecoded.string(), oldDecoded.getString());
+        Assertions.assertArrayEquals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
     }
 
     public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {
@@ -311,6 +128,92 @@ public class PerformanceBenchmark {
         boolean hasBytes();
 
         com.google.protobuf.ByteString getBytes();
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Jacksonized
+    @Data
+    @Builder
+    @Accessors(fluent = true)
+    public static class ModernScalarMessage implements ProtobufMessage {
+        @ProtobufProperty(
+                index = 1,
+                type = ProtobufType.FIXED32
+        )
+        private int fixed32;
+
+        @ProtobufProperty(
+                index = 2,
+                type = ProtobufType.SFIXED32
+        )
+        private int sfixed32;
+
+        @ProtobufProperty(
+                index = 3,
+                type = ProtobufType.INT32
+        )
+        private int int32;
+
+        @ProtobufProperty(
+                index = 4,
+                type = ProtobufType.UINT32
+        )
+        private int uint32;
+
+        @ProtobufProperty(
+                index = 5,
+                type = ProtobufType.FIXED64
+        )
+        private long fixed64;
+
+        @ProtobufProperty(
+                index = 6,
+                type = ProtobufType.SFIXED64
+        )
+        private long sfixed64;
+
+        @ProtobufProperty(
+                index = 7,
+                type = ProtobufType.INT64
+        )
+        private long int64;
+
+        @ProtobufProperty(
+                index = 8,
+                type = ProtobufType.UINT64
+        )
+        private long uint64;
+
+        @ProtobufProperty(
+                index = 9,
+                type = ProtobufType.FLOAT
+        )
+        private float _float;
+
+        @ProtobufProperty(
+                index = 10,
+                type = ProtobufType.DOUBLE
+        )
+        private double _double;
+
+        @ProtobufProperty(
+                index = 11,
+                type = ProtobufType.BOOL
+        )
+        private boolean bool;
+
+        @ProtobufProperty(
+                index = 12,
+                type = ProtobufType.STRING
+        )
+        private String string;
+
+        @ProtobufProperty(
+                index = 13,
+                type = ProtobufType.BYTES
+        )
+        private byte[] bytes;
     }
 
     public static final class ScalarMessage extends
@@ -1123,6 +1026,8 @@ public class PerformanceBenchmark {
                 instance.clearBytes();
                 return this;
             }
+
+
         }
     }
 }
