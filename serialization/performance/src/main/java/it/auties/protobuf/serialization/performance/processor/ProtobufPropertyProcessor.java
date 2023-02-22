@@ -36,6 +36,8 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     private static final String SETTER_ENUM_ENTRY = "(%s k, Integer v) -> k.%s(%s.%s(v))";
     private static final String SETTER_ENUM_ENTRY_FALLBACK = "(java.util.function.BiConsumer<%s, Integer>) (k, v) -> { if(v < %s.values().length) k.%s(%s.values()[v]); }";
     private static final String GETTER_ENTRY = "(%s e) -> e.%s()";
+    private static final String GETTER_INDEX_ENTRY = "(%s e) -> e.%s().index()";
+    private static final String GETTER_ORDINAL_ENTRY = "(%s e) -> e.%s().ordinal()";
     private static final String GETTER_CONVERTED_ENTRY = "(%s e) -> { var v =  e.%s(); return v != null ? v.%s() : null; }";
     private static final String RECORD_ENTRY = "new it.auties.protobuf.serialization.performance.model.ProtobufField(%s, it.auties.protobuf.base.ProtobufType.%s, %s, %s)";
     private static final String MODEL_INSTRUCTION = "new it.auties.protobuf.serialization.performance.model.ProtobufModel(%s, %s, new java.util.HashMap<>(){{%s}})";
@@ -68,7 +70,7 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
             writer = new PrintWriter(file.openWriter());
             writer.println("package %s;".formatted(PACKAGE_NAME));
             writer.println("class %s {".formatted(CLASS_NAME));
-            writer.println(PROPERTIES_FIELD);
+            writer.print(PROPERTIES_FIELD);
         }catch (IOException exception) {
             throw new UncheckedIOException("Cannot create file", exception);
         }
@@ -79,8 +81,8 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
             return;
         }
 
-        writer.println("}};");
-        writer.println("}");
+        writer.print("}};");
+        writer.print("}");
         writer.close();
     }
 
@@ -264,8 +266,26 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
 
     private String createGetter(String className, ProtobufWritable entry) {
         var converter = getConverter(entry.element());
-        return converter != null ? GETTER_CONVERTED_ENTRY.formatted(className, entry.name(), converter.getSimpleName().toString())
-                : GETTER_ENTRY.formatted(className, entry.name());
+        if (converter != null) {
+            return GETTER_CONVERTED_ENTRY.formatted(className, entry.name(), converter.getSimpleName().toString());
+        }
+
+        if (entry.element() == null || entry.element().getKind() != ElementKind.ENUM) {
+            return GETTER_ENTRY.formatted(className, entry.name());
+        }
+
+        var indexField = getEnumIndexField(entry);
+        return indexField != null ? GETTER_INDEX_ENTRY.formatted(className, entry.name())
+                : GETTER_ORDINAL_ENTRY.formatted(className, entry.name());
+    }
+
+    private Element getEnumIndexField(ProtobufWritable entry) {
+        return entry.element()
+                .getEnclosedElements()
+                .stream()
+                .filter(field -> field.getKind() == ElementKind.METHOD && field.getSimpleName().toString().equals("index"))
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean hasProtobufMessage(TypeElement typeElement) {

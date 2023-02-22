@@ -13,7 +13,6 @@ import it.auties.protobuf.serialization.stream.ArrayInputStream;
 import it.auties.protobuf.serialization.stream.ArrayOutputStream;
 import lombok.NonNull;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
@@ -21,6 +20,8 @@ import java.util.function.Supplier;
 
 import static it.auties.protobuf.serialization.model.WireType.*;
 
+// Code style could be better in this class, but it's like this because it needs to be as performant as possible
+// Every ns is saved here
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class Protobuf<T> {
     private static final Map<Class<?>, ProtobufModel> propertiesMap;
@@ -40,6 +41,7 @@ public class Protobuf<T> {
     private final Map<Integer, ProtobufAccessors> accessors;
     public Protobuf(@NonNull Class<T> clazz) {
         var properties = propertiesMap.get(clazz);
+        Objects.requireNonNull(properties, "Corrupted schema: no properties for %s".formatted(clazz.getName()));
         this.builder = properties.builder();
         this.build = properties.build();
         this.accessors = properties.accessors();
@@ -50,7 +52,7 @@ public class Protobuf<T> {
         return new Protobuf<>(clazz);
     }
     
-    public static <T> T readMessage(byte[] message, Class<T> clazz) throws IOException {
+    public static <T> T readMessage(byte[] message, Class<T> clazz) {
         var decoder = new Protobuf<>(clazz);
         return decoder.decode(message);
     }
@@ -61,7 +63,7 @@ public class Protobuf<T> {
     }
 
     @SuppressWarnings("unchecked")
-    public T decode(byte[] bytes) throws IOException {
+    public T decode(byte[] bytes) {
         var input = new ArrayInputStream(bytes);
         var instance = builder.get();
         var repeatedFieldsMap = new HashMap<Integer, List<Object>>();
@@ -101,7 +103,7 @@ public class Protobuf<T> {
         return (T) build.apply(instance);
     }
 
-    private Object readFieldContent(ArrayInputStream input, int tag, ProtobufField property) throws IOException {
+    private Object readFieldContent(ArrayInputStream input, int tag, ProtobufField property) {
         return switch (tag & 7) {
             case WIRE_TYPE_VAR_INT -> {
                 var value = input.readInt64();
@@ -202,7 +204,7 @@ public class Protobuf<T> {
                    collection.forEach(entry -> encodeField(output, singleField, entry));
                    return;
                }catch (ClassCastException exception){
-                   throw new RuntimeException("An error occurred while serializing %s: repeated fields should be wrapped in a collection".formatted(field), exception);
+                   throw new ProtobufSerializationException("An error occurred while serializing %s: repeated fields should be wrapped in a collection".formatted(field), exception);
                }
             }
             
@@ -219,37 +221,16 @@ public class Protobuf<T> {
                 case UINT64 -> output.writeUInt64(field.index(), (long) value);
                 case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), (long) value);
                 default -> {
-                    if (value instanceof Enum<?>) {
-                        output.writeUInt64(field.index(), findEnumIndex(value));
-                        return;
+                    if(value instanceof Integer enumIndex){
+                        output.writeUInt64(field.index(), enumIndex);
+                    }else {
+                        var message = writeMessage(value);
+                        output.writeByteArray(field.index(), message);
                     }
-
-                    var message = writeMessage(value);
-                    output.writeByteArray(field.index(), message);
                 }
             }
         } catch (ClassCastException exception) {
-            throw new RuntimeException("A field misreported its own type in a schema: %s".formatted(field), exception);
-        }
-    }
-
-    private int findEnumIndex(Object object) {
-        try {
-            var method = object.getClass().getMethod("index");
-            method.setAccessible(true);
-            return (int) method.invoke(object);
-        } catch (Throwable throwable) {
-            return findEnumIndexFallback(object);
-        }
-    }
-
-    private int findEnumIndexFallback(Object object) {
-        try {
-            var method = object.getClass().getMethod("ordinal");
-            method.setAccessible(true);
-            return (int) method.invoke(object);
-        } catch (Throwable throwable) {
-            throw new RuntimeException("An exception occurred while invoking the index method for the enum", throwable);
+            throw new ProtobufSerializationException("A field misreported its own type in a schema: %s".formatted(field), exception);
         }
     }
 }
