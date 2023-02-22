@@ -1,7 +1,5 @@
 package it.auties.protobuf;
 
-import static it.auties.protobuf.base.ProtobufType.STRING;
-
 import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
@@ -13,6 +11,8 @@ import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static it.auties.protobuf.base.ProtobufType.STRING;
 
 public class ConversionTest implements TestProvider {
     @Test
@@ -42,12 +42,7 @@ public class ConversionTest implements TestProvider {
             return new Wrapper(object.toString());
         }
 
-        @Override
-        public boolean isValueBased() {
-            return true;
-        }
-
-        @Override
+        @ProtobufConverter
         public Object toValue() {
             return value;
         }

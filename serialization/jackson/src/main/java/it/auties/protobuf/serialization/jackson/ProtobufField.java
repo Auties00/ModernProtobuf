@@ -1,11 +1,14 @@
 package it.auties.protobuf.serialization.jackson;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.exception.ProtobufSerializationException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.Objects;
 
 record ProtobufField(Object value, Class<? extends ProtobufMessage> messageType, int index,
@@ -38,11 +41,17 @@ record ProtobufField(Object value, Class<? extends ProtobufMessage> messageType,
         try {
             field.setAccessible(true);
             var value = field.get(owner);
-            return value instanceof ProtobufMessage message && message.isValueBased()
-                ? message.toValue() : value;
+            var converter = Arrays.stream(field.getType().getDeclaredMethods())
+                    .filter(entry -> entry.getAnnotation(ProtobufConverter.class) != null && !Modifier.isStatic(entry.getModifiers()))
+                    .findFirst()
+                    .orElse(null);
+            if (converter != null) {
+                converter.setAccessible(true);
+                return converter.invoke(value);
+            }
+            return value;
         } catch (ReflectiveOperationException exception) {
-            throw new ProtobufSerializationException("Cannot access field %s inside class %s"
-                .formatted(field.getName(), field.getDeclaringClass().getName()), exception);
+            throw new ProtobufSerializationException("Cannot access field %s inside class %s".formatted(field.getName(), field.getDeclaringClass().getName()), exception);
         }
     }
 

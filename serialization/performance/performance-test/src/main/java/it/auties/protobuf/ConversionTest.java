@@ -39,12 +39,7 @@ public class ConversionTest implements TestProvider {
             return new Wrapper(object.toString());
         }
 
-        @Override
-        public boolean isValueBased() {
-            return true;
-        }
-
-        @Override
+        @ProtobufConverter
         public Object toValue() {
             return value;
         }

@@ -1,8 +1,8 @@
 package it.auties.protobuf;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.serialization.exception.ProtobufSerializationException;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -31,7 +31,7 @@ public class ModifierTest implements TestProvider {
         try {
             writeValueAsBytes(object);
             return true;
-        } catch (JsonMappingException exception) {
+        } catch (ProtobufSerializationException exception) {
             return false;
         }
     }
