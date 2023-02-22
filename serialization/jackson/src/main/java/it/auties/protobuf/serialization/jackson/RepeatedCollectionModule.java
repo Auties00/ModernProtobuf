@@ -69,7 +69,7 @@ class RepeatedCollectionModule extends SimpleModule {
             }
 
             var collection = (Collection<Object>) valueInitiator.createUsingDefault(context);
-            context.setAttribute(field.name(), collection);
+            context.setAttribute(field.name(), collection); // TODO: Can this cause a memory leak?
             return collection;
         }
 

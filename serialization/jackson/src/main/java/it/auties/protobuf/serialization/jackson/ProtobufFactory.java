@@ -3,11 +3,11 @@ package it.auties.protobuf.serialization.jackson;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.io.ContentReference;
 import com.fasterxml.jackson.core.io.IOContext;
+import lombok.NoArgsConstructor;
 
 import java.io.*;
 import java.net.URL;
 import java.util.Arrays;
-import lombok.NoArgsConstructor;
 
 @NoArgsConstructor
 class ProtobufFactory extends JsonFactory {
@@ -56,7 +56,7 @@ class ProtobufFactory extends JsonFactory {
 
     @Override
     public ProtobufParser createParser(InputStream in) throws IOException {
-        var context = _createContext(_createContentReference(in), false);
+        var context = _createContext(_createContentReference(in), true);
         return _createParser(_decorate(in, context), context);
     }
 
@@ -132,14 +132,14 @@ class ProtobufFactory extends JsonFactory {
 
     @Override
     public ProtobufGenerator createGenerator(OutputStream out, JsonEncoding enc) throws IOException {
-        var context = _createContext(_createContentReference(out), false);
+        var context = _createContext(_createContentReference(out), true);
         context.setEncoding(enc);
         return _createProtobufGenerator(_generatorFeatures, _objectCodec, _decorate(out, context));
     }
 
     @Override
     public ProtobufGenerator createGenerator(OutputStream out) throws IOException {
-        var context = _createContext(_createContentReference(out), false);
+        var context = _createContext(_createContentReference(out), true);
         return _createProtobufGenerator(_generatorFeatures, _objectCodec, _decorate(out, context));
     }
 

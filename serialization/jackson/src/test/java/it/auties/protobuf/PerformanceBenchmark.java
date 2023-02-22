@@ -4,36 +4,31 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
 import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.jackson.ProtobufSchema;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.annotations.*;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 5)
-@Measurement(iterations = 5)
+@Warmup(iterations = 2)
+@Measurement(iterations = 2)
 public class PerformanceBenchmark implements TestProvider {
   private static final int ITERATIONS = 1_000;
   private static final byte[] SERIALIZED_INPUT;
@@ -43,10 +38,15 @@ public class PerformanceBenchmark implements TestProvider {
   static {
     try {
       SERIALIZED_INPUT = ScalarMessage.newBuilder()
-          .setString("Hello, this is an automated test!")
-          .setFloat(Float.MAX_VALUE)
-          .build()
-          .toByteArray();
+              .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
+              .setFixed32(Integer.MAX_VALUE)
+              .setSfixed32(Integer.MAX_VALUE)
+              .setInt32(Integer.MAX_VALUE)
+              .setUint32(Integer.MAX_VALUE)
+              .setFixed64(Long.MAX_VALUE)
+              .setSfixed64(Long.MAX_VALUE)
+              .build()
+              .toByteArray();
       MODERN_READER = JACKSON.reader(ProtobufSchema.of(ModernScalarMessage.class));
       var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
       Objects.requireNonNull(protoSource, "Missing scalar proto");
