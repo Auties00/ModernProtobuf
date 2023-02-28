@@ -58,6 +58,10 @@ public class Protobuf<T> {
     }
 
     public static byte[] writeMessage(Object object) {
+        if(object == null){
+            return null;
+        }
+
         var encoder = new Protobuf<>(object.getClass());
         return encoder.encode(object);
     }
@@ -80,14 +84,17 @@ public class Protobuf<T> {
             }
 
             var accessor = accessors.get(number);
-            var property = accessor != null ? accessor.record() : null;
+            var hasAccessor = accessor != null;
+            var property = hasAccessor ? accessor.record() : null;
             var value = readFieldContent(input, tag, property);
-            if(property != null && !property.repeated()){
-                accessor.setter().accept(instance, value);
-            }else if(accessor != null){
-                repeatedMatches = true;
-                var repeatedWrapper = repeatedFieldsMap.computeIfAbsent(number, ignored -> new ArrayList<>());
-                repeatedWrapper.add(value);
+            if(hasAccessor){
+                if(!property.repeated()){
+                    accessor.setter().accept(instance, value);
+                }else {
+                    repeatedMatches = true;
+                    var repeatedWrapper = repeatedFieldsMap.computeIfAbsent(number, ignored -> new ArrayList<>());
+                    repeatedWrapper.add(value);
+                }
             }
         }
 
@@ -107,29 +114,32 @@ public class Protobuf<T> {
         return switch (tag & 7) {
             case WIRE_TYPE_VAR_INT -> {
                 var value = input.readInt64();
-                yield switch (property == null ? null : property.type()) {
-                    case INT32, SINT32, UINT32, MESSAGE -> (int) value;
-                    case INT64, SINT64, UINT64 -> value;
-                    case BOOL -> value == 1;
-                    case null -> throw new IllegalStateException("Unexpected value");
-                    default -> throw new IllegalStateException("Unexpected value: " + property.type());
-                };
+                if (property == null) {
+                    yield null;
+                } else {
+                    yield switch (property.type()) {
+                        case INT32, SINT32, UINT32, MESSAGE -> (int) value;
+                        case INT64, SINT64, UINT64 -> value;
+                        case BOOL -> value == 1;
+                        default -> throw new IllegalStateException("Unexpected value: " + property.type());
+                    };
+                }
             }
             case WIRE_TYPE_FIXED64 -> {
                 var value = input.readFixed64();
-                if (property.type() == ProtobufType.DOUBLE) {
+                if(property == null){
+                    yield null;
+                }else if (property.type() == ProtobufType.DOUBLE) {
                     yield Double.longBitsToDouble(value);
+                }else {
+                    yield value;
                 }
-
-                yield value;
             }
             case WIRE_TYPE_LENGTH_DELIMITED -> {
                 var read = input.readBytes();
                 if(property == null){
-                    yield read;
-                }
-
-                if(property.packed()){
+                    yield null;
+                } else if(property.packed()){
                     var stream = new ArrayInputStream(read);
                     yield switch (property.type()){
                         case FIXED32, SFIXED32 -> stream.readFixed32();
@@ -140,31 +150,38 @@ public class Protobuf<T> {
                         case DOUBLE -> Double.longBitsToDouble(stream.readFixed64());
                         default -> throw new IllegalStateException("Unexpected value: " + property.type());
                     };
-                }
-
-                yield switch (property.type()) {
-                    case BYTES -> read;
-                    case STRING -> new String(read, StandardCharsets.UTF_8);
-                    default -> {
-                        if(property.type().isMessage()) {
+                } else {
+                    yield switch (property.type()) {
+                        case BYTES -> read;
+                        case STRING -> new String(read, StandardCharsets.UTF_8);
+                        case MESSAGE -> {
                             var decoder = new Protobuf(property.implementation());
                             yield decoder.decode(read);
                         }
-
-                        yield new String(read, StandardCharsets.UTF_8);
-                    }
-                };
+                        default -> throw new IllegalStateException("Unexpected value: " + property.type());
+                    };
+                }
             }
-            case WIRE_TYPE_EMBEDDED_MESSAGE -> decode(input.readBytes());
-            case WireType.WIRE_TYPE_END_OBJECT -> null;
+            case WIRE_TYPE_EMBEDDED_MESSAGE -> {
+                var read = input.readBytes();
+                if(read == null){
+                    yield null;
+                }else {
+                    var decoder = new Protobuf(property.implementation());
+                    yield decoder.decode(read);
+                }
+            }
             case WireType.WIRE_TYPE_FIXED32 -> {
                 var value = input.readFixed32();
-                if (property != null && property.type() == ProtobufType.FLOAT) {
+                if(property == null){
+                    yield null;
+                }else if (property.type() == ProtobufType.FLOAT) {
                     yield Float.intBitsToFloat(value);
+                } else {
+                    yield value;
                 }
-
-                yield value;
             }
+            case WireType.WIRE_TYPE_END_OBJECT -> null;
             default -> throw new ProtobufDeserializationException("Protocol message had invalid wire type");
         };
     }

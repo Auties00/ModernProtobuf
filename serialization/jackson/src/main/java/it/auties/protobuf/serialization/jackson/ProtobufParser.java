@@ -3,17 +3,14 @@ package it.auties.protobuf.serialization.jackson;
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.base.ParserMinimalBase;
 import com.fasterxml.jackson.core.io.IOContext;
-import it.auties.protobuf.base.ProtobufConverter;
 import it.auties.protobuf.base.ProtobufMessage;
+import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serialization.stream.ArrayInputStream;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 import static it.auties.protobuf.serialization.model.WireType.*;
 
@@ -26,9 +23,14 @@ class ProtobufParser extends ParserMinimalBase {
     private boolean closed;
 
     private ProtobufField lastField;
+    private Object lastValue;
     private int lastType;
     private int lastValueInt;
     private long lastValueLong;
+    private String lastValueString;
+    private float lastValueFloat;
+    private double lastValueDouble;
+    private boolean lastValueBool;
     private Object lastValueObject;
 
     public ProtobufParser(IOContext ioContext, int parserFeatures, ObjectCodec codec, byte[] input) {
@@ -54,8 +56,7 @@ class ProtobufParser extends ParserMinimalBase {
     }
 
     @Override
-    protected void _handleEOF() {
-    }
+    protected void _handleEOF() {}
 
     @Override
     public void close() {
@@ -96,174 +97,152 @@ class ProtobufParser extends ParserMinimalBase {
     public JsonToken nextToken() {
         if (_currToken == null) {
             return _currToken = JsonToken.START_OBJECT;
-        }
-
-        if (_currToken == JsonToken.FIELD_NAME) {
-            return _currToken = readValueAndToken();
-        }
-
-        if (packedInput != null) {
-            return _currToken = readPackedValue();
-        }
-
-        var tag = input.readTag();
-        if (tag == 0) {
-            return _currToken = JsonToken.END_OBJECT;
-        }
-
-        this.lastType = tag & 7;
-        this.lastField = ProtobufFieldCache.getField(type, tag >>> 3);
-        return _currToken = JsonToken.FIELD_NAME;
-    }
-
-    private JsonToken readPackedValue() {
-        if (packedInput.isAtEnd()) {
-            this.packedInput = null;
-            return JsonToken.END_ARRAY;
-        }
-
-        if (lastType == WIRE_TYPE_FIXED64) {
-            this.lastValueLong = packedInput.readInt64();
-            return JsonToken.VALUE_NUMBER_INT;
-        }
-
-        this.lastValueInt = packedInput.readInt32();
-        return JsonToken.VALUE_NUMBER_INT;
-    }
-
-    @SuppressWarnings("RedundantLabeledSwitchRuleCodeBlock")
-    private JsonToken readValueAndToken() {
-        return switch (lastType) {
-            case WIRE_TYPE_VAR_INT -> {
-                var value = input.readInt64();
-                if(lastField != null) {
-                    switch (lastField.type()) {
-                        case INT32, SINT32, UINT32, FIXED32, SFIXED32, FLOAT, BOOL, MESSAGE -> this.lastValueInt = (int) value;
-                        case INT64, SINT64, UINT64, FIXED64, SFIXED64, DOUBLE -> this.lastValueLong = value;
+        } else if (_currToken == JsonToken.FIELD_NAME) {
+            return _currToken = switch (lastType) {
+                case WIRE_TYPE_VAR_INT -> {
+                    var value = input.readInt64();
+                    if(lastField == null) {
+                        yield null;
+                    } else {
+                        yield switch (lastField.type()) {
+                            case INT32, SINT32, UINT32, MESSAGE -> {
+                                this.lastValueInt = (int) value;
+                                this.lastValue = lastValueInt;
+                                yield JsonToken.VALUE_NUMBER_INT;
+                            }
+                            case INT64, SINT64, UINT64 -> {
+                                this.lastValueLong = value;
+                                this.lastValue = lastValueLong;
+                                yield JsonToken.VALUE_NUMBER_INT;
+                            }
+                            case BOOL -> {
+                                var result = value == 1;
+                                this.lastValueBool = result;
+                                this.lastValue = lastValueBool;
+                                yield result ? JsonToken.VALUE_TRUE : JsonToken.VALUE_FALSE;
+                            }
+                            default -> throw new ProtobufDeserializationException(
+                                    "Cannot deserialize field %s inside %s: type mismatch(expected scalar type, got %s)"
+                                            .formatted(lastFieldIndex(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+                        };
                     }
                 }
-                yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
+                case WIRE_TYPE_FIXED64 -> {
+                    var value = input.readFixed64();
+                    if(lastField == null) {
+                        yield null;
+                    }else if(lastField.type() == ProtobufType.DOUBLE){
+                        this.lastValueDouble = Double.longBitsToDouble(value);
+                        this.lastValue = lastValueDouble;
+                        yield JsonToken.VALUE_NUMBER_FLOAT;
+                    }else {
+                        this.lastValueLong = value;
+                        this.lastValue = lastValueLong;
+                        yield JsonToken.VALUE_NUMBER_INT;
+                    }
+                }
+                case WIRE_TYPE_LENGTH_DELIMITED -> {
+                    var read = input.readBytes();
+                    if(lastField == null) {
+                        yield null;
+                    } else if(lastField.packed()) {
+                        this.lastType = switch (lastField.type()) { // TODO: Support all scalar types
+                            case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> WIRE_TYPE_FIXED64;
+                            case INT32, SINT32, UINT32, FIXED32, SFIXED32 -> WIRE_TYPE_FIXED32;
+                            default -> throw new ProtobufDeserializationException(
+                                    "Cannot deserialize field %s inside %s: type mismatch(expected scalar type for packed field, got %s)"
+                                            .formatted(lastFieldIndex(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+                        };
+                        this.packedInput = new ArrayInputStream(read);
+                        yield JsonToken.START_ARRAY;
+                    } else {
+                        yield switch (lastField.type()) {
+                            case BYTES -> {
+                                this.lastValueObject = read;
+                                this.lastValue = lastValueObject;
+                                yield JsonToken.VALUE_EMBEDDED_OBJECT;
+                            }
+                            case STRING -> {
+                                this.lastValueString = new String(read, StandardCharsets.UTF_8);
+                                this.lastValue = lastValueString;
+                                yield JsonToken.VALUE_STRING;
+                            }
+                            case MESSAGE -> {
+                                this.lastValueObject = readEmbeddedMessage(read);
+                                this.lastValue = lastValueObject;
+                                yield JsonToken.VALUE_EMBEDDED_OBJECT;
+                            }
+                            default -> throw new ProtobufDeserializationException(
+                                    "Cannot deserialize field %s inside %s, type mismatch: expected bytes, string or message, got %s"
+                                            .formatted(lastFieldIndex(), type.getName(), (getCurrentValue() == null ? null : getCurrentValue().getClass().getSimpleName())));
+                        };
+                    }
+                }
+                case WIRE_TYPE_EMBEDDED_MESSAGE -> {
+                    var read = input.readBytes();
+                    if(lastField == null) {
+                        yield null;
+                    } else {
+                        this.lastValueObject = readEmbeddedMessage(read);
+                        this.lastValue = lastValueObject;
+                        yield JsonToken.VALUE_EMBEDDED_OBJECT;
+                    }
+                }
+                case WIRE_TYPE_FIXED32 -> {
+                    var read = input.readFixed32();
+                    if(lastField == null){
+                        yield null;
+                    }else if (lastField.type() == ProtobufType.FLOAT) {
+                        this.lastValueFloat = Float.intBitsToFloat(read);
+                        this.lastValue = lastValueFloat;
+                        yield JsonToken.VALUE_NUMBER_FLOAT;
+                    } else {
+                        this.lastValueInt = read;
+                        this.lastValue = lastValueInt;
+                        yield JsonToken.VALUE_NUMBER_INT;
+                    }
+                }
+                case WIRE_TYPE_END_OBJECT -> JsonToken.END_OBJECT;
+                default -> throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: invalid wire type %s"
+                        .formatted(lastFieldIndex(), type.getName(), lastType));
+            };
+        } else if (packedInput != null) {
+            if (packedInput.isAtEnd()) {
+                this.packedInput = null;
+                return _currToken = JsonToken.END_ARRAY;
+            } else if (lastType == WIRE_TYPE_FIXED64) {
+                this.lastValueLong = packedInput.readInt64();
+                this.lastValue = lastValueLong;
+                return _currToken = JsonToken.VALUE_NUMBER_INT;
+            } else {
+                this.lastValueInt = packedInput.readInt32();
+                this.lastValue = lastValueInt;
+                return _currToken = JsonToken.VALUE_NUMBER_INT;
             }
-            case WIRE_TYPE_FIXED64 -> {
-                this.lastValueLong = input.readFixed64();
-                yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
+        } else {
+            var tag = input.readTag();
+            if (tag == 0) {
+                return _currToken = JsonToken.END_OBJECT;
             }
-            case WIRE_TYPE_FIXED32 -> {
-                this.lastValueInt = input.readFixed32();
-                yield tokenOrNull(JsonToken.VALUE_NUMBER_INT);
-            }
-            case WIRE_TYPE_LENGTH_DELIMITED -> {
-                yield tokenOrNull(readDelimitedWithConversion());
-            }
-            case WIRE_TYPE_EMBEDDED_MESSAGE -> {
-                readEmbeddedMessage(input.readBytes());
-                yield tokenOrNull(JsonToken.VALUE_EMBEDDED_OBJECT);
-            }
-            case WIRE_TYPE_END_OBJECT -> {
-                yield tokenOrNull(JsonToken.END_OBJECT);
-            }
-            default ->
-                    throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: invalid wire type %s"
-                            .formatted(lastFieldIndex(), type.getName(), lastType));
-        };
-    }
 
-    private JsonToken tokenOrNull(JsonToken token) {
-        return lastField == null ? JsonToken.VALUE_NULL : token;
-    }
-
-    private JsonToken readDelimitedWithConversion() {
-        var token = readDelimited();
-        if (lastField == null || lastField.messageType() == null || !lastField.convert()) {
-            return token;
+            this.lastType = tag & 7;
+            this.lastField = ProtobufFieldCache.getField(type, tag >>> 3);
+            return _currToken = JsonToken.FIELD_NAME;
         }
-
-        try {
-            var converter = findConverter();
-            converter.setAccessible(true);
-            this.lastValueObject = converter.invoke(null, lastValueObject);
-            return JsonToken.VALUE_EMBEDDED_OBJECT;
-        } catch (ReflectiveOperationException exception) {
-            throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot invoke converter"
-                    .formatted(lastFieldIndex(), type.getName()), exception);
-        }
     }
 
-    private Method findConverter() {
-        return Arrays.stream(lastField.messageType().getMethods())
-                .filter(this::isValidConverter)
-                .findFirst()
-                .orElseThrow(() -> new ProtobufDeserializationException("Cannot deserialize field %s with index %s in %s: no converter found from %s to %s"
-                        .formatted(lastField.name(), lastFieldIndex(), type.getName(), lastValueObject.getClass().getName(), lastField.messageType().getName())));
-    }
-
-    private boolean isValidConverter(Method method) {
-        return Modifier.isStatic(method.getModifiers())
-                && method.isAnnotationPresent(ProtobufConverter.class)
-                && method.getReturnType() == lastField.messageType()
-                && method.getParameters().length >= 1
-                && (lastValueObject == null || method.getParameters()[0].getType().isAssignableFrom(lastValueObject.getClass()));
-    }
-
-    private JsonToken readDelimited() {
-        var read = input.readBytes();
-        return lastField == null ? readUnknownField(read)
-            : lastField.packed() ? readPackedField(read) : readGenericField(read);
-    }
-
-    private JsonToken readPackedField(byte[] read) {
-        this.lastType = switch (lastField.type()) {
-            case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> WIRE_TYPE_FIXED64;
-            case INT32, SINT32, UINT32, FIXED32, SFIXED32 -> WIRE_TYPE_FIXED32;
-            default -> throw new ProtobufDeserializationException(
-                "Cannot deserialize field %s inside %s: type mismatch(expected scalar type for packed field, got %s)"
-                    .formatted(lastFieldIndex(), type.getName(),
-                        (getCurrentValue() == null ? null
-                            : getCurrentValue().getClass().getSimpleName())));
-        };
-        this.packedInput = new ArrayInputStream(read);
-        return JsonToken.START_ARRAY;
-    }
-
-    private JsonToken readGenericField(byte[] read) {
-        return switch (lastField.type()) {
-            case BYTES -> {
-                this.lastValueObject = read;
-                yield JsonToken.VALUE_EMBEDDED_OBJECT;
-            }
-            case STRING -> {
-                this.lastValueObject = new String(read, StandardCharsets.UTF_8);
-                yield JsonToken.VALUE_STRING;
-            }
-            case MESSAGE -> {
-                readEmbeddedMessage(read);
-                yield JsonToken.VALUE_EMBEDDED_OBJECT;
-            }
-            default -> throw new ProtobufDeserializationException(
-                "Cannot deserialize field %s inside %s, type mismatch: expected bytes, string or message, got %s"
-                    .formatted(
-                        lastFieldIndex(), type.getName(), (getCurrentValue() == null ? null
-                            : getCurrentValue().getClass().getSimpleName())));
-        };
-    }
-
-    private JsonToken readUnknownField(byte[] read) {
-        this.lastValueObject = read;
-        return JsonToken.VALUE_EMBEDDED_OBJECT;
-    }
-
-    private void readEmbeddedMessage(byte[] bytes) {
-        if (lastField == null) {
-            this.lastValueObject = bytes;
-            return;
-        }
-
+    private Object readEmbeddedMessage(byte[] bytes) {
         var lastField = this.lastField;
         var lastType = this.type;
         var lastInput = this.input;
         var lastToken = super._currToken;
         var lastValueInt = this.lastValueInt;
         var lastValueLong = this.lastValueLong;
+        var lastValueString = this.lastValueString;
+        var lastValueFloat = this.lastValueFloat;
+        var lastValueDouble = this.lastValueDouble;
+        var lastValueBool = this.lastValueBool;
+        var lastValue = this.lastValue;
         try {
             ProtobufFieldCache.cacheFields(lastField.messageType());
             this.type = lastField.messageType();
@@ -272,8 +251,13 @@ class ProtobufParser extends ParserMinimalBase {
             this.lastField = null;
             this.lastValueInt = 0;
             this.lastValueLong = 0;
+            this.lastValueString = null;
+            this.lastValueFloat = 0;
+            this.lastValueDouble = 0;
+            this.lastValueBool = false;
             this.lastValueObject = null;
-            this.lastValueObject = readValueAs(lastField.messageType());
+            this.lastValue = null;
+            return readValueAs(lastField.messageType());
         } catch (Throwable exception) {
             throw new ProtobufDeserializationException("Cannot deserialize field %s inside %s: cannot decode embedded message with type %s"
                 .formatted(lastField.index(), lastType.getName(), lastField.messageType() == null ? "unknown" : lastField.messageType().getName()), exception);
@@ -284,6 +268,11 @@ class ProtobufParser extends ParserMinimalBase {
             this.lastField = lastField;
             this.lastValueInt = lastValueInt;
             this.lastValueLong = lastValueLong;
+            this.lastValueString = lastValueString;
+            this.lastValueFloat = lastValueFloat;
+            this.lastValueDouble = lastValueDouble;
+            this.lastValueBool = lastValueBool;
+            this.lastValue = lastValue;
         }
     }
 
@@ -294,31 +283,22 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public Object getCurrentValue() {
-        return switch (lastField.type()){
-            case MESSAGE, BYTES, STRING -> lastValueObject;
-            case FLOAT -> getFloatValue();
-            case DOUBLE -> getDoubleValue();
-            case BOOL, INT32, FIXED32, UINT32, SFIXED32, SINT32 -> lastValueInt;
-            case INT64, SINT64, FIXED64, UINT64, SFIXED64 -> lastValueLong;
-        };
+        return lastValue;
     }
 
     @Override
     public JsonLocation getTokenLocation() {
-        return new JsonLocation(ioContext.contentReference(),
-                input.position(),
-                -1, -1, input.position());
+        return new JsonLocation(ioContext.contentReference(), input.position(), -1, -1, input.position());
     }
 
     @Override
     public String getText() {
-        return (String) lastValueObject;
+        return lastValueString;
     }
 
     @Override
     public int getTextLength() {
-        var text = getText();
-        return text != null ? text.length() : 0;
+        return lastValueString != null ? lastValueString.length() : 0;
     }
 
     @Override
@@ -331,11 +311,11 @@ class ProtobufParser extends ParserMinimalBase {
         return switch (lastField.type()){
             case INT32, SINT32, UINT32, FIXED32, SFIXED32, BOOL, MESSAGE -> lastValueInt;
             case INT64, SINT64, UINT64, FIXED64, SFIXED64-> lastValueLong;
-            case FLOAT -> getFloatValue();
-            case DOUBLE -> getDoubleValue();
+            case FLOAT -> lastValueFloat;
+            case DOUBLE -> lastValueDouble;
             default ->
-                throw new ProtobufDeserializationException("Cannot get number for field %s inside %s for wire type %s: type mismatch"
-                    .formatted(lastFieldIndex(), this.type.getName(), lastType));
+                    throw new ProtobufDeserializationException("Cannot get number for field %s inside %s for wire type %s: type mismatch"
+                            .formatted(lastFieldIndex(), this.type.getName(), lastType));
         };
     }
 
@@ -347,8 +327,8 @@ class ProtobufParser extends ParserMinimalBase {
             case FLOAT -> NumberType.FLOAT;
             case DOUBLE -> NumberType.DOUBLE;
             default ->
-                throw new ProtobufDeserializationException("Cannot get number type for field %s inside %s for wire type %s: type mismatch"
-                    .formatted(lastFieldIndex(), this.type.getName(), lastType));
+                    throw new ProtobufDeserializationException("Cannot get number type for field %s inside %s for wire type %s: type mismatch"
+                            .formatted(lastFieldIndex(), this.type.getName(), lastType));
         };
     }
 
@@ -364,12 +344,17 @@ class ProtobufParser extends ParserMinimalBase {
 
     @Override
     public float getFloatValue() {
-        return Float.intBitsToFloat(lastValueInt);
+        return lastValueFloat;
     }
 
     @Override
     public double getDoubleValue() {
-        return Double.longBitsToDouble(lastValueLong);
+        return lastValueDouble;
+    }
+
+    @Override
+    public boolean getBooleanValue() {
+        return lastValueBool;
     }
 
     @Override

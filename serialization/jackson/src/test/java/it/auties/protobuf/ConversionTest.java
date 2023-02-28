@@ -6,6 +6,7 @@ import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.serialization.jackson.ProtobufSchema;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
 import lombok.extern.jackson.Jacksonized;
@@ -32,9 +33,8 @@ public class ConversionTest implements TestProvider {
     @Accessors(fluent = true)
     public static class SomeMessage implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = STRING)
-        private Wrapper wrapper;
+        private @NonNull Wrapper wrapper;
     }
-
 
     record Wrapper(String value) implements ProtobufMessage {
         @ProtobufConverter

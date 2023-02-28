@@ -28,8 +28,8 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 1)
-@Measurement(iterations = 1)
+@Warmup(iterations = 2)
+@Measurement(iterations = 5)
 public class PerformanceBenchmark {
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;

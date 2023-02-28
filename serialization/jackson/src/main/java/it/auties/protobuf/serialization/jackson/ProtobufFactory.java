@@ -69,7 +69,6 @@ class ProtobufFactory extends JsonFactory {
         return _createParser(data, 0, data.length, _createContext(_createContentReference(data), true), schema);
     }
 
-
     @Override
     public ProtobufParser createParser(byte[] data, int offset, int len) throws IOException {
         var context = _createContext(_createContentReference(data, offset, len), true);
