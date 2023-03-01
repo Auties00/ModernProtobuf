@@ -70,7 +70,7 @@ public class Protobuf<T> {
     public T decode(byte[] bytes) {
         var input = new ArrayInputStream(bytes);
         var instance = builder.get();
-        var repeatedFieldsMap = new HashMap<Integer, List<Object>>();
+        var repeatedFieldsMap = new HashMap<Integer, Collection>();
         var repeatedMatches = false;
         while (true) {
             var tag = input.readTag();
@@ -87,12 +87,12 @@ public class Protobuf<T> {
             var hasAccessor = accessor != null;
             var property = hasAccessor ? accessor.record() : null;
             var value = readFieldContent(input, tag, property);
-            if(hasAccessor){
+            if(hasAccessor && !property.ignore()){
                 if(!property.repeated()){
                     accessor.setter().accept(instance, value);
                 }else {
                     repeatedMatches = true;
-                    var repeatedWrapper = repeatedFieldsMap.computeIfAbsent(number, ignored -> new ArrayList<>());
+                    var repeatedWrapper = repeatedFieldsMap.computeIfAbsent(number, ignored -> accessor.repeatedField().get());
                     repeatedWrapper.add(value);
                 }
             }
