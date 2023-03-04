@@ -3,7 +3,7 @@
     <parent>
         <artifactId>protobuf</artifactId>
         <groupId>com.github.auties00</groupId>
-        <version>1.19</version>
+        <version>1.20</version>
     </parent>
     <modules>
         <module>jackson</module>

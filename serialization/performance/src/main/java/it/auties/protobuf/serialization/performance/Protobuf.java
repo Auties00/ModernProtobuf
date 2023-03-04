@@ -164,7 +164,7 @@ public class Protobuf<T> {
             }
             case WIRE_TYPE_EMBEDDED_MESSAGE -> {
                 var read = input.readBytes();
-                if(read == null){
+                if(property == null || read == null){
                     yield null;
                 }else {
                     var decoder = new Protobuf(property.implementation());

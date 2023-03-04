@@ -213,10 +213,6 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     }
 
     private ProtobufTypeImplementation parseImplementation(Element entry, ProtobufProperty annotation, TypeMirror implementation) {
-        if (!annotation.type().isMessage()) {
-            return new ProtobufTypeImplementation(getRawType(entry.asType().toString()), null);
-        }
-
         if (!implementation.toString().equals(PROTOBUF_NAME)) {
             var implementationType = getRawType(implementation.toString());
             if(annotation.repeated()){
@@ -260,16 +256,16 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     private String createSetter(String builderClassName, ProtobufWritable entry) {
         var rawType = entry.implementation().rawType();
         var type = PRIMITIVES_MAP.getOrDefault(rawType, rawType);
-        var converter = getStaticConstructor(entry.element());
+        var converter = getStaticConstructor(entry.elementType());
         if(converter != null){
             return SETTER_CONVERTER_ENTRY.formatted(builderClassName, entry.name(), type, converter.getSimpleName().toString());
         }
 
-        if (entry.element() == null || entry.element().getKind() != ElementKind.ENUM) {
+        if (entry.elementType() == null || entry.elementType().getKind() != ElementKind.ENUM) {
             return SETTER_ENTRY.formatted(builderClassName, type, builderClassName, entry.name());
         }
 
-        var enumStaticConstructor = getStaticConstructor(entry.element());
+        var enumStaticConstructor = getStaticConstructor(entry.elementType());
         if(enumStaticConstructor != null) {
             return SETTER_ENUM_ENTRY.formatted(builderClassName, entry.name(), type, enumStaticConstructor.getSimpleName().toString());
         }
@@ -283,7 +279,7 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     }
 
     private Element getImplicitStaticConstructor(ProtobufWritable entry) {
-        return entry.element() == null ? null : entry.element()
+        return entry.elementType() == null ? null : entry.elementType()
                 .getEnclosedElements()
                 .stream()
                 .filter(candidate -> candidate.getKind() == ElementKind.METHOD
@@ -297,13 +293,13 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
         var thisConverter = getConverter(entry.enclosing());
         var thisConverterElement = thisConverter != null ? (TypeElement) processingEnv.getTypeUtils().asElement(thisConverter.getReturnType()) : entry.enclosing();
         var methodName = thisConverter != null ? "%s().%s".formatted(thisConverter.getSimpleName(), entry.name()) : entry.name();
-        var converter = getConverter(entry.element());
+        var converter = getConverter(entry.elementType());
         if (converter != null) {
             return isOptionalGetter(thisConverterElement, entry) ? GETTER_CONVERTED_ENTRY_OPTIONAL.formatted(className, methodName, converter.getSimpleName().toString())
                     : GETTER_CONVERTED_ENTRY.formatted(className, methodName, converter.getSimpleName().toString());
         }
 
-        if (entry.element() == null || entry.element().getKind() != ElementKind.ENUM) {
+        if (entry.elementType() == null || entry.elementType().getKind() != ElementKind.ENUM) {
             return isOptionalGetter(thisConverterElement, entry) ? GETTER_ENTRY_OPTIONAL.formatted(className, methodName)
                     : GETTER_ENTRY.formatted(className, methodName);
         }
@@ -335,7 +331,7 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     }
 
     private Element getEnumIndexField(ProtobufWritable entry) {
-        return entry.element()
+        return entry.elementType()
                 .getEnclosedElements()
                 .stream()
                 .filter(field -> field.getKind() == ElementKind.METHOD && field.getSimpleName().toString().equals("index"))
