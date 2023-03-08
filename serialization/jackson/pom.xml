@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.github.auties00</groupId>
         <artifactId>protobuf-serialization</artifactId>
-        <version>1.20</version>
+        <version>1.21</version>
     </parent>
 
     <artifactId>protobuf-serializer-jackson</artifactId>
@@ -44,12 +44,12 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>1.20</version>
+            <version>1.21</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-serialization-base</artifactId>
-            <version>1.20</version>
+            <version>1.21</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
