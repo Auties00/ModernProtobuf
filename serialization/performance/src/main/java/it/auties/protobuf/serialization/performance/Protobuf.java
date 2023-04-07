@@ -248,6 +248,8 @@ public class Protobuf<T> {
             }
         } catch (ClassCastException exception) {
             throw new ProtobufSerializationException("A field misreported its own type in a schema: %s".formatted(field), exception);
+        } catch (ProtobufSerializationException exception){
+            throw new ProtobufSerializationException("Called by field %s inside %s".formatted(field, value), exception);
         }
     }
 }
