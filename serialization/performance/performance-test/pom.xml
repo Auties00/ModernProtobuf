@@ -33,7 +33,7 @@
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
                             <artifactId>protobuf-serializer-performance</artifactId>
-                            <version>1.21</version>
+                            <version>1.22</version>
                         </annotationProcessorPath>
                         <annotationProcessorPath>
                             <groupId>org.openjdk.jmh</groupId>
@@ -56,7 +56,7 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-serializer-performance</artifactId>
-            <version>1.21</version>
+            <version>1.22</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
@@ -81,7 +81,7 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-serializer-jackson</artifactId>
-            <version>1.21</version>
+            <version>1.22</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
