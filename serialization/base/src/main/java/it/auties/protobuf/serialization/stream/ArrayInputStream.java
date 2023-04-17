@@ -23,11 +23,6 @@ public class ArrayInputStream {
         fspath:
         {
             int tempPos = pos;
-
-            if (limit == tempPos) {
-                break fspath;
-            }
-
             byte[] buffer = this.buffer;
             int x;
             if ((x = buffer[tempPos++]) >= 0) {
@@ -65,11 +60,6 @@ public class ArrayInputStream {
         fspath:
         {
             int tempPos = pos;
-
-            if (limit == tempPos) {
-                break fspath;
-            }
-
             byte[] buffer = this.buffer;
             long x;
             int y;
@@ -138,6 +128,10 @@ public class ArrayInputStream {
 
     public int readFixed32() {
         var tempPos = this.pos;
+        if (this.limit - tempPos < 4) {
+            throw ProtobufDeserializationException.truncatedMessage();
+        }
+
         byte[] buffer = this.buffer;
         this.pos = tempPos + 4;
         return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
@@ -175,7 +169,7 @@ public class ArrayInputStream {
     }
 
     public boolean isAtEnd() {
-        return this.pos == this.limit;
+        return pos >= limit;
     }
 
     public int position() {

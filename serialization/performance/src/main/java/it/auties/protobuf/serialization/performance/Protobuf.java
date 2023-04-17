@@ -21,7 +21,6 @@ import java.util.function.Supplier;
 import static it.auties.protobuf.serialization.model.WireType.*;
 
 // Code style could be better in this class, but it's like this because it needs to be as performant as possible
-// Every ns is saved here
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class Protobuf<T> {
     private static final Map<Class<?>, ProtobufModel> propertiesMap;

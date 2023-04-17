@@ -175,8 +175,15 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     private record ClassEntry(String packageName, String className) { }
 
     private List<ProtobufWritable> getProtobufFields(TypeElement typeElement) {
-        return typeElement.getEnclosedElements()
-                .stream()
+        var elements = new ArrayList<Element>();
+        var parent = typeElement.getSuperclass();
+        while (parent != null && hasProtobufMessageInterface(parent)){
+            var superTypeElement = (TypeElement) processingEnv.getTypeUtils().asElement(parent);
+            elements.addAll(superTypeElement.getEnclosedElements());
+            parent = superTypeElement.getSuperclass();
+        }
+        elements.addAll(typeElement.getEnclosedElements());
+        return elements.stream()
                 .map(this::getProtobufField)
                 .filter(Objects::nonNull)
                 .toList();
