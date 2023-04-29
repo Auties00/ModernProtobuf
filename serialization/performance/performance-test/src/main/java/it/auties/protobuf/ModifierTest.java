@@ -27,7 +27,7 @@ public class ModifierTest implements TestProvider {
         Assertions.assertTrue(encode(alternated), "Alternated fields didn't pass compilation");
     }
 
-    private boolean encode(Object object) throws IOException {
+    private boolean encode(ProtobufMessage object) throws IOException {
         try {
             writeValueAsBytes(object);
             return true;

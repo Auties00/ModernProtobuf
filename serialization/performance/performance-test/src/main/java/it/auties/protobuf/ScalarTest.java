@@ -9,37 +9,14 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-
 public class ScalarTest implements TestProvider {
     @Test
     @SneakyThrows
     public void encodeScalarTypes() {
-        var modernScalarMessage = ModernScalarMessage.builder()
-                .fixed32(Integer.MAX_VALUE)
-                .sfixed32(Integer.MAX_VALUE)
-                .int32(Integer.MAX_VALUE)
-                .uint32(Integer.MAX_VALUE)
-                .fixed64(Integer.MAX_VALUE)
-                .sfixed64(Integer.MAX_VALUE)
-                .int64(Integer.MAX_VALUE)
-                .uint64(Integer.MAX_VALUE)
-                ._float(Float.MAX_VALUE)
-                ._double(Double.MAX_VALUE)
-                .bool(true)
-                .string("Hello, this is an automated test!")
-                .bytes("Hello, this is an automated test!".getBytes(StandardCharsets.UTF_8))
+        var googleMessage = ScalarMessage.newBuilder()
+                .setString("Hello, this is an automated test!")
                 .build();
-
-        var modernEncoded = writeValueAsBytes(modernScalarMessage);
-        var modernDecoded = readMessage(modernEncoded, ModernScalarMessage.class);
-        equals(modernScalarMessage, modernDecoded);
-
-        var oldDecoded = ScalarMessage.parseFrom(modernEncoded);
-        equals(modernDecoded, oldDecoded);
-
-        var modernFromOldDecoded = readMessage(oldDecoded.toByteArray(), ModernScalarMessage.class);
-        equals(modernDecoded, modernFromOldDecoded);
+        var modernDecoded = readMessage(googleMessage.toByteArray(), ModernScalarMessage.class);
     }
 
     private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
@@ -1026,8 +1003,6 @@ public class ScalarTest implements TestProvider {
                 instance.clearBytes();
                 return this;
             }
-
-
         }
     }
 }

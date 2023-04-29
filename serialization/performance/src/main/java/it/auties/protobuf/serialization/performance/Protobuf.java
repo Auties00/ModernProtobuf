@@ -1,62 +1,56 @@
 package it.auties.protobuf.serialization.performance;
 
+import it.auties.protobuf.base.ProtobufMessage;
+import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
 import it.auties.protobuf.serialization.exception.ProtobufDeserializationException;
-import it.auties.protobuf.serialization.exception.ProtobufException;
-import it.auties.protobuf.serialization.exception.ProtobufSerializationException;
 import it.auties.protobuf.serialization.model.WireType;
-import it.auties.protobuf.serialization.performance.model.ProtobufAccessors;
-import it.auties.protobuf.serialization.performance.model.ProtobufField;
-import it.auties.protobuf.serialization.performance.model.ProtobufModel;
-import it.auties.protobuf.serialization.performance.processor.ProtobufAnnotation;
 import it.auties.protobuf.serialization.stream.ArrayInputStream;
-import it.auties.protobuf.serialization.stream.ArrayOutputStream;
-import lombok.NonNull;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static it.auties.protobuf.serialization.model.WireType.*;
 
 // Code style could be better in this class, but it's like this because it needs to be as performant as possible
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class Protobuf<T> {
-    private static final Map<Class<?>, ProtobufModel> propertiesMap;
-    static {
-        try {
-            var clazz = Class.forName("it.auties.protobuf.ProtobufStubs");
-            var field = clazz.getField("properties");
-            field.setAccessible(true);
-            propertiesMap = new HashMap<>((Map<Class<?>, ProtobufModel>) field.get(null));
-        } catch (ReflectiveOperationException exception) {
-            throw new RuntimeException("Cannot initialize decoder", exception);
+public class Protobuf<T extends ProtobufMessage> {
+    private final Class<T> clazz;
+    private final Map<Integer, Collection> repeatedFields;
+    private final Map<Integer, ProtoField> properties;
+
+    private Protobuf(Class<T> clazz){
+        this.clazz = clazz;
+        this.repeatedFields = new HashMap<>();
+        this.properties = new HashMap<>();
+        var declaredFields = clazz.getDeclaredFields();
+        var declaredFieldsLength = declaredFields.length;
+        var fields = clazz.getFields();
+        var total = declaredFieldsLength + fields.length;
+        for(var i = 0; i < total; i++){
+            var field = i < declaredFieldsLength ? declaredFields[i] : fields[i];
+            var annotation = Annotations.getAnnotation(field, ProtobufProperty.class);
+            if(annotation != null) {
+                properties.put((Integer) annotation.get("index"), new ProtoField(field, annotation));
+            }
         }
     }
 
-    private final Supplier<?> builder;
-    private final Function build;
-    private final Map<Integer, ProtobufAccessors> accessors;
-    public Protobuf(@NonNull Class<T> clazz) {
-        var properties = propertiesMap.get(clazz);
-        Objects.requireNonNull(properties, "Corrupted schema: no properties for %s".formatted(clazz.getName()));
-        this.builder = properties.builder();
-        this.build = properties.build();
-        this.accessors = properties.accessors();
-    }
+    private record ProtoField(Field field, Map<String, Object> properties){}
 
-    @SuppressWarnings("unused")
-    public static <T> Protobuf<T> of(Class<T> clazz) {
-        return new Protobuf<>(clazz);
-    }
-    
-    public static <T> T readMessage(byte[] message, Class<T> clazz) {
+    public static <T extends ProtobufMessage> T readMessage(byte[] message, Class<T> clazz) {
+        if(message == null){
+            return null;
+        }
+
         var decoder = new Protobuf<>(clazz);
         return decoder.decode(message);
     }
 
-    public static byte[] writeMessage(Object object) {
+    public static byte[] writeMessage(ProtobufMessage object) {
         if(object == null){
             return null;
         }
@@ -65,70 +59,81 @@ public class Protobuf<T> {
         return encoder.encode(object);
     }
 
-    @SuppressWarnings("unchecked")
-    public T decode(byte[] bytes) {
-        var input = new ArrayInputStream(bytes);
-        var instance = builder.get();
-        var repeatedFieldsMap = new HashMap<Integer, Collection>();
-        var repeatedMatches = false;
-        while (true) {
-            var tag = input.readTag();
-            if (tag == 0) {
-                break;
-            }
+    private T decode(byte[] bytes) {
+       try {
+           var input = new ArrayInputStream(bytes);
+           var builder = MethodHandles.publicLookup()
+                   .findStatic(clazz, "builder", MethodType.methodType(Object.class))
+                   .invokeExact();
+           var builderType = builder.getClass();
+           var repeatedMatches = false;
+           while (true) {
+               var tag = input.readTag();
+               if (tag == 0) {
+                   break;
+               }
 
-            var number = tag >>> 3;
-            if (number == 0) {
-                throw ProtobufDeserializationException.invalidTag(tag);
-            }
+               var index = tag >>> 3;
+               if (index == 0) {
+                   throw ProtobufDeserializationException.invalidTag(tag);
+               }
 
-            var accessor = accessors.get(number);
-            var hasAccessor = accessor != null;
-            var property = hasAccessor ? accessor.record() : null;
-            var value = readFieldContent(input, tag, property);
-            if(hasAccessor && !property.ignore()){
-                if(!property.repeated()){
-                    accessor.setter().accept(instance, value);
-                }else {
-                    repeatedMatches = true;
-                    var repeatedWrapper = repeatedFieldsMap.computeIfAbsent(number, ignored -> accessor.repeatedField().get());
-                    repeatedWrapper.add(value);
-                }
-            }
-        }
+               var field = properties.get(index);
+               var fieldType = field.field.getType();
+               var result = readFieldContent(input, tag, field);
+               if(result == null){
+                   continue;
+               }
 
-        if(repeatedMatches) {
-            for (var entry : repeatedFieldsMap.entrySet()) {
-                var setter = accessors.get(entry.getKey()).setter();
-                if(setter != null){
-                    setter.accept(instance, entry.getValue());
-                }
-            }
-        }
+               if((boolean) field.properties.getOrDefault("repeated", false)){
+                   repeatedMatches = true;
+                   var repeatedWrapper = repeatedFields.computeIfAbsent(index, ignored -> createCollection(fieldType));
+                   repeatedWrapper.add(result);
+               }else {
+                   MethodHandles.privateLookupIn(builderType, MethodHandles.lookup())
+                           .findSetter(builderType, field.field.getName(), field.field.getType())
+                           .invoke(builder, result);
+               }
+           }
 
-        return (T) build.apply(instance);
+           if(repeatedMatches) {
+               // TODO: Repeated messages
+           }
+
+           return (T) MethodHandles.publicLookup()
+                   .findVirtual(builderType, "build", MethodType.methodType(clazz))
+                   .invoke(builder);
+       }catch (Throwable throwable){
+           throw new ProtobufDeserializationException("Cannot read message", throwable);
+       }
     }
 
-    private Object readFieldContent(ArrayInputStream input, int tag, ProtobufField property) {
+    private static Collection<?> createCollection(Class<?> fieldType){
+        try {
+            return (Collection<?>) fieldType.getConstructor().newInstance();
+        }catch (ReflectiveOperationException exception){
+            throw new NoSuchElementException("Cannot find a no-args constructor for class %s".formatted(fieldType.getName()));
+        }
+    }
+
+    private Object readFieldContent(ArrayInputStream input, int tag, ProtoField field) {
+        var type = field != null ? (ProtobufType) field.properties.get("type") : null;
         return switch (tag & 7) {
             case WIRE_TYPE_VAR_INT -> {
                 var value = input.readInt64();
-                if (property == null) {
-                    yield null;
-                } else {
-                    yield switch (property.type()) {
-                        case INT32, SINT32, UINT32, MESSAGE -> (int) value;
-                        case INT64, SINT64, UINT64 -> value;
-                        case BOOL -> value == 1;
-                        default -> throw new IllegalStateException("Unexpected value: " + property.type());
-                    };
-                }
+                yield switch (type) {
+                    case INT32, SINT32, UINT32, MESSAGE -> (int) value;
+                    case INT64, SINT64, UINT64 -> value;
+                    case BOOL -> value == 1;
+                    case null -> null;
+                    default -> throw new IllegalStateException("Unexpected value: " + type);
+                };
             }
             case WIRE_TYPE_FIXED64 -> {
                 var value = input.readFixed64();
-                if(property == null){
+                if(field == null){
                     yield null;
-                }else if (property.type() == ProtobufType.DOUBLE) {
+                }else if (type == ProtobufType.DOUBLE) {
                     yield Double.longBitsToDouble(value);
                 }else {
                     yield value;
@@ -136,45 +141,47 @@ public class Protobuf<T> {
             }
             case WIRE_TYPE_LENGTH_DELIMITED -> {
                 var read = input.readBytes();
-                if(property == null){
+                if(field == null){
                     yield null;
-                } else if(property.packed()){
+                } else if((boolean) field.properties.get("packed")){
                     var stream = new ArrayInputStream(read);
-                    yield switch (property.type()){
+                    yield switch (type){
                         case FIXED32, SFIXED32 -> stream.readFixed32();
                         case INT32, SINT32, UINT32 -> stream.readInt32();
                         case FLOAT -> Float.intBitsToFloat(stream.readFixed32());
                         case FIXED64, SFIXED64 -> stream.readFixed64();
                         case INT64, SINT64, UINT64  -> stream.readInt64();
                         case DOUBLE -> Double.longBitsToDouble(stream.readFixed64());
-                        default -> throw new IllegalStateException("Unexpected value: " + property.type());
+                        default -> throw new IllegalStateException("Unexpected value: " + type);
                     };
                 } else {
-                    yield switch (property.type()) {
+                    yield switch (type) {
                         case BYTES -> read;
                         case STRING -> new String(read, StandardCharsets.UTF_8);
                         case MESSAGE -> {
-                            var decoder = new Protobuf(property.implementation());
+                            var implementation = (Class<?>) field.properties.get("implementation");
+                            var decoder = new Protobuf(implementation);
                             yield decoder.decode(read);
                         }
-                        default -> throw new IllegalStateException("Unexpected value: " + property.type());
+                        default -> throw new IllegalStateException("Unexpected value: " + type);
                     };
                 }
             }
             case WIRE_TYPE_EMBEDDED_MESSAGE -> {
                 var read = input.readBytes();
-                if(property == null || read == null){
+                if(field == null || read == null){
                     yield null;
                 }else {
-                    var decoder = new Protobuf(property.implementation());
+                    var implementation = (Class<?>) field.properties.get("implementation");
+                    var decoder = new Protobuf(implementation);
                     yield decoder.decode(read);
                 }
             }
             case WireType.WIRE_TYPE_FIXED32 -> {
                 var value = input.readFixed32();
-                if(property == null){
+                if(field == null){
                     yield null;
-                }else if (property.type() == ProtobufType.FLOAT) {
+                }else if (type == ProtobufType.FLOAT) {
                     yield Float.intBitsToFloat(value);
                 } else {
                     yield value;
@@ -185,70 +192,7 @@ public class Protobuf<T> {
         };
     }
 
-    public byte[] encode(Object object) {
-        try {
-            var output = new ArrayOutputStream();
-            for(var entry : accessors.values()){
-                var record = entry.record();
-                Function getter = entry.getter();
-                var value = getter.apply(object);
-                if(record.required() && value == null){
-                    throw new ProtobufSerializationException("Mandatory field with index %s in %s cannot be null"
-                            .formatted(record.index(), object.getClass().getName()));
-                }
-
-                encodeField(output, record, value);
-            }
-            return output.buffer().toByteArray();
-        } catch (ProtobufException exception) {
-            throw exception;
-        } catch (Throwable throwable) {
-            throw new ProtobufSerializationException("An unknown exception occurred while serializing", throwable);
-        }
-    }
-
-    private void encodeField(ArrayOutputStream output, ProtobufField field, Object value) {
-        if(value == null){
-            return;
-        }
-
-        try {
-            if(field.repeated()){
-               try {
-                   var singleField = ProtobufAnnotation.toNonRepeatedField(field);
-                   var collection = (Collection<?>) value;
-                   collection.forEach(entry -> encodeField(output, singleField, entry));
-                   return;
-               }catch (ClassCastException exception){
-                   throw new ProtobufSerializationException("An error occurred while serializing %s: repeated fields should be wrapped in a collection".formatted(field), exception);
-               }
-            }
-            
-            switch (field.type()) {
-                case BOOL -> output.writeBool(field.index(), (boolean) value);
-                case STRING -> output.writeString(field.index(), (String) value);
-                case BYTES -> output.writeByteArray(field.index(), (byte[]) value);
-                case FLOAT -> output.writeFixed32(field.index(), Float.floatToRawIntBits((float) value));
-                case DOUBLE -> output.writeFixed64(field.index(), Double.doubleToRawLongBits((double) value));
-                case INT32, SINT32 -> output.writeInt32(field.index(), (int) value);
-                case UINT32 -> output.writeUInt32(field.index(), (int) value);
-                case FIXED32, SFIXED32 -> output.writeFixed32(field.index(), (int) value);
-                case INT64, SINT64 -> output.writeInt64(field.index(), (long) value);
-                case UINT64 -> output.writeUInt64(field.index(), (long) value);
-                case FIXED64, SFIXED64 -> output.writeFixed64(field.index(), (long) value);
-                default -> {
-                    if(value instanceof Integer enumIndex){
-                        output.writeUInt64(field.index(), enumIndex);
-                    }else {
-                        var message = writeMessage(value);
-                        output.writeByteArray(field.index(), message);
-                    }
-                }
-            }
-        } catch (ClassCastException exception) {
-            throw new ProtobufSerializationException("A field misreported its own type in a schema: %s".formatted(field), exception);
-        } catch (ProtobufSerializationException exception){
-            throw new ProtobufSerializationException("Called by field %s inside %s".formatted(field, value), exception);
-        }
+    private byte[] encode(Object object) {
+        throw new UnsupportedOperationException();
     }
 }

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.dataformat.protobuf.ProtobufMapper;
 import com.fasterxml.jackson.dataformat.protobuf.schema.ProtobufSchemaLoader;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessageLite;
-import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
 import it.auties.protobuf.base.ProtobufType;
@@ -33,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 public class PerformanceBenchmark {
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;
-    private static final Protobuf<ModernScalarMessage> MODERN_READER_PERFORMANCE;
     private static final it.auties.protobuf.serialization.jackson.ProtobufMapper MODERN_READER_JACKSON;
     private static final ObjectReader JACKSON_READER;
     static {
@@ -48,7 +46,6 @@ public class PerformanceBenchmark {
                     .setSfixed64(Long.MAX_VALUE)
                     .build()
                     .toByteArray();
-            MODERN_READER_PERFORMANCE = new Protobuf<>(ModernScalarMessage.class);
             var protoSource = ClassLoader.getSystemClassLoader().getResource("scalar.proto");
             Objects.requireNonNull(protoSource, "Missing scalar proto");
             var protoSchema = Files.readString(Path.of(protoSource.toURI()));
@@ -67,34 +64,7 @@ public class PerformanceBenchmark {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void modernProtobufPerformance() throws IOException {
         for (var i = 0; i < ITERATIONS; ++i) {
-            MODERN_READER_PERFORMANCE.decode(SERIALIZED_INPUT);
-        }
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void modernProtobufJackson() throws IOException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            MODERN_READER_JACKSON.readMessage(SERIALIZED_INPUT, ModernScalarMessage.class);
-        }
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void jacksonProtobuf() throws IOException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            JACKSON_READER.readValue(SERIALIZED_INPUT);
-        }
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void googleProtobuf() throws InvalidProtocolBufferException {
-        for (var i = 0; i < ITERATIONS; ++i) {
-            ScalarMessage.parseFrom(SERIALIZED_INPUT);
+            Protobuf.readMessage(SERIALIZED_INPUT, ModernScalarMessage.class);
         }
     }
 
@@ -237,6 +207,10 @@ public class PerformanceBenchmark {
                 type = ProtobufType.BYTES
         )
         private byte[] bytes;
+
+        public static Object builder(){
+            return new ModernScalarMessageBuilder();
+        }
     }
 
     public interface ScalarMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {

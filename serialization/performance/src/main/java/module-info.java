@@ -1,5 +1,3 @@
-import it.auties.protobuf.serialization.performance.processor.ProtobufPropertyProcessor;
-
 open module it.auties.protobuf.serializer.performance {
     requires static lombok;
     requires static java.logging;
@@ -9,7 +7,4 @@ open module it.auties.protobuf.serializer.performance {
     requires java.compiler;
 
     exports it.auties.protobuf.serialization.performance;
-    exports it.auties.protobuf.serialization.performance.model;
-
-    provides javax.annotation.processing.Processor with ProtobufPropertyProcessor;
 }

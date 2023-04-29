@@ -34,7 +34,37 @@
                             <version>1.35</version>
                         </path>
                     </annotationProcessorPaths>
-                    <compilerArgs>--enable-preview</compilerArgs>
+                    <compilerArgs>
+                        <compilerArg>--enable-preview</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.annotation=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.generics.factory=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.generics.parser=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.generics.scope=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.generics.visitor=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/jdk.internal.reflect=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/jdk.internal.access=it.auties.protobuf.serializer.performance</compilerArg>
+                        <compilerArg>--add-exports=java.base/sun.reflect.generics.tree=it.auties.protobuf.serializer.performance</compilerArg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <source>${java.version}</source>
+                    <failOnError>true</failOnError>
+                    <additionalOptions>--enable-preview --add-exports java.base/sun.reflect.annotation=it.auties.protobuf.serializer.performance --add-exports java.base/sun.reflect.generics.factory=it.auties.protobuf.serializer.performance --add-exports java.base/sun.reflect.generics.parser=it.auties.protobuf.serializer.performance --add-exports java.base/sun.reflect.generics.scope=it.auties.protobuf.serializer.performance --add-exports java.base/sun.reflect.generics.visitor=it.auties.protobuf.serializer.performance --add-exports java.base/jdk.internal.reflect=it.auties.protobuf.serializer.performance --add-exports java.base/jdk.internal.access=it.auties.protobuf.serializer.performance --add-exports java.base/sun.reflect.generics.tree=it.auties.protobuf.serializer.performance</additionalOptions>
+                    <debug>true</debug>
+                    <verbose>true</verbose>
                 </configuration>
             </plugin>
         </plugins>
