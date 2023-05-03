@@ -27,6 +27,7 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
     private static final String BUILDER_INSTRUCTION = "%s::builder";
     private static final String BUILD_INSTRUCTION = "(%s e) -> e.build()";
     private static final String SETTER_ENTRY = "(java.util.function.BiConsumer<%s, %s>) %s::%s";
+    private static final String SETTER_REPEATED_ENTRY = "(java.util.function.BiConsumer<%s, %s>) %s::%s";
     private static final String SETTER_CONVERTER_ENTRY = "(java.util.function.BiConsumer<%s, Object>) (k, v) -> k.%s(%s.%s(v))";
     private static final String SETTER_CONVERTER_REPEATED_ENTRY = "(java.util.function.BiConsumer<%s, java.util.Collection>) (k, v) -> k.%s(v.stream().map(%s::%s).filter(java.util.Objects::nonNull).toList())";
     private static final String SETTER_ENUM_ENTRY = "(java.util.function.BiConsumer<%s, Integer>) (k, v) -> k.%s(%s.%s(v))";
@@ -282,6 +283,11 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
         }
 
         if (entry.implementation().rawElement() == null || entry.implementation().rawElement().getKind() != ElementKind.ENUM) {
+            if(entry.repeated()){
+                var repeatedType =  getRepeatedParameterElement(entry.implementation().rawType());
+                return SETTER_REPEATED_ENTRY.formatted(builderClassName, getRawType(repeatedType.toString()), builderClassName, entry.name());
+            }
+
             return SETTER_ENTRY.formatted(builderClassName, type, builderClassName, entry.name());
         }
 
@@ -296,6 +302,13 @@ public class ProtobufPropertyProcessor extends AbstractProcessor {
         }
 
         return SETTER_ENUM_ENTRY_FALLBACK.formatted(builderClassName, type, entry.name(), type);
+    }
+
+    private TypeMirror getRepeatedParameterElement(TypeMirror typeMirror) {
+        var collectionTypeMirror = processingEnv.getElementUtils().getTypeElement(Collection.class.getName()).asType();
+        var erasedTypeMirror = processingEnv.getTypeUtils().erasure(typeMirror);
+        return processingEnv.getTypeUtils().isAssignable(erasedTypeMirror, collectionTypeMirror)
+                ? erasedTypeMirror : collectionTypeMirror;
     }
 
     private Element getImplicitStaticConstructor(ProtobufWritable entry) {
