@@ -1,6 +1,0 @@
-package it.auties.protobuf;
-
-message RequiredMessage {
-  required string required = 1;
-  optional string optional = 2;
-}
