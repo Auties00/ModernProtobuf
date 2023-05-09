@@ -11,7 +11,7 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class MixedNotationsTest implements TestProvider {
+public class MixedNotationsTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

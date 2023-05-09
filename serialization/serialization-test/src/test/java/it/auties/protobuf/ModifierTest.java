@@ -15,7 +15,7 @@ import java.io.IOException;
 
 import static it.auties.protobuf.base.ProtobufType.STRING;
 
-public class ModifierTest implements TestProvider {
+public class ModifierTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import static it.auties.protobuf.base.ProtobufType.STRING;
 
-public class Utf8MessageTest implements TestProvider {
+public class Utf8MessageTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testNormal() {

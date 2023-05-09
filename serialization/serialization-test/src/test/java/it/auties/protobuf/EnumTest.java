@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static it.auties.protobuf.base.ProtobufType.MESSAGE;
 
-public class EnumTest implements TestProvider {
+public class EnumTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

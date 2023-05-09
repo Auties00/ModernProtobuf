@@ -10,12 +10,11 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HexFormat;
 import java.util.List;
 
 import static it.auties.protobuf.base.ProtobufType.UINT32;
 
-public class PackedTest implements TestProvider {
+public class PackedTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

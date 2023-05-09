@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import static it.auties.protobuf.base.ProtobufType.STRING;
 
-public class MissingFieldTest implements TestProvider {
+public class MissingFieldTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

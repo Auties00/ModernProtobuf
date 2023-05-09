@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import static it.auties.protobuf.base.ProtobufType.MESSAGE;
 import static it.auties.protobuf.base.ProtobufType.STRING;
 
-public class EmbeddedMessageTest implements TestProvider {
+public class EmbeddedMessageTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

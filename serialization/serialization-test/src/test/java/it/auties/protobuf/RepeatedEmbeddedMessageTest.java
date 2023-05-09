@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-public class RepeatedEmbeddedMessageTest implements TestProvider {
+public class RepeatedEmbeddedMessageTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {

@@ -17,7 +17,7 @@ import java.util.List;
 
 import static it.auties.protobuf.base.ProtobufType.STRING;
 
-public class ConversionTest implements TestProvider {
+public class ConversionTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {
