@@ -8,7 +8,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufProperty {
-    String ANNOTATION_NAME = "it.auties.protobuf.base.ProtobufProperty";
     String DEFAULT_NAME = "<unknown>";
 
     int index();
@@ -22,8 +21,6 @@ public @interface ProtobufProperty {
     boolean required() default false;
 
     boolean ignore() default false;
-
-    boolean packed() default false;
 
     boolean repeated() default false;
 }
