@@ -318,12 +318,12 @@ public class ProtobufMavenMojo extends AbstractMojo {
     private void createDeserializerMethod(ClassPool classPool, CtClass ctClass, Map<CtField, ProtobufProperty> fields, boolean test) throws NotFoundException, CannotCompileException {
         var methodName = getDeserializationMethod(ctClass);
         if(ctClass.isEnum()){
-            var methodBody = DESERIALIZATION_ENUM_BODY.formatted(ctClass.getName(), DESERIALIZATION_ENUM_METHOD, ctClass.getName(), ctClass.getName());
-            addSafeMethod(ctClass, methodName, methodBody);
+            var methodBody = DESERIALIZATION_ENUM_BODY.formatted(ctClass.getName(), methodName, ctClass.getName(), ctClass.getName());
+            addSafeMethod(ctClass, methodName, methodBody, classPool.get(int.class.getName()));
             return;
         }
 
-        var builderMethod = getBuilderMethod(ctClass);
+        var builderMethod = findMethod(ctClass, "builder");
         if(builderMethod.isEmpty()){
             getLog().error("Missing builder() in %s".formatted(ctClass.getName()));
             return;
@@ -376,7 +376,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
             });
             body.println("return builder.build();");
             body.println("}");
-            addSafeMethod(ctClass, methodName, bodyBuilder.toString());
+            addSafeMethod(ctClass, methodName, bodyBuilder.toString(), classPool.get(byte[].class.getName()));
             getLog().info("Created deserialization method");
         }
     }
@@ -400,14 +400,18 @@ public class ProtobufMavenMojo extends AbstractMojo {
         throw new IllegalArgumentException("Unexpected collection type for repeated field %s in %s: %s".formatted(field.getName(), field.getDeclaringClass().getName(), implementation.getName()));
     }
 
-    private void addSafeMethod(CtClass ctClass, String methodName, String body) throws CannotCompileException, NotFoundException {
+    private void addSafeMethod(CtClass ctClass, String methodName, String body, CtClass... params) throws CannotCompileException {
+        findMethod(ctClass, methodName, params).ifPresent(method -> {
+            try {
+                ctClass.removeMethod(method);
+            } catch (NotFoundException exception) {
+                throw new RuntimeException("Cannot delete method", exception);
+            }
+        });
         var method = CtMethod.make(body, ctClass);
-        var existingMethods = ctClass.getDeclaredMethods(methodName);
-        for (var existingMethod : existingMethods) {
-            ctClass.removeMethod(existingMethod);
-        }
         ctClass.addMethod(method);
     }
+
 
     private String toJavaType(CtMethod ctMethod){
         return toJavaType(ctMethod.getDeclaringClass()) + "." + ctMethod.getName();
@@ -637,14 +641,6 @@ public class ProtobufMavenMojo extends AbstractMojo {
             return Optional.of(Map.entry(entry, annotation));
         }catch (ClassNotFoundException exception){
             throw new RuntimeException("Cannot parse field", exception);
-        }
-    }
-
-    private Optional<CtMethod> getBuilderMethod(CtClass clazz) {
-        try {
-            return Optional.ofNullable(clazz.getDeclaredMethod("builder"));
-        }catch (NotFoundException exception){
-            return Optional.empty();
         }
     }
 
