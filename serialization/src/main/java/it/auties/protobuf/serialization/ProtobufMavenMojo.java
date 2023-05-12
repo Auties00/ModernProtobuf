@@ -624,11 +624,27 @@ public class ProtobufMavenMojo extends AbstractMojo {
     }
 
     private Map<CtField, ProtobufProperty> getProtobufFields(CtClass ctClass) {
-        return Stream.of(ctClass.getFields(), ctClass.getDeclaredFields())
-                .flatMap(Arrays::stream)
+        var fields = new HashSet<CtField>();
+        fields.addAll(Arrays.asList(ctClass.getFields()));
+        fields.addAll(Arrays.asList(ctClass.getDeclaredFields()));
+        var parent = getSuperClass(ctClass);
+        while (parent.isPresent()){
+            fields.addAll(Arrays.asList(ctClass.getFields()));
+            fields.addAll(Arrays.asList(ctClass.getDeclaredFields()));
+            parent = getSuperClass(parent.get());
+        }
+        return fields.stream()
                 .map(this::getProtobufPropertyEntry)
                 .flatMap(Optional::stream)
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private Optional<CtClass> getSuperClass(CtClass ctClass){
+        try {
+            return Optional.ofNullable(ctClass.getSuperclass());
+        }catch (NotFoundException exception){
+            return Optional.empty();
+        }
     }
 
     private Optional<Entry<CtField, ProtobufProperty>> getProtobufPropertyEntry(CtField entry) {
