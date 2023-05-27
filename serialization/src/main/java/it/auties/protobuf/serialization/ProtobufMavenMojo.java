@@ -4,7 +4,6 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import it.auties.protobuf.base.*;
 import javassist.*;
-import javassist.compiler.Javac;
 import lombok.SneakyThrows;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -24,7 +23,6 @@ import java.net.URLClassLoader;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static it.auties.protobuf.base.ProtobufWireType.*;
 
@@ -135,7 +133,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         ctClass.writeFile(test ? project.getBuild().getTestOutputDirectory() : project.getBuild().getOutputDirectory());
     }
 
-    private void createSerializationMethod(ClassPool classPool, CtClass ctClass, Map<CtField, ProtobufProperty> fields, boolean test) throws NotFoundException, CannotCompileException  {
+    private void createSerializationMethod(ClassPool classPool, CtClass ctClass, Map<CtField, ProtobufProperty> fields, boolean test) throws CannotCompileException  {
         var bodyBuilder = new StringWriter();
         try(var body = new PrintWriter(bodyBuilder)) {
             body.println("public byte[] %s() {".formatted(SERIALIZATION_METHOD));
@@ -629,8 +627,8 @@ public class ProtobufMavenMojo extends AbstractMojo {
         fields.addAll(Arrays.asList(ctClass.getDeclaredFields()));
         var parent = getSuperClass(ctClass);
         while (parent.isPresent()){
-            fields.addAll(Arrays.asList(ctClass.getFields()));
-            fields.addAll(Arrays.asList(ctClass.getDeclaredFields()));
+            fields.addAll(Arrays.asList(parent.get().getFields()));
+            fields.addAll(Arrays.asList(parent.get().getDeclaredFields()));
             parent = getSuperClass(parent.get());
         }
         return fields.stream()
