@@ -212,43 +212,43 @@ public class ProtobufMavenMojo extends AbstractMojo {
 
         switch (annotation.type()){
             case MESSAGE -> createSerializationMessage(classPool, body, field, annotation, converter, test, nullCheck);
-            case FLOAT -> createSerializationAny(classPool, body, annotation, converter, "Float", field);
-            case DOUBLE -> createSerializationAny(classPool, body, annotation, converter, "Double", field);
-            case BOOL -> createSerializationAny(classPool, body, annotation, converter, "Bool", field);
-            case STRING -> createSerializationAny(classPool, body, annotation, converter, "String", field);
-            case BYTES -> createSerializationAny(classPool, body, annotation, converter, "Bytes", field);
-            case INT32, SINT32 -> createSerializationAny(classPool, body, annotation, converter, "Int32", field);
-            case UINT32 -> createSerializationAny(classPool, body, annotation, converter, "UInt32", field);
-            case FIXED32, SFIXED32 -> createSerializationAny(classPool, body, annotation, converter, "Fixed32", field);
-            case INT64, SINT64 -> createSerializationAny(classPool, body, annotation, converter, "Int64", field);
-            case UINT64 -> createSerializationAny(classPool, body, annotation, converter, "UInt64", field);
-            case FIXED64, SFIXED64 -> createSerializationAny(classPool, body, annotation, converter, "Fixed64", field);
+            case FLOAT -> createSerializationAny(classPool, body, annotation, converter, "Float", field, nullCheck);
+            case DOUBLE -> createSerializationAny(classPool, body, annotation, converter, "Double", field, nullCheck);
+            case BOOL -> createSerializationAny(classPool, body, annotation, converter, "Bool", field, nullCheck);
+            case STRING -> createSerializationAny(classPool, body, annotation, converter, "String", field, nullCheck);
+            case BYTES -> createSerializationAny(classPool, body, annotation, converter, "Bytes", field, nullCheck);
+            case INT32, SINT32 -> createSerializationAny(classPool, body, annotation, converter, "Int32", field, nullCheck);
+            case UINT32 -> createSerializationAny(classPool, body, annotation, converter, "UInt32", field, nullCheck);
+            case FIXED32, SFIXED32 -> createSerializationAny(classPool, body, annotation, converter, "Fixed32", field, nullCheck);
+            case INT64, SINT64 -> createSerializationAny(classPool, body, annotation, converter, "Int64", field, nullCheck);
+            case UINT64 -> createSerializationAny(classPool, body, annotation, converter, "UInt64", field, nullCheck);
+            case FIXED64, SFIXED64 -> createSerializationAny(classPool, body, annotation, converter, "Fixed64", field, nullCheck);
         }
     }
 
     private void createSerializationMessage(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test, boolean nullCheck) {
         var ctType = getImplementationType(classPool, field, annotation);
         processClass(classPool, ctType.getName(), test);
-        if(nullCheck){
-            body.println("} else {");
-        }else{
-            body.println("if(%s != null) {".formatted(field.getName()));
+        if(!annotation.repeated()) {
+            if (nullCheck) {
+                body.println("} else {");
+            } else {
+                body.println("if(%s != null) {".formatted(field.getName()));
+            }
         }
 
         if(ctType.isEnum()){
             if(annotation.repeated()) {
-                createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
+                createSerializationRepeatedFixed(classPool, field, annotation, converter, body, nullCheck);
                 body.println("output.writeUInt32(%s, entry%s.index());".formatted(annotation.index(), toMethodCall(converter)));
-                body.println("}");
                 body.println("}");
             }else {
                 var getter = findGetter(classPool, field, annotation);
                 body.println("output.writeUInt32(%s, %s%s.index());".formatted(annotation.index(), getter, toMethodCall(converter)));
             }
         }else if(annotation.repeated()){
-            createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
+            createSerializationRepeatedFixed(classPool, field, annotation, converter, body, nullCheck);
             body.println("output.writeBytes(%s, entry%s.%s());".formatted(annotation.index(), toMethodCall(converter), SERIALIZATION_METHOD));
-            body.println("}");
             body.println("}");
         }else {
             var getter = findGetter(classPool, field, annotation);
@@ -258,9 +258,9 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("}");
     }
 
-    private void createSerializationAny(ClassPool classPool, PrintWriter body, ProtobufProperty annotation, CtMethod converter, String writeType, CtField field) {
+    private void createSerializationAny(ClassPool classPool, PrintWriter body, ProtobufProperty annotation, CtMethod converter, String writeType, CtField field, boolean nullCheck) {
         if(annotation.repeated()){
-            createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
+            createSerializationRepeatedFixed(classPool, field, annotation, converter, body, nullCheck);
             body.println("output.write%s(%s, entry%s);".formatted(writeType, annotation.index(), toMethodCall(converter)));
             body.println("}");
             body.println("}");
@@ -271,10 +271,15 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("output.write%s(%s, %s%s);".formatted(writeType, annotation.index(), getter, toMethodCall(converter)));
     }
 
-    private void createSerializationRepeatedFixed(ClassPool classPool, CtField field, ProtobufProperty annotation, CtMethod converter, PrintWriter body) {
+    private void createSerializationRepeatedFixed(ClassPool classPool, CtField field, ProtobufProperty annotation, CtMethod converter, PrintWriter body, boolean nullCheck) {
         var implementationType = getImplementationType(classPool, field, annotation).getName();
         var getter = findGetter(classPool, field, annotation);
-        body.println("if(%s != null) {".formatted(field.getName()));
+        if(nullCheck){
+            body.println("} else {");
+        }else {
+            body.println("if(%s != null) {".formatted(field.getName()));
+        }
+
         body.println("java.util.Iterator iterator = %s.iterator();".formatted(getter));
         body.println("%s entry;".formatted(implementationType));
         body.println("while(iterator.hasNext()) {");
