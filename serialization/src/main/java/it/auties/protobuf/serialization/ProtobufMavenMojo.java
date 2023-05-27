@@ -258,7 +258,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("}");
     }
 
-    private void createSerializationAny(ClassPool classPool, PrintWriter body, ProtobufProperty annotation, CtMethod converter, String writeType, CtField field, boolean nullCheck) {
+    private void createSerializationAny(ClassPool classPool, PrintWriter body, ProtobufProperty annotation, CtMethod converter, String writeType, CtField field, boolean nullCheck) throws NotFoundException {
         if(annotation.repeated()){
             createSerializationRepeatedFixed(classPool, field, annotation, converter, body, nullCheck);
             body.println("output.write%s(%s, entry%s);".formatted(writeType, annotation.index(), toMethodCall(converter)));
@@ -267,8 +267,20 @@ public class ProtobufMavenMojo extends AbstractMojo {
             return;
         }
 
+        var primitive = field.getType().isPrimitive();
+        if(!primitive) {
+            if (nullCheck) {
+                body.println("} else {");
+            } else {
+                body.println("if(%s != null) {".formatted(field.getName()));
+            }
+        }
+
         var getter = findGetter(classPool, field, annotation);
         body.println("output.write%s(%s, %s%s);".formatted(writeType, annotation.index(), getter, toMethodCall(converter)));
+        if(!primitive){
+            body.println("}");
+        }
     }
 
     private void createSerializationRepeatedFixed(ClassPool classPool, CtField field, ProtobufProperty annotation, CtMethod converter, PrintWriter body, boolean nullCheck) {
