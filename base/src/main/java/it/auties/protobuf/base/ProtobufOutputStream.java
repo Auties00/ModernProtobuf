@@ -29,6 +29,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeInt32(int fieldNumber, Integer value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeInt32NoTag(value);
     }
@@ -39,6 +43,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeUInt32(int fieldNumber, Integer value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeUInt32NoTag(value);
     }
@@ -48,6 +56,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeFloat(int fieldNumber, Float value) {
+        if(value == null){
+            return;
+        }
+
         writeFixed32(fieldNumber, Float.floatToRawIntBits(value));
     }
 
@@ -57,6 +69,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeFixed32(int fieldNumber, Integer value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED32);
         writeFixed32NoTag(value);
     }
@@ -66,6 +82,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeInt64(int fieldNumber, Long value) {
+        if(value == null){
+            return;
+        }
+
         writeUInt64(fieldNumber, value);
     }
 
@@ -75,6 +95,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeUInt64(int fieldNumber, Long value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeUInt64NoTag(value);
     }
@@ -84,6 +108,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeDouble(int fieldNumber, Double value) {
+        if(value == null){
+            return;
+        }
+
         writeFixed64(fieldNumber, Double.doubleToRawLongBits(value));
     }
 
@@ -93,6 +121,10 @@ public final class ProtobufOutputStream {
     }
 
     public void writeFixed64(int fieldNumber, Long value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED64);
         writeFixed64NoTag(value);
     }
@@ -103,16 +135,28 @@ public final class ProtobufOutputStream {
     }
 
     public void writeBool(int fieldNumber, Boolean value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeRaw((byte) (value ? 1 : 0));
     }
 
     public void writeString(int fieldNumber, String value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeStringNoTag(value);
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {
+        if(value == null){
+            return;
+        }
+
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeBytesNoTag(value);
     }

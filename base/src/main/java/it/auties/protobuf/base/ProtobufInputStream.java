@@ -83,7 +83,7 @@ public class ProtobufInputStream {
     }
 
     public double readDouble() {
-        return Double.doubleToLongBits(readFixed64());
+        return Double.longBitsToDouble(readFixed64());
     }
 
     public boolean readBool(){

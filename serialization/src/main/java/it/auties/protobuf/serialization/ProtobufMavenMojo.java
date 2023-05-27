@@ -133,19 +133,21 @@ public class ProtobufMavenMojo extends AbstractMojo {
         ctClass.writeFile(test ? project.getBuild().getTestOutputDirectory() : project.getBuild().getOutputDirectory());
     }
 
-    private void createSerializationMethod(ClassPool classPool, CtClass ctClass, Map<CtField, ProtobufProperty> fields, boolean test) throws CannotCompileException  {
+    private void createSerializationMethod(ClassPool classPool, CtClass ctClass, Map<CtField, ProtobufProperty> fields, boolean test) throws CannotCompileException, NotFoundException {
         var bodyBuilder = new StringWriter();
         try(var body = new PrintWriter(bodyBuilder)) {
             body.println("public byte[] %s() {".formatted(SERIALIZATION_METHOD));
             body.println("%s output = new %s();".formatted(ARRAY_OUTPUT_STREAM, ARRAY_OUTPUT_STREAM));
-            fields.forEach((field, annotation) -> {
-                if(annotation.ignore()){
-                    return;
+            for (var entry : fields.entrySet()) {
+                var field = entry.getKey();
+                var annotation = entry.getValue();
+                if (annotation.ignore()) {
+                    continue;
                 }
 
                 var converter = getConverter(classPool, field, annotation, false);
                 createSerializationField(classPool, body, field, annotation, converter, test);
-            });
+            }
             body.println("return output.toByteArray();");
             body.println("}");
             addSafeMethod(ctClass, SERIALIZATION_METHOD, bodyBuilder.toString());
@@ -198,11 +200,13 @@ public class ProtobufMavenMojo extends AbstractMojo {
       }
     }
 
-    @SneakyThrows
-    private void createSerializationField(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test) {
-        if(!field.getType().isPrimitive()) {
-            body.println("if(%s != null) {".formatted(field.getName()));
+
+    private void createSerializationField(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test) throws NotFoundException {
+        if(!field.getType().isPrimitive() && annotation.required()) {
+            var fieldName = Objects.equals(annotation.name(), ProtobufProperty.DEFAULT_NAME) ? field.getName() : annotation.name();
+            body.println("if(%s == null) throw %s.missingMandatoryField(\"%s\");".formatted(field.getName(), PROTOBUF_SERIALIZATION_EXCEPTION, fieldName));
         }
+
         switch (annotation.type()){
             case MESSAGE -> createSerializationMessage(classPool, body, field, annotation, converter, test);
             case FLOAT -> createSerializationAny(classPool, body, annotation, converter, "Float", field);
@@ -217,18 +221,6 @@ public class ProtobufMavenMojo extends AbstractMojo {
             case UINT64 -> createSerializationAny(classPool, body, annotation, converter, "UInt64", field);
             case FIXED64, SFIXED64 -> createSerializationAny(classPool, body, annotation, converter, "Fixed64", field);
         }
-        if (field.getType().isPrimitive()) {
-            return;
-        }
-
-        body.println("}");
-        if(!annotation.required()){
-            return;
-        }
-
-        body.println("else");
-        var fieldName = Objects.equals(annotation.name(), ProtobufProperty.DEFAULT_NAME) ? field.getName() : annotation.name();
-        body.println("throw %s.missingMandatoryField(\"%s\");".formatted(PROTOBUF_SERIALIZATION_EXCEPTION, fieldName));
     }
 
     private void createSerializationMessage(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test) {
