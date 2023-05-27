@@ -202,13 +202,16 @@ public class ProtobufMavenMojo extends AbstractMojo {
 
 
     private void createSerializationField(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test) throws NotFoundException {
-        if(!field.getType().isPrimitive() && annotation.required()) {
+        var nullCheck = !field.getType().isPrimitive() && annotation.required();
+        if(nullCheck) {
             var fieldName = Objects.equals(annotation.name(), ProtobufProperty.DEFAULT_NAME) ? field.getName() : annotation.name();
-            body.println("if(%s == null) throw %s.missingMandatoryField(\"%s\");".formatted(field.getName(), PROTOBUF_SERIALIZATION_EXCEPTION, fieldName));
+            body.println("if(%s == null) {".formatted(field.getName()));
+            body.println("throw %s.missingMandatoryField(\"%s\");".formatted(PROTOBUF_SERIALIZATION_EXCEPTION, fieldName));
+            body.println("}");
         }
 
         switch (annotation.type()){
-            case MESSAGE -> createSerializationMessage(classPool, body, field, annotation, converter, test);
+            case MESSAGE -> createSerializationMessage(classPool, body, field, annotation, converter, test, nullCheck);
             case FLOAT -> createSerializationAny(classPool, body, annotation, converter, "Float", field);
             case DOUBLE -> createSerializationAny(classPool, body, annotation, converter, "Double", field);
             case BOOL -> createSerializationAny(classPool, body, annotation, converter, "Bool", field);
@@ -223,37 +226,43 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private void createSerializationMessage(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test) {
+    private void createSerializationMessage(ClassPool classPool, PrintWriter body, CtField field, ProtobufProperty annotation, CtMethod converter, boolean test, boolean nullCheck) {
         var ctType = getImplementationType(classPool, field, annotation);
         processClass(classPool, ctType.getName(), test);
+        if(nullCheck){
+            body.println("} else {");
+        }else{
+            body.println("if(%s != null) {".formatted(field.getName()));
+        }
+
         if(ctType.isEnum()){
             if(annotation.repeated()) {
                 createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
                 body.println("output.writeUInt32(%s, entry%s.index());".formatted(annotation.index(), toMethodCall(converter)));
                 body.println("}");
-                return;
+                body.println("}");
+            }else {
+                var getter = findGetter(classPool, field, annotation);
+                body.println("output.writeUInt32(%s, %s%s.index());".formatted(annotation.index(), getter, toMethodCall(converter)));
             }
-
-            var getter = findGetter(classPool, field, annotation);
-            body.println("output.writeUInt32(%s, %s%s.index());".formatted(annotation.index(), getter, toMethodCall(converter)));
-            return;
-        }
-
-        if(annotation.repeated()){
+        }else if(annotation.repeated()){
             createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
             body.println("output.writeBytes(%s, entry%s.%s());".formatted(annotation.index(), toMethodCall(converter), SERIALIZATION_METHOD));
             body.println("}");
-            return;
+            body.println("}");
+        }else {
+            var getter = findGetter(classPool, field, annotation);
+            body.println("output.writeBytes(%s, %s%s.%s());".formatted(annotation.index(), getter, toMethodCall(converter), SERIALIZATION_METHOD));
         }
 
-        var getter = findGetter(classPool, field, annotation);
-        body.println("output.writeBytes(%s, %s%s.%s());".formatted(annotation.index(), getter, toMethodCall(converter), SERIALIZATION_METHOD));
+        body.println("}");
     }
 
     private void createSerializationAny(ClassPool classPool, PrintWriter body, ProtobufProperty annotation, CtMethod converter, String writeType, CtField field) {
         if(annotation.repeated()){
             createSerializationRepeatedFixed(classPool, field, annotation, converter, body);
             body.println("output.write%s(%s, entry%s);".formatted(writeType, annotation.index(), toMethodCall(converter)));
+            body.println("}");
             body.println("}");
             return;
         }
@@ -265,6 +274,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
     private void createSerializationRepeatedFixed(ClassPool classPool, CtField field, ProtobufProperty annotation, CtMethod converter, PrintWriter body) {
         var implementationType = getImplementationType(classPool, field, annotation).getName();
         var getter = findGetter(classPool, field, annotation);
+        body.println("if(%s != null) {".formatted(field.getName()));
         body.println("java.util.Iterator iterator = %s.iterator();".formatted(getter));
         body.println("%s entry;".formatted(implementationType));
         body.println("while(iterator.hasNext()) {");
