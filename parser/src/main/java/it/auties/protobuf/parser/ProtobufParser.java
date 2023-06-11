@@ -116,7 +116,7 @@ public final class ProtobufParser {
 
             var type = getReferencedType(fieldStatement, messageType);
             if(type == null){
-                throw new ProtobufTypeException("Cannot resolve type in field %s inside %s",
+                throw new ProtobufTypeException("Cannot resolve protobufType in field %s inside %s",
                         fieldStatement, fieldStatement.parent().name());
             }
 
@@ -124,7 +124,7 @@ public final class ProtobufParser {
             return;
         }
 
-        throw new ProtobufTypeException("Cannot check type of %s", statement.name());
+        throw new ProtobufTypeException("Cannot check protobufType of %s", statement.name());
     }
 
     private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, ProtobufMessageType messageType) {
@@ -134,14 +134,14 @@ public final class ProtobufParser {
 
         var types = messageType.name().split(TYPE_SELECTOR_KEYWORD_SPLITTER);
         if(types.length == 0){
-            throw new ProtobufTypeException("Cannot resolve type in field %s inside %s",
+            throw new ProtobufTypeException("Cannot resolve protobufType in field %s inside %s",
                     fieldStatement, fieldStatement.parent().name());
         }
 
         var type = getReferencedType(fieldStatement, types[0]);
         for(var index = 1; index < types.length; index++){
             type = (ProtobufObject<?>) type.getStatement(types[index])
-                    .orElseThrow(() -> new ProtobufTypeException("Cannot resolve type in field %s inside %s", fieldStatement, fieldStatement.parent().name()));
+                    .orElseThrow(() -> new ProtobufTypeException("Cannot resolve protobufType in field %s inside %s", fieldStatement, fieldStatement.parent().name()));
         }
 
         return type;
@@ -420,7 +420,7 @@ public final class ProtobufParser {
             }
             case NAME ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
-                            "Expected assignment operator after field type", tokenizer.lineno());
+                            "Expected assignment operator after field protobufType", tokenizer.lineno());
             case INDEX -> {
                 var index = parseIndex(token, field.parent().statementType() == ProtobufStatementType.ENUM)
                         .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));

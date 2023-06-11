@@ -3,8 +3,7 @@ package it.auties.protobuf.parser.type;
 import it.auties.protobuf.base.ProtobufType;
 
 public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, ProtobufMessageType {
-    String name();
-    ProtobufType type();
+    ProtobufType protobufType();
     boolean primitive();
 
     static ProtobufTypeReference of(String type){

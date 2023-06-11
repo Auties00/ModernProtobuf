@@ -45,10 +45,11 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
                 : "%s.%s".formatted(packageName(), name());
     }
 
-    public String staticallyQualifiedName(){
+    public String qualifiedPath(){
         return name == null ? name()
+                : nested() ? "%s/%s".formatted(parent.qualifiedName(), name())
                 : packageName == null ? name()
-                : "%s.%s".formatted(packageName(), name());
+                : "%s/%s".formatted(packageName(), name());
     }
 
     public ProtobufObject<?> parent() {

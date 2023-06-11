@@ -1,12 +1,16 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.base.ProtobufType;
-import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
+import it.auties.protobuf.parser.statement.ProtobufObject;
+import lombok.Getter;
+import lombok.experimental.Accessors;
 
+@Getter
+@Accessors(fluent = true)
 public final class ProtobufMessageType implements ProtobufTypeReference {
-    private final String typeName;
-    private ProtobufObject<?> typeDeclaration;
+    private final String name;
+    private ProtobufObject<?> declaration;
 
     public static ProtobufMessageType unattributed(String typeName){
         return new ProtobufMessageType(typeName, null);
@@ -16,13 +20,13 @@ public final class ProtobufMessageType implements ProtobufTypeReference {
         return new ProtobufMessageType(typeName, typeDeclaration);
     }
 
-    private ProtobufMessageType(String typeName, ProtobufMessageStatement typeDeclaration){
-        this.typeName = typeName;
-        this.typeDeclaration = typeDeclaration;
+    private ProtobufMessageType(String name, ProtobufMessageStatement declaration){
+        this.name = name;
+        this.declaration = declaration;
     }
 
     @Override
-    public ProtobufType type() {
+    public ProtobufType protobufType() {
         return ProtobufType.MESSAGE;
     }
 
@@ -31,19 +35,15 @@ public final class ProtobufMessageType implements ProtobufTypeReference {
         return false;
     }
 
-    public String name(){
-        return typeName;
-    }
-
     public ProtobufObject<?> declaration() {
-        return typeDeclaration;
+        return declaration;
     }
 
     public boolean attributed(){
-        return typeDeclaration != null;
+        return declaration != null;
     }
 
     public void attribute(ProtobufObject<?> statement) {
-        this.typeDeclaration = statement;
+        this.declaration = statement;
     }
 }

@@ -7,6 +7,7 @@ import lombok.experimental.Accessors;
 
 import java.util.*;
 
+@Getter
 @AllArgsConstructor
 @Accessors(fluent = true)
 public enum ProtobufType {
@@ -33,11 +34,9 @@ public enum ProtobufType {
                 .findFirst();
     }
 
-    @Getter
     @NonNull
     private final Class<?> primitiveType;
 
-    @Getter
     @NonNull
     private final Class<?> wrappedType;
 

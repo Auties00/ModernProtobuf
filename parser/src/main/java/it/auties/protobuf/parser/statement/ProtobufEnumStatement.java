@@ -18,7 +18,7 @@ public final class ProtobufEnumStatement extends ProtobufReservable<ProtobufFiel
     @Override
     public ProtobufObject<ProtobufFieldStatement> addStatement(ProtobufFieldStatement statement) {
         if(statement.type() != null){
-            throw new IllegalArgumentException("Cannot add statement %s to an enum as it cannot have a type".formatted(statement.type()));
+            throw new IllegalArgumentException("Cannot add statement %s to an enum as it cannot have a protobufType".formatted(statement.type()));
         }
 
         return super.addStatement(statement);

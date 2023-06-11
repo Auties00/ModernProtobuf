@@ -9,8 +9,8 @@
     <modules>
         <module>base</module>
         <module>parser</module>
-        <module>tool</module>
-        <module>serialization</module>
+        <module>schema</module>
+        <module>plugin</module>
     </modules>
 
     <name>${project.groupId}:${project.artifactId}</name>

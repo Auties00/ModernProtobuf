@@ -8,13 +8,7 @@ public final class ProtobufOneOfStatement extends ProtobufObject<ProtobufFieldSt
     }
 
     public String className() {
-        var className = name().substring(0, 1).toUpperCase(Locale.ROOT)
-                + name().substring(1);
-        return "%sType".formatted(className);
-    }
-
-    public String methodName() {
-        return "%sType".formatted(name());
+        return name().substring(0, 1).toUpperCase(Locale.ROOT) + name().substring(1);
     }
 
     @Override

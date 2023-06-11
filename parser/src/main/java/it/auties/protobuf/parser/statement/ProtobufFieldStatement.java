@@ -1,5 +1,6 @@
 package it.auties.protobuf.parser.statement;
 
+import it.auties.protobuf.parser.type.ProtobufMessageType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Arrays;
@@ -82,28 +83,45 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return this;
     }
 
-    public String nameAsConstant() {
-        if(name().chars().allMatch(entry -> Character.isUpperCase(entry) || Character.isDigit(entry))){
-            return name();
-        }
+    @Override
+    public String name() {
+        var name = super.name();
+        return switch (parent().statementType()){
+            case ENUM -> {
+                if(name.chars().allMatch(entry -> Character.isUpperCase(entry) || Character.isDigit(entry))){
+                    yield name;
+                }
 
-        if(name().contains("_")){
-            return name().toUpperCase(Locale.ROOT);
-        }
+                if(name.contains("_")){
+                    yield name.toUpperCase(Locale.ROOT);
+                }
 
-        var builder = new StringBuilder();
-        for(var i = 0; i < name().length(); i++){
-            var entry = name().charAt(i);
-            if (i == 0 || Character.isLowerCase(entry)) {
-                builder.append(Character.toUpperCase(entry));
-                continue;
+                var builder = new StringBuilder();
+                for(var i = 0; i < name.length(); i++){
+                    var entry = name.charAt(i);
+                    if (i == 0 || Character.isLowerCase(entry)) {
+                        builder.append(Character.toUpperCase(entry));
+                        continue;
+                    }
+
+                    builder.append("_");
+                    builder.append(entry);
+                }
+
+                yield builder.toString();
             }
 
-            builder.append("_");
-            builder.append(entry);
-        }
+            case ONE_OF -> {
+                var parentName = parent().name();
+                if(name.toLowerCase().contains(parentName.toLowerCase())){
+                    yield name;
+                }
 
-        return builder.toString();
+                yield parentName + name.substring(0, 1).toUpperCase() + name.substring(1);
+            }
+
+            default -> name;
+        };
     }
 
     public boolean nothing(){
@@ -144,7 +162,15 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
     }
 
     private String toPrettyType() {
-        return type() == null ? "" : "%s ".formatted(type().name());
+        if (type() == null) {
+            return "";
+        }
+
+        if (type() instanceof ProtobufMessageType messageType) {
+            return "%s ".formatted(messageType.name());
+        }
+
+        return "%s ".formatted(type().protobufType().name());
     }
 
     private String toPrettyModifier() {
