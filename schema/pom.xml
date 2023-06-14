@@ -68,6 +68,13 @@
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>com.github.auties00</groupId>
@@ -95,9 +102,9 @@
             <version>2.14.0</version>
         </dependency>
         <dependency>
-            <groupId>com.github.javaparser</groupId>
-            <artifactId>javaparser-core</artifactId>
-            <version>3.25.3</version>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>javaparser</artifactId>
+            <version>1c0c18cccf6541ae5a038ff1bc65469d21f48992</version>
         </dependency>
     </dependencies>
 </project>

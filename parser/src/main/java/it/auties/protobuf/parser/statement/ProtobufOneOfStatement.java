@@ -7,8 +7,14 @@ public final class ProtobufOneOfStatement extends ProtobufObject<ProtobufFieldSt
         super(name, packageName, parent);
     }
 
+    @Override
+    public String name() {
+        return super.name().replaceFirst("(?i)oneof", "");
+    }
+
     public String className() {
-        return name().substring(0, 1).toUpperCase(Locale.ROOT) + name().substring(1);
+        var name = super.name().replaceFirst("(?i)oneof", "");
+        return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Seal";
     }
 
     @Override

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 @UtilityClass
 public class AstUtils implements LogProvider {
@@ -20,17 +21,18 @@ public class AstUtils implements LogProvider {
         try(var walker = Files.walk(directory.toPath())) {
             return walker.filter(entry -> entry.endsWith(".java"))
                     .map(AstUtils::parseClass)
+                    .flatMap(Optional::stream)
                     .toList();
         }catch (IOException exception){
             throw new RuntimeException("Cannot create class pool", exception);
         }
     }
 
-    private CompilationUnit parseClass(Path path) {
+    private Optional<CompilationUnit> parseClass(Path path) {
         try {
-            return StaticJavaParser.parse(path);
+            return Optional.of(StaticJavaParser.parse(path));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            return Optional.empty();
         }
     }
 }

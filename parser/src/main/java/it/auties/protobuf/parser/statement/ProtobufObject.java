@@ -29,6 +29,10 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 : Optional.ofNullable(statements.get(name));
     }
 
+    public void clearStatements() {
+        statements.clear();
+    }
+
     @SuppressWarnings("unchecked")
     public <V extends ProtobufStatement> Optional<? extends V> getStatement(String name, Class<? extends V> clazz){
         return getStatement(name)

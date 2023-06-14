@@ -112,12 +112,9 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
             }
 
             case ONE_OF -> {
-                var parentName = parent().name();
-                if(name.toLowerCase().contains(parentName.toLowerCase())){
-                    yield name;
-                }
-
-                yield parentName + name.substring(0, 1).toUpperCase() + name.substring(1);
+                var parentName = parent().name().replaceFirst("(?i)oneof", "");
+                yield name.toLowerCase().contains(parentName.toLowerCase()) ? name.replaceFirst("(?i)oneof", "")
+                        : parentName + name.substring(0, 1).toUpperCase() + name.substring(1);
             }
 
             default -> name;

@@ -8,13 +8,13 @@ import lombok.experimental.Accessors;
 import java.util.Arrays;
 import java.util.Optional;
 
+@Getter
 @AllArgsConstructor
 @Accessors(fluent = true)
 public enum ProtobufVersion {
     PROTOBUF_2("proto2"),
     PROTOBUF_3("proto3");
 
-    @Getter
     private final String versionCode;
 
     public static ProtobufVersion defaultVersion() {
