@@ -2,6 +2,7 @@ package it.auties.protobuf.tool.schema;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
+import com.github.javaparser.ast.Modifier.Keyword;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.*;
@@ -267,7 +268,7 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
         if (!fieldStatement.repeated() && fieldStatement.type().protobufType() == ProtobufType.MESSAGE) {
             var fieldType = (ProtobufMessageType) fieldStatement.type();
             var wrapperType = getTypeDeclaration(fieldType.name(), QueryType.ANY);
-            wrapperType.ifPresent(queryResult -> queryResult.result().addModifier(Modifier.Keyword.FINAL));
+            wrapperType.ifPresent(queryResult -> queryResult.result().addModifier(Keyword.FINAL));
             return new MessageType(javaType, rawType, typeParameter, wrapperType.map(QueryResult::result).orElse(null), wrapperType.isPresent() ? null : fieldType.name());
         }
 
@@ -325,13 +326,13 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
     private void addOneOfStatement(TypeDeclaration<?> typeDeclaration, ProtobufOneOfStatement oneOfStatement) {
         var ctInterface = new ClassOrInterfaceDeclaration();
         typeDeclaration.addMember(ctInterface);
-        ctInterface.addModifier(Modifier.Keyword.PUBLIC);
-        ctInterface.addModifier(Modifier.Keyword.SEALED);
+        ctInterface.addModifier(Keyword.PUBLIC);
+        ctInterface.addModifier(Keyword.SEALED);
         ctInterface.setInterface(true);
         ctInterface.setName(oneOfStatement.className());
         ctInterface.setExtendedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
         var ctMethod = new MethodDeclaration();
-        ctMethod.addModifier(Modifier.Keyword.PUBLIC);
+        ctMethod.addModifier(Keyword.PUBLIC);
         ctMethod.setName(oneOfStatement.name());
         var ctMethodBody = new BlockStmt();
         ctMethod.setBody(ctMethodBody);
@@ -381,9 +382,25 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
             return Optional.of(generate());
         }
 
-        var record = (RecordDeclaration) result.get().result();
-        addRecordMembers(record);
-        addReservedAnnotation(record);
-        return result.map(QueryResult::compilationUnit);
+        if(result.get().result() instanceof RecordDeclaration ctRecord){
+            addImplementedType(ProtobufMessage.class.getSimpleName(), ctRecord);
+            ctRecord.setImplementedTypes(NodeList.nodeList());
+            getDeferredImplementation(protoStatement.name())
+                    .ifPresent(entry -> addImplementedType(entry, ctRecord));
+            addRecordMembers(ctRecord);
+            addReservedAnnotation(ctRecord);
+            return Optional.of(result.get().compilationUnit());
+        }
+
+        var ctClass = (ClassOrInterfaceDeclaration) result.get().result();
+        addImplementedType(ProtobufMessage.class.getSimpleName(), ctClass);
+        getDeferredImplementation(protoStatement.name()).ifPresent(entry -> {
+            addImplementedType(entry, ctClass);
+            ctClass.setFinal(true);
+        });
+        addClassMembers(ctClass);
+        addAllArgsConstructor(ctClass);
+        addReservedAnnotation(ctClass);
+        return Optional.of(result.get().compilationUnit());
     }
 }

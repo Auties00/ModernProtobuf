@@ -12,16 +12,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
-    public ProtobufSchemaCreator(ProtobufDocument document){
-        this(document, null);
-    }
-
     public void generate(List<CompilationUnit> classPool, boolean mutable) {
         document.statements()
                 .stream()
@@ -62,16 +57,18 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.name(), object.getClass().getName()));
     }
 
-    public void update(ProtobufObject<?> statement, boolean mutable, List<CompilationUnit> classPool, Path output) {
+    public void update(ProtobufObject<?> statement, boolean mutable, List<CompilationUnit> classPool) {
         if (statement instanceof ProtobufMessageStatement msg) {
             var schema = new MessageSchemaCreator(msg, mutable, classPool, directory.toPath());
-            schema.update();
+            schema.update()
+                    .ifPresent(entry -> writeOrThrow(msg.qualifiedCanonicalPath(), entry));
             return;
         }
 
         if (statement instanceof ProtobufEnumStatement enm) {
             var schema = new EnumSchemaCreator(enm, classPool, directory.toPath());
-            schema.update();
+            schema.update()
+                    .ifPresent(entry -> writeOrThrow(enm.qualifiedCanonicalPath(), entry));
             return;
         }
 

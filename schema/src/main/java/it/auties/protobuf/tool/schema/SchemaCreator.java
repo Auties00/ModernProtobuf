@@ -271,11 +271,15 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
     void addImplementedType(ClassOrInterfaceDeclaration ctInterface, TypeDeclaration<?> target) {
         var simpleName = qualifiedMinimalName(target, ctInterface);
         var nodeWithImplements = (NodeWithImplements<?>) target;
-        if(nodeWithImplements.getImplementedTypes().stream().anyMatch(entry -> Objects.equals(entry.getNameAsString(), simpleName))){
+        addImplementedType(simpleName, nodeWithImplements);
+    }
+
+    void addImplementedType(String ctInterface, NodeWithImplements<?> nodeWithImplements) {
+        if(nodeWithImplements.getImplementedTypes().stream().anyMatch(entry -> Objects.equals(entry.getNameAsString(), ctInterface))){
             return;
         }
 
-        nodeWithImplements.addImplementedType(simpleName);
+        nodeWithImplements.addImplementedType(ctInterface);
     }
 
     String qualifiedMinimalName(TypeDeclaration<?> scopeDeclaration, TypeDeclaration<?> typeDeclaration) {

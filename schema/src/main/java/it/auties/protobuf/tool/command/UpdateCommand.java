@@ -11,6 +11,7 @@ import picocli.CommandLine.Parameters;
 import java.io.File;
 import java.io.IOException;
 import java.lang.System.Logger.Level;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 
 @Command(
@@ -56,9 +57,9 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
             log.log(Level.INFO, "Created AST model from existing Java classes");
             log.log(Level.INFO, "Starting update...");
             for (var entry : document.statements()) {
-                log.log(Level.INFO, "Updating %s".formatted(entry));
-                var creator = new ProtobufSchemaCreator(document);
-                creator.update(entry, mutable, classPool, output.toPath());
+                log.log(Level.INFO, "Updating %s".formatted(entry.name()));
+                var creator = new ProtobufSchemaCreator(document, Objects.requireNonNullElse(output, input));
+                creator.update(entry, mutable, classPool);
             }
             log.log(Level.INFO, "Finished update successfully");
             return 0;
