@@ -136,91 +136,78 @@ public class PerformanceBenchmark implements Protobuf {
     public static class ModernScalarMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
-                name = "fixed32",
                 type = ProtobufType.FIXED32
         )
         private int fixed32;
 
         @ProtobufProperty(
                 index = 2,
-                name = "sfixed32",
                 type = ProtobufType.SFIXED32
         )
         private int sfixed32;
 
         @ProtobufProperty(
                 index = 3,
-                name = "int32",
                 type = ProtobufType.INT32
         )
         private int int32;
 
         @ProtobufProperty(
                 index = 4,
-                name = "uint32",
                 type = ProtobufType.UINT32
         )
         private int uint32;
 
         @ProtobufProperty(
                 index = 5,
-                name = "fixed64",
                 type = ProtobufType.FIXED64
         )
         private long fixed64;
 
         @ProtobufProperty(
                 index = 6,
-                name = "sfixed64",
                 type = ProtobufType.SFIXED64
         )
         private long sfixed64;
 
         @ProtobufProperty(
                 index = 7,
-                name = "int64",
                 type = ProtobufType.INT64
         )
         private long int64;
 
         @ProtobufProperty(
                 index = 8,
-                name = "uint64",
                 type = ProtobufType.UINT64
         )
         private long uint64;
 
         @ProtobufProperty(
                 index = 9,
-                name = "_float",
                 type = ProtobufType.FLOAT
         )
         private float _float;
 
         @ProtobufProperty(
                 index = 10,
-                name = "_double",
                 type = ProtobufType.DOUBLE
         )
         private double _double;
 
         @ProtobufProperty(
                 index = 11,
-                name = "bool",
                 type = ProtobufType.BOOL
         )
         private boolean bool;
 
         @ProtobufProperty(
                 index = 12,
-                name = "string",
                 type = ProtobufType.STRING
         )
         private String string;
 
         @ProtobufProperty(
                 index = 13,
-                name = "bytes",
                 type = ProtobufType.BYTES
         )
         private byte[] bytes;

@@ -2,11 +2,7 @@ package it.auties.protobuf;
 
 import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.base.ProtobufProperty;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -24,12 +20,8 @@ public class PackedTest implements Protobuf {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = UINT32, repeated = true)
-        private List<Integer> content;
+    public record SomeMessage(
+            @ProtobufProperty(index = 1, type = UINT32, repeated = true) List<Integer> content) implements ProtobufMessage {
+
     }
 }

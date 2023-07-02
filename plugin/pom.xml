@@ -32,6 +32,13 @@
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -44,9 +51,9 @@
             <version>3.9.1</version>
         </dependency>
         <dependency>
-            <groupId>org.javassist</groupId>
-            <artifactId>javassist</artifactId>
-            <version>3.29.2-GA</version>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>javaparser</artifactId>
+            <version>1c0c18cccf6541ae5a038ff1bc65469d21f48992</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>

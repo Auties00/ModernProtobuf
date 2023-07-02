@@ -40,11 +40,7 @@ public enum ProtobufType {
     @NonNull
     private final Class<?> wrappedType;
 
-    public boolean isMessage() {
+    public boolean message() {
         return this == MESSAGE;
-    }
-
-    public boolean isAssignableFrom(Class<?> clazz){
-        return primitiveType().isAssignableFrom(clazz) || wrappedType.isAssignableFrom(clazz);
     }
 }
