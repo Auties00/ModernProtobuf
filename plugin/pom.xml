@@ -51,9 +51,9 @@
             <version>3.9.1</version>
         </dependency>
         <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>javaparser</artifactId>
-            <version>1c0c18cccf6541ae5a038ff1bc65469d21f48992</version>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-dep</artifactId>
+            <version>1.14.5</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>

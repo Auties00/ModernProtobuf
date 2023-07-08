@@ -1,68 +1,42 @@
 package it.auties.protobuf.serialization;
 
-import com.github.javaparser.JavaParser;
-import com.github.javaparser.ParserConfiguration.LanguageLevel;
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.Modifier.Keyword;
-import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.body.*;
-import com.github.javaparser.ast.expr.*;
-import com.github.javaparser.ast.nodeTypes.NodeWithName;
-import com.github.javaparser.ast.nodeTypes.NodeWithSimpleName;
-import com.github.javaparser.ast.nodeTypes.NodeWithType;
-import com.github.javaparser.resolution.types.ResolvedType;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import it.auties.protobuf.base.*;
+import net.bytebuddy.description.annotation.AnnotationDescription;
+import net.bytebuddy.description.annotation.AnnotationSource;
+import net.bytebuddy.description.field.FieldDescription;
+import net.bytebuddy.description.method.MethodDescription;
+import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.pool.TypePool;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Proxy;
-import java.lang.reflect.UndeclaredThrowableException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static it.auties.protobuf.base.ProtobufMessage.*;
 import static it.auties.protobuf.base.ProtobufWireType.*;
 
 @Mojo(name = "protobuf", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
-@SuppressWarnings("unused")
 public class ProtobufMavenMojo extends AbstractMojo {
-    private static final ResolvedType COLLECTION_TYPE = StaticJavaParser.parseType(Collection.class.getName())
-            .resolve();
-    private static final ResolvedType MAP_TYPE = StaticJavaParser.parseType(Map.class.getName())
-            .resolve();
     private static final String ARRAY_INPUT_STREAM = ProtobufInputStream.class.getName();
     private static final String ARRAY_OUTPUT_STREAM = ProtobufOutputStream.class.getName();
     private static final String PROTOBUF_SERIALIZATION_EXCEPTION = ProtobufSerializationException.class.getName();
     private static final String PROTOBUF_DESERIALIZATION_EXCEPTION = ProtobufDeserializationException.class.getName();
-    private static final String SERIALIZATION_STUB = """
-            public byte[] %s() {
-                throw new UnsupportedOperationException();
-            }
-            """;
-    private static final String DESERIALIZATION_STUB = """
-            public static %s %s(byte[] bytes) {
-                throw new UnsupportedOperationException();
-            }
-            """;
     private static final String DESERIALIZATION_ENUM_BODY = """
                 public static %s %s(int index){
                         java.util.Iterator iterator = java.util.Arrays.stream(values()).iterator();
@@ -77,12 +51,14 @@ public class ProtobufMavenMojo extends AbstractMojo {
                     }
             """;
 
-    @org.apache.maven.plugins.annotations.Parameter(defaultValue = "${project}", required = true, readonly = true)
+    @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
-    private final Set<String> processed = new HashSet<>();
+    private URLClassLoader classLoader;
     
-    private Map<String, TypeDeclaration<?>> classPool;
+    private TypePool classPool;
+    
+    private final Set<String> processed = new HashSet<>();
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -94,9 +70,9 @@ public class ProtobufMavenMojo extends AbstractMojo {
         var time = System.currentTimeMillis();
         try {
             getLog().info("Starting to process %s".formatted(test ? "tests" : "files"));
-            this.classPool = createClassPool(new File(test ? project.getBuild().getTestOutputDirectory() : project.getBuild().getOutputDirectory()));
-            getLog().info("Found %s message%s to process".formatted(classPool.size(), classPool.size() > 1 ? "s" : ""));
-            classPool.forEach((name, typeDeclaration) -> processClass(typeDeclaration, test));
+            this.classLoader = createClassLoader(test);
+            this.classPool = TypePool.Default.of(classLoader);
+            runTransformation();
         } catch (Throwable exception) {
             getLog().error(exception);
             throw new MojoExecutionException("Cannot run protobuf plugin", exception);
@@ -105,8 +81,16 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private void processClass(TypeDeclaration<?> typeDeclaration, boolean test) {
-        var className = typeDeclaration.getNameAsString();
+    private void runTransformation() {
+        getAllClasses(classLoader)
+                .stream()
+                .map(this::getFromClassPool)
+                .flatMap(Optional::stream)
+                .forEach(this::processClass);
+    }
+
+    private void processClass(TypeDescription typeDeclaration) {
+        var className = typeDeclaration.getCanonicalName();
         if(processed.contains(className)){
             return;
         }
@@ -119,18 +103,15 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
 
         var fields = getProtobufFields(typeDeclaration);
-        createSerializationMethod(typeDeclaration, fields, test);
-        createDeserializerMethod(typeDeclaration, fields, test);
-        // TODO: Write result
+        createSerializationMethod(typeDeclaration, fields);
+        createDeserializerMethod(typeDeclaration, fields);
     }
 
-    private boolean isNonConcrete(TypeDeclaration<?> typeDeclaration) {
-        return typeDeclaration.toClassOrInterfaceDeclaration()
-                .map(ClassOrInterfaceDeclaration::isInterface)
-                .orElse(typeDeclaration.hasModifier(Keyword.ABSTRACT));
+    private boolean isNonConcrete(TypeDescription typeDeclaration) {
+        return typeDeclaration.isInterface() || typeDeclaration.isAbstract();
     }
     
-    private void createSerializationMethod(TypeDeclaration<?> typeDeclaration, Map<VariableDeclarator, ProtobufProperty> fields, boolean test) {
+    private void createSerializationMethod(TypeDescription typeDeclaration, Map<FieldDescription.InDefinedShape, ProtobufProperty> fields) {
         var bodyBuilder = new StringWriter();
         try(var body = new PrintWriter(bodyBuilder)) {
             body.println("public byte[] %s() {".formatted(SERIALIZATION_METHOD));
@@ -142,8 +123,8 @@ public class ProtobufMavenMojo extends AbstractMojo {
                     continue;
                 }
 
-                var converter = getConverter(typeDeclaration, field, annotation, false);
-                createSerializationField(typeDeclaration, body, field, annotation, converter, test);
+                var converter = getConverter(field, annotation, false);
+                createSerializationField(typeDeclaration, body, field, annotation, converter);
             }
             body.println("return output.toByteArray();");
             body.println("}");
@@ -152,50 +133,34 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private MethodDeclaration getConverter(TypeDeclaration<?> typeDeclaration, VariableDeclarator field, ProtobufProperty annotation, boolean staticMethod) {
-        var ctType = getImplementationType(typeDeclaration, field, annotation);
-        var ctPrimitive = classPool.get(annotation.type().primitiveType().getName());
-        var declaration = classPool.get(annotation.type().wrappedType().getName());
-        if (ctType.isDescendantOf(ctPrimitive) || isSubType(ctType, declaration)) {
+    private MethodDescription.InDefinedShape getConverter(FieldDescription.InDefinedShape field, ProtobufProperty annotation, boolean staticMethod) {
+        var ctType = getImplementationType(field, annotation)
+                .orElse(null);
+        if (ctType == null || ctType.isAssignableFrom(annotation.type().primitiveType()) || ctType.isAssignableFrom(annotation.type().wrappedType())) {
             return null;
         }
 
-        return ctType.getMethods()
+        return ctType.getDeclaredMethods()
                 .stream()
-                .filter(entry -> entry.getAnnotationByClass(ProtobufConverter.class).isPresent() && staticMethod == entry.isStatic())
+                .filter(entry -> getAnnotation(entry, ProtobufConverter.class) .isPresent() && staticMethod == entry.isStatic())
                 .findFirst()
                 .orElseThrow(() -> new ProtobufSerializationException("Missing converter in %s".formatted(ctType.getName())));
     }
 
-    private boolean isSubType(TypeDeclaration<?> first, TypeDeclaration<?> second){
-        return first instanceof NodeWithType<?, ?> firstTyped && second instanceof NodeWithType<?, ?> secondTyped
-                && secondTyped.getType().resolve().isAssignableBy(firstTyped.getType().resolve());
-    }
-
-    private TypeDeclaration<?> getImplementationType(TypeDeclaration<?> typeDeclaration, VariableDeclarator field, ProtobufProperty annotation) {
-        try {
-            var result = classPool.get(annotation.implementation().getName());
-            return getConvertedWrapperType(typeDeclaration, field, annotation, result);
-        }catch (UndeclaredThrowableException exception){
-            var result = classPool.get(exception.getCause().getMessage());
-            return getConvertedWrapperType(typeDeclaration, field, annotation, result);
-        }
-    }
-
-    private TypeDeclaration<?> getConvertedWrapperType(TypeDeclaration<?> typeDeclaration, VariableDeclarator field, ProtobufProperty annotation, TypeDeclaration<?> implementation) {
-        if (!Objects.equals(implementation.getNameAsString(), ProtobufMessage.class.getName())) {
-            return implementation;
+    private Optional<TypeDescription> getImplementationType(FieldDescription.InDefinedShape field, ProtobufProperty annotation) {
+        if (!Objects.equals(annotation.implementation().getName(), ProtobufMessage.class.getName())) {
+            return getFromClassPool(annotation.implementation().getName());
         }
 
         if (annotation.repeated()) {
-            return classPool.get(annotation.type().wrappedType().getName());
+            return getFromClassPool(annotation.type().wrappedType().getName());
         }
 
-        return classPool.get(field.getTypeAsString());
+        return getFromClassPool(field.getType().getActualName());
     }
 
-    private void createSerializationField(TypeDeclaration<?> typeDeclaration, PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, boolean test) {
-        var nullCheck = !field.getType().isPrimitiveType() && annotation.required();
+    private void createSerializationField(TypeDescription typeDeclaration, PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
+        var nullCheck = !field.getType().isPrimitive() && annotation.required();
         if(nullCheck) {
             body.println("if(%s == null) {".formatted(field.getName()));
             body.println("throw %s.missingMandatoryField(\"%s\");".formatted(PROTOBUF_SERIALIZATION_EXCEPTION,  field.getName()));
@@ -203,7 +168,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
 
         switch (annotation.type()){
-            case MESSAGE -> createSerializationMessage(typeDeclaration, body, field, annotation, converter, test, nullCheck);
+            case MESSAGE -> createSerializationMessage(typeDeclaration, body, field, annotation, converter, nullCheck);
             case FLOAT -> createSerializationAny(typeDeclaration, body, annotation, converter, "Float", field, nullCheck);
             case DOUBLE -> createSerializationAny(typeDeclaration, body, annotation, converter, "Double", field, nullCheck);
             case BOOL -> createSerializationAny(typeDeclaration, body, annotation, converter, "Bool", field, nullCheck);
@@ -218,9 +183,13 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private void createSerializationMessage(TypeDeclaration<?> typeDeclaration, PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, boolean test, boolean nullCheck) {
-        var ctType = getImplementationType(typeDeclaration, field, annotation);
-        processClass(typeDeclaration, test);
+    private void createSerializationMessage(TypeDescription typeDeclaration, PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter, boolean nullCheck) {
+        var ctType = getImplementationType(field, annotation).orElse(null);
+        if(ctType == null){
+            return;
+        }
+
+        processClass(typeDeclaration);
         if(!annotation.repeated()) {
             if (nullCheck) {
                 body.println("else {");
@@ -229,9 +198,9 @@ public class ProtobufMavenMojo extends AbstractMojo {
             }
         }
 
-        if(ctType instanceof EnumDeclaration){
+        if(ctType.isEnum()){
             if(annotation.repeated()) {
-                createSerializationRepeatedFixed(typeDeclaration, field, annotation, converter, body, nullCheck);
+                createSerializationRepeatedFixed(typeDeclaration, field, annotation, body, nullCheck);
                 body.println("output.writeUInt32(%s, entry%s.index());".formatted(annotation.index(), toMethodCall(converter)));
                 body.println("}");
             }else {
@@ -239,7 +208,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
                 body.println("output.writeUInt32(%s, %s%s.index());".formatted(annotation.index(), getter, toMethodCall(converter)));
             }
         }else if(annotation.repeated()){
-            createSerializationRepeatedFixed(typeDeclaration, field, annotation, converter, body, nullCheck);
+            createSerializationRepeatedFixed(typeDeclaration, field, annotation, body, nullCheck);
             body.println("output.writeBytes(%s, entry%s.%s());".formatted(annotation.index(), toMethodCall(converter), SERIALIZATION_METHOD));
             body.println("}");
         }else {
@@ -250,16 +219,16 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("}");
     }
 
-    private void createSerializationAny(TypeDeclaration<?> typeDeclaration, PrintWriter body, ProtobufProperty annotation, MethodDeclaration converter, String writeType, VariableDeclarator field, boolean nullCheck) {
+    private void createSerializationAny(TypeDescription typeDeclaration, PrintWriter body, ProtobufProperty annotation, MethodDescription.InDefinedShape converter, String writeType, FieldDescription.InDefinedShape field, boolean nullCheck) {
         if(annotation.repeated()){
-            createSerializationRepeatedFixed(typeDeclaration, field, annotation, converter, body, nullCheck);
+            createSerializationRepeatedFixed(typeDeclaration, field, annotation, body, nullCheck);
             body.println("output.write%s(%s, entry%s);".formatted(writeType, annotation.index(), toMethodCall(converter)));
             body.println("}");
             body.println("}");
             return;
         }
 
-        var primitive = field.getType().isPrimitiveType();
+        var primitive = field.getType().isPrimitive();
         if(!primitive) {
             if (nullCheck) {
                 body.println("else {");
@@ -275,8 +244,13 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private void createSerializationRepeatedFixed(TypeDeclaration<?> typeDeclaration, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, PrintWriter body, boolean nullCheck) {
-        var implementationType = getImplementationType(typeDeclaration, field, annotation).getName();
+    private void createSerializationRepeatedFixed(TypeDescription typeDeclaration, FieldDescription.InDefinedShape field, ProtobufProperty annotation, PrintWriter body, boolean nullCheck) {
+        var type = getImplementationType(field, annotation).orElse(null);
+        if(type == null){
+            return;
+        }
+
+        var implementationType = type.getName();
         var getter = findGetter(typeDeclaration, field, annotation);
         if(nullCheck){
             body.println("else {");
@@ -290,40 +264,60 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("entry = (%s) iterator.next();".formatted(implementationType));
     }
 
-    private String toMethodCall(MethodDeclaration converter) {
+    private String toMethodCall(MethodDescription.InDefinedShape converter) {
         return converter != null ? ".%s()".formatted(converter.getName()) : "";
     }
 
-    private String findGetter(TypeDeclaration<?> typeDeclaration, VariableDeclarator variable, ProtobufProperty annotation){
-        if (!annotation.repeated()) {
-            return variable.getNameAsString();
+    private String findGetter(TypeDescription typeDeclaration, FieldDescription.InDefinedShape variable, ProtobufProperty annotation){
+        if (!annotation.repeated() || variable.getType().asErasure().isAssignableFrom(Collection.class)) {
+            return variable.getName();
         }
 
-        if(COLLECTION_TYPE.isAssignableBy(variable.getType().resolve())){
-            return variable.getNameAsString();
-        }
-
-        var accessor = findMethod(typeDeclaration, variable.getNameAsString())
-                .or(() -> findMethod(typeDeclaration, "get" + variable.getNameAsString().substring(0, 1).toUpperCase() + variable.getNameAsString().substring(1)))
-                .orElseThrow(() -> new NoSuchElementException("Missing getter/accessor for repeated field %s in %s".formatted(variable.getName(), typeDeclaration.getNameAsString())));
-        if(!COLLECTION_TYPE.isAssignableBy(accessor.getType().resolve())){
+        var accessor = findMethod(typeDeclaration, variable.getName())
+                .or(() -> findMethod(typeDeclaration, "get" + variable.getName().substring(0, 1).toUpperCase() + variable.getName().substring(1)))
+                .orElseThrow(() -> new NoSuchElementException("Missing getter/accessor for repeated field %s in %s".formatted(variable.getName(), typeDeclaration.getCanonicalName())));
+        if(!accessor.getReturnType().asErasure().isAssignableFrom(Collection.class)) {
             throw new IllegalStateException("Unexpected getter/accessor for repeated field %s in %s: expected return type to extend Collection".formatted(variable.getName(), typeDeclaration.getName()));
         }
 
         return accessor.getName() + "()";
     }
 
-    private Optional<MethodDeclaration> findMethod(TypeDeclaration<?> typeDeclaration, String name, String... params){
-        return typeDeclaration.getMethodsBySignature(name, params)
+    private Optional<MethodDescription.InDefinedShape> findMethod(TypeDescription typeDeclaration, String name, Class<?>... params){
+        return typeDeclaration.getDeclaredMethods()
+                .asDefined()
                 .stream()
+                .filter(entry -> isMethodMatching(name, params, entry))
                 .findFirst();
     }
 
-    private void createDeserializerMethod(TypeDeclaration<?> typeDeclaration, Map<VariableDeclarator, ProtobufProperty> fields, boolean test) {
+    private boolean isMethodMatching(String name, Class<?>[] params, MethodDescription.InDefinedShape entry) {
+        if(Objects.equals(entry.getName(), name)){
+            return false;
+        }
+
+        var actualParamsIterator = Arrays.stream(params).iterator();
+        var candidateParamsIterator = entry.getParameters().iterator();
+        while (actualParamsIterator.hasNext()){
+            var actualParameter = actualParamsIterator.next();
+            if(!candidateParamsIterator.hasNext()){
+                return false;
+            }
+
+            var candidateParameter = candidateParamsIterator.next();
+            if(!candidateParameter.getType().asErasure().isAssignableFrom(actualParameter)){
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void createDeserializerMethod(TypeDescription typeDeclaration, Map<FieldDescription.InDefinedShape, ProtobufProperty> fields) {
         var methodName = getDeserializationMethod(typeDeclaration);
-        if(typeDeclaration instanceof EnumDeclaration){
+        if(typeDeclaration.isEnum()){
             var methodBody = DESERIALIZATION_ENUM_BODY.formatted(typeDeclaration.getName(), methodName, typeDeclaration.getName(), typeDeclaration.getName());
-            addSafeMethod(typeDeclaration, methodName, methodBody, "int");
+            addSafeMethod(typeDeclaration, methodName, methodBody, int.class);
             return;
         }
 
@@ -335,7 +329,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
 
         var bodyBuilder = new StringWriter();
         try(var body = new PrintWriter(bodyBuilder)) {
-            body.println("public static %s %s(byte[] bytes) {".formatted(toJavaType(typeDeclaration), methodName));
+            body.println("public static %s %s(byte[] bytes) {".formatted(typeDeclaration.getCanonicalName(), methodName));
             var requiredFields = getRequiredFields(fields);
             if(!requiredFields.isEmpty()){
                 body.println("java.util.BitSet fields = new java.util.BitSet();");
@@ -356,8 +350,8 @@ public class ProtobufMavenMojo extends AbstractMojo {
                     return;
                 }
 
-                var converter = getConverter(typeDeclaration, field, annotation, true);
-                createDeserializerField(typeDeclaration, body, field, annotation, converter, test);
+                var converter = getConverter(field, annotation, true);
+                createDeserializerField(typeDeclaration, body, field, annotation, converter);
             });
             body.println("default:");
             body.println("input.readBytes();");
@@ -369,29 +363,29 @@ public class ProtobufMavenMojo extends AbstractMojo {
                 body.println("throw %s.missingMandatoryField(\"%s\");".formatted(PROTOBUF_DESERIALIZATION_EXCEPTION,  field.getName()));
             });
             var args = getConstructorCallArgs(fields);
-            body.println("return new %s(%s);".formatted(toJavaType(typeDeclaration), args));
+            body.println("return new %s(%s);".formatted(typeDeclaration.getCanonicalName(), args));
             body.println("}");
-            addSafeMethod(typeDeclaration, methodName, bodyBuilder.toString(), "byte[]");
+            addSafeMethod(typeDeclaration, methodName, bodyBuilder.toString(), byte[].class);
             getLog().info("Created deserialization method");
         }
     }
 
-    private String getConstructorCallArgs(Map<VariableDeclarator, ProtobufProperty> fields) {
+    private String getConstructorCallArgs(Map<FieldDescription.InDefinedShape, ProtobufProperty> fields) {
         return fields.entrySet()
                 .stream()
                 .filter(entry -> !entry.getValue().ignore())
-                .map(entry -> entry.getValue().repeated() ? "%sValues".formatted(entry.getKey().getNameAsString()) : entry.getKey().getNameAsString())
+                .map(entry -> entry.getValue().repeated() ? "%sValues".formatted(entry.getKey().getName()) : entry.getKey().getName())
                 .collect(Collectors.joining(", "));
     }
 
-    private Map<VariableDeclarator, ProtobufProperty> getRequiredFields(Map<VariableDeclarator, ProtobufProperty> fields) {
+    private Map<FieldDescription.InDefinedShape, ProtobufProperty> getRequiredFields(Map<FieldDescription.InDefinedShape, ProtobufProperty> fields) {
         return fields.entrySet()
                 .stream()
                 .filter(entry -> !entry.getValue().ignore() && entry.getValue().required())
                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue, (first, second) -> first, LinkedHashMap::new));
     }
 
-    private void createDeserializerField(VariableDeclarator field, ProtobufProperty annotation, PrintWriter body) {
+    private void createDeserializerField(FieldDescription.InDefinedShape field, ProtobufProperty annotation, PrintWriter body) {
         if(annotation.ignore()){
             return;
         }
@@ -402,8 +396,8 @@ public class ProtobufMavenMojo extends AbstractMojo {
             return;
         }
 
-        if(!field.getType().isPrimitiveType()){
-            body.println("%s %s = null;".formatted(field.getTypeAsString(), field.getName()));
+        if(!field.getType().isPrimitive()){
+            body.println("%s %s = null;".formatted(field.getType().getActualName(), field.getName()));
             return;
         }
 
@@ -416,41 +410,30 @@ public class ProtobufMavenMojo extends AbstractMojo {
             case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> "0L";
             default -> throw new IllegalStateException("Unexpected value: " + annotation.type());
         };
-        body.println("%s %s = %s;".formatted(field.getTypeAsString(), field.getName(), defaultValue));
+        body.println("%s %s = %s;".formatted(field.getType().getActualName(), field.getName(), defaultValue));
     }
 
-    private String getCollectionType(VariableDeclarator field) {
-        var type = field.getType().resolve();
-        return COLLECTION_TYPE.isAssignableBy(type) || MAP_TYPE.isAssignableBy(type) ? ArrayList.class.getName()
-                : field.getTypeAsString();
+    private String getCollectionType(FieldDescription.InDefinedShape field) {
+        var type = field.getType().asErasure();
+        return type.isAssignableFrom(Collection.class) || type.isAssignableFrom(Map.class)
+                ? ArrayList.class.getName()
+                : type.getActualName();
     }
 
-    private void addSafeMethod(TypeDeclaration<?> typeDeclaration, String methodName, String body, String... params) {
+    private void addSafeMethod(TypeDescription typeDeclaration, String methodName, String body, Class<?>... params) {
         findMethod(typeDeclaration, methodName, params)
-                .ifPresent(typeDeclaration::remove);
-        typeDeclaration.addMember(StaticJavaParser.parseMethodDeclaration(body));
+                .ifPresent(typeDeclaration.getDeclaredMethods()::remove);
+        // typeDeclaration.getDeclaredMethods().add(StaticJavaParser.parseMethodDescription.InDefinedShape(body));
     }
 
-    private String toJavaType(MethodDeclaration methodDeclaration){
-        var parent = methodDeclaration.getParentNode()
-                .filter(entry -> entry instanceof NodeWithName<?>)
-                .map(entry -> (NodeWithName<?>) entry)
-                .orElseThrow();
-        return toJavaType(parent.getNameAsString() + "." + methodDeclaration.getNameAsString());
+    private String toJavaType(MethodDescription.InDefinedShape methodDeclaration){
+        return methodDeclaration.getDeclaringType().getCanonicalName() + "." + methodDeclaration.getName();
     }
 
-    private String toJavaType(TypeDeclaration<?> declaration){
-        return toJavaType(declaration.getFullyQualifiedName().orElse(declaration.getNameAsString()));
-    }
-
-    private String toJavaType(String type){
-        return type.replaceAll("\\$", ".");
-    }
-
-    private void createDeserializerField(TypeDeclaration<?> typeDeclaration, PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, boolean test) {
+    private void createDeserializerField(TypeDescription typeDeclaration, PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         body.println("case %s: ".formatted(annotation.index()));
         switch (annotation.type()){
-            case MESSAGE -> createDeserializerMessage(typeDeclaration, field, annotation, converter, body, test);
+            case MESSAGE -> createDeserializerMessage(typeDeclaration, field, annotation, converter, body);
             case BOOL -> createDeserializerBoolean(body, field, annotation, converter);
             case STRING -> createDeserializerString(body, field, annotation, converter);
             case BYTES -> createDeserializerBytes(body, field, annotation, converter);
@@ -458,7 +441,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private void createDeserializerScalar(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter) {
+    private void createDeserializerScalar(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         var methodName = getScalarMethodName(annotation);
         var expectedTag = getScalarWireType(annotation);
         if(annotation.repeated()){
@@ -503,7 +486,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         };
     }
 
-    private void writeDeserializerFixedScalar(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, String methodName) {
+    private void writeDeserializerFixedScalar(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter, String methodName) {
         if(converter != null && annotation.repeated()){
             body.println("%sValues.add(%s.valueOf(%s(input.read%s())));".formatted(field.getName(), annotation.type().wrappedType().getName(), toJavaType(converter), methodName));
             body.println("break;");
@@ -522,7 +505,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
             return;
         }
 
-        if(field.getType().isPrimitiveType()) {
+        if(field.getType().isPrimitive()) {
             body.println("%s = input.read%s();".formatted(field.getName(), methodName));
             body.println("break;");
             return;
@@ -532,7 +515,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private void createDeserializerBytes(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter) {
+    private void createDeserializerBytes(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         body.println("if(tag != %s) throw %s.invalidTag(tag);".formatted(WIRE_TYPE_LENGTH_DELIMITED , PROTOBUF_DESERIALIZATION_EXCEPTION));
         if(converter != null && annotation.repeated()) {
             var converterName = toJavaType(converter);
@@ -558,7 +541,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private void createDeserializerString(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter) {
+    private void createDeserializerString(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         body.println("if(tag != %s) throw %s.invalidTag(tag);".formatted(WIRE_TYPE_LENGTH_DELIMITED, PROTOBUF_DESERIALIZATION_EXCEPTION));
         if(converter != null && annotation.repeated()) {
             var converterName = toJavaType(converter);
@@ -584,13 +567,17 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private void createDeserializerMessage(TypeDeclaration<?> typeDeclaration, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter, PrintWriter body, boolean test) {
-        var implementationType = getImplementationType(typeDeclaration, field, annotation);
+    private void createDeserializerMessage(TypeDescription typeDeclaration, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter, PrintWriter body) {
+        var implementationType = getImplementationType(field, annotation).orElse(null);
+        if(implementationType == null){
+            return;
+        }
+
         var deserializationMethod = getDeserializationMethod(implementationType);
-        processClass(typeDeclaration, test);
+        processClass(typeDeclaration);
         addMessageTagCheck(body, implementationType);
-        var readMethod = implementationType instanceof EnumDeclaration ? "Int32" : "Bytes";
-        var implementation = toJavaType(implementationType);
+        var readMethod = implementationType.isEnum() ? "Int32" : "Bytes";
+        var implementation = implementationType.getCanonicalName();
         if(converter != null && annotation.repeated()) {
             var converterName = toJavaType(converter);
             body.println("%sValues.add(%s(%s.%s(input.read%s())));".formatted(field.getName(), converterName, implementation, deserializationMethod, readMethod));
@@ -615,8 +602,8 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private void addMessageTagCheck(PrintWriter body, TypeDeclaration<?> implementationType) {
-        if(implementationType instanceof EnumDeclaration){
+    private void addMessageTagCheck(PrintWriter body, TypeDescription implementationType) {
+        if(implementationType.isEnum()){
             body.println("if(tag != %s) throw %s.invalidTag(tag);".formatted(WIRE_TYPE_VAR_INT, PROTOBUF_DESERIALIZATION_EXCEPTION));
             return;
         }
@@ -624,11 +611,11 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("if(tag != %s && tag != %s) throw %s.invalidTag(tag);".formatted(WIRE_TYPE_LENGTH_DELIMITED, WIRE_TYPE_EMBEDDED_MESSAGE, PROTOBUF_DESERIALIZATION_EXCEPTION));
     }
 
-    private String getDeserializationMethod(TypeDeclaration<?> implementationType) {
-        return implementationType instanceof EnumDeclaration ? DESERIALIZATION_ENUM_METHOD : DESERIALIZATION_CLASS_METHOD;
+    private String getDeserializationMethod(TypeDescription implementationType) {
+        return implementationType.isEnum() ? DESERIALIZATION_ENUM_METHOD : DESERIALIZATION_CLASS_METHOD;
     }
 
-    private void createDeserializerBoolean(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter) {
+    private void createDeserializerBoolean(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         if (!annotation.repeated()) {
             body.println("if(tag != %s) throw %s.invalidTag(tag);".formatted(WIRE_TYPE_VAR_INT, PROTOBUF_DESERIALIZATION_EXCEPTION));
             writeDeserializerFixedBoolean(body, field, annotation, converter);
@@ -649,14 +636,14 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private void writeDeserializerFixedBoolean(PrintWriter body, VariableDeclarator field, ProtobufProperty annotation, MethodDeclaration converter) {
+    private void writeDeserializerFixedBoolean(PrintWriter body, FieldDescription.InDefinedShape field, ProtobufProperty annotation, MethodDescription.InDefinedShape converter) {
         if(converter != null && annotation.repeated()) {
             body.println("%sValues.add(%s(input.readBool()));".formatted(field.getName(), toJavaType(converter)));
             body.println("break;");
             return;
         }
 
-        if(converter != null && field.getType().isPrimitiveType()) {
+        if(converter != null && field.getType().isPrimitive()) {
             body.println("%s = %s(input.readBool());".formatted(field.getName(), toJavaType(converter)));
             body.println("break;");
             return;
@@ -674,7 +661,7 @@ public class ProtobufMavenMojo extends AbstractMojo {
             return;
         }
 
-        if(field.getType().isPrimitiveType()) {
+        if(field.getType().isPrimitive()) {
             body.println("%s = input.readBool();".formatted(field.getName()));
             body.println("break;");
             return;
@@ -684,133 +671,22 @@ public class ProtobufMavenMojo extends AbstractMojo {
         body.println("break;");
     }
 
-    private <T extends TypeDeclaration<T>> Map<VariableDeclarator, ProtobufProperty> getProtobufFields(TypeDeclaration<T> typeDeclaration) {
-        if(typeDeclaration instanceof RecordDeclaration recordDeclaration) {
-            return recordDeclaration.getParameters()
-                    .stream()
-                    .map(this::getProtobufPropertyEntry)
-                    .flatMap(Optional::stream)
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, LinkedHashMap::new));
-        }
-
-        if(typeDeclaration instanceof ClassOrInterfaceDeclaration classOrInterfaceDeclaration){
-            return classOrInterfaceDeclaration.getFields()
-                    .stream()
-                    .map(this::getProtobufPropertyEntry)
-                    .reduce(new LinkedHashMap<>(), (first, second) -> { first.putAll(second); return first; });
-        }
-        
-        throw new IllegalArgumentException("Unknown class type: " + classPool.getClass().getName());
-    }
-
-    private Optional<Entry<ParameterVar, ProtobufProperty>> getProtobufPropertyEntry(Parameter parameter) {
-        return parameter.getAnnotationByClass(ProtobufProperty.class)
-                .map(this::createMockAnnotation)
-                .map(property -> Map.entry(new ParameterVar(parameter), property));
-    }
-
-    private <T extends Node> LinkedHashMap<VariableDeclarator, ProtobufProperty> getProtobufPropertyEntry(FieldDeclaration entry) {
-        return entry.getAnnotationByClass(ProtobufProperty.class)
-                .map(this::createMockAnnotation)
-                .map(property -> getProtobufPropertyEntry(entry, property))
-                .orElseGet(LinkedHashMap::new);
-    }
-
-    private LinkedHashMap<VariableDeclarator, ProtobufProperty> getProtobufPropertyEntry(FieldDeclaration entry, ProtobufProperty property) {
-        return entry.getVariables()
+    private Map<FieldDescription.InDefinedShape, ProtobufProperty> getProtobufFields(TypeDescription typeDeclaration) {
+        return typeDeclaration.getDeclaredFields()
                 .stream()
-                .collect(Collectors.toMap(Function.identity(), ignored -> property, (first, second) -> first, LinkedHashMap::new));
+                .map(entry -> getAnnotation(entry, ProtobufProperty.class).map(value -> Map.entry(entry, value)))
+                .flatMap(Optional::stream)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, LinkedHashMap::new));
     }
 
-    private static class ParameterVar extends VariableDeclarator {
-        private ParameterVar(Parameter parameter){
-            super(parameter.getType(), parameter.getName());
-        }
+    private URLClassLoader createClassLoader(boolean test) {
+        var projectFiles = getProjectFiles(test);
+        var projectUrl = parseURL(projectFiles);
+        return URLClassLoader.newInstance(new URL[]{projectUrl});
     }
 
-    private ProtobufProperty createMockAnnotation(AnnotationExpr annotationExpr) {
-        if(!(annotationExpr instanceof NormalAnnotationExpr annotation)){
-            throw new IllegalArgumentException("Illegal statement: expected @ProtobufProperty to have a body");
-        }
-
-        var pairs = annotation.getPairs()
-                .stream()
-                .collect(Collectors.toUnmodifiableMap(NodeWithSimpleName::getNameAsString, MemberValuePair::getValue));
-        return new ProtobufProperty() {
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return ProtobufProperty.class;
-            }
-
-            @Override
-            public int index() {
-                var literalExpression =  pairs.get("index");
-                if(!(literalExpression instanceof IntegerLiteralExpr integerLiteralExpr)){
-                    throw new IllegalArgumentException("Illegal statement: expected @ProtobufProperty's index to be an int literal");
-                }
-
-                return integerLiteralExpr.asNumber().intValue();
-            }
-
-            @Override
-            public ProtobufType type() {
-                var literalExpression =  pairs.get("type");
-                var result = literalExpression.toString();
-                var index = result.lastIndexOf(".");
-                return ProtobufType.of(result.substring(index + 1))
-                            .orElseThrow(() -> new IllegalArgumentException("Illegal statement, invalid type: " + result));
-            }
-
-            @Override
-            public Class<?> implementation() {
-                var implementation = pairs.get("implementation");
-                if(implementation == null){
-                    return null;
-                }
-
-                //noinspection SuspiciousInvocationHandlerImplementation
-                return (Class<?>) Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(), new Class[]{Class.class}, (proxy, ignored, args) -> implementation.toString());
-            }
-
-            @Override
-            public boolean required() {
-                var literalExpression =  pairs.get("required");
-                if(!(literalExpression instanceof BooleanLiteralExpr booleanLiteralExpr)){
-                    throw new IllegalArgumentException("Illegal statement: expected @ProtobufProperty's index to be a boolean literal");
-                }
-
-                return booleanLiteralExpr.getValue();
-            }
-
-            @Override
-            public boolean ignore() {
-                var literalExpression =  pairs.get("ignore");
-                if(!(literalExpression instanceof BooleanLiteralExpr booleanLiteralExpr)){
-                    throw new IllegalArgumentException("Illegal statement: expected @ProtobufProperty's index to be a boolean literal");
-                }
-
-                return booleanLiteralExpr.getValue();
-            }
-
-            @Override
-            public boolean repeated() {
-                var literalExpression =  pairs.get("repeated");
-                if(!(literalExpression instanceof BooleanLiteralExpr booleanLiteralExpr)){
-                    throw new IllegalArgumentException("Illegal statement: expected @ProtobufProperty's index to be a boolean literal");
-                }
-
-                return booleanLiteralExpr.getValue();
-            }
-        };
-    }
-
-    private List<ClassInfo> getAllClasses(URLClassLoader pluginClassLoader) {
-        var scanner = new ClassGraph()
-                .overrideClassLoaders(pluginClassLoader)
-                .enableClassInfo();
-        try(var scanResult = scanner.scan()) {
-            return scanResult.getClassesImplementing(ProtobufMessage.class);
-        }
+    private String getProjectFiles(boolean test) {
+       return test ? project.getBuild().getTestOutputDirectory() : project.getBuild().getOutputDirectory();
     }
 
     private URL parseURL(String resource) {
@@ -821,31 +697,29 @@ public class ProtobufMavenMojo extends AbstractMojo {
         }
     }
 
-    private Map<String, TypeDeclaration<?>> createClassPool(File directory) {
-        if(directory == null){
-            return Map.of();
+    private List<String> getAllClasses(URLClassLoader pluginClassLoader) {
+        var scanner = new ClassGraph()
+                .overrideClassLoaders(pluginClassLoader)
+                .enableClassInfo();
+        try(var scanResult = scanner.scan()) {
+            return scanResult.getClassesImplementing(ProtobufMessage.class)
+                    .stream()
+                    .map(ClassInfo::getName)
+                    .toList();
         }
-
-        try(var walker = Files.walk(directory.toPath())) {
-            return walker.filter(entry -> entry.endsWith(".java"))
-                    .map(this::parseClass)
-                    .flatMap(Optional::stream)
-                    .map(CompilationUnit::getTypes)
-                    .flatMap(Collection::stream)
-                    .collect(Collectors.toUnmodifiableMap(entry -> entry.getFullyQualifiedName().orElse(entry.getNameAsString()), Function.identity()));
-        }catch (IOException exception){
-            throw new RuntimeException("Cannot create class pool", exception);
-        }
-   }
-
-    private Optional<CompilationUnit> parseClass(Path path) {
-        try {
-            var parser = new JavaParser();
-            parser.getParserConfiguration().setLanguageLevel(LanguageLevel.JAVA_17);
-            var result = parser.parse(path);
-            return result.getResult();
-        } catch (IOException e) {
+    }
+    
+    private Optional<TypeDescription> getFromClassPool(String name) {
+        var result = classPool.describe(name);
+        if(!result.isResolved()){
             return Optional.empty();
         }
+        
+        return Optional.of(result.resolve());
+    }
+    
+    private <T extends Annotation> Optional<T> getAnnotation(AnnotationSource source, Class<T> type){
+        return Optional.ofNullable(source.getDeclaredAnnotations().ofType(type))
+                .map(AnnotationDescription.Loadable::load);
     }
 }
