@@ -19,4 +19,6 @@ public @interface ProtobufProperty {
     boolean ignore() default false;
 
     boolean repeated() default false;
+
+    boolean packed() default false;
 }

@@ -21,7 +21,8 @@ public class PackedTest implements Protobuf {
     }
 
     public record SomeMessage(
-            @ProtobufProperty(index = 1, type = UINT32, repeated = true) List<Integer> content) implements ProtobufMessage {
+            @ProtobufProperty(index = 1, type = UINT32, repeated = true) List<Integer> content
+    ) implements ProtobufMessage {
 
     }
 }
