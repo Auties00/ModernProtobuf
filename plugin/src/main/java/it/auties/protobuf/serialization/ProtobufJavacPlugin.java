@@ -1,24 +1,22 @@
 package it.auties.protobuf.serialization;
 
-import com.sun.source.util.*;
-import lombok.SneakyThrows;
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.dynamic.ClassFileLocator;
-import net.bytebuddy.dynamic.DynamicType;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.Plugin;
+import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskListener;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URLClassLoader;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.Set;
 
 public class ProtobufJavacPlugin implements Plugin, TaskListener{
     private String outputDirectory;
-
-    private Set<Class<?>> classes;
 
     @Override
     public void init(JavacTask task, String... args) {
@@ -57,7 +55,6 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         return true;
     }
 
-    @SneakyThrows
     @Override
     public void finished(TaskEvent event) {
         if(event.getKind() != TaskEvent.Kind.GENERATE){
@@ -69,18 +66,28 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         var qualifiedElementName = getQualifiedElementName(event);
         var className = qualifiedElementName.replace(packageName + ".", "");
         var outputFile = getOutputFile(outputDirectory, packageName, className);
-        var byteBuddy = loadClass(outputFile);
-        System.out.println(outputFile.toString() + Files.exists(outputFile));
+        var classReader = redefineClass(outputFile);
+        var classWriter = new ClassWriter(classReader, 0);
+        var messageVisitor = new ProtobufMessageVisitor();
+        classReader.accept(messageVisitor, 0);
+        var messageName = messageVisitor.messageName();
+        if(messageName.isEmpty()){
+            return;
+        }
+
+        var serializerVisitor = new ProtobufDeserializationVisitor(messageName.get(), messageVisitor.fieldsPropertyValuesMap(), classWriter);
+        classReader.accept(serializerVisitor, 0);
+        System.out.println("Done: " + messageVisitor.fieldsPropertyValuesMap());
     }
 
-    private DynamicType.Builder<?> loadClass(Path pathToClassFile) throws Exception {
-        var defineMethod = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-        defineMethod.setAccessible(true);
-        var read = Files.readAllBytes(pathToClassFile);
-        var loadedClass = (Class<?>) defineMethod.invoke(ProtobufJavacPlugin.class.getClassLoader(), null, read, 0, read.length);
-        return new ByteBuddy().redefine(loadedClass);
+    private ClassReader redefineClass(Path pathToClassFile) {
+       try {
+           var read = Files.readAllBytes(pathToClassFile);
+           return new ClassReader(read);
+       }catch (IOException throwable) {
+           throw new UncheckedIOException("Cannot read class to redefine", throwable);
+       }
     }
-
 
     private Path getOutputFile(String outputDirectory, String packageName, String className) {
         var packageLocation = packageName.replaceAll("\\.", File.separator);
