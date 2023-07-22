@@ -1,9 +1,6 @@
 package it.auties.protobuf.serialization;
 
-import it.auties.protobuf.base.ProtobufInputStream;
-import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufOutputStream;
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.base.*;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -11,6 +8,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.LocalVariablesSorter;
 
 import java.util.Map;
+import java.util.Objects;
 
 class ProtobufDeserializationVisitor extends ClassVisitor {
     private final ProtobufMessageElement element;
@@ -39,9 +37,14 @@ class ProtobufDeserializationVisitor extends ClassVisitor {
         localCreator.visitVarInsn(Opcodes.ASTORE, localCreator.newLocal(inputStreamType));
         element.fields().forEach((name, property) -> {
             localCreator.visitInsn(Opcodes.ACONST_NULL);
-            var localId = localCreator.newLocal(inputStreamType);
-            localCreator.visitVarInsn(Opcodes.ASTORE, localId);
+            var variableType = getLocalVariableType(property);
+            localCreator.visitVarInsn(Opcodes.ASTORE, localCreator.newLocal(variableType));
         });
         cv.visitEnd();
+    }
+
+    private Type getLocalVariableType(ProtobufPropertyStub property) {
+        return property.type() != ProtobufType.MESSAGE ? Type.getType(property.type().wrappedType())
+                : property.implementation();
     }
 }

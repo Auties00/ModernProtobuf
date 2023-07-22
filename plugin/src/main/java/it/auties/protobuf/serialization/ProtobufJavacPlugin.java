@@ -122,9 +122,10 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                     continue;
                 }
 
+                var type = Type.getType(field.desc);
                 var values = getDefaultPropertyValues();
-                element.addField(field.name, values);
                 annotation.accept(new ProtobufPropertyVisitor(values));
+                element.addField(type.getClassName(), field.name, values);
             }
         }
     }
