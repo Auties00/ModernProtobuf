@@ -27,7 +27,7 @@ public class EmbeddedEnumTest implements Protobuf {
     public enum Type implements ProtobufMessage {
         FIRST(0),
         SECOND(1),
-        THIRD(2);
+        THIRD(10);
 
         @Getter
         private final int index;

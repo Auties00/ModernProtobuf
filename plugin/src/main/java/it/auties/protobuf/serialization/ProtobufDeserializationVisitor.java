@@ -1,6 +1,8 @@
 package it.auties.protobuf.serialization;
 
+import it.auties.protobuf.base.ProtobufInputStream;
 import it.auties.protobuf.base.ProtobufMessage;
+import it.auties.protobuf.base.ProtobufOutputStream;
 import it.auties.protobuf.base.ProtobufType;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -10,19 +12,17 @@ import org.objectweb.asm.commons.LocalVariablesSorter;
 
 import java.util.Map;
 
-public class ProtobufDeserializationVisitor extends ClassVisitor {
-    private final String className;
-    private final Map<String, Map<String, Object>> fieldsPropertyValuesMap;
-    protected ProtobufDeserializationVisitor(String className, Map<String, Map<String, Object>> fieldsPropertyValuesMap, ClassVisitor classVisitor) {
+class ProtobufDeserializationVisitor extends ClassVisitor {
+    private final ProtobufMessageElement element;
+    protected ProtobufDeserializationVisitor(ProtobufMessageElement element, ClassVisitor classVisitor) {
         super(Opcodes.ASM9);
-        this.className = className;
-        this.fieldsPropertyValuesMap = fieldsPropertyValuesMap;
+        this.element = element;
         this.cv = classVisitor;
     }
 
     @Override
     public void visitEnd() {
-        var methodDescriptor = "()L" + className;
+        var methodDescriptor = "([B)L" + element.className() + ";";
         var methodVisitor = cv.visitMethod(
                 Opcodes.ACC_PUBLIC,
                 ProtobufMessage.DESERIALIZATION_CLASS_METHOD,
@@ -32,14 +32,15 @@ public class ProtobufDeserializationVisitor extends ClassVisitor {
         );
         methodVisitor.visitCode();
         var localCreator = new LocalVariablesSorter(api, methodDescriptor, methodVisitor);
-        fieldsPropertyValuesMap.forEach((fieldName, fieldProperties) -> {
-            var required = (boolean) fieldProperties.get("required");
-            var protobufType = (ProtobufType) fieldProperties.get("type");
-            var javaType = Type.getType(protobufType.primitiveType());
-            var localId = localCreator.newLocal(javaType);
-            localCreator.visitInsn(Opcodes.ICONST_2);
-            localCreator.visitVarInsn(Opcodes.ISTORE, localId);
-
+        var inputStreamType = Type.getType(ProtobufInputStream.class);
+        localCreator.visitTypeInsn(Opcodes.NEW, inputStreamType.getInternalName());
+        localCreator.visitVarInsn(Opcodes.ALOAD, 0);
+        localCreator.visitMethodInsn(Opcodes.INVOKESPECIAL, ProtobufInputStream.class.getName(), "<init>", "([B)V", false);
+        localCreator.visitVarInsn(Opcodes.ASTORE, localCreator.newLocal(inputStreamType));
+        element.fields().forEach((name, property) -> {
+            localCreator.visitInsn(Opcodes.ACONST_NULL);
+            var localId = localCreator.newLocal(inputStreamType);
+            localCreator.visitVarInsn(Opcodes.ASTORE, localId);
         });
         cv.visitEnd();
     }

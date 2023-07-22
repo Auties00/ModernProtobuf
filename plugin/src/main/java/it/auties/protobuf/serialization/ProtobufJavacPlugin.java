@@ -4,16 +4,18 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.Plugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
+import it.auties.protobuf.base.ProtobufMessage;
+import it.auties.protobuf.base.ProtobufProperty;
+import org.objectweb.asm.*;
+import org.objectweb.asm.tree.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ProtobufJavacPlugin implements Plugin, TaskListener{
     private String outputDirectory;
@@ -64,28 +66,115 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         var outputDirectory = getOutputDirectory(event);
         var packageName = getPackageName(event);
         var qualifiedElementName = getQualifiedElementName(event);
-        var className = qualifiedElementName.replace(packageName + ".", "");
-        var outputFile = getOutputFile(outputDirectory, packageName, className);
-        var classReader = redefineClass(outputFile);
-        var classWriter = new ClassWriter(classReader, 0);
-        var messageVisitor = new ProtobufMessageVisitor();
-        classReader.accept(messageVisitor, 0);
-        var messageName = messageVisitor.messageName();
-        if(messageName.isEmpty()){
+        var simpleClassName = qualifiedElementName.replace(packageName + ".", "");
+        var outputFile = getOutputFile(outputDirectory, packageName, simpleClassName);
+        var classReader = getClassReader(outputFile);
+        if(classReader == null) {
             return;
         }
 
-        var serializerVisitor = new ProtobufDeserializationVisitor(messageName.get(), messageVisitor.fieldsPropertyValuesMap(), classWriter);
-        classReader.accept(serializerVisitor, 0);
-        System.out.println("Done: " + messageVisitor.fieldsPropertyValuesMap());
+        var element = createProtoElement(classReader);
+        if(element == null) {
+            return;
+        }
+
+        var classWriter = new ClassWriter(classReader, 0);
+        var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
+        classReader.accept(deserializationVisitor, 0);
+        writeResult(classWriter, outputFile);
     }
 
-    private ClassReader redefineClass(Path pathToClassFile) {
+    private void writeResult(ClassWriter classWriter, Path outputFile) {
+        try {
+            var result = classWriter.toByteArray();
+            Files.write(outputFile, result);
+        }catch (IOException exception) {
+            throw new UncheckedIOException("Cannot write instrumented class", exception);
+        }
+    }
+
+    private ProtobufMessageElement createProtoElement(ClassReader classReader) {
+        var classNode = new ClassNode();
+        classReader.accept(classNode,0);
+        if(!isProtoMessage(classNode)) {
+            return null;
+        }
+
+        var element = new ProtobufMessageElement(toCanonicalName(classNode.name), isEnum(classNode.access));
+        if(element.isEnum()) {
+            getEnumConstants(classNode, element);
+            return element;
+        }
+
+        getMessageFields(classNode, element);
+        return element;
+    }
+
+    private void getMessageFields(ClassNode classNode, ProtobufMessageElement element) {
+        for(var field : classNode.fields) {
+            if(field.visibleAnnotations == null) {
+                continue;
+            }
+
+            for(var annotation : field.visibleAnnotations) {
+                var annotationType = Type.getType(annotation.desc);
+                if (!Objects.equals(annotationType.getClassName(), ProtobufProperty.class.getName())) {
+                    continue;
+                }
+
+                var values = getDefaultPropertyValues();
+                element.addField(field.name, values);
+                annotation.accept(new ProtobufPropertyVisitor(values));
+            }
+        }
+    }
+
+    private void getEnumConstants(ClassNode classNode, ProtobufMessageElement element) {
+        var clInitMethod = classNode.methods
+                .stream()
+                .filter(entry -> entry.name.equals("<clinit>"))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("Missing <clinit> method in enum declaration: corrupted bytecode"));
+        var analyzer = new ProtobufAnalyzerAdapter(element, clInitMethod);
+        clInitMethod.accept(analyzer);
+    }
+
+    private boolean isEnumConstant(ProtobufMessageElement element, AbstractInsnNode entry) {
+        return entry instanceof FieldInsnNode fieldNode
+                && Objects.equals(Type.getType(fieldNode.desc).getClassName(), element.className());
+    }
+
+    private TreeMap<String, Object> getDefaultPropertyValues() {
+        return Arrays.stream(ProtobufProperty.class.getMethods())
+                .map(entry -> entry.getDefaultValue() != null ? Map.entry(entry.getName(), entry.getDefaultValue()) : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, TreeMap::new));
+    }
+
+    private boolean isProtoMessage(ClassNode classNode) {
+        return !isAbstract(classNode)
+                && classNode.interfaces.stream().anyMatch(entry -> Objects.equals(toCanonicalName(entry), ProtobufMessage.class.getName()));
+    }
+    
+    private boolean isAbstract(ClassNode node) {
+        return (node.access & Opcodes.ACC_INTERFACE) != 0
+                || (node.access & Opcodes.ACC_ABSTRACT) != 0;
+    }
+
+    private boolean isEnum(int access) {
+        return (access & Opcodes.ACC_ENUM) != 0;
+    }
+
+    private String toCanonicalName(String entry) {
+        return entry.replaceAll("/", ".");
+    }
+
+    private ClassReader getClassReader(Path pathToClassFile) {
        try {
            var read = Files.readAllBytes(pathToClassFile);
            return new ClassReader(read);
        }catch (IOException throwable) {
-           throw new UncheckedIOException("Cannot read class to redefine", throwable);
+           return null; // This happens for example in anonymous inner classes
        }
     }
 
