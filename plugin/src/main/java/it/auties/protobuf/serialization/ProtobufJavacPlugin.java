@@ -100,7 +100,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
             return null;
         }
 
-        var element = new ProtobufMessageElement(toCanonicalName(classNode.name), isEnum(classNode.access));
+        var element = new ProtobufMessageElement(classNode.name, isEnum(classNode.access));
         if(element.isEnum()) {
             getEnumConstants(classNode, element);
             return element;
