@@ -122,10 +122,10 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                     continue;
                 }
 
-                var type = Type.getType(field.desc);
+                var type = Type.getType(Objects.requireNonNullElse(field.signature, field.desc));
                 var values = getDefaultPropertyValues();
                 annotation.accept(new ProtobufPropertyVisitor(values));
-                element.addField(type.getClassName(), field.name, values);
+                element.addProperty(type, field.name, values);
             }
         }
     }
@@ -138,11 +138,6 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                 .orElseThrow(() -> new NoSuchElementException("Missing <clinit> method in enum declaration: corrupted bytecode"));
         var analyzer = new ProtobufAnalyzerAdapter(element, clInitMethod);
         clInitMethod.accept(analyzer);
-    }
-
-    private boolean isEnumConstant(ProtobufMessageElement element, AbstractInsnNode entry) {
-        return entry instanceof FieldInsnNode fieldNode
-                && Objects.equals(Type.getType(fieldNode.desc).getClassName(), element.className());
     }
 
     private TreeMap<String, Object> getDefaultPropertyValues() {

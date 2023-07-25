@@ -12,13 +12,14 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class RepeatedTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var repeatedMessage = new ModernRepeatedMessage(List.of(1, 2, 3));
+        var repeatedMessage = new ModernRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)));
         var encoded = writeValueAsBytes(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
         var modernDecoded = readMessage(encoded, ModernRepeatedMessage.class);
@@ -29,7 +30,7 @@ public class RepeatedTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testMultipleModifiers(){
-        var repeatedMessage = new ModernBetaRepeatedMessage(List.of(1, 2, 3), List.of("abc", "def"));
+        var repeatedMessage = new ModernBetaRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)), new ArrayList<>(List.of("abc", "def")));
         var encoded = writeValueAsBytes(repeatedMessage);
         var modernDecoded = readMessage(encoded, ModernRepeatedMessage.class);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
@@ -46,14 +47,14 @@ public class RepeatedTest implements Protobuf {
                 type = ProtobufType.INT32,
                 repeated = true
         )
-        private List<Integer> content;
+        private ArrayList<Integer> content;
 
         @ProtobufProperty(
                 index = 2,
                 type = ProtobufType.STRING,
                 repeated = true
         )
-        private List<String> content2;
+        private ArrayList<String> content2;
     }
 
     @AllArgsConstructor
@@ -67,7 +68,7 @@ public class RepeatedTest implements Protobuf {
                 type = ProtobufType.INT32,
                 repeated = true
         )
-        private List<Integer> content;
+        private ArrayList<Integer> content;
     }
 
     public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {

@@ -12,18 +12,19 @@ import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class RepeatedEmbeddedMessageTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testModifiers() {
-        var finalMessage = new FinalMessage(List.of(1, 2, 3));
-        var anotherFinalMessage = new FinalMessage(List.of(4, 5, 6));
-        var lastFinalMessage = new FinalMessage(List.of(7, 8, 9));
-        var anotherMessage = new AnotherMessage(List.of(finalMessage, anotherFinalMessage, lastFinalMessage));
-        var anotherAnotherMessage = new AnotherMessage(List.of(anotherFinalMessage));
-        var someMessage = new SomeMessage(List.of(anotherMessage, anotherAnotherMessage));
+        var finalMessage = new FinalMessage(new ArrayList<>(List.of(1, 2, 3)));
+        var anotherFinalMessage = new FinalMessage(new ArrayList<>(List.of(4, 5, 6)));
+        var lastFinalMessage = new FinalMessage(new ArrayList<>(List.of(7, 8, 9)));
+        var anotherMessage = new AnotherMessage(new ArrayList<>(List.of(finalMessage, anotherFinalMessage, lastFinalMessage)));
+        var anotherAnotherMessage = new AnotherMessage(new ArrayList<>(List.of(anotherFinalMessage)));
+        var someMessage = new SomeMessage(new ArrayList<>(List.of(anotherMessage, anotherAnotherMessage)));
         var encoded = writeValueAsBytes(someMessage);
         var decoded = readMessage(encoded, SomeMessage.class);
         Assertions.assertEquals(someMessage.content(), decoded.content());
@@ -38,10 +39,9 @@ public class RepeatedEmbeddedMessageTest implements Protobuf {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.MESSAGE,
-                implementation = AnotherMessage.class,
                 repeated = true
         )
-        private List<AnotherMessage> content;
+        private ArrayList<AnotherMessage> content;
     }
 
 
@@ -54,10 +54,9 @@ public class RepeatedEmbeddedMessageTest implements Protobuf {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.MESSAGE,
-                implementation = FinalMessage.class,
                 repeated = true
         )
-        private List<FinalMessage> content;
+        private ArrayList<FinalMessage> content;
     }
 
     @AllArgsConstructor
@@ -71,6 +70,6 @@ public class RepeatedEmbeddedMessageTest implements Protobuf {
                 type = ProtobufType.INT32,
                 repeated = true
         )
-        private List<Integer> content;
+        private ArrayList<Integer> content;
     }
 }

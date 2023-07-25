@@ -29,7 +29,7 @@ public class ConversionTest implements Protobuf {
     @Test
     @SneakyThrows
     public void testRepeated() {
-        var someMessage = new SomeRepeatedMessage(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3")));
+        var someMessage = new SomeRepeatedMessage(new ArrayList<>(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3"))));
         var encoded = writeValueAsBytes(someMessage);
         var decoded = readMessage(encoded, SomeRepeatedMessage.class);
         Assertions.assertEquals(someMessage.wrappers(), decoded.wrappers());
@@ -49,9 +49,13 @@ public class ConversionTest implements Protobuf {
     @Data
     @Accessors(fluent = true)
     public static class SomeRepeatedMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = STRING, repeated = true, implementation = Wrapper.class)
+        @ProtobufProperty(
+                index = 1,
+                type = STRING,
+                repeated = true
+        )
         @Default
-        private List<Wrapper> wrappers = new ArrayList<>();
+        private ArrayList<Wrapper> wrappers = new ArrayList<>();
     }
 
     record Wrapper(String value) implements ProtobufMessage {
