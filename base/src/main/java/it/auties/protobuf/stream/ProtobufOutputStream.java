@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 
 public final class ProtobufOutputStream {
     private final ProtobufVersion version;
@@ -25,11 +26,14 @@ public final class ProtobufOutputStream {
         writeUInt32NoTag(makeTag(fieldNumber, wireType));
     }
 
-    public void writeInt32(int fieldNumber, int value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeInt32NoTag(value);
-    }
+    public void writeInt32(int fieldNumber, Collection<Integer> values) {
+        if(values == null){
+            return;
+        }
 
+        values.forEach(value -> writeInt32(fieldNumber, value));
+    }
+    
     public void writeInt32(int fieldNumber, Integer value) {
         if(value == null){
             return;
@@ -38,10 +42,13 @@ public final class ProtobufOutputStream {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeInt32NoTag(value);
     }
+    
+    public void writeUInt32(int fieldNumber, Collection<Integer> values) {
+        if(values == null){
+            return;
+        }
 
-    public void writeUInt32(int fieldNumber, int value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeUInt32NoTag(value);
+        values.forEach(value -> writeUInt32(fieldNumber, value));
     }
 
     public void writeUInt32(int fieldNumber, Integer value) {
@@ -53,10 +60,14 @@ public final class ProtobufOutputStream {
         writeUInt32NoTag(value);
     }
 
-    public void writeFloat(int fieldNumber, float value) {
-        writeFixed32(fieldNumber, Float.floatToRawIntBits(value));
-    }
+    public void writeFloat(int fieldNumber, Collection<Float> values) {
+        if(values == null){
+            return;
+        }
 
+        values.forEach(value -> writeFloat(fieldNumber, value));
+    }
+    
     public void writeFloat(int fieldNumber, Float value) {
         if(value == null){
             return;
@@ -65,11 +76,14 @@ public final class ProtobufOutputStream {
         writeFixed32(fieldNumber, Float.floatToRawIntBits(value));
     }
 
-    public void writeFixed32(int fieldNumber, int value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED32);
-        writeFixed32NoTag(value);
-    }
+    public void writeFixed32(int fieldNumber, Collection<Integer> values) {
+        if(values == null){
+            return;
+        }
 
+        values.forEach(value -> writeFixed32(fieldNumber, value));
+    }
+    
     public void writeFixed32(int fieldNumber, Integer value) {
         if(value == null){
             return;
@@ -79,10 +93,15 @@ public final class ProtobufOutputStream {
         writeFixed32NoTag(value);
     }
 
-    public void writeInt64(int fieldNumber, long value) {
-        writeUInt64(fieldNumber, value);
-    }
+    public void writeInt64(int fieldNumber, Collection<Long> values) {
+        if(values == null){
+            return;
+        }
 
+
+        values.forEach(value -> writeInt64(fieldNumber, value));
+    }
+    
     public void writeInt64(int fieldNumber, Long value) {
         if(value == null){
             return;
@@ -91,11 +110,14 @@ public final class ProtobufOutputStream {
         writeUInt64(fieldNumber, value);
     }
 
-    public void writeUInt64(int fieldNumber, long value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeUInt64NoTag(value);
-    }
+    public void writeUInt64(int fieldNumber, Collection<Long> values) {
+        if(values == null){
+            return;
+        }
 
+        values.forEach(value -> writeUInt64(fieldNumber, value));
+    }
+    
     public void writeUInt64(int fieldNumber, Long value) {
         if(value == null){
             return;
@@ -105,10 +127,14 @@ public final class ProtobufOutputStream {
         writeUInt64NoTag(value);
     }
 
-    public void writeDouble(int fieldNumber, double value) {
-        writeFixed64(fieldNumber, Double.doubleToRawLongBits(value));
-    }
+    public void writeDouble(int fieldNumber, Collection<Double> values) {
+        if(values == null){
+            return;
+        }
 
+        values.forEach(value -> writeDouble(fieldNumber, value));
+    }
+    
     public void writeDouble(int fieldNumber, Double value) {
         if(value == null){
             return;
@@ -117,9 +143,13 @@ public final class ProtobufOutputStream {
         writeFixed64(fieldNumber, Double.doubleToRawLongBits(value));
     }
 
-    public void writeFixed64(int fieldNumber, long value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED64);
-        writeFixed64NoTag(value);
+    public void writeFixed64(int fieldNumber, Collection<Long> values) {
+        if(values == null){
+            return;
+        }
+
+
+        values.forEach(value -> writeFixed64(fieldNumber, value));
     }
 
     public void writeFixed64(int fieldNumber, Long value) {
@@ -131,9 +161,12 @@ public final class ProtobufOutputStream {
         writeFixed64NoTag(value);
     }
 
-    public void writeBool(int fieldNumber, boolean value) {
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeRaw((byte) (value ? 1 : 0));
+    public void writeBool(int fieldNumber, Collection<Boolean> values) {
+        if(values == null){
+            return;
+        }
+
+        values.forEach(value -> writeBool(fieldNumber, value));
     }
 
     public void writeBool(int fieldNumber, Boolean value) {
@@ -145,6 +178,14 @@ public final class ProtobufOutputStream {
         writeRaw((byte) (value ? 1 : 0));
     }
 
+    public void writeString(int fieldNumber, Collection<String> values) {
+        if(values == null){
+            return;
+        }
+
+        values.forEach(value -> writeString(fieldNumber, value));
+    }
+
     public void writeString(int fieldNumber, String value) {
         if(value == null){
             return;
@@ -152,6 +193,14 @@ public final class ProtobufOutputStream {
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeStringNoTag(value);
+    }
+
+    public void writeBytes(int fieldNumber, Collection<byte[]> values) {
+        if(values == null){
+            return;
+        }
+
+        values.forEach(value -> writeBytes(fieldNumber, value));
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {

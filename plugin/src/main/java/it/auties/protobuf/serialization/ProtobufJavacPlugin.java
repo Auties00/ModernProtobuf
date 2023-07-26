@@ -77,14 +77,23 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         }
 
         element.checkErrors();
-        createDeserializer(outputFile, classReader, element);
+        var classWriter = new ClassWriter(classReader, 0);
+        if(!element.isEnum()){
+            createSerializer(classWriter, classReader, element);
+        }
+
+        createDeserializer(classWriter, classReader, element);
+        writeResult(classWriter, outputFile);
     }
 
-    private void createDeserializer(Path outputFile, ClassReader classReader, ProtobufMessageElement element) {
-        var classWriter = new ClassWriter(classReader, 0);
+    private void createSerializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
+        var deserializationVisitor = new ProtobufSerializationVisitor(element, classWriter);
+        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_FRAMES);
+    }
+
+    private void createDeserializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
         var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_MAXS);
-        writeResult(classWriter, outputFile);
+        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_FRAMES);
     }
 
     private void writeResult(ClassWriter classWriter, Path outputFile) {

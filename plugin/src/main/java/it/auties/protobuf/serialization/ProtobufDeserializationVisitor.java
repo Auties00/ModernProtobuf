@@ -296,8 +296,7 @@ class ProtobufDeserializationVisitor extends ClassVisitor {
         }
     }
 
-    // Creates a ProtobufInputStream from the first parameter of the method
-    // This is assumed to be an array of bytes
+    // Creates a ProtobufInputStream from the first and second parameters of the method(ProtobufVersion, byte[])
     private int createInputStream(LocalVariablesSorter localCreator) {
         try {
             var inputStreamType = Type.getType(ProtobufInputStream.class);
@@ -613,6 +612,7 @@ class ProtobufDeserializationVisitor extends ClassVisitor {
         );
     }
 
+    // Pushes an int to the stack using the best operator
     private void pushIntToStack(MethodVisitor methodVisitor, int value) {
         switch (value) {
             case -1 -> methodVisitor.visitInsn(Opcodes.ICONST_M1);
@@ -626,7 +626,7 @@ class ProtobufDeserializationVisitor extends ClassVisitor {
         }
     }
 
-    // Returns the wire type of a property
+    // Returns the wire-type of a property
     private int getWireType(ProtobufPropertyStub annotation) {
         return switch (annotation.protoType()) {
             case MESSAGE, STRING, BYTES -> WIRE_TYPE_LENGTH_DELIMITED;
@@ -839,6 +839,7 @@ class ProtobufDeserializationVisitor extends ClassVisitor {
         trueBranch.accept(visitor);
     }
 
+    // Creates a switch statement
     private void createSwitchStatement(MethodVisitor visitor, int[] knownBranches, IntConsumer knownBranch, Consumer<MethodVisitor> defaultBranch) {
         var unknownPropertyLabel = new Label();
         var labels = IntStream.range(0, knownBranches.length)
