@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.type;
 
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.model.ProtobufType;
 
 public record ProtobufPrimitiveType(ProtobufType protobufType) implements ProtobufTypeReference {
     public static ProtobufPrimitiveType of(ProtobufType protobufType){
@@ -14,7 +14,7 @@ public record ProtobufPrimitiveType(ProtobufType protobufType) implements Protob
     }
 
     @Override
-    public boolean primitive(){
+    public boolean isPrimitive(){
         return true;
     }
 }

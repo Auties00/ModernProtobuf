@@ -1,10 +1,10 @@
 package it.auties.protobuf.parser;
 
-import it.auties.protobuf.base.ProtobufVersion;
+import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
 import it.auties.protobuf.parser.statement.*;
-import it.auties.protobuf.parser.type.ProtobufMessageType;
+import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,8 +20,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.IntStream;
 
-import static it.auties.protobuf.base.ProtobufVersion.PROTOBUF_2;
-import static it.auties.protobuf.base.ProtobufVersion.PROTOBUF_3;
+import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_2;
+import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_3;
 import static java.util.Objects.requireNonNullElse;
 
 public final class ProtobufParser {
@@ -106,7 +106,7 @@ public final class ProtobufParser {
         }
 
         if(statement instanceof ProtobufFieldStatement fieldStatement){
-            if(!(fieldStatement.type() instanceof ProtobufMessageType messageType)){
+            if(!(fieldStatement.type() instanceof ProtobufObjectType messageType)){
                 return;
             }
 
@@ -127,7 +127,7 @@ public final class ProtobufParser {
         throw new ProtobufTypeException("Cannot check protobufType of %s", statement.name());
     }
 
-    private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, ProtobufMessageType messageType) {
+    private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, ProtobufObjectType messageType) {
         if (!messageType.name().contains(TYPE_SELECTOR_KEYWORD)) {
             return getReferencedType(fieldStatement, messageType.name());
         }

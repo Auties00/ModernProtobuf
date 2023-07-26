@@ -13,10 +13,9 @@ import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
-import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.base.ProtobufReserved;
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufReserved;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.statement.ProtobufObject;
 import it.auties.protobuf.parser.statement.ProtobufReservable;
@@ -125,7 +124,6 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
             compilationUnit.setPackageDeclaration(packageName);
         }
 
-        compilationUnit.addImport(ProtobufMessage.class.getName());
         if(!protoStatement.statements().isEmpty()){
             compilationUnit.addImport(ProtobufProperty.class.getName());
             compilationUnit.addImport(ProtobufType.class.getName());
@@ -196,45 +194,6 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
         }
 
         ctEnum.addAnnotation(annotation);
-    }
-
-    String getSuggestedNames(String originalName, boolean isEnum) {
-        var elements = classPool.stream()
-                .map(CompilationUnit::getTypes)
-                .flatMap(Collection::stream)
-                .filter(ctClass -> isProtobufMessage(ctClass, isEnum))
-                .toList();
-        return getSuggestedNames(originalName, elements);
-    }
-
-    private boolean isProtobufMessage(TypeDeclaration<?> typeDeclaration, boolean isEnum) {
-        var protoType = StaticJavaParser.parseClassOrInterfaceType(ProtobufMessage.class.getName());
-        if(!isEnum && typeDeclaration instanceof ClassOrInterfaceDeclaration ctClass) {
-            return ctClass.getImplementedTypes().contains(protoType) || ctClass.getExtendedTypes()
-                    .stream()
-                    .map(type -> getTypeDeclaration(type.getNameAsString(), QueryType.MESSAGE))
-                    .flatMap(Optional::stream)
-                    .anyMatch(entry -> isProtobufMessage(entry.result(), false));
-        }
-
-        if(!isEnum && typeDeclaration instanceof RecordDeclaration ctRecord){
-            return ctRecord.getImplementedTypes().contains(protoType);
-        }
-
-        if(isEnum && typeDeclaration instanceof EnumDeclaration ctEnum){
-            return ctEnum.getImplementedTypes().contains(protoType);
-        }
-
-        return false;
-    }
-
-    private String getSuggestedNames(String originalName, List<TypeDeclaration<?>> result) {
-        return result.stream()
-                .map(entry -> new SimilarString(originalName, entry.getNameAsString(), null))
-                .filter(SimilarString::isSuggestion)
-                .sorted()
-                .map(SimilarString::toString)
-                .collect(Collectors.joining(", "));
     }
 
     private record SimilarString(String name, String oldName, double similarity) implements Comparable<SimilarString> {

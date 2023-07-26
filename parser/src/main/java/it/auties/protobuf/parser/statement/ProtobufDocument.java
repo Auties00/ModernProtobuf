@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.statement;
 
-import it.auties.protobuf.base.ProtobufVersion;
+import it.auties.protobuf.model.ProtobufVersion;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

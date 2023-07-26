@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.statement;
 
-import it.auties.protobuf.parser.type.ProtobufMessageType;
+import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Arrays;
@@ -163,7 +163,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
             return "";
         }
 
-        if (type() instanceof ProtobufMessageType messageType) {
+        if (type() instanceof ProtobufObjectType messageType) {
             return "%s ".formatted(messageType.name());
         }
 

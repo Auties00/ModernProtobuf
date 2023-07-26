@@ -4,8 +4,7 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.Plugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
-import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufProperty;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
@@ -64,9 +63,8 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         }
 
         var outputDirectory = getOutputDirectory(event);
-        var packageName = getPackageName(event);
-        var qualifiedElementName = getQualifiedElementName(event);
-        var simpleClassName = qualifiedElementName.replace(packageName + ".", "");
+        var packageName = getPackageName(event).orElse(null);
+        var simpleClassName = getSimpleClassName(event, packageName);
         var outputFile = getOutputFile(outputDirectory, packageName, simpleClassName);
         var classReader = getClassReader(outputFile);
         if(classReader == null) {
@@ -74,13 +72,18 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         }
 
         var element = createProtoElement(classReader);
-        if(element == null) {
+        if(!element.isProtobuf()) {
             return;
         }
 
+        element.checkErrors();
+        createDeserializer(outputFile, classReader, element);
+    }
+
+    private void createDeserializer(Path outputFile, ClassReader classReader, ProtobufMessageElement element) {
         var classWriter = new ClassWriter(classReader, 0);
         var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, 0);
+        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_MAXS);
         writeResult(classWriter, outputFile);
     }
 
@@ -96,11 +99,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
     private ProtobufMessageElement createProtoElement(ClassReader classReader) {
         var classNode = new ClassNode();
         classReader.accept(classNode,0);
-        if(!isProtoMessage(classNode)) {
-            return null;
-        }
-
-        var element = new ProtobufMessageElement(classNode.name, isEnum(classNode.access));
+        var element = new ProtobufMessageElement(classNode);
         if(element.isEnum()) {
             getEnumConstants(classNode, element);
             return element;
@@ -122,10 +121,11 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                     continue;
                 }
 
-                var type = Type.getType(Objects.requireNonNullElse(field.signature, field.desc));
                 var values = getDefaultPropertyValues();
                 annotation.accept(new ProtobufPropertyVisitor(values));
-                element.addProperty(type, field.name, values);
+                var type = Type.getType(Objects.requireNonNullElse(field.signature, field.desc));
+                var name = field.name;
+                element.addProperty(type, name, values);
             }
         }
     }
@@ -147,24 +147,6 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, TreeMap::new));
     }
 
-    private boolean isProtoMessage(ClassNode classNode) {
-        return !isAbstract(classNode)
-                && classNode.interfaces.stream().anyMatch(entry -> Objects.equals(toCanonicalName(entry), ProtobufMessage.class.getName()));
-    }
-    
-    private boolean isAbstract(ClassNode node) {
-        return (node.access & Opcodes.ACC_INTERFACE) != 0
-                || (node.access & Opcodes.ACC_ABSTRACT) != 0;
-    }
-
-    private boolean isEnum(int access) {
-        return (access & Opcodes.ACC_ENUM) != 0;
-    }
-
-    private String toCanonicalName(String entry) {
-        return entry.replaceAll("/", ".");
-    }
-
     private ClassReader getClassReader(Path pathToClassFile) {
        try {
            var read = Files.readAllBytes(pathToClassFile);
@@ -175,24 +157,25 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
     }
 
     private Path getOutputFile(String outputDirectory, String packageName, String className) {
-        var packageLocation = packageName.replaceAll("\\.", File.separator);
+        var packagePart = packageName == null ? "" : packageName.replaceAll("\\.", File.separator) + File.separator;
         var innerClass = className.replaceAll("\\.", "\\$");
-        return Path.of(outputDirectory + packageLocation + File.separator + innerClass + ".class");
+        return Path.of(outputDirectory + packagePart + innerClass + ".class");
     }
 
-    private String getQualifiedElementName(TaskEvent event) {
-        var result = event.getTypeElement()
+    private String getSimpleClassName(TaskEvent event, String packageName) {
+        var rawQualifiedName = event.getTypeElement()
                 .getQualifiedName()
                 .toString();
-        return result.endsWith(".")
-                ? result.substring(0, result.length() - 1)
-                : result;
+        var qualifiedName = rawQualifiedName.endsWith(".")
+                ? rawQualifiedName.substring(0, rawQualifiedName.length() - 1)
+                : rawQualifiedName;
+        return packageName == null ? qualifiedName
+                : qualifiedName.replace(packageName + ".", "");
     }
 
-    private String getPackageName(TaskEvent event) {
-        return event.getCompilationUnit()
-                .getPackageName()
-                .toString();
+    private Optional<String> getPackageName(TaskEvent event) {
+        return Optional.ofNullable(event.getCompilationUnit().getPackageName())
+                .map(Objects::toString);
     }
 
 

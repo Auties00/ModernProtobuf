@@ -14,14 +14,13 @@ import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
-import it.auties.protobuf.base.ProtobufMessage;
-import it.auties.protobuf.base.ProtobufProperty;
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufOneOfStatement;
-import it.auties.protobuf.parser.type.ProtobufMessageType;
+import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import lombok.NonNull;
 
@@ -55,7 +54,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
         if(mutable){
             var ctClass = new ClassOrInterfaceDeclaration(NodeList.nodeList(Modifier.publicModifier()), false, protoStatement.name());
             linkToParent(parent, ctClass);
-            ctClass.setImplementedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
             getDeferredImplementation(protoStatement.name()).ifPresent(entry -> {
                 addImplementedType(entry, ctClass);
                 ctClass.setFinal(true);
@@ -68,7 +66,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
 
         var ctRecord = new RecordDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name());
         linkToParent(parent, ctRecord);
-        ctRecord.setImplementedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
         getDeferredImplementation(protoStatement.name())
                 .ifPresent(entry -> addImplementedType(entry, ctRecord));
         addRecordMembers(ctRecord);
@@ -265,8 +262,8 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
             return new MessageType(javaType, rawType, typeParameter, null, null);
         }
 
-        if (!fieldStatement.repeated() && fieldStatement.type().protobufType() == ProtobufType.MESSAGE) {
-            var fieldType = (ProtobufMessageType) fieldStatement.type();
+        if (!fieldStatement.repeated() && (fieldStatement.type().protobufType() == ProtobufType.MESSAGE || fieldStatement.type().protobufType() == ProtobufType.ENUM)) {
+            var fieldType = (ProtobufObjectType) fieldStatement.type();
             var wrapperType = getTypeDeclaration(fieldType.name(), QueryType.ANY);
             wrapperType.ifPresent(queryResult -> queryResult.result().addModifier(Keyword.FINAL));
             return new MessageType(javaType, rawType, typeParameter, wrapperType.map(QueryResult::result).orElse(null), wrapperType.isPresent() ? null : fieldType.name());
@@ -274,7 +271,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
 
         var wrapperRecordName = fieldStatement.name().substring(0, 1).toUpperCase() + fieldStatement.name().substring(1);
         var wrapperRecord = new RecordDeclaration(NodeList.nodeList(Modifier.publicModifier()), wrapperRecordName);
-        wrapperRecord.setImplementedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
         var parameter = new Parameter(javaType, "value");
         wrapperRecord.addParameter(parameter);
         scope.addMember(wrapperRecord);
@@ -282,7 +278,7 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
     }
 
     private String getMessageFieldRawType(TypeDeclaration<?> scope, boolean primitive, ProtobufTypeReference type) {
-        if (type instanceof ProtobufMessageType messageType) {
+        if (type instanceof ProtobufObjectType messageType) {
             var qualifiedName = messageType.declaration().qualifiedCanonicalName();
             var fullName = packageName != null ? "%s.%s".formatted(packageName, qualifiedName) : qualifiedName;
             return qualifiedMinimalName(scope, fullName);
@@ -330,7 +326,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
         ctInterface.addModifier(Keyword.SEALED);
         ctInterface.setInterface(true);
         ctInterface.setName(oneOfStatement.className());
-        ctInterface.setExtendedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
         var ctMethod = new MethodDeclaration();
         ctMethod.addModifier(Keyword.PUBLIC);
         ctMethod.setName(oneOfStatement.name());
@@ -383,7 +378,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
         }
 
         if(result.get().result() instanceof RecordDeclaration ctRecord){
-            addImplementedType(ProtobufMessage.class.getSimpleName(), ctRecord);
             ctRecord.setImplementedTypes(NodeList.nodeList());
             getDeferredImplementation(protoStatement.name())
                     .ifPresent(entry -> addImplementedType(entry, ctRecord));
@@ -393,7 +387,6 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
         }
 
         var ctClass = (ClassOrInterfaceDeclaration) result.get().result();
-        addImplementedType(ProtobufMessage.class.getSimpleName(), ctClass);
         getDeferredImplementation(protoStatement.name()).ifPresent(entry -> {
             addImplementedType(entry, ctClass);
             ctClass.setFinal(true);

@@ -1,15 +1,17 @@
 package it.auties.protobuf.parser.type;
 
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.model.ProtobufType;
 
-public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, ProtobufMessageType {
+public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, ProtobufObjectType {
     ProtobufType protobufType();
-    boolean primitive();
+    boolean isPrimitive();
 
     static ProtobufTypeReference of(String type){
         var protobufType = ProtobufType.of(type)
-                .orElse(ProtobufType.MESSAGE);
-        return protobufType == ProtobufType.MESSAGE ? ProtobufMessageType.unattributed(type)
-                : ProtobufPrimitiveType.of(protobufType);
+                .orElseThrow(() -> new IllegalArgumentException("Unknown type: " +  type));
+        return switch (protobufType) {
+            case MESSAGE, ENUM -> ProtobufObjectType.unattributed(type, protobufType == ProtobufType.ENUM);
+            default -> ProtobufPrimitiveType.of(protobufType);
+        };
     }
 }

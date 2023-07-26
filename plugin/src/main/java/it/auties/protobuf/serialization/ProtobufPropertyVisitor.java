@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization;
 
-import it.auties.protobuf.base.ProtobufType;
+import it.auties.protobuf.model.ProtobufType;
 import org.objectweb.asm.*;
 
 import java.util.*;

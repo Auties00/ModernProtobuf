@@ -11,7 +11,6 @@ import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
-import it.auties.protobuf.base.ProtobufMessage;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
 import lombok.NonNull;
@@ -44,7 +43,6 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
     void generate(Node parent) {
         var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name());
         linkToParent(parent, ctEnum);
-        ctEnum.setImplementedTypes(NodeList.nodeList(parseClassOrInterfaceType(ProtobufMessage.class.getSimpleName())));
         getDeferredImplementation(protoStatement.name())
                 .ifPresent(entry -> addImplementedType(entry, ctEnum));
         addEnumConstants(ctEnum);
