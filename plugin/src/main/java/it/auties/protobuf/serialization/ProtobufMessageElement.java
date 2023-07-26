@@ -5,7 +5,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 
+import java.lang.reflect.Modifier;
 import java.util.*;
+
+import static java.lang.System.Logger.Level.WARNING;
 
 class ProtobufMessageElement {
     private final ClassNode classNode;
@@ -17,10 +20,6 @@ class ProtobufMessageElement {
         this.classNode = classNode;
         this.properties = new ArrayList<>();
         this.constants = new TreeMap<>();
-    }
-
-    protected ClassNode classNode() {
-        return classNode;
     }
 
     protected String className() {
@@ -56,6 +55,10 @@ class ProtobufMessageElement {
         var implementation = getParsedImplementationType(type, fieldType, rawImplementation, required, repeated);
         var wrapperType = getWrapperType(fieldType, repeated);
         var ignore = (boolean) values.get("ignore");
+        if(ignore) {
+            return;
+        }
+
         var packed = (boolean) values.get("packed");
         properties.add(new ProtobufPropertyStub(index, fieldName, type, implementation, wrapperType, required, ignore, repeated, packed));
     }
@@ -98,15 +101,66 @@ class ProtobufMessageElement {
     }
 
     protected void checkErrors() {
-        if(isEnum() && !hasIndexField()) {
-            throw new IllegalArgumentException("Missing index field in enum " + className());
+        if(isEnum()) {
+            checkEnumIndexField();
+            return;
         }
 
+        checkPackedFields();
+        checkRepeatedFieldsWrapper();
         // TODO: Can we check if a constructor for properties exists?
         // The problem tho is that it's kind of hard to determine if a type is assignable to another type
     }
 
-    private boolean hasIndexField() {
-        return classNode.fields.stream().anyMatch(entry -> entry.name.equals("index"));
+    private void checkPackedFields() {
+        properties.stream()
+                .filter(ProtobufPropertyStub::packed)
+                .forEach(this::checkPackedField);
+    }
+
+    private void checkPackedField(ProtobufPropertyStub entry) {
+        if(entry.repeated()){
+            return;
+        }
+
+        throw new IllegalArgumentException("%s is not repeated: only repeated fields can be marked as packed".formatted(entry.name()));
+    }
+
+    private void checkRepeatedFieldsWrapper() {
+        properties.stream()
+                .filter(ProtobufPropertyStub::repeated)
+                .forEach(this::checkRepeatedFieldWrapper);
+    }
+
+    private void checkRepeatedFieldWrapper(ProtobufPropertyStub property) {
+        var genericType = property.wrapperType().getClassName();
+        try {
+            var rawType = genericType.substring(0, genericType.indexOf("<"));
+            var javaClass = Class.forName(rawType);
+            if (Modifier.isAbstract(javaClass.getModifiers())) {
+                throw new IllegalArgumentException("%s %s is abstract: this is not allowed for repeated types!".formatted(genericType, property.name()));
+            }
+
+            if (javaClass.isAssignableFrom(Collection.class)) {
+                throw new IllegalArgumentException("%s %s is not a collection: this is not allowed for repeated types!".formatted(genericType, property.name()));
+            }
+
+            try {
+                javaClass.getConstructor();
+            }catch (NoSuchMethodException ignored) {
+                throw new IllegalArgumentException("%s doesn't provide a no-args constructor: this is not allowed for repeated types!".formatted(genericType));
+            }
+        } catch (ClassNotFoundException exception) {
+            var logger = System.getLogger("Protobuf");
+            logger.log(WARNING, "Cannot check whether %s is a valid type for a repeated field as it's not part of the std Java library".formatted(genericType));
+        }
+    }
+
+    private void checkEnumIndexField() {
+        if(classNode.fields.stream().anyMatch(entry -> entry.name.equals("index"))){
+            return;
+        }
+
+        throw new IllegalArgumentException("Missing index field in enum " + className());
     }
 }

@@ -1,17 +1,20 @@
 package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
+import it.auties.protobuf.model.ProtobufVersion;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class ProtobufInputStream {
+    private final ProtobufVersion version;
     private final byte[] buffer;
     private final int limit;
     private int pos;
 
-    public ProtobufInputStream(byte[] buffer) {
+    public ProtobufInputStream(ProtobufVersion version, byte[] buffer) {
+        this.version = version;
         this.buffer = buffer;
         this.limit = buffer.length;
         this.pos = 0;
@@ -23,7 +26,7 @@ public class ProtobufInputStream {
 
     public List<Float> readFloatPacked() {
         var results = new ArrayList<Float>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readFloat());
         }
@@ -32,7 +35,7 @@ public class ProtobufInputStream {
     }
     public List<Double> readDoublePacked() {
         var results = new ArrayList<Double>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readDouble());
         }
@@ -42,7 +45,7 @@ public class ProtobufInputStream {
 
     public List<Integer> readInt32Packed() {
         var results = new ArrayList<Integer>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readInt32());
         }
@@ -52,7 +55,7 @@ public class ProtobufInputStream {
 
     public List<Long> readInt64Packed() {
         var results = new ArrayList<Long>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readInt64());
         }
@@ -62,7 +65,7 @@ public class ProtobufInputStream {
 
     public List<Integer> readFixed32Packed() {
         var results = new ArrayList<Integer>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readInt32());
         }
@@ -72,7 +75,7 @@ public class ProtobufInputStream {
 
     public List<Long> readFixed64Packed() {
         var results = new ArrayList<Long>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readInt64());
         }
@@ -94,7 +97,7 @@ public class ProtobufInputStream {
 
     public List<Boolean> readBoolPacked(){
         var results = new ArrayList<Boolean>();
-        var input = new ProtobufInputStream(readBytes());
+        var input = new ProtobufInputStream(version, readBytes());
         while (!input.isAtEnd()){
             results.add(input.readInt64() == 1);
         }

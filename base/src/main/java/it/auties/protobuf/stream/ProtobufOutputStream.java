@@ -1,5 +1,6 @@
 package it.auties.protobuf.stream;
 
+import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.io.ByteArrayOutputStream;
@@ -8,13 +9,12 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 public final class ProtobufOutputStream {
+    private final ProtobufVersion version;
     private final ByteArrayOutputStream buffer;
-    public ProtobufOutputStream(ByteArrayOutputStream buffer) {
-        this.buffer = buffer;
-    }
 
-    public ProtobufOutputStream() {
-        this(new ByteArrayOutputStream());
+    public ProtobufOutputStream(ProtobufVersion version) {
+        this.version = version;
+        this.buffer = new ByteArrayOutputStream();
     }
 
     static int makeTag(int fieldNumber, int wireType) {

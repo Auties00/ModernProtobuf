@@ -1,12 +1,11 @@
 package it.auties.protobuf.serialization;
 
-import org.objectweb.asm.*;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.AnalyzerAdapter;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 
 public class ProtobufAnalyzerAdapter extends AnalyzerAdapter {
     private final ProtobufMessageElement element;
@@ -39,6 +38,7 @@ public class ProtobufAnalyzerAdapter extends AnalyzerAdapter {
 
     private Integer readIntValue(int opcode) {
         return switch (opcode) {
+            case Opcodes.ICONST_M1 -> -1;
             case Opcodes.ICONST_0 -> 0;
             case Opcodes.ICONST_1 -> 1;
             case Opcodes.ICONST_2 -> 2;
