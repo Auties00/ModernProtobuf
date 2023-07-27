@@ -19,6 +19,7 @@ public class EmbeddedEnumTest {
         Assertions.assertEquals(anotherMessage.type(), decoded.content().type());
     }
 
+    @Getter
     @AllArgsConstructor
     @Accessors(fluent = true)
     public enum Type {
@@ -26,7 +27,6 @@ public class EmbeddedEnumTest {
         SECOND(1),
         THIRD(10);
 
-        @Getter
         private final int index;
     }
 
@@ -35,7 +35,7 @@ public class EmbeddedEnumTest {
     @Data
     @Accessors(fluent = true)
     public static class SomeMessage {
-        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+        @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
         private AnotherMessage content;
     }
 
@@ -44,7 +44,7 @@ public class EmbeddedEnumTest {
     @Data
     @Accessors(fluent = true)
     public static class AnotherMessage {
-        @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
+        @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
         private Type type;
     }
 }

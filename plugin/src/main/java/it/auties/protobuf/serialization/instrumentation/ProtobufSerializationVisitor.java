@@ -1,91 +1,86 @@
-package it.auties.protobuf.serialization;
+package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.serialization.model.ProtobufMessageElement;
+import it.auties.protobuf.serialization.model.ProtobufProperty;
 import it.auties.protobuf.stream.ProtobufOutputStream;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
-import org.objectweb.asm.commons.LocalVariablesSorter;
 
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Objects;
 
-class ProtobufSerializationVisitor extends ClassVisitor {
-    private final ProtobufMessageElement element;
+import static it.auties.protobuf.Protobuf.SERIALIZATION_METHOD;
 
-    protected ProtobufSerializationVisitor(ProtobufMessageElement element, ClassVisitor classVisitor) {
-        super(Opcodes.ASM9);
-        this.element = element;
-        this.cv = classVisitor;
+public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor {
+    public ProtobufSerializationVisitor(ProtobufMessageElement element, ClassWriter classWriter) {
+        super(element, classWriter);
     }
 
     @Override
-    public void visitEnd() {
-        var methodAccess = getMethodAccess();
-        var methodName = getMethodName();
-        var methodDescriptor = getMethodDescriptor();
-        var methodVisitor = cv.visitMethod(
-                methodAccess,
-                methodName,
-                methodDescriptor,
-                null,
-                new String[0]
-        );
+    public void instrument() {
         methodVisitor.visitCode();
-        createMessageSerializer(methodVisitor, methodAccess, methodName, methodDescriptor);
-        methodVisitor.visitMaxs(-1, -1);
+        createMessageSerializer();
+        methodVisitor.visitMaxs(stackSize, localsCount);
         methodVisitor.visitEnd();
-        cv.visitEnd();
     }
 
-    // Returns the modifiers for the serializer
-    private int getMethodAccess() {
+    @Override
+    public int access() {
         return Opcodes.ACC_PUBLIC;
     }
-
-    // Returns the name of the serializer
-    private String getMethodName() {
-        return Protobuf.SERIALIZATION_METHOD;
+    
+    @Override
+    public String name() {
+        return SERIALIZATION_METHOD;
     }
-
-    // Returns the descriptor of the serializer
-    private String getMethodDescriptor() {
+    
+    @Override
+    public String descriptor() {
         var versionType = Type.getType(ProtobufVersion.class);
         return "(L%s;)[B".formatted(versionType.getInternalName());
     }
 
+    @Override
+    protected String signature() {
+        return null;
+    }
+
+    @Override
+    public int argsCount() {
+        return 2;
+    }
+
     // Creates the body of the serializer for a message
-    private void createMessageSerializer(MethodVisitor methodVisitor, int access, String methodName, String methodDescriptor) {
-        var localCreator = new GeneratorAdapter(
-                methodVisitor,
-                access,
-                methodName,
-                methodDescriptor
-        );
-        var outputStreamId = createOutputStream(localCreator);
-        writeProperties(methodVisitor, localCreator, outputStreamId);
-        createReturnSerializedValue(methodVisitor, localCreator, outputStreamId);
+    private void createMessageSerializer() {
+        var outputStreamId = createOutputStream();
+        writeProperties(outputStreamId);
+        createReturnSerializedValue(outputStreamId);
     }
 
     // Writes all properties to the output stream
-    private void writeProperties(MethodVisitor methodVisitor, GeneratorAdapter localCreator, int outputStreamId) {
+    private void writeProperties(int outputStreamId) {
         element.properties()
-                .forEach(property -> writeProperty(methodVisitor, localCreator, outputStreamId, property));
+                .forEach(property -> writeProperty(outputStreamId, property));
     }
 
     // Writes a property to the output stream
-    private void writeProperty(MethodVisitor methodVisitor, GeneratorAdapter localCreator, int outputStreamId, ProtobufPropertyStub property) {
+    private void writeProperty(int outputStreamId, ProtobufProperty property) {
         methodVisitor.visitVarInsn(
                 Opcodes.ALOAD,
                 outputStreamId
         );
         pushIntToStack(
-                methodVisitor,
                 property.index()
+        );
+        methodVisitor.visitVarInsn(
+                Opcodes.ALOAD,
+                0 // this
         );
         methodVisitor.visitFieldInsn(
                 Opcodes.GETFIELD,
@@ -93,8 +88,11 @@ class ProtobufSerializationVisitor extends ClassVisitor {
                 property.name(),
                 Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getDescriptor()
         );
+        createJavaPropertySerializer(
+                property
+        );
         var readMethod = getSerializerStreamMethod(property);
-        localCreator.visitMethodInsn(
+        methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 Type.getType(ProtobufOutputStream.class).getInternalName(),
                 readMethod.getName(),
@@ -103,21 +101,73 @@ class ProtobufSerializationVisitor extends ClassVisitor {
         );
     }
 
+    private void createJavaPropertySerializer(ProtobufProperty property) {
+        var methodName = getJavaPropertyConverterMethodName(property);
+        if(methodName == null) {
+            return;
+        }
+
+        var methodDescriptor = getJavaPropertyConverterDescriptor(property);
+        pushJavaPropertyConverterArgsToStack(property);
+        methodVisitor.visitMethodInsn(
+                Opcodes.INVOKEVIRTUAL,
+                Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getInternalName(),
+                methodName,
+                methodDescriptor,
+                false
+        );
+    }
+
+    private String getJavaPropertyConverterMethodName(ProtobufProperty property) {
+        return switch (property.protoType()) {
+            case MESSAGE -> SERIALIZATION_METHOD;
+            case ENUM -> "index";
+            case STRING -> "getBytes";
+            default -> null;
+        };
+    }
+
+    private String getJavaPropertyConverterDescriptor(ProtobufProperty property) {
+        try {
+            return switch (property.protoType()) {
+                case MESSAGE -> descriptor();
+                case ENUM -> "()I";
+                case STRING -> Type.getMethodDescriptor(String.class.getMethod("getBytes", Charset.class));
+                default -> throw new IllegalStateException("Unexpected value: " + property.protoType());
+            };
+        }catch (NoSuchMethodException exception) {
+            throw new RuntimeException("Cannot get java property converter descriptor", exception);
+        }
+    }
+
+    private void pushJavaPropertyConverterArgsToStack(ProtobufProperty property) {
+        if(property.protoType() != ProtobufType.STRING) {
+            return;
+        }
+
+        methodVisitor.visitFieldInsn(
+                Opcodes.GETSTATIC,
+                Type.getType(StandardCharsets.class).getInternalName(),
+                "UTF_8",
+                Type.getType(String.class).getDescriptor()
+        );
+    }
+
     // Returns the serialized value
-    private void createReturnSerializedValue(MethodVisitor methodVisitor, GeneratorAdapter localCreator, int outputStreamId) {
+    private void createReturnSerializedValue(int outputStreamId) {
        try {
            methodVisitor.visitVarInsn(
                    Opcodes.ALOAD,
                    outputStreamId
            );
-           localCreator.visitMethodInsn(
+           methodVisitor.visitMethodInsn(
                    Opcodes.INVOKEVIRTUAL,
                    Type.getType(ProtobufOutputStream.class).getInternalName(),
                    "toByteArray",
                    Type.getMethodDescriptor(ProtobufOutputStream.class.getMethod("toByteArray")),
                    false
            );
-           localCreator.visitInsn(
+           methodVisitor.visitInsn(
                    Opcodes.ARETURN
            );
        }catch (NoSuchMethodException exception) {
@@ -126,7 +176,7 @@ class ProtobufSerializationVisitor extends ClassVisitor {
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
-    private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
+    private Method getSerializerStreamMethod(ProtobufProperty annotation) {
         var clazz = ProtobufOutputStream.class;
         try {
             return switch (annotation.protoType()) {
@@ -204,49 +254,35 @@ class ProtobufSerializationVisitor extends ClassVisitor {
     }
 
     // Creates a ProtobufOutputStream from the first parameter of the method(ProtobufVersion)
-    private int createOutputStream(LocalVariablesSorter localCreator) {
+    private int createOutputStream() {
         try {
             var outputStreamType = Type.getType(ProtobufOutputStream.class);
-            localCreator.visitTypeInsn(
+            methodVisitor.visitTypeInsn(
                     Opcodes.NEW,
                     outputStreamType.getInternalName()
             );
-            localCreator.visitInsn(
+            methodVisitor.visitInsn(
                     Opcodes.DUP
             );
-            localCreator.visitVarInsn(
+            methodVisitor.visitVarInsn(
                     Opcodes.ALOAD,
                     1
             );
-            localCreator.visitMethodInsn(
+            methodVisitor.visitMethodInsn(
                     Opcodes.INVOKESPECIAL,
                     outputStreamType.getInternalName(),
                     "<init>",
                     Type.getConstructorDescriptor(ProtobufOutputStream.class.getConstructor(ProtobufVersion.class)),
                     false
             );
-            var streamLocalId = localCreator.newLocal(outputStreamType);
-            localCreator.visitVarInsn(
+            var localVariableId = createLocalVariable();
+            methodVisitor.visitVarInsn(
                     Opcodes.ASTORE,
-                    streamLocalId
+                    localVariableId
             );
-            return streamLocalId;
+            return localVariableId;
         }catch (NoSuchMethodException throwable) {
             throw new RuntimeException("Cannot create input stream var", throwable);
-        }
-    }
-
-    // Pushes an int to the stack using the best operator
-    private void pushIntToStack(MethodVisitor methodVisitor, int value) {
-        switch (value) {
-            case -1 -> methodVisitor.visitInsn(Opcodes.ICONST_M1);
-            case 0 -> methodVisitor.visitInsn(Opcodes.ICONST_0);
-            case 1 -> methodVisitor.visitInsn(Opcodes.ICONST_1);
-            case 2 -> methodVisitor.visitInsn(Opcodes.ICONST_2);
-            case 3 -> methodVisitor.visitInsn(Opcodes.ICONST_3);
-            case 4 -> methodVisitor.visitInsn(Opcodes.ICONST_4);
-            case 5 -> methodVisitor.visitInsn(Opcodes.ICONST_5);
-            default -> methodVisitor.visitIntInsn(Opcodes.BIPUSH, value);
         }
     }
 }

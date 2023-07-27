@@ -1,13 +1,13 @@
-package it.auties.protobuf.serialization;
+package it.auties.protobuf.serialization.analysis;
 
 import it.auties.protobuf.model.ProtobufType;
 import org.objectweb.asm.*;
 
 import java.util.*;
 
-class ProtobufPropertyVisitor extends AnnotationVisitor {
+public class ProtobufPropertyAnalyzer extends AnnotationVisitor {
     private final Map<String, Object> values;
-    ProtobufPropertyVisitor(Map<String, Object> values) {
+    public ProtobufPropertyAnalyzer(Map<String, Object> values) {
         super(Opcodes.ASM9);
         this.values = values;
     }

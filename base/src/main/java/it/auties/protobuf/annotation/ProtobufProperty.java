@@ -18,7 +18,7 @@ public @interface ProtobufProperty {
 
     boolean required() default false;
 
-    boolean ignore() default false;
+    boolean ignored() default false;
 
     boolean repeated() default false;
 

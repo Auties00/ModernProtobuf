@@ -618,6 +618,7 @@ public final class ProtobufParser {
         }
     }
 
+    @Getter
     @AllArgsConstructor
     @Accessors(fluent = true)
     private enum Instruction {
@@ -631,7 +632,6 @@ public final class ProtobufParser {
         ONE_OF(true),
         SERVICE(true);
 
-        @Getter
         private final boolean hasBody;
 
         public static Instruction of(@NonNull String name) {

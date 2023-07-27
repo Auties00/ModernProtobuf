@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization;
+package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.model.ProtobufType;
 import org.objectweb.asm.Opcodes;
@@ -10,9 +10,9 @@ import java.util.*;
 
 import static java.lang.System.Logger.Level.WARNING;
 
-class ProtobufMessageElement {
+public class ProtobufMessageElement {
     private final ClassNode classNode;
-    private final List<ProtobufPropertyStub> properties;
+    private final List<ProtobufProperty> properties;
 
     private final Map<String, Integer> constants;
 
@@ -22,31 +22,31 @@ class ProtobufMessageElement {
         this.constants = new TreeMap<>();
     }
 
-    protected String className() {
+    public String className() {
         return classNode.name;
     }
 
-    protected List<ProtobufPropertyStub> properties() {
+    public List<ProtobufProperty> properties() {
         return Collections.unmodifiableList(properties);
     }
 
-    protected boolean isEnum() {
+    public boolean isEnum() {
         return (classNode.access & Opcodes.ACC_ENUM) != 0;
     }
 
-    protected Map<String, Integer> constants() {
+    public Map<String, Integer> constants() {
         return Collections.unmodifiableMap(constants);
     }
 
-    protected void addConstant(String fieldName, int fieldIndex) {
+    public void addConstant(String fieldName, int fieldIndex) {
         constants.put(fieldName, fieldIndex);
     }
 
-    protected boolean isProtobuf() {
+    public boolean isProtobuf() {
         return !properties().isEmpty() || !constants().isEmpty();
     }
 
-    protected void addProperty(Type fieldType, String fieldName, Map<String, Object> values) {
+    public void addProperty(Type fieldType, String fieldName, Map<String, Object> values) {
         var index = (int) values.get("index");
         var type = (ProtobufType) values.get("type");
         var required = (boolean) values.get("required");
@@ -54,13 +54,13 @@ class ProtobufMessageElement {
         var repeated = (boolean) values.get("repeated");
         var implementation = getParsedImplementationType(type, fieldType, rawImplementation, required, repeated);
         var wrapperType = getWrapperType(fieldType, repeated);
-        var ignore = (boolean) values.get("ignore");
-        if(ignore) {
+        var ignored = (boolean) values.get("ignored");
+        if(ignored) {
             return;
         }
 
         var packed = (boolean) values.get("packed");
-        properties.add(new ProtobufPropertyStub(index, fieldName, type, implementation, wrapperType, required, ignore, repeated, packed));
+        properties.add(new ProtobufProperty(index, fieldName, type, implementation, wrapperType, required, repeated, packed));
     }
 
     private Type getWrapperType(Type javaType, boolean repeated) {
@@ -100,7 +100,7 @@ class ProtobufMessageElement {
         }
     }
 
-    protected void checkErrors() {
+    public void checkErrors() {
         if(isEnum()) {
             checkEnumIndexField();
             return;
@@ -114,11 +114,11 @@ class ProtobufMessageElement {
 
     private void checkPackedFields() {
         properties.stream()
-                .filter(ProtobufPropertyStub::packed)
+                .filter(ProtobufProperty::packed)
                 .forEach(this::checkPackedField);
     }
 
-    private void checkPackedField(ProtobufPropertyStub entry) {
+    private void checkPackedField(ProtobufProperty entry) {
         if(entry.repeated()){
             return;
         }
@@ -128,11 +128,11 @@ class ProtobufMessageElement {
 
     private void checkRepeatedFieldsWrapper() {
         properties.stream()
-                .filter(ProtobufPropertyStub::repeated)
+                .filter(ProtobufProperty::repeated)
                 .forEach(this::checkRepeatedFieldWrapper);
     }
 
-    private void checkRepeatedFieldWrapper(ProtobufPropertyStub property) {
+    private void checkRepeatedFieldWrapper(ProtobufProperty property) {
         var genericType = property.wrapperType().getClassName();
         try {
             var rawType = genericType.substring(0, genericType.indexOf("<"));

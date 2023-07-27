@@ -5,6 +5,11 @@ import com.sun.source.util.Plugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.serialization.analysis.ProtobufEnumAnalyzer;
+import it.auties.protobuf.serialization.model.ProtobufMessageElement;
+import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
+import it.auties.protobuf.serialization.analysis.ProtobufPropertyAnalyzer;
+import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
@@ -22,7 +27,6 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
     @Override
     public void init(JavacTask task, String... args) {
         parseArgs(args);
-        System.err.println("Started");
         task.addTaskListener(this);
     }
 
@@ -88,12 +92,12 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
 
     private void createSerializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
         var deserializationVisitor = new ProtobufSerializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_FRAMES);
+        classReader.accept(deserializationVisitor, 0);
     }
 
     private void createDeserializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
         var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, ClassWriter.COMPUTE_FRAMES);
+        classReader.accept(deserializationVisitor, 0);
     }
 
     private void writeResult(ClassWriter classWriter, Path outputFile) {
@@ -131,7 +135,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                 }
 
                 var values = getDefaultPropertyValues();
-                annotation.accept(new ProtobufPropertyVisitor(values));
+                annotation.accept(new ProtobufPropertyAnalyzer(values));
                 var type = Type.getType(Objects.requireNonNullElse(field.signature, field.desc));
                 var name = field.name;
                 element.addProperty(type, name, values);
@@ -145,7 +149,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                 .filter(entry -> entry.name.equals("<clinit>"))
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("Missing <clinit> method in enum declaration: corrupted bytecode"));
-        var analyzer = new ProtobufAnalyzerAdapter(element, clInitMethod);
+        var analyzer = new ProtobufEnumAnalyzer(element, clInitMethod);
         clInitMethod.accept(analyzer);
     }
 
@@ -205,6 +209,6 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
             return path.substring(0, testIndex) + "target/classes/";
         }
 
-        throw new IllegalArgumentException("Inference for output file failed: " + path);
+        throw new IllegalArgumentException("Inference for output file failed. Please specify the output path manually as a plugin parameter");
     }
 }

@@ -1,5 +1,6 @@
-package it.auties.protobuf.serialization;
+package it.auties.protobuf.serialization.analysis;
 
+import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.AnalyzerAdapter;
@@ -7,10 +8,10 @@ import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Objects;
 
-public class ProtobufAnalyzerAdapter extends AnalyzerAdapter {
+public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
     private final ProtobufMessageElement element;
     private Integer value;
-    protected ProtobufAnalyzerAdapter(ProtobufMessageElement element, MethodNode node) {
+    public ProtobufEnumAnalyzer(ProtobufMessageElement element, MethodNode node) {
         super(Opcodes.ASM9, element.className(), node.access, node.name, node.desc, null);
         this.element = element;
     }

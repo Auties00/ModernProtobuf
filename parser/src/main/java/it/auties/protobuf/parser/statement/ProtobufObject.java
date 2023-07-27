@@ -29,10 +29,6 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 : Optional.ofNullable(statements.get(name));
     }
 
-    public void clearStatements() {
-        statements.clear();
-    }
-
     @SuppressWarnings("unchecked")
     public <V extends ProtobufStatement> Optional<? extends V> getStatement(String name, Class<? extends V> clazz){
         return getStatement(name)
@@ -50,7 +46,7 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 .findFirst();
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unused", "unchecked"})
     public <V extends ProtobufStatement> List<V> getStatementsRecursive(Class<V> clazz){
         return statements().stream()
             .mapMulti((T entry, Consumer<V> consumer) -> {
