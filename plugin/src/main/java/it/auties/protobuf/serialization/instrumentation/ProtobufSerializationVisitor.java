@@ -14,6 +14,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 
 import static it.auties.protobuf.Protobuf.SERIALIZATION_METHOD;
 
@@ -74,16 +75,21 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 Opcodes.ALOAD,
                 0 // this
         );
+        var fieldType = Objects.requireNonNullElse(property.wrapperType(), property.javaType());
         methodVisitor.visitFieldInsn(
                 Opcodes.GETFIELD,
                 element.className(),
                 property.name(),
-                Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getDescriptor()
-        );
-        createJavaPropertySerializer(
-                property
+                fieldType.getDescriptor()
         );
         var readMethod = getSerializerStreamMethod(property);
+        var convertedType = createJavaPropertySerializer(
+                property
+        );
+        boxValueIfNecessary(
+                convertedType.orElse(fieldType),
+                readMethod
+        );
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 Type.getType(ProtobufOutputStream.class).getInternalName(),
@@ -93,10 +99,26 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         );
     }
 
-    private void createJavaPropertySerializer(ProtobufProperty property) {
+    private void boxValueIfNecessary(Type fieldType, Method readMethod) {
+        if (fieldType.getSort() == Type.OBJECT || fieldType.getSort() == Type.ARRAY) {
+            return;
+        }
+
+        var paramTypes = readMethod.getParameterTypes();
+        var paramToSerializeType = Type.getType(paramTypes[paramTypes.length - 1]);
+        methodVisitor.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                paramToSerializeType.getInternalName(),
+                "valueOf",
+                "(%s)%s".formatted(fieldType.getDescriptor(), paramToSerializeType.getDescriptor()),
+                false
+        );
+    }
+
+    private Optional<Type> createJavaPropertySerializer(ProtobufProperty property) {
         var methodName = getJavaPropertyConverterMethodName(property);
         if(methodName == null) {
-            return;
+            return Optional.empty();
         }
 
         var methodDescriptor = getJavaPropertyConverterDescriptor(property);
@@ -105,9 +127,10 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 Opcodes.INVOKEVIRTUAL,
                 Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getInternalName(),
                 methodName,
-                methodDescriptor,
+                methodDescriptor.getInternalName(),
                 false
         );
+        return Optional.of(methodDescriptor.getReturnType());
     }
 
     private String getJavaPropertyConverterMethodName(ProtobufProperty property) {
@@ -119,14 +142,14 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         };
     }
 
-    private String getJavaPropertyConverterDescriptor(ProtobufProperty property) {
+    private Type getJavaPropertyConverterDescriptor(ProtobufProperty property) {
         try {
-            return switch (property.protoType()) {
+            return Type.getType(switch (property.protoType()) {
                 case MESSAGE -> descriptor();
                 case ENUM -> "()I";
                 case STRING -> Type.getMethodDescriptor(String.class.getMethod("getBytes", Charset.class));
                 default -> throw new IllegalStateException("Unexpected value: " + property.protoType());
-            };
+            });
         }catch (NoSuchMethodException exception) {
             throw new RuntimeException("Cannot get java property converter descriptor", exception);
         }

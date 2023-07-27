@@ -82,7 +82,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         }
 
         element.checkErrors();
-        var classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS);
+        var classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_FRAMES);
         classReader.accept(classWriter, 0);
         if(!element.isEnum()){
             createSerializer(classWriter, element);
