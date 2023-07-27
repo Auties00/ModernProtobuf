@@ -5,24 +5,29 @@ import com.sun.source.util.Plugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.analysis.ProtobufEnumAnalyzer;
-import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.analysis.ProtobufPropertyAnalyzer;
+import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
-import org.objectweb.asm.*;
-import org.objectweb.asm.tree.*;
+import it.auties.protobuf.serialization.model.ProtobufMessageElement;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class ProtobufJavacPlugin implements Plugin, TaskListener{
+    private final Map<String, byte[]> javaToSourceMap = new HashMap<>();
+    private final Map<Path, List<ProtobufMessageElement>> missingTypesToElementsMap = new HashMap<>();
+    private final Map<ProtobufMessageElement, List<Path>> elementsToMissingTypesMap = new HashMap<>();
     private String outputDirectory;
 
     @Override
@@ -71,19 +76,27 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         var packageName = getPackageName(event).orElse(null);
         var simpleClassName = getSimpleClassName(event, packageName);
         var outputFile = getOutputFile(outputDirectory, packageName, simpleClassName);
-        var classReader = getClassReader(outputFile);
+        var classReader = getClassReaderResult(outputFile).orElse(null);
         if(classReader == null) {
             return;
         }
 
-        var element = createProtoElement(classReader);
-        if(!element.isProtobuf()) {
+        var element = createProtoElement(classReader.classReader(), outputDirectory)
+                .filter(ProtobufMessageElement::isProtobuf)
+                .orElse(null);
+        if(element == null) {
             return;
         }
 
+        processElement(element, outputFile);
+        classReader.dependentElements()
+                .forEach(dependentElement -> processElement(dependentElement, outputFile));
+    }
+
+    private void processElement(ProtobufMessageElement element, Path outputFile) {
         element.checkErrors();
-        var classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_FRAMES);
-        classReader.accept(classWriter, 0);
+        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_MAXS);
+        element.classReader().accept(classWriter, 0);
         if(!element.isEnum()){
             createSerializer(classWriter, element);
         }
@@ -104,32 +117,33 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
 
     private void writeResult(ClassWriter classWriter, Path outputFile) {
         try {
-            var result = classWriter.toByteArray();
-            Files.write(outputFile, result, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(outputFile, classWriter.toByteArray());
         }catch (IOException exception) {
             throw new UncheckedIOException("Cannot write instrumented class", exception);
         }
     }
 
-    private ProtobufMessageElement createProtoElement(ClassReader classReader) {
+    private Optional<ProtobufMessageElement> createProtoElement(ClassReader classReader, String output) {
         var classNode = new ClassNode();
         classReader.accept(classNode, 0);
-        var element = new ProtobufMessageElement(classNode);
+        var element = new ProtobufMessageElement(classNode, classReader);
         if(element.isEnum()) {
             getEnumConstants(classNode, element);
-            return element;
+            return Optional.of(element);
         }
 
-        getMessageFields(classNode, element);
-        return element;
+        return Optional.of(element)
+                .filter(entry -> getMessageFields(classNode, entry, output));
     }
 
-    private void getMessageFields(ClassNode classNode, ProtobufMessageElement element) {
+    private boolean getMessageFields(ClassNode classNode, ProtobufMessageElement element, String output) {
+        var completeType = true;
         for(var field : classNode.fields) {
             if(field.visibleAnnotations == null) {
                 continue;
             }
 
+            var missingTypes = new ArrayList<Path>();
             for(var annotation : field.visibleAnnotations) {
                 var annotationType = Type.getType(annotation.desc);
                 if (!Objects.equals(annotationType.getClassName(), ProtobufProperty.class.getName())) {
@@ -138,9 +152,37 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
 
                 var values = getDefaultPropertyValues();
                 annotation.accept(new ProtobufPropertyAnalyzer(values));
-                element.addProperty(field.name, field.desc, field.signature, values);
+                var property = element.addProperty(field.name, field.desc, field.signature, values)
+                        .orElse(null);
+                if(property == null || (property.protoType() != ProtobufType.MESSAGE && property.protoType() != ProtobufType.ENUM)) {
+                    continue;
+                }
+
+                var path = Path.of(output + property.javaType().getInternalName() + ".class");
+                if(Files.exists(path)) {
+                    var classReaderResult = getClassReaderResult(path)
+                            .orElseThrow(() -> new IllegalArgumentException("Cannot read: " + path));
+                    classReaderResult.dependentElements()
+                            .forEach(dependentElement -> processElement(dependentElement, Path.of(output)));
+                    property.localJavaType().set(classReaderResult.classReader());
+                    continue;
+                }
+
+                var missingElements = Objects.requireNonNullElseGet(missingTypesToElementsMap.get(path), ArrayList<ProtobufMessageElement>::new);
+                missingElements.add(element);
+                missingTypesToElementsMap.put(path, missingElements);
+                missingTypes.add(path);
+                completeType = false;
             }
+
+            if(missingTypes.isEmpty()) {
+                continue;
+            }
+
+            elementsToMissingTypesMap.put(element, missingTypes);
         }
+
+        return completeType;
     }
 
     private void getEnumConstants(ClassNode classNode, ProtobufMessageElement element) {
@@ -160,13 +202,38 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, TreeMap::new));
     }
 
-    private ClassReader getClassReader(Path pathToClassFile) {
+    private Optional<ClassReaderResult> getClassReaderResult(Path source) {
        try {
-           var read = Files.readAllBytes(pathToClassFile);
-           return new ClassReader(read);
+           var cached = javaToSourceMap.get(source.toString());
+           if(cached != null) {
+               return Optional.of(new ClassReaderResult(new ClassReader(cached), List.of()));
+           }
+
+           var read = Files.readAllBytes(source);
+           javaToSourceMap.put(source.toString(), read);
+           var result = new ClassReader(read);
+           var dependentElements = getDependentElements(source);
+           return Optional.of(new ClassReaderResult(result, dependentElements));
        }catch (IOException throwable) {
-           return null; // This happens for example in anonymous inner classes
+           return Optional.empty();
        }
+    }
+
+    private List<ProtobufMessageElement> getDependentElements(Path source) {
+        return Objects.requireNonNullElseGet(missingTypesToElementsMap.remove(source), ArrayList<ProtobufMessageElement>::new)
+                .stream()
+                .filter(element -> isElementReady(source, element))
+                .toList();
+    }
+
+    private boolean isElementReady(Path source, ProtobufMessageElement element) {
+        var missingElements = elementsToMissingTypesMap.get(element);
+        missingElements.remove(source);
+        return missingElements.isEmpty();
+    }
+
+    private record ClassReaderResult(ClassReader classReader, List<ProtobufMessageElement> dependentElements) {
+
     }
 
     private Path getOutputFile(String outputDirectory, String packageName, String className) {

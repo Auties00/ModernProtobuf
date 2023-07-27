@@ -1,23 +1,26 @@
 package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.model.ProtobufType;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.lang.System.Logger.Level.WARNING;
 
 public class ProtobufMessageElement {
     private final ClassNode classNode;
+    private final ClassReader classReader;
     private final Map<Integer, ProtobufProperty> properties;
-
     private final Map<Integer, String> constants;
 
-    public ProtobufMessageElement(ClassNode classNode) {
+    public ProtobufMessageElement(ClassNode classNode, ClassReader classReader) {
         this.classNode = classNode;
+        this.classReader = classReader;
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
     }
@@ -38,6 +41,10 @@ public class ProtobufMessageElement {
         return Collections.unmodifiableMap(constants);
     }
 
+    public ClassReader classReader() {
+        return classReader;
+    }
+
     public void addConstant(int fieldIndex, String fieldName) {
         var error = constants.put(fieldIndex, fieldName);
         if(error == null) {
@@ -51,26 +58,27 @@ public class ProtobufMessageElement {
         return !properties().isEmpty() || !constants().isEmpty();
     }
 
-    public void addProperty(String fieldName, String fieldDescription, String fieldSignature, Map<String, Object> properties) {
-        var index = (int) properties.get("index");
-        var type = (ProtobufType) properties.get("type");
-        var required = (boolean) properties.get("required");
-        var rawImplementation = properties.get("implementation");
-        var repeated = (boolean) properties.get("repeated");
+    public Optional<ProtobufProperty> addProperty(String fieldName, String fieldDescription, String fieldSignature, Map<String, Object> values) {
+        var index = (int) values.get("index");
+        var type = (ProtobufType) values.get("type");
+        var required = (boolean) values.get("required");
+        var rawImplementation = values.get("implementation");
+        var repeated = (boolean) values.get("repeated");
         var implementation = getParsedImplementationType(type, Type.getType(Objects.requireNonNullElse(fieldSignature, fieldDescription)), rawImplementation, required, repeated);
         var wrapperType = getWrapperType(fieldDescription, repeated);
-        var ignored = (boolean) properties.get("ignored");
+        var ignored = (boolean) values.get("ignored");
         if(ignored) {
-            return;
+            return Optional.empty();
         }
 
-        var packed = (boolean) properties.get("packed");
-        var error = this.properties.put(index, new ProtobufProperty(index, fieldName, type, implementation, wrapperType, required, repeated, packed));
-        if(error == null) {
-            return;
+        var packed = (boolean) values.get("packed");
+        var result = new ProtobufProperty(index, fieldName, type, implementation, new AtomicReference<>(), wrapperType, required, repeated, packed);
+        var error = properties.put(index, result);
+        if (error != null) {
+            throw new IllegalArgumentException("Duplicate protobuf field with index %s: %s/%s in %s".formatted(index, fieldName, error.name(), className()));
         }
 
-        throw new IllegalArgumentException("Duplicate protobuf field with index %s: %s/%s in %s".formatted(index, fieldName, error.name(), className()));
+        return Optional.of(result);
     }
 
     private static Type getWrapperType(String fieldDescription, boolean repeated) {
@@ -177,5 +185,10 @@ public class ProtobufMessageElement {
         }
 
         throw new IllegalArgumentException("Missing index field in enum " + className());
+    }
+
+    @Override
+    public String toString() {
+        return className();
     }
 }

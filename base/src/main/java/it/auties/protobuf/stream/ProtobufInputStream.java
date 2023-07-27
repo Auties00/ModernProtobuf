@@ -3,6 +3,7 @@ package it.auties.protobuf.stream;
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufVersion;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -103,6 +104,10 @@ public class ProtobufInputStream {
         }
 
         return results;
+    }
+
+    public String readString() {
+        return new String(readBytes(), StandardCharsets.UTF_8);
     }
 
     public int readInt32() {

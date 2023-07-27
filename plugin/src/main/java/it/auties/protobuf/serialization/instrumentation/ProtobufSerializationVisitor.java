@@ -1,6 +1,5 @@
 package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufProperty;
@@ -10,8 +9,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.lang.reflect.Method;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -122,7 +119,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         }
 
         var methodDescriptor = getJavaPropertyConverterDescriptor(property);
-        pushJavaPropertyConverterArgsToStack(property);
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getInternalName(),
@@ -137,35 +133,16 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return switch (property.protoType()) {
             case MESSAGE -> SERIALIZATION_METHOD;
             case ENUM -> "index";
-            case STRING -> "getBytes";
             default -> null;
         };
     }
 
     private Type getJavaPropertyConverterDescriptor(ProtobufProperty property) {
-        try {
-            return Type.getType(switch (property.protoType()) {
-                case MESSAGE -> descriptor();
-                case ENUM -> "()I";
-                case STRING -> Type.getMethodDescriptor(String.class.getMethod("getBytes", Charset.class));
-                default -> throw new IllegalStateException("Unexpected value: " + property.protoType());
-            });
-        }catch (NoSuchMethodException exception) {
-            throw new RuntimeException("Cannot get java property converter descriptor", exception);
-        }
-    }
-
-    private void pushJavaPropertyConverterArgsToStack(ProtobufProperty property) {
-        if(property.protoType() != ProtobufType.STRING) {
-            return;
-        }
-
-        methodVisitor.visitFieldInsn(
-                Opcodes.GETSTATIC,
-                Type.getType(StandardCharsets.class).getInternalName(),
-                "UTF_8",
-                Type.getType(String.class).getDescriptor()
-        );
+        return Type.getType(switch (property.protoType()) {
+            case MESSAGE -> descriptor();
+            case ENUM -> "()I";
+            default -> throw new IllegalStateException("Unexpected value: " + property.protoType());
+        });
     }
 
     // Returns the serialized value
@@ -195,7 +172,14 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         var clazz = ProtobufOutputStream.class;
         try {
             return switch (annotation.protoType()) {
-                case MESSAGE, BYTES, STRING -> {
+                case STRING -> {
+                    if (annotation.repeated()) {
+                        yield clazz.getMethod("writeString", int.class, Collection.class);
+                    }
+
+                    yield clazz.getMethod("writeString", int.class, String.class);
+                }
+                case MESSAGE, BYTES -> {
                     if (annotation.packed()) {
                         throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
                     }
@@ -206,7 +190,14 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
                     yield clazz.getMethod("writeBytes", int.class, byte[].class);
                 }
-                case ENUM, INT32, SINT32, BOOL -> {
+                case BOOL -> {
+                    if (annotation.repeated()) {
+                        yield clazz.getMethod("writeBool", int.class, Collection.class);
+                    }
+
+                    yield clazz.getMethod("writeBool", int.class, Boolean.class);
+                }
+                case ENUM, INT32, SINT32 -> {
                     if (annotation.repeated()) {
                         yield clazz.getMethod("writeInt32", int.class, Collection.class);
                     }
@@ -290,7 +281,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                     Type.getConstructorDescriptor(ProtobufOutputStream.class.getConstructor(ProtobufVersion.class)),
                     false
             );
-            var localVariableId = createLocalVariable();
+            var localVariableId = createLocalVariable(outputStreamType);
             methodVisitor.visitVarInsn(
                     Opcodes.ASTORE,
                     localVariableId

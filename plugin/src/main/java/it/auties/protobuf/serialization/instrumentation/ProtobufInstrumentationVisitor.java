@@ -4,26 +4,33 @@ import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.commons.LocalVariablesSorter;
 
 public abstract class ProtobufInstrumentationVisitor {
     protected final ProtobufMessageElement element;
     protected final ClassWriter classWriter;
-    protected  MethodVisitor methodVisitor;
-    protected int localsCount;
+    protected LocalVariablesSorter methodVisitor;
 
     protected ProtobufInstrumentationVisitor(ProtobufMessageElement element, ClassWriter classWriter) {
         this.element = element;
-        this.localsCount = argsCount();
         this.classWriter = classWriter;
     }
 
     public void instrument() {
-        this.methodVisitor = classWriter.visitMethod(
-                access(),
+        var access = access();
+        var descriptor = descriptor();
+        var visitor = classWriter.visitMethod(
+                access,
                 name(),
-                descriptor(),
+                descriptor,
                 signature(),
                 new String[0]
+        );
+        this.methodVisitor = new LocalVariablesSorter(
+                access,
+                descriptor,
+                visitor
         );
         methodVisitor.visitCode();
         doInstrumentation();
@@ -56,7 +63,7 @@ public abstract class ProtobufInstrumentationVisitor {
         }
     }
 
-    protected int createLocalVariable() {
-        return ++localsCount;
+    protected int createLocalVariable(Type type) {
+        return methodVisitor.newLocal(type);
     }
 }

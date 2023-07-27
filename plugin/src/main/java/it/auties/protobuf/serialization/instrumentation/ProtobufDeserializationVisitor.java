@@ -12,8 +12,6 @@ import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -77,8 +75,8 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     private void createMessageDeserializer() {
         var inputStreamLocalId = createInputStream();
         var properties = createdLocalDeserializedVariables();
-        var rawTagId = createLocalVariable();
-        var tagId = createLocalVariable();
+        var rawTagId = createLocalVariable(Type.INT_TYPE);
+        var tagId = createLocalVariable(Type.INT_TYPE);
         createWhileStatement(
                 Opcodes.IFNE,
                 () -> createTagAndIndexReader(inputStreamLocalId, rawTagId, tagId),
@@ -107,7 +105,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                     inputStreamLocalId,
                     tagId,
                     properties.get(property),
-                    null,
                     () -> deserializeMessageFromBytes(property)
             );
 
@@ -116,25 +113,14 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                     inputStreamLocalId,
                     tagId,
                     properties.get(property),
-                    null,
                     () -> deserializeEnumFromInt(property)
             );
 
-            case STRING -> createPropertyDeserializer(
+            case STRING, BYTES -> createPropertyDeserializer(
                     property,
                     inputStreamLocalId,
                     tagId,
                     properties.get(property),
-                    this::allocateNewString,
-                    this::deserializeStringFromBytes
-            );
-
-            case BYTES -> createPropertyDeserializer(
-                    property,
-                    inputStreamLocalId,
-                    tagId,
-                    properties.get(property),
-                    null,
                     null
             );
 
@@ -294,46 +280,14 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                     Type.getConstructorDescriptor(ProtobufInputStream.class.getConstructor(ProtobufVersion.class, byte[].class)),
                     false
             );
+            var id = createLocalVariable(inputStreamType);
             methodVisitor.visitVarInsn(
                     Opcodes.ASTORE,
-                    createLocalVariable()
+                    id
             );
-            return localsCount;
+            return id;
         }catch (NoSuchMethodException throwable) {
             throw new RuntimeException("Cannot create input stream var", throwable);
-        }
-    }
-
-    // Allocates a new String to prepare for deserialization
-    private void allocateNewString() {
-        var stringType = Type.getType(String.class);
-        methodVisitor.visitTypeInsn(
-                Opcodes.NEW,
-                stringType.getInternalName()
-        );
-        methodVisitor.visitInsn(
-                Opcodes.DUP
-        );
-    }
-
-    // Deserializes a String from an array of bytes
-    private void deserializeStringFromBytes() {
-        try {
-            methodVisitor.visitFieldInsn(
-                    Opcodes.GETSTATIC,
-                    Type.getType(StandardCharsets.class).getInternalName(),
-                    "UTF_8",
-                    Type.getType(String.class).getDescriptor()
-            );
-            methodVisitor.visitMethodInsn(
-                    Opcodes.INVOKESPECIAL,
-                    element.className(),
-                    "<init>",
-                    Type.getConstructorDescriptor(String.class.getConstructor(byte[].class, Charset.class)),
-                    false
-            );
-        }catch (NoSuchMethodException exception) {
-            throw new RuntimeException("Cannot create deserializer bytes -> string", exception);
         }
     }
 
@@ -406,11 +360,12 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Creates a local variable to store a property's deserialized value
     private int createLocalDeserializeVariable(ProtobufProperty property) {
         addDeserializerDefaultValue(property);
+        var id = createLocalVariable(Objects.requireNonNullElse(property.wrapperType(), property.javaType()));
         methodVisitor.visitVarInsn(
                 Opcodes.ASTORE,
-                createLocalVariable()
+                id
         );
-        return localsCount;
+        return id;
     }
 
     // Pushes to the stack the correct default value for the local variable created by createDeserializedField
@@ -539,14 +494,22 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private String getDeserializerStreamMethod(ProtobufProperty annotation) {
         return switch (annotation.protoType()) {
-            case MESSAGE, BYTES, STRING -> {
+            case STRING -> {
+                if (annotation.packed()) {
+                    throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
+                }
+
+                yield "readString";
+            }
+            case MESSAGE, BYTES -> {
                 if (annotation.packed()) {
                     throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
                 }
 
                 yield "readBytes";
             }
-            case ENUM, INT32, SINT32, UINT32, BOOL -> annotation.packed() ? "readInt32Packed" : "readInt32";
+            case BOOL -> annotation.packed() ? "readBoolPacked" : "readBool";
+            case ENUM, INT32, SINT32, UINT32 -> annotation.packed() ? "readInt32Packed" : "readInt32";
             case FLOAT -> annotation.packed() ? "readFloatPacked" : "readFloat";
             case DOUBLE -> annotation.packed() ? "readDoublePacked" : "readDouble";
             case FIXED32, SFIXED32 -> annotation.packed() ? "readFixed32Packed" : "readFixed32";
@@ -556,7 +519,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a message deserializer with a wire tag check
-    private void createPropertyDeserializer(ProtobufProperty property, int inputStreamId, int tagId, int fieldId, Runnable preparer, Runnable finalizer) {
+    private void createPropertyDeserializer(ProtobufProperty property, int inputStreamId, int tagId, int fieldId, Runnable finalizer) {
         methodVisitor.visitVarInsn(
                 Opcodes.ILOAD,
                 tagId
@@ -571,7 +534,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                         property,
                         inputStreamId,
                         fieldId,
-                        preparer,
                         finalizer
                 ),
                 () -> throwInvalidTag(tagId)
@@ -589,7 +551,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a message deserializer assuming that the wire tag is correct
-    private void createSafePropertyDeserializer(ProtobufProperty property, int inputStreamId, int fieldId, Runnable preparer, Runnable finalizer) {
+    private void createSafePropertyDeserializer(ProtobufProperty property, int inputStreamId, int fieldId, Runnable finalizer) {
         try {
             var repeated = property.repeated();
             if(repeated) {
@@ -597,9 +559,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                         Opcodes.ALOAD,
                         fieldId
                 );
-            }
-            if(preparer != null) {
-                preparer.run();
             }
             methodVisitor.visitVarInsn(
                     Opcodes.ALOAD,
