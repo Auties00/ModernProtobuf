@@ -220,8 +220,8 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
     }
 
     private List<ProtobufMessageElement> getDependentElements(Path source) {
-        return Objects.requireNonNullElseGet(missingTypesToElementsMap.remove(source), ArrayList<ProtobufMessageElement>::new)
-                .stream()
+        var missingTypes = missingTypesToElementsMap.remove(source);
+        return missingTypes == null ? List.of() : missingTypes.stream()
                 .filter(element -> isElementReady(source, element))
                 .toList();
     }
