@@ -10,7 +10,7 @@ import java.util.Objects;
 
 public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
     private final ProtobufMessageElement element;
-    private Integer value;
+    private Integer index;
     public ProtobufEnumAnalyzer(ProtobufMessageElement element, MethodNode node) {
         super(Opcodes.ASM9, element.className(), node.access, node.name, node.desc, null);
         this.element = element;
@@ -19,13 +19,13 @@ public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
     @Override
     public void visitIntInsn(int opcode, int operand) {
         super.visitIntInsn(opcode, operand);
-        this.value = operand;
+        this.index = operand;
     }
 
     @Override
     public void visitInsn(int opcode) {
         super.visitInsn(opcode);
-        if(value != null) {
+        if(index != null) {
             return;
         }
 
@@ -34,7 +34,7 @@ public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
             return;
         }
 
-        this.value = value;
+        this.index = value;
     }
 
     private Integer readIntValue(int opcode) {
@@ -58,8 +58,8 @@ public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
             return;
         }
 
-        Objects.requireNonNull(value, "Proto constant %s in %s doesn't specify an index".formatted(name, element.className()));
-        element.addConstant(name, value);
-        this.value = null;
+        Objects.requireNonNull(index, "Proto constant %s in %s doesn't specify an index".formatted(name, element.className()));
+        element.addConstant(index, name);
+        this.index = null;
     }
 }

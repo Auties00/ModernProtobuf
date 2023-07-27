@@ -30,8 +30,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     @Override
-    public void instrument() {
-        methodVisitor.visitCode();
+    protected void doInstrumentation() {
         if (element.isEnum()) {
             createEnumDeserializer();
         }else {
@@ -417,19 +416,16 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Pushes to the stack the correct default value for the local variable created by createDeserializedField
     private void addDeserializerDefaultValue(ProtobufProperty property) {
         if(property.wrapperType() != null){
-            var wrapperName = property.wrapperType().getInternalName();
-            var wrapperParametersStart = wrapperName.indexOf("<");
-            var wrapperRawName = wrapperParametersStart != -1 ? wrapperName.substring(0, wrapperParametersStart) : wrapperName;
             methodVisitor.visitTypeInsn(
                     Opcodes.NEW,
-                    wrapperRawName
+                    property.wrapperType().getInternalName()
             );
             methodVisitor.visitInsn(
                     Opcodes.DUP
             );
             methodVisitor.visitMethodInsn(
                     Opcodes.INVOKESPECIAL,
-                    wrapperRawName,
+                    property.wrapperType().getInternalName(),
                     "<init>",
                     "()V",
                     false
@@ -724,7 +720,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     private Object[] createEnumConstructorLambda() {
         var lambdaName = "lambda$of$0";
         var lambdaDescriptor = "(IL%s;)Z".formatted(element.className());
-        var predicateLambdaMethod = cv.visitMethod(
+        var predicateLambdaMethod = classWriter.visitMethod(
                 Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
                 lambdaName,
                 lambdaDescriptor,

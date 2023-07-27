@@ -21,13 +21,10 @@ public class ProtobufPropertyAnalyzer extends AnnotationVisitor {
     @Override
     public void visitEnum(String name, String descriptor, String value) {
         var enumType = Type.getType(descriptor);
-        if(!Objects.equals(enumType.getClassName(), ProtobufType.class.getName())){
-            super.visitEnum(name, descriptor, value);
-            return;
+        if(Objects.equals(enumType.getClassName(), ProtobufType.class.getName())){
+            ProtobufType.of(value).ifPresent(type -> values.put(name, type));
         }
 
-        ProtobufType.of(value)
-                .ifPresent(type -> values.put(name, type));
         super.visitEnum(name, descriptor, value);
     }
 }

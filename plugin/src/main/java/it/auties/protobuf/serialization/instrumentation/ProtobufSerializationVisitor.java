@@ -23,11 +23,10 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     @Override
-    public void instrument() {
-        methodVisitor.visitCode();
-        createMessageSerializer();
-        methodVisitor.visitMaxs(stackSize, localsCount);
-        methodVisitor.visitEnd();
+    protected void doInstrumentation() {
+        var outputStreamId = createOutputStream();
+        writeProperties(outputStreamId);
+        createReturnSerializedValue(outputStreamId);
     }
 
     @Override
@@ -53,14 +52,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     public int argsCount() {
-        return 2;
-    }
-
-    // Creates the body of the serializer for a message
-    private void createMessageSerializer() {
-        var outputStreamId = createOutputStream();
-        writeProperties(outputStreamId);
-        createReturnSerializedValue(outputStreamId);
+        return 1;
     }
 
     // Writes all properties to the output stream

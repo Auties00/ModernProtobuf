@@ -37,7 +37,7 @@ public class EnumTest {
         @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
         private Type content;
 
-        @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
+        @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
         private Type content1;
     }
 }

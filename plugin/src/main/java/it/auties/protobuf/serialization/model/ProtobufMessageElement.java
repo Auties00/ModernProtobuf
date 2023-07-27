@@ -12,14 +12,14 @@ import static java.lang.System.Logger.Level.WARNING;
 
 public class ProtobufMessageElement {
     private final ClassNode classNode;
-    private final List<ProtobufProperty> properties;
+    private final Map<Integer, ProtobufProperty> properties;
 
-    private final Map<String, Integer> constants;
+    private final Map<Integer, String> constants;
 
     public ProtobufMessageElement(ClassNode classNode) {
         this.classNode = classNode;
-        this.properties = new ArrayList<>();
-        this.constants = new TreeMap<>();
+        this.properties = new LinkedHashMap<>();
+        this.constants = new LinkedHashMap<>();
     }
 
     public String className() {
@@ -27,44 +27,58 @@ public class ProtobufMessageElement {
     }
 
     public List<ProtobufProperty> properties() {
-        return Collections.unmodifiableList(properties);
+        return List.copyOf(properties.values());
     }
 
     public boolean isEnum() {
         return (classNode.access & Opcodes.ACC_ENUM) != 0;
     }
 
-    public Map<String, Integer> constants() {
+    public Map<Integer, String> constants() {
         return Collections.unmodifiableMap(constants);
     }
 
-    public void addConstant(String fieldName, int fieldIndex) {
-        constants.put(fieldName, fieldIndex);
+    public void addConstant(int fieldIndex, String fieldName) {
+        var error = constants.put(fieldIndex, fieldName);
+        if(error == null) {
+            return;
+        }
+
+        throw new IllegalArgumentException("Duplicated protobuf constant with index %s: %s/%s in %s".formatted(fieldIndex, fieldName, error, className()));
     }
 
     public boolean isProtobuf() {
         return !properties().isEmpty() || !constants().isEmpty();
     }
 
-    public void addProperty(Type fieldType, String fieldName, Map<String, Object> values) {
-        var index = (int) values.get("index");
-        var type = (ProtobufType) values.get("type");
-        var required = (boolean) values.get("required");
-        var rawImplementation = values.get("implementation");
-        var repeated = (boolean) values.get("repeated");
-        var implementation = getParsedImplementationType(type, fieldType, rawImplementation, required, repeated);
-        var wrapperType = getWrapperType(fieldType, repeated);
-        var ignored = (boolean) values.get("ignored");
+    public void addProperty(String fieldName, String fieldDescription, String fieldSignature, Map<String, Object> properties) {
+        var index = (int) properties.get("index");
+        var type = (ProtobufType) properties.get("type");
+        var required = (boolean) properties.get("required");
+        var rawImplementation = properties.get("implementation");
+        var repeated = (boolean) properties.get("repeated");
+        var implementation = getParsedImplementationType(type, Type.getType(Objects.requireNonNullElse(fieldSignature, fieldDescription)), rawImplementation, required, repeated);
+        var wrapperType = getWrapperType(fieldDescription, repeated);
+        var ignored = (boolean) properties.get("ignored");
         if(ignored) {
             return;
         }
 
-        var packed = (boolean) values.get("packed");
-        properties.add(new ProtobufProperty(index, fieldName, type, implementation, wrapperType, required, repeated, packed));
+        var packed = (boolean) properties.get("packed");
+        var error = this.properties.put(index, new ProtobufProperty(index, fieldName, type, implementation, wrapperType, required, repeated, packed));
+        if(error == null) {
+            return;
+        }
+
+        throw new IllegalArgumentException("Duplicate protobuf field with index %s: %s/%s in %s".formatted(index, fieldName, error.name(), className()));
     }
 
-    private Type getWrapperType(Type javaType, boolean repeated) {
-        return !repeated ? null : javaType;
+    private static Type getWrapperType(String fieldDescription, boolean repeated) {
+        if (!repeated) {
+            return null;
+        }
+
+        return Type.getType(fieldDescription);
     }
 
     private Type getParsedImplementationType(ProtobufType protoType, Type javaType, Object implementation, boolean required, boolean repeated) {
@@ -77,12 +91,12 @@ public class ProtobufMessageElement {
             return rawImplementation;
         }
 
-        var javaTypeName = javaType.getInternalName();
-        var paramsStart = javaTypeName.indexOf("<");
         if (!repeated) {
-            return paramsStart == -1 ? javaType : Type.getType(javaTypeName.substring(paramsStart));
+            return javaType;
         }
 
+        var javaTypeName = javaType.getInternalName();
+        var paramsStart = javaTypeName.indexOf("<");
         if(paramsStart == -1) {
             throw new IllegalArgumentException("Repeated fields cannot be represented by a raw type: specify a type parameter(List<Something>) or an implementation(@ProtobufProperty(implementation = Something.class))");
         }
@@ -113,7 +127,8 @@ public class ProtobufMessageElement {
     }
 
     private void checkPackedFields() {
-        properties.stream()
+        properties.values()
+                .stream()
                 .filter(ProtobufProperty::packed)
                 .forEach(this::checkPackedField);
     }
@@ -127,32 +142,32 @@ public class ProtobufMessageElement {
     }
 
     private void checkRepeatedFieldsWrapper() {
-        properties.stream()
+        properties.values()
+                .stream()
                 .filter(ProtobufProperty::repeated)
                 .forEach(this::checkRepeatedFieldWrapper);
     }
 
     private void checkRepeatedFieldWrapper(ProtobufProperty property) {
-        var genericType = property.wrapperType().getClassName();
+        var wrapperTypeName = property.wrapperType().getClassName();
         try {
-            var rawType = genericType.substring(0, genericType.indexOf("<"));
-            var javaClass = Class.forName(rawType);
+            var javaClass = Class.forName(wrapperTypeName);
             if (Modifier.isAbstract(javaClass.getModifiers())) {
-                throw new IllegalArgumentException("%s %s is abstract: this is not allowed for repeated types!".formatted(genericType, property.name()));
+                throw new IllegalArgumentException("%s %s is abstract: this is not allowed for repeated types!".formatted(wrapperTypeName, property.name()));
             }
 
             if (javaClass.isAssignableFrom(Collection.class)) {
-                throw new IllegalArgumentException("%s %s is not a collection: this is not allowed for repeated types!".formatted(genericType, property.name()));
+                throw new IllegalArgumentException("%s %s is not a collection: this is not allowed for repeated types!".formatted(wrapperTypeName, property.name()));
             }
 
             try {
                 javaClass.getConstructor();
             }catch (NoSuchMethodException ignored) {
-                throw new IllegalArgumentException("%s doesn't provide a no-args constructor: this is not allowed for repeated types!".formatted(genericType));
+                throw new IllegalArgumentException("%s doesn't provide a no-args constructor: this is not allowed for repeated types!".formatted(wrapperTypeName));
             }
         } catch (ClassNotFoundException exception) {
             var logger = System.getLogger("Protobuf");
-            logger.log(WARNING, "Cannot check whether %s is a valid type for a repeated field as it's not part of the std Java library".formatted(genericType));
+            logger.log(WARNING, "Cannot check whether %s is a valid type for a repeated field as it's not part of the std Java library".formatted(wrapperTypeName));
         }
     }
 

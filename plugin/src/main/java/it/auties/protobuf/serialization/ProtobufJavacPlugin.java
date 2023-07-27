@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -81,29 +82,30 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
         }
 
         element.checkErrors();
-        var classWriter = new ClassWriter(classReader, 0);
+        var classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS);
+        classReader.accept(classWriter, 0);
         if(!element.isEnum()){
-            createSerializer(classWriter, classReader, element);
+            createSerializer(classWriter, element);
         }
 
-        createDeserializer(classWriter, classReader, element);
+        createDeserializer(classWriter, element);
         writeResult(classWriter, outputFile);
     }
 
-    private void createSerializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
-        var deserializationVisitor = new ProtobufSerializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, 0);
+    private void createSerializer(ClassWriter classWriter, ProtobufMessageElement element) {
+        var serializationVisitor = new ProtobufSerializationVisitor(element, classWriter);
+        serializationVisitor.instrument();
     }
 
-    private void createDeserializer(ClassWriter classWriter, ClassReader classReader, ProtobufMessageElement element) {
+    private void createDeserializer(ClassWriter classWriter, ProtobufMessageElement element) {
         var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
-        classReader.accept(deserializationVisitor, 0);
+        deserializationVisitor.instrument();
     }
 
     private void writeResult(ClassWriter classWriter, Path outputFile) {
         try {
             var result = classWriter.toByteArray();
-            Files.write(outputFile, result);
+            Files.write(outputFile, result, StandardOpenOption.TRUNCATE_EXISTING);
         }catch (IOException exception) {
             throw new UncheckedIOException("Cannot write instrumented class", exception);
         }
@@ -111,7 +113,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
 
     private ProtobufMessageElement createProtoElement(ClassReader classReader) {
         var classNode = new ClassNode();
-        classReader.accept(classNode,0);
+        classReader.accept(classNode, 0);
         var element = new ProtobufMessageElement(classNode);
         if(element.isEnum()) {
             getEnumConstants(classNode, element);
@@ -136,9 +138,7 @@ public class ProtobufJavacPlugin implements Plugin, TaskListener{
 
                 var values = getDefaultPropertyValues();
                 annotation.accept(new ProtobufPropertyAnalyzer(values));
-                var type = Type.getType(Objects.requireNonNullElse(field.signature, field.desc));
-                var name = field.name;
-                element.addProperty(type, name, values);
+                element.addProperty(field.name, field.desc, field.signature, values);
             }
         }
     }

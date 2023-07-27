@@ -1,39 +1,37 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
-public abstract class ProtobufInstrumentationVisitor extends ClassVisitor {
+public abstract class ProtobufInstrumentationVisitor {
     protected final ProtobufMessageElement element;
+    protected final ClassWriter classWriter;
     protected  MethodVisitor methodVisitor;
     protected int localsCount;
-    protected int stackSize;
 
     protected ProtobufInstrumentationVisitor(ProtobufMessageElement element, ClassWriter classWriter) {
-        super(Opcodes.ASM9);
         this.element = element;
         this.localsCount = argsCount();
-        this.cv = classWriter;
+        this.classWriter = classWriter;
     }
 
-    @Override
-    public void visitEnd() {
-        this.methodVisitor = cv.visitMethod(
+    public void instrument() {
+        this.methodVisitor = classWriter.visitMethod(
                 access(),
                 name(),
                 descriptor(),
                 signature(),
                 new String[0]
         );
-        instrument();
-        methodVisitor.visitMaxs(stackSize, localsCount);
+        methodVisitor.visitCode();
+        doInstrumentation();
+        methodVisitor.visitMaxs(-1, -1);
         methodVisitor.visitEnd();
     }
 
-    public abstract void instrument();
+    protected abstract void doInstrumentation();
 
     protected abstract int access();
     protected abstract String name();
