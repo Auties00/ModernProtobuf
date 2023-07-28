@@ -12,7 +12,7 @@ public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
     private final ProtobufMessageElement element;
     private Integer index;
     public ProtobufEnumAnalyzer(ProtobufMessageElement element, MethodNode node) {
-        super(Opcodes.ASM9, element.className(), node.access, node.name, node.desc, null);
+        super(Opcodes.ASM9, element.classType().getInternalName(), node.access, node.name, node.desc, null);
         this.element = element;
     }
 
@@ -54,11 +54,11 @@ public class ProtobufEnumAnalyzer extends AnalyzerAdapter {
     public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
         super.visitFieldInsn(opcode, owner, name, descriptor);
         var type = Type.getType(descriptor);
-        if(!Objects.equals(type.getClassName(), element.className())) {
+        if(!Objects.equals(type.getClassName(), element.classType())) {
             return;
         }
 
-        Objects.requireNonNull(index, "Proto constant %s in %s doesn't specify an index".formatted(name, element.className()));
+        Objects.requireNonNull(index, "Proto constant %s in %s doesn't specify an index".formatted(name, element.classType()));
         element.addConstant(index, name);
         this.index = null;
     }

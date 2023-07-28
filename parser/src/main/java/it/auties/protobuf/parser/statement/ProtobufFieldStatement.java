@@ -87,38 +87,40 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
     public String name() {
         var name = super.name();
         return switch (parent().statementType()){
-            case ENUM -> {
-                if(name.chars().allMatch(entry -> Character.isUpperCase(entry) || Character.isDigit(entry))){
-                    yield name;
-                }
-
-                if(name.contains("_")){
-                    yield name.toUpperCase(Locale.ROOT);
-                }
-
-                var builder = new StringBuilder();
-                for(var i = 0; i < name.length(); i++){
-                    var entry = name.charAt(i);
-                    if (i == 0 || Character.isLowerCase(entry)) {
-                        builder.append(Character.toUpperCase(entry));
-                        continue;
-                    }
-
-                    builder.append("_");
-                    builder.append(entry);
-                }
-
-                yield builder.toString();
-            }
-
-            case ONE_OF -> {
-                var parentName = parent().name().replaceFirst("(?i)oneof", "");
-                yield name.toLowerCase().contains(parentName.toLowerCase()) ? name.replaceFirst("(?i)oneof", "")
-                        : parentName + name.substring(0, 1).toUpperCase() + name.substring(1);
-            }
-
+            case ENUM -> toEnumName(name);
+            case ONE_OF -> toOneOfName(name);
             default -> name;
         };
+    }
+
+    private String toOneOfName(String name) {
+        var parentName = parent().name().replaceFirst("(?i)oneof", "");
+        return name.toLowerCase().contains(parentName.toLowerCase()) ? name.replaceFirst("(?i)oneof", "")
+                : parentName + name.substring(0, 1).toUpperCase() + name.substring(1);
+    }
+
+    private static String toEnumName(String name) {
+        if(name.chars().allMatch(entry -> Character.isUpperCase(entry) || Character.isDigit(entry))){
+            return name;
+        }
+
+        if(name.contains("_")){
+            return name.toUpperCase(Locale.ROOT);
+        }
+
+        var builder = new StringBuilder();
+        for(var i = 0; i < name.length(); i++){
+            var entry = name.charAt(i);
+            if (i == 0 || Character.isLowerCase(entry)) {
+                builder.append(Character.toUpperCase(entry));
+                continue;
+            }
+
+            builder.append("_");
+            builder.append(entry);
+        }
+
+        return builder.toString();
     }
 
     public boolean nothing(){
@@ -151,7 +153,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return INDENTATION.repeat(level) +
                 toPrettyModifier() +
                 toPrettyType() +
-                rawName() +
+                name +
                 " = " +
                 index() +
                 toPrettyOptions() +

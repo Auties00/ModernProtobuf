@@ -11,23 +11,23 @@ import java.util.*;
 @AllArgsConstructor
 @Accessors(fluent = true)
 public enum ProtobufType {
-    MESSAGE(Object.class, Object.class),
-    ENUM(Enum.class, Enum.class),
-    FLOAT(float.class, Float.class),
-    DOUBLE(double.class, Double.class),
-    BOOL(boolean.class, Boolean.class),
-    STRING(String.class, String.class),
-    BYTES(byte[].class, byte[].class),
-    INT32(int.class, Integer.class),
-    SINT32(int.class, Integer.class),
-    UINT32(int.class, Integer.class),
-    FIXED32(int.class, Integer.class),
-    SFIXED32(int.class, Integer.class),
-    INT64(long.class, Long.class),
-    SINT64(long.class, Long.class),
-    UINT64(long.class, Long.class),
-    FIXED64(long.class, Long.class),
-    SFIXED64(long.class, Long.class);
+    MESSAGE(Object.class, Object.class, false),
+    ENUM(Enum.class, Enum.class, false),
+    FLOAT(float.class, Float.class, true),
+    DOUBLE(double.class, Double.class, true),
+    BOOL(boolean.class, Boolean.class, true),
+    STRING(String.class, String.class, false),
+    BYTES(byte[].class, byte[].class, false),
+    INT32(int.class, Integer.class, true),
+    SINT32(int.class, Integer.class, true),
+    UINT32(int.class, Integer.class, true),
+    FIXED32(int.class, Integer.class, true),
+    SFIXED32(int.class, Integer.class, true),
+    INT64(long.class, Long.class, true),
+    SINT64(long.class, Long.class, true),
+    UINT64(long.class, Long.class, true),
+    FIXED64(long.class, Long.class, true),
+    SFIXED64(long.class, Long.class, true);
 
     public static Optional<ProtobufType> of(String name) {
         return Arrays.stream(values())
@@ -40,4 +40,6 @@ public enum ProtobufType {
 
     @NonNull
     private final Class<?> wrappedType;
+
+    private final boolean isPackable;
 }

@@ -23,7 +23,7 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
         return version;
     }
 
-    public ProtobufDocument version(ProtobufVersion version) {
+    public ProtobufDocument setVersion(ProtobufVersion version) {
         this.version = version;
         return this;
     }
@@ -34,8 +34,8 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
     }
 
     @Override
-    public ProtobufDocument packageName(String packageName) {
-        return (ProtobufDocument) super.packageName(packageName);
+    public ProtobufDocument setPackageName(String packageName) {
+        return (ProtobufDocument) super.setPackageName(packageName);
     }
 
     @Override

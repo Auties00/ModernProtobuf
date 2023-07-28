@@ -2,7 +2,7 @@ package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufProperty;
+import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -60,7 +60,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     // Writes a property to the output stream
-    private void writeProperty(int outputStreamId, ProtobufProperty property) {
+    private void writeProperty(int outputStreamId, ProtobufPropertyStub property) {
         methodVisitor.visitVarInsn(
                 Opcodes.ALOAD,
                 outputStreamId
@@ -75,7 +75,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         var fieldType = Objects.requireNonNullElse(property.wrapperType(), property.javaType());
         methodVisitor.visitFieldInsn(
                 Opcodes.GETFIELD,
-                element.className(),
+                element.classType().getInternalName(),
                 property.name(),
                 fieldType.getDescriptor()
         );
@@ -112,7 +112,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         );
     }
 
-    private Optional<Type> createJavaPropertySerializer(ProtobufProperty property) {
+    private Optional<Type> createJavaPropertySerializer(ProtobufPropertyStub property) {
         var methodName = getJavaPropertyConverterMethodName(property);
         if(methodName == null) {
             return Optional.empty();
@@ -129,7 +129,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return Optional.of(methodDescriptor.getReturnType());
     }
 
-    private String getJavaPropertyConverterMethodName(ProtobufProperty property) {
+    private String getJavaPropertyConverterMethodName(ProtobufPropertyStub property) {
         return switch (property.protoType()) {
             case MESSAGE -> SERIALIZATION_METHOD;
             case ENUM -> "index";
@@ -137,7 +137,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         };
     }
 
-    private Type getJavaPropertyConverterDescriptor(ProtobufProperty property) {
+    private Type getJavaPropertyConverterDescriptor(ProtobufPropertyStub property) {
         return Type.getType(switch (property.protoType()) {
             case MESSAGE -> descriptor();
             case ENUM -> "()I";
@@ -168,7 +168,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
-    private Method getSerializerStreamMethod(ProtobufProperty annotation) {
+    private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
         var clazz = ProtobufOutputStream.class;
         try {
             return switch (annotation.protoType()) {
@@ -180,10 +180,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                     yield clazz.getMethod("writeString", int.class, String.class);
                 }
                 case MESSAGE, BYTES -> {
-                    if (annotation.packed()) {
-                        throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
-                    }
-
                     if (annotation.repeated()) {
                         yield clazz.getMethod("writeBytes", int.class, Collection.class);
                     }

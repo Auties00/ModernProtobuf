@@ -1,4 +1,5 @@
 import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import lombok.Builder;
 import lombok.Data;
@@ -33,6 +34,7 @@ public class Utf8MessageTest {
     @Builder
     @Data
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class UtfMessage  {
         @ProtobufProperty(index = 1, type = STRING)
         private String content;

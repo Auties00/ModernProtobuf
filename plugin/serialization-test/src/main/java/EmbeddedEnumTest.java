@@ -1,4 +1,7 @@
 import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.*;
@@ -20,20 +23,24 @@ public class EmbeddedEnumTest {
     }
 
     @Getter
-    @AllArgsConstructor
     @Accessors(fluent = true)
+    @ProtobufEnum
     public enum Type {
         FIRST(0),
         SECOND(1),
         THIRD(10);
 
         private final int index;
+        Type(@ProtobufEnumIndex int index) {
+            this.index = index;
+        }
     }
 
     @Jacksonized
     @Builder
     @Data
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class SomeMessage {
         @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
         private AnotherMessage content;
@@ -43,6 +50,7 @@ public class EmbeddedEnumTest {
     @Builder
     @Data
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class AnotherMessage {
         @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
         private Type type;

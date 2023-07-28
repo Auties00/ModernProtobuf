@@ -6,9 +6,9 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
     public static final String UNKNOWN_NAME = "<unknown>";
     protected final String INDENTATION = "    ";
 
-    private String name;
-    private String packageName;
-    private final ProtobufObject<?> parent;
+    protected String name;
+    protected String packageName;
+    protected final ProtobufObject<?> parent;
     public ProtobufStatement(String name, String packageName, ProtobufObject<?> parent){
         this.name = name;
         this.packageName = packageName;
@@ -20,11 +20,7 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
                 : SourceVersion.isKeyword(name) ? "_%s".formatted(name) : name;
     }
 
-    public String rawName(){
-        return name;
-    }
-
-    public ProtobufStatement name(String name) {
+    public ProtobufStatement setName(String name) {
         this.name = name;
         return this;
     }
@@ -33,7 +29,7 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
         return packageName;
     }
 
-    protected ProtobufStatement packageName(String packageName){
+    protected ProtobufStatement setPackageName(String packageName){
         this.packageName = packageName;
         return this;
     }

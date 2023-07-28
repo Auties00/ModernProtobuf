@@ -1,4 +1,5 @@
 import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.AllArgsConstructor;
@@ -39,6 +40,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class ModernBetaRepeatedMessage  {
         @ProtobufProperty(
                 index = 1,
@@ -60,6 +62,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class ModernRepeatedMessage  {
         @ProtobufProperty(
                 index = 1,

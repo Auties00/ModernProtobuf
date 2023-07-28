@@ -25,6 +25,7 @@ import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_3;
 import static java.util.Objects.requireNonNullElse;
 
 public final class ProtobufParser {
+    private static final System.Logger LOGGER = System.getLogger("Protobuf");
     private static final String STATEMENT_END = ";";
     private static final String OBJECT_START = "{";
     private static final String OBJECT_END = "}";
@@ -32,7 +33,6 @@ public final class ProtobufParser {
     private static final String ARRAY_START = "[";
     private static final String ARRAY_END = "]";
     private static final String COMMA = ",";
-    private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
     private static final String TO_CONTEXTUAL_KEYWORD = "to";
     private static final String TYPE_SELECTOR_KEYWORD = ".";
     private static final String TYPE_SELECTOR_KEYWORD_SPLITTER = "\\.";
@@ -78,7 +78,6 @@ public final class ProtobufParser {
         }
 
         attribute(document);
-
         return document;
     }
 
@@ -147,14 +146,11 @@ public final class ProtobufParser {
         return type;
     }
 
-    // This can be optimized with a map
-    // TODO: Look into it
     private ProtobufObject<?> getReferencedType(ProtobufFieldStatement fieldStatement, String accessed) {
         ProtobufObject<?> parent = fieldStatement.parent();
         ProtobufObject<?> innerType = null;
         while (parent != null && innerType == null){
-            innerType = parent.getStatement(accessed, ProtobufObject.class)
-                    .orElse(null);
+            innerType = parent.getStatement(accessed, ProtobufObject.class).orElse(null);
             parent = parent.parent();
         }
 
@@ -416,7 +412,7 @@ public final class ProtobufParser {
             case TYPE -> {
                 ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
                         tokenizer.lineno(), token);
-                field.name(token);
+                field.setName(token);
             }
             case NAME ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
@@ -485,7 +481,7 @@ public final class ProtobufParser {
             }
             case ENUM -> {
 
-                field.name(token);
+                field.setName(token);
                 this.fieldState = FieldState.NAME;
             }
         }
@@ -511,7 +507,7 @@ public final class ProtobufParser {
             case DECLARATION ->
                     ProtobufSyntaxException.check(isAssignmentOperator(token),
                             "Expected assignment operator after syntax declaration", tokenizer.lineno());
-            case VALUE -> document.version(ProtobufVersion.of(token)
+            case VALUE -> document.setVersion(ProtobufVersion.of(token)
                     .orElseThrow(() -> new ProtobufSyntaxException("Illegal syntax declaration: %s is not a valid version".formatted(token),
                             tokenizer.lineno())));
             case OPTIONS, BODY ->
@@ -523,7 +519,7 @@ public final class ProtobufParser {
     private void createPackageOption(String token) {
         ProtobufSyntaxException.check(instructionState == InstructionState.DECLARATION,
                 "Illegal options specified for package declaration", tokenizer.lineno());
-        document.packageName(token);
+        document.setPackageName(token);
     }
 
     private void openInstruction(String token) {

@@ -1,4 +1,5 @@
 import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,7 @@ public class MissingFieldTest {
     @Builder
     @Data
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class Serializable {
         @ProtobufProperty(index = 1, type = STRING)
         private String content;
@@ -42,6 +44,7 @@ public class MissingFieldTest {
     @Builder
     @Data
     @Accessors(fluent = true)
+    @ProtobufMessage
     public static class Deserializable {
         @ProtobufProperty(index = 3, type = STRING)
         private String content2;

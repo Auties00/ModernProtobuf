@@ -4,7 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufProperty;
+import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import org.objectweb.asm.*;
 
@@ -54,7 +54,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         }
 
         var versionType = Type.getType(ProtobufVersion.class);
-        return "(L%s;[B)L%s;".formatted(versionType.getInternalName(), element.className());
+        return "(L%s;[B)L%s;".formatted(versionType.getInternalName(), element.classType());
     }
     
     @Override
@@ -63,7 +63,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             return null;
         }
 
-        return "(I)Ljava/util/Optional<L%s;>;".formatted(element.className());
+        return "(I)Ljava/util/Optional<L%s;>;".formatted(element.classType());
     }
 
     @Override
@@ -86,7 +86,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for any kind of property
-    private void createPropertyDeserializer(Label whileOuterLabel, Map<ProtobufProperty, Integer> properties, int inputStreamLocalId, int rawTagId, int tagId) {
+    private void createPropertyDeserializer(Label whileOuterLabel, Map<ProtobufPropertyStub, Integer> properties, int inputStreamLocalId, int rawTagId, int tagId) {
         pushPropertyIndexToStack(rawTagId, tagId);
         pushPropertyWireTypeToStack(rawTagId);
         createSwitchStatement(
@@ -97,7 +97,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a property that is in the model
-    private void createKnownPropertyDeserializer(Label whileOuterLabel, Map<ProtobufProperty, Integer> properties, int inputStreamLocalId, int tagId, int index) {
+    private void createKnownPropertyDeserializer(Label whileOuterLabel, Map<ProtobufPropertyStub, Integer> properties, int inputStreamLocalId, int tagId, int index) {
         var property = element.properties().get(index);
         switch (property.protoType()) {
             case MESSAGE -> createPropertyDeserializer(
@@ -151,7 +151,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     private int[] getPropertiesIndexes() {
         return element.properties()
                 .stream()
-                .mapToInt(ProtobufProperty::index)
+                .mapToInt(ProtobufPropertyStub::index)
                 .toArray();
     }
 
@@ -192,14 +192,14 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Returns the deserialized value by calling the message's constructor
     // it also checks that all required fields are filled
-    private void createReturnDeserializedValue(LinkedHashMap<ProtobufProperty, Integer> properties) {
+    private void createReturnDeserializedValue(LinkedHashMap<ProtobufPropertyStub, Integer> properties) {
         properties.entrySet()
                 .stream()
                 .filter(entry -> entry.getKey().required())
                 .forEach(entry -> applyNullCheck(entry.getKey(), entry.getValue()));
         methodVisitor.visitTypeInsn(
                 Opcodes.NEW,
-                element.className()
+                element.classType().getInternalName()
         );
         methodVisitor.visitInsn(
                 Opcodes.DUP
@@ -211,7 +211,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 .collect(Collectors.joining(""));
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESPECIAL,
-                element.className(),
+                element.classType().getInternalName(),
                 "<init>",
                 "(%s)V".formatted(constructorArgsDescriptor),
                 false
@@ -292,7 +292,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Deserializes an Enum or null object from an index
-    private void deserializeEnumFromInt(ProtobufProperty property) {
+    private void deserializeEnumFromInt(ProtobufPropertyStub property) {
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 property.javaType().getInternalName(),
@@ -307,13 +307,13 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 Opcodes.INVOKEVIRTUAL,
                 Type.getType(Optional.class).getInternalName(),
                 "orElse",
-                "(Ljava/lang/Object;)L%s;".formatted(element.className()),
+                "(Ljava/lang/Object;)L%s;".formatted(element.classType()),
                 false
         );
     }
 
     // Deserializes a message from bytes
-    private void deserializeMessageFromBytes(ProtobufProperty property) {
+    private void deserializeMessageFromBytes(ProtobufPropertyStub property) {
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 property.javaType().getInternalName(),
@@ -324,7 +324,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Invokes Objects.requireNonNull on a required field
-    private void applyNullCheck(ProtobufProperty property, int localVariableId) {
+    private void applyNullCheck(ProtobufPropertyStub property, int localVariableId) {
         try {
             methodVisitor.visitVarInsn(
                     Opcodes.ALOAD,
@@ -350,7 +350,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Creates a Map that links every property to a local variable that holds its deserialized value
     // A LinkedHashMap is used to preserve the order of the properties
-    private LinkedHashMap<ProtobufProperty, Integer> createdLocalDeserializedVariables() {
+    private LinkedHashMap<ProtobufPropertyStub, Integer> createdLocalDeserializedVariables() {
         return element.properties()
                 .stream()
                 .map(entry -> Map.entry(entry, createLocalDeserializeVariable(entry)))
@@ -358,7 +358,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a local variable to store a property's deserialized value
-    private int createLocalDeserializeVariable(ProtobufProperty property) {
+    private int createLocalDeserializeVariable(ProtobufPropertyStub property) {
         addDeserializerDefaultValue(property);
         var id = createLocalVariable(Objects.requireNonNullElse(property.wrapperType(), property.javaType()));
         methodVisitor.visitVarInsn(
@@ -369,7 +369,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Pushes to the stack the correct default value for the local variable created by createDeserializedField
-    private void addDeserializerDefaultValue(ProtobufProperty property) {
+    private void addDeserializerDefaultValue(ProtobufPropertyStub property) {
         if(property.wrapperType() != null){
             methodVisitor.visitTypeInsn(
                     Opcodes.NEW,
@@ -400,7 +400,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a packable property
-    private void createPackablePropertyDeserializer(ProtobufProperty property, int inputStreamId, int tagId, int fieldId) {
+    private void createPackablePropertyDeserializer(ProtobufPropertyStub property, int inputStreamId, int tagId, int fieldId) {
         if(!property.packed()) {
             methodVisitor.visitVarInsn(
                     Opcodes.ILOAD,
@@ -432,7 +432,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a packed property
-    private void createPackedPropertyDeserializer(ProtobufProperty property, int inputStreamId, int fieldId, int index) {
+    private void createPackedPropertyDeserializer(ProtobufPropertyStub property, int inputStreamId, int fieldId, int index) {
         switch (index) {
             case WIRE_TYPE_LENGTH_DELIMITED -> createSafePackedPropertyDeserializer(
                     property,
@@ -451,7 +451,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a packed property assuming that the wire type is correct
-    private void createSafePackedPropertyDeserializer(ProtobufProperty property, int inputStreamId, int fieldId, boolean packedWireType) {
+    private void createSafePackedPropertyDeserializer(ProtobufPropertyStub property, int inputStreamId, int fieldId, boolean packedWireType) {
         try {
             var repeated = property.repeated();
             if(repeated) {
@@ -492,22 +492,10 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
-    private String getDeserializerStreamMethod(ProtobufProperty annotation) {
+    private String getDeserializerStreamMethod(ProtobufPropertyStub annotation) {
         return switch (annotation.protoType()) {
-            case STRING -> {
-                if (annotation.packed()) {
-                    throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
-                }
-
-                yield "readString";
-            }
-            case MESSAGE, BYTES -> {
-                if (annotation.packed()) {
-                    throw new IllegalArgumentException("%s %s is packed: only scalar types are allowed to have this modifier".formatted(annotation.protoType().name(), annotation.name()));
-                }
-
-                yield "readBytes";
-            }
+            case STRING -> "readString";
+            case MESSAGE, BYTES -> "readBytes";
             case BOOL -> annotation.packed() ? "readBoolPacked" : "readBool";
             case ENUM, INT32, SINT32, UINT32 -> annotation.packed() ? "readInt32Packed" : "readInt32";
             case FLOAT -> annotation.packed() ? "readFloatPacked" : "readFloat";
@@ -519,7 +507,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a message deserializer with a wire tag check
-    private void createPropertyDeserializer(ProtobufProperty property, int inputStreamId, int tagId, int fieldId, Runnable finalizer) {
+    private void createPropertyDeserializer(ProtobufPropertyStub property, int inputStreamId, int tagId, int fieldId, Runnable finalizer) {
         methodVisitor.visitVarInsn(
                 Opcodes.ILOAD,
                 tagId
@@ -541,7 +529,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Returns the wire-type of a property
-    private int getWireType(ProtobufProperty annotation) {
+    private int getWireType(ProtobufPropertyStub annotation) {
         return switch (annotation.protoType()) {
             case MESSAGE, STRING, BYTES -> WIRE_TYPE_LENGTH_DELIMITED;
             case ENUM, BOOL, INT32, SINT32, UINT32, INT64, SINT64, UINT64 -> WIRE_TYPE_VAR_INT;
@@ -551,7 +539,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a message deserializer assuming that the wire tag is correct
-    private void createSafePropertyDeserializer(ProtobufProperty property, int inputStreamId, int fieldId, Runnable finalizer) {
+    private void createSafePropertyDeserializer(ProtobufPropertyStub property, int inputStreamId, int fieldId, Runnable finalizer) {
         try {
             var repeated = property.repeated();
             if(repeated) {
@@ -623,9 +611,9 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         try {
             methodVisitor.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
-                    element.className(),
+                    element.classType().getInternalName(),
                     "values",
-                    "()[L%s;".formatted(element.className()),
+                    "()[L%s;".formatted(element.classType()),
                     false
             );
             methodVisitor.visitMethodInsn(
@@ -678,7 +666,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // (ProtobufEnum entry) -> entry.index == index
     private Object[] createEnumConstructorLambda() {
         var lambdaName = "lambda$of$0";
-        var lambdaDescriptor = "(IL%s;)Z".formatted(element.className());
+        var lambdaDescriptor = "(IL%s;)Z".formatted(element.classType());
         var predicateLambdaMethod = classWriter.visitMethod(
                 Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
                 lambdaName,
@@ -693,7 +681,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         );
         predicateLambdaMethod.visitFieldInsn(
                 Opcodes.GETFIELD,
-                element.className(),
+                element.classType().getInternalName(),
                 "index",
                 "I"
         );
@@ -719,7 +707,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 Type.getType("(Ljava/lang/Object;)Z"),
                 new Handle(
                         Opcodes.H_INVOKESTATIC,
-                        element.className(),
+                        element.classType().getInternalName(),
                         lambdaName,
                         lambdaDescriptor,
                         false
