@@ -262,7 +262,7 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
             return new MessageType(javaType, rawType, typeParameter, null, null);
         }
 
-        if (!fieldStatement.repeated() && (fieldStatement.type().protobufType() == ProtobufType.MESSAGE || fieldStatement.type().protobufType() == ProtobufType.ENUM)) {
+        if (!fieldStatement.repeated() && fieldStatement.type().protobufType() == ProtobufType.MESSAGE) {
             var fieldType = (ProtobufObjectType) fieldStatement.type();
             var wrapperType = getTypeDeclaration(fieldType.name(), QueryType.ANY);
             wrapperType.ifPresent(queryResult -> queryResult.result().addModifier(Keyword.FINAL));

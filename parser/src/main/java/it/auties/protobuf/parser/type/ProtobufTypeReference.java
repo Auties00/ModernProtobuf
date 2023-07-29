@@ -10,7 +10,7 @@ public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, Pro
         var protobufType = ProtobufType.of(type)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown type: " +  type));
         return switch (protobufType) {
-            case MESSAGE, ENUM -> ProtobufObjectType.unattributed(type, protobufType == ProtobufType.ENUM);
+            case MESSAGE -> ProtobufObjectType.unattributed(type);
             default -> ProtobufPrimitiveType.of(protobufType);
         };
     }

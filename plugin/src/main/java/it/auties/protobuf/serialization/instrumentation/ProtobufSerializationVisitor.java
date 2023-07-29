@@ -1,5 +1,6 @@
 package it.auties.protobuf.serialization.instrumentation;
 
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
@@ -68,17 +69,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         pushIntToStack(
                 property.index()
         );
-        methodVisitor.visitVarInsn(
-                Opcodes.ALOAD,
-                0 // this
-        );
-        var fieldType = Objects.requireNonNullElse(property.wrapperType(), property.javaType());
-        methodVisitor.visitFieldInsn(
-                Opcodes.GETFIELD,
-                element.classType().getInternalName(),
-                property.name(),
-                fieldType.getDescriptor()
-        );
+        var fieldType = loadPropertyIntoStack(property);
         var readMethod = getSerializerStreamMethod(property);
         var convertedType = createJavaPropertySerializer(
                 property
@@ -94,6 +85,21 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 Type.getMethodDescriptor(readMethod),
                 false
         );
+    }
+
+    private Type loadPropertyIntoStack(ProtobufPropertyStub property) {
+        methodVisitor.visitVarInsn(
+                Opcodes.ALOAD,
+                0 // this
+        );
+        var fieldType = Objects.requireNonNullElse(property.wrapperType(), property.javaType());
+        methodVisitor.visitFieldInsn(
+                Opcodes.GETFIELD,
+                element.classType().getInternalName(),
+                property.name(),
+                fieldType.getDescriptor()
+        );
+        return fieldType;
     }
 
     private void boxValueIfNecessary(Type fieldType, Method readMethod) {
@@ -114,35 +120,43 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     private Optional<Type> createJavaPropertySerializer(ProtobufPropertyStub property) {
         var methodName = getJavaPropertyConverterMethodName(property);
-        if(methodName == null) {
+        if(methodName.isEmpty()) {
             return Optional.empty();
         }
 
         var methodDescriptor = getJavaPropertyConverterDescriptor(property);
+        if(methodDescriptor.isEmpty()) {
+            return Optional.empty();
+        }
+
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 Objects.requireNonNullElse(property.wrapperType(), property.javaType()).getInternalName(),
-                methodName,
-                methodDescriptor.getInternalName(),
+                methodName.get(),
+                methodDescriptor.get().getInternalName(),
                 false
         );
-        return Optional.of(methodDescriptor.getReturnType());
+        return Optional.of(methodDescriptor.get().getReturnType());
     }
 
-    private String getJavaPropertyConverterMethodName(ProtobufPropertyStub property) {
-        return switch (property.protoType()) {
-            case MESSAGE -> SERIALIZATION_METHOD;
-            case ENUM -> "index";
-            default -> null;
-        };
+    // TODO: Support @ProtobufConverter
+    // TODO: Support dynamic enum index field
+    private Optional<String> getJavaPropertyConverterMethodName(ProtobufPropertyStub property) {
+        if(property.isEnum()) {
+            return Optional.of("index");
+        }
+
+        return Optional.empty();
     }
 
-    private Type getJavaPropertyConverterDescriptor(ProtobufPropertyStub property) {
-        return Type.getType(switch (property.protoType()) {
-            case MESSAGE -> descriptor();
-            case ENUM -> "()I";
-            default -> throw new IllegalStateException("Unexpected value: " + property.protoType());
-        });
+    // TODO: Support @ProtobufConverter
+    // TODO: Support dynamic enum index field
+    private Optional<Type> getJavaPropertyConverterDescriptor(ProtobufPropertyStub property) {
+        if(property.isEnum()) {
+            return Optional.of(Type.getType("()I"));
+        }
+
+        return Optional.empty();
     }
 
     // Returns the serialized value
@@ -169,86 +183,38 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
-        var clazz = ProtobufOutputStream.class;
         try {
+            var clazz = ProtobufOutputStream.class;
+            if(annotation.isEnum()) {
+                return annotation.repeated() ? clazz.getMethod("writeInt32", int.class, Collection.class)
+                        : clazz.getMethod("writeInt32", int.class, Integer.class);
+            }
+
             return switch (annotation.protoType()) {
-                case STRING -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeString", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeString", int.class, String.class);
-                }
-                case MESSAGE, BYTES -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeBytes", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeBytes", int.class, byte[].class);
-                }
-                case BOOL -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeBool", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeBool", int.class, Boolean.class);
-                }
-                case ENUM, INT32, SINT32 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeInt32", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeInt32", int.class, Integer.class);
-                }
-                case UINT32 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeUInt32", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeUInt32", int.class, Integer.class);
-                }
-                case FLOAT -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeFloat", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeFloat", int.class, Float.class);
-                }
-                case DOUBLE -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeDouble", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeDouble", int.class, Double.class);
-                }
-                case FIXED32, SFIXED32 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeFixed32", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeFixed32", int.class, Integer.class);
-                }
-                case INT64, SINT64 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeInt64", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeInt64", int.class, Long.class);
-                }
-                case UINT64 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeUInt64", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeUInt64", int.class, Long.class);
-                }
-                case FIXED64, SFIXED64 -> {
-                    if (annotation.repeated()) {
-                        yield clazz.getMethod("writeFixed64", int.class, Collection.class);
-                    }
-
-                    yield clazz.getMethod("writeFixed64", int.class, Long.class);
-                }
+                case STRING ->
+                        annotation.repeated() ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
+                case MESSAGE ->
+                        annotation.repeated() ? clazz.getMethod("writeMessage", int.class, Collection.class) : clazz.getMethod("writeMessage", int.class, ProtobufObject.class);
+                case BYTES ->
+                        annotation.repeated() ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
+                case BOOL ->
+                        annotation.repeated() ? clazz.getMethod("writeBool", int.class, Collection.class) : clazz.getMethod("writeBool", int.class, Boolean.class);
+                case INT32, SINT32 ->
+                        annotation.repeated() ? clazz.getMethod("writeInt32", int.class, Collection.class) : clazz.getMethod("writeInt32", int.class, Integer.class);
+                case UINT32 ->
+                        annotation.repeated() ? clazz.getMethod("writeUInt32", int.class, Collection.class) : clazz.getMethod("writeUInt32", int.class, Integer.class);
+                case FLOAT ->
+                        annotation.repeated() ? clazz.getMethod("writeFloat", int.class, Collection.class) : clazz.getMethod("writeFloat", int.class, Float.class);
+                case DOUBLE ->
+                        annotation.repeated() ? clazz.getMethod("writeDouble", int.class, Collection.class) : clazz.getMethod("writeDouble", int.class, Double.class);
+                case FIXED32, SFIXED32 ->
+                        annotation.repeated() ? clazz.getMethod("writeFixed32", int.class, Collection.class) : clazz.getMethod("writeFixed32", int.class, Integer.class);
+                case INT64, SINT64 ->
+                        annotation.repeated() ? clazz.getMethod("writeInt64", int.class, Collection.class) : clazz.getMethod("writeInt64", int.class, Long.class);
+                case UINT64 ->
+                        annotation.repeated() ? clazz.getMethod("writeUInt64", int.class, Collection.class) : clazz.getMethod("writeUInt64", int.class, Long.class);
+                case FIXED64, SFIXED64 ->
+                        annotation.repeated() ? clazz.getMethod("writeFixed64", int.class, Collection.class) : clazz.getMethod("writeFixed64", int.class, Long.class);
             };
         }catch (NoSuchMethodException exception) {
             throw new RuntimeException("Missing serializer method", exception);

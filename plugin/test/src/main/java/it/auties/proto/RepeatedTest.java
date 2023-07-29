@@ -1,6 +1,8 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,7 +31,7 @@ public class RepeatedTest {
     @Test
     @SneakyThrows
     public void testMultipleModifiers(){
-        var repeatedMessage = new ModernBetaRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)), new ArrayList<>(List.of("abc", "def")));
+        var repeatedMessage = new ModernBetaRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)), new ArrayList<>(List.of(new ModernRepeatedMessage(new ArrayList<>(List.of(1, 2, 3))))));
         var encoded = Protobuf.writeMessage(repeatedMessage);
         var modernDecoded = Protobuf.readMessage(encoded, ModernRepeatedMessage.class);
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
@@ -40,8 +42,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class ModernBetaRepeatedMessage  {
+    public static class ModernBetaRepeatedMessage implements ProtobufObject {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.INT32,
@@ -51,10 +52,10 @@ public class RepeatedTest {
 
         @ProtobufProperty(
                 index = 2,
-                type = ProtobufType.STRING,
+                type = ProtobufType.MESSAGE,
                 repeated = true
         )
-        private ArrayList<String> content2;
+        private ArrayList<ModernRepeatedMessage> content2;
     }
 
     @AllArgsConstructor
@@ -62,8 +63,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class ModernRepeatedMessage  {
+    public static class ModernRepeatedMessage implements ProtobufObject {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.INT32,

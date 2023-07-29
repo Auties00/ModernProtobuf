@@ -8,10 +8,9 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.source.util.Trees;
-import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
@@ -34,8 +33,6 @@ import java.util.*;
 import java.util.stream.IntStream;
 
 @SupportedAnnotationTypes({
-        "it.auties.protobuf.annotation.ProtobufMessage",
-        "it.auties.protobuf.annotation.ProtobufEnum",
         "it.auties.protobuf.annotation.ProtobufProperty",
         "it.auties.protobuf.annotation.ProtobufEnumIndex"
 })
@@ -45,19 +42,32 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private Map<String, ProtobufMessageElement> results;
     private Trees trees;
     private TypeMirror objectType;
+    private TypeMirror protoObjectType;
     private TypeMirror collectionType;
     private Path outputDirectory;
 
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
-        super.init(processingEnv);
+    public synchronized void init(ProcessingEnvironment wrapperProcessingEnv) {
+        var unwrapProcessingEnv = unwrapProcessingEnv(wrapperProcessingEnv);
+        super.init(unwrapProcessingEnv);
         this.results = new HashMap<>();
         this.trees = Trees.instance(processingEnv);
-        this.objectType = getObjectClass();
+        this.objectType = getType(Object.class);
+        this.protoObjectType = getType(ProtobufObject.class);
         this.collectionType = getCollectionType();
         this.outputDirectory = getOutputDirectory();
         var task = JavacTask.instance(processingEnv);
         task.addTaskListener(this);
+    }
+
+    private ProcessingEnvironment unwrapProcessingEnv(ProcessingEnvironment wrapper) {
+        try {
+            var apiWrappers = wrapper.getClass().getClassLoader().loadClass("org.jetbrains.jps.javac.APIWrappers");
+            var unwrapMethod = apiWrappers.getDeclaredMethod("unwrap", Class.class, Object.class);
+            return (ProcessingEnvironment) unwrapMethod.invoke(null, ProcessingEnvironment.class, wrapper);
+        } catch (ReflectiveOperationException exception) {
+            return wrapper;
+        }
     }
 
     private Path getOutputDirectory() {
@@ -71,8 +81,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         }
     }
 
-    private TypeMirror getObjectClass() {
-        var result = processingEnv.getElementUtils().getTypeElement(Object.class.getName());
+    private TypeMirror getType(Class<?> type) {
+        var result = processingEnv.getElementUtils().getTypeElement(type.getName());
         return result.asType();
     }
 
@@ -97,7 +107,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processElement(ProtobufMessageElement element) {
-        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_MAXS);
+        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_FRAMES);
         element.classReader().accept(classWriter, 0);
         if(!element.isEnum()){
             createSerializer(classWriter, element);
@@ -128,30 +138,29 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         checkAnnotations(roundEnv);
-        processMessages(roundEnv);
-        processEnums(roundEnv);
+        processObjects(roundEnv);
         return true;
     }
 
     private void checkAnnotations(RoundEnvironment roundEnv) {
         checkAnnotations(
                 roundEnv,
-                ProtobufMessage.class,
+                protoObjectType,
                 ProtobufProperty.class,
-                "All fields annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage"
+                "All fields annotated with @ProtobufProperty should be enclosed by a class or record that implements ProtobufObject"
         );
         checkAnnotations(
                 roundEnv,
-                ProtobufEnum.class,
+                protoObjectType,
                 ProtobufEnumIndex.class,
-                "All fields annotated with @ProtobufEnumIndex should be enclosed by an enum annotated with @ProtobufEnum"
+                "All parameters annotated with @ProtobufEnumIndex should be enclosed by an enum that implements ProtobufObject"
         );
     }
 
-    private void checkAnnotations(RoundEnvironment roundEnv, Class<? extends Annotation> parentAnnotation, Class<? extends Annotation> annotation, String error) {
+    private void checkAnnotations(RoundEnvironment roundEnv, TypeMirror type, Class<? extends Annotation> annotation, String error) {
         roundEnv.getElementsAnnotatedWith(annotation)
                 .stream()
-                .filter(property -> getEnclosingTypeElement(property).getAnnotation(parentAnnotation) == null)
+                .filter(property -> !isSubType(getEnclosingTypeElement(property).asType(), type))
                 .forEach(property -> printError(error, property));
     }
 
@@ -164,22 +173,25 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         return getEnclosingTypeElement(element.getEnclosingElement());
     }
 
-    private void processMessages(RoundEnvironment roundEnv) {
-        var messages = roundEnv.getElementsAnnotatedWith(ProtobufMessage.class);
-        for(var message : messages) {
-            if(message.getKind() != ElementKind.CLASS && message.getKind() != ElementKind.RECORD) {
-                printError("@ProtobufMessage can only be used on classes and records", message);
-                continue;
+    private void processObjects(RoundEnvironment roundEnv) {
+        var objects = getProtobufObjects(roundEnv);
+        for(var object : objects) {
+            switch (object.getKind()) {
+                case ENUM -> processEnum(object);
+                case RECORD, CLASS -> processMessage(object);
+                default -> printError("Only classes, records and enums can implement ProtobufObject", object);
             }
-
-            var messageElement = createMessageElement(message);
-            var propertiesCount = processProperties(messageElement);
-            if(propertiesCount != 0) {
-                continue;
-            }
-
-            printWarning("No properties found", message);
         }
+    }
+
+    private void processMessage(TypeElement message) {
+        var messageElement = createMessageElement(message);
+        var propertiesCount = processProperties(messageElement);
+        if(propertiesCount != 0) {
+            return;
+        }
+
+        printWarning("No properties found", message);
     }
 
     private ProtobufMessageElement createMessageElement(Element element) {
@@ -223,7 +235,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         }
 
         var type = getImplementationType(variableElement, propertyAnnotation);
-        System.out.println(type);
         if(type.isEmpty()) {
             return true;
         }
@@ -240,35 +251,105 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private Optional<ProtobufPropertyType> getImplementationType(VariableElement element, ProtobufProperty property) {
         var type = element.asType();
         var rawImplementation = getMirroredImplementation(property);
-        if (!processingEnv.getTypeUtils().isSameType(rawImplementation, objectType)) {
+        if (!isSameType(rawImplementation, objectType)) {
             var result = new ProtobufPropertyType(
                     toAsmType(rawImplementation),
-                    property.repeated() ? toAsmType(erase(type)) : null
+                    property.repeated() ? toAsmType(erase(type)) : null,
+                    isEnum(rawImplementation)
             );
             return Optional.of(result);
         }
 
         if (!property.repeated()) {
-            var result = new ProtobufPropertyType(toAsmType(type), null);
+            var result = new ProtobufPropertyType(
+                    toAsmType(type),
+                    null,
+                    isEnum(type)
+            );
             return Optional.of(result);
         }
 
-        var declaredType = (DeclaredType) type;
-        var typeArguments = declaredType.getTypeArguments();
-        if(typeArguments.isEmpty()) {
-            printError("Repeated fields cannot be represented by a raw type: specify a type parameter(List<Something>) or an implementation(@ProtobufProperty(implementation = Something.class))", element);
+        var javaArgumentType = getCollectionType(type);
+        if(javaArgumentType.isEmpty()) {
+            printError("Type inference error: cannot determine collection's type.\nSpecify the implementation explicitly in @ProtobufProperty", element);
             return Optional.empty();
         }
 
-        // TODO: Infer the right type argument from the context
-        if(typeArguments.size() > 1) {
-            printError("Repeated fields cannot be represented by a Collection type with more than one type argument", element);
-            return Optional.empty();
-        }
-
-        var argumentType = toAsmType(typeArguments.get(0));
-        var result = new ProtobufPropertyType(argumentType, toAsmType(type));
+        var asmArgumentType = toAsmType(javaArgumentType.get());
+        var result = new ProtobufPropertyType(
+                asmArgumentType,
+                toAsmType(type),
+                isEnum(javaArgumentType.get())
+        );
         return Optional.of(result);
+    }
+
+    private boolean isEnum(TypeMirror mirror) {
+        return mirror instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.ENUM;
+    }
+
+    private Optional<TypeMirror> getCollectionType(TypeMirror mirror) {
+        if(!(mirror instanceof DeclaredType declaredType)) {
+            return Optional.empty();
+        }
+
+        var typeElement = (TypeElement) declaredType.asElement();
+        return typeElement.getInterfaces()
+                .stream()
+                .filter(implemented -> implemented instanceof DeclaredType)
+                .map(implemented -> (DeclaredType) implemented)
+                .map(implemented -> getCollectionTypeByImplement(declaredType, implemented))
+                .flatMap(Optional::stream)
+                .findFirst()
+                .or(() -> getCollectionTypeBySuperClass(declaredType, typeElement));
+    }
+
+    private Optional<TypeMirror> getCollectionTypeByImplement(DeclaredType declaredType, DeclaredType implemented) {
+        if (isSameType(implemented, collectionType)) {
+            var collectionTypeArgument = implemented.getTypeArguments().get(0);
+            return getConcreteCollectionArgumentType(collectionTypeArgument, declaredType);
+        }
+
+        return getCollectionType(implemented)
+                .flatMap(result -> getConcreteCollectionArgumentType(result, declaredType));
+    }
+
+    private Optional<TypeMirror> getCollectionTypeBySuperClass(DeclaredType declaredType, TypeElement typeElement) {
+        if (!(typeElement.getSuperclass() instanceof DeclaredType superDeclaredType)) {
+            return Optional.empty();
+        }
+
+        return getCollectionType(superDeclaredType)
+                .flatMap(result -> getConcreteCollectionArgumentType(result, superDeclaredType))
+                .flatMap(result -> getConcreteCollectionArgumentType(result, declaredType));
+    }
+
+    private Optional<TypeMirror> getConcreteCollectionArgumentType(TypeMirror argumentMirror, DeclaredType previousType) {
+        if(argumentMirror instanceof DeclaredType declaredTypeArgument) {
+            return Optional.of(declaredTypeArgument);
+        }else if(argumentMirror instanceof TypeVariable typeVariableArgument){
+            return getConcreteTypeFromTypeVariable(typeVariableArgument, previousType);
+        }else {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<TypeMirror> getConcreteTypeFromTypeVariable(TypeVariable typeVariableArgument, DeclaredType previousType) {
+        var currentTypeVarName = typeVariableArgument.asElement().getSimpleName();
+        var previousTypeArguments = previousType.getTypeArguments();
+        var previousElement = (TypeElement) previousType.asElement();
+        var previousTypeParameters = previousElement.getTypeParameters();
+        for(var i = 0; i < previousTypeParameters.size(); i++) {
+            if(previousTypeParameters.get(i).getSimpleName().equals(currentTypeVarName)){
+                return Optional.of(previousTypeArguments.get(i));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean isSameType(TypeMirror firstType, TypeMirror secondType) {
+        return processingEnv.getTypeUtils().isSameType(erase(firstType), secondType);
     }
 
     private TypeMirror erase(TypeMirror typeMirror) {
@@ -316,7 +397,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private boolean checkRepeatedField(VariableElement variableElement) {
-        if (isCollection(variableElement.asType())) {
+        if (isSubType(variableElement.asType(), collectionType)) {
             return true;
         }
 
@@ -324,8 +405,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         return false;
     }
 
-    private boolean isCollection(TypeMirror type) {
-        return processingEnv.getTypeUtils().isSubtype(type, collectionType);
+    private boolean isSubType(TypeMirror child, TypeMirror parent) {
+        return processingEnv.getTypeUtils().isSubtype(child, parent);
     }
 
     private boolean isValidPackedProperty(VariableElement variableElement, ProtobufProperty propertyAnnotation) {
@@ -342,28 +423,19 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         return true;
     }
 
-    private void processEnums(RoundEnvironment roundEnv) {
-        var enums = roundEnv.getElementsAnnotatedWith(ProtobufEnum.class);
-        for(var entry : enums) {
-            if(entry.getKind() != ElementKind.ENUM) {
-                printError("@ProtobufEnum can only be used on enums", entry);
-                continue;
-            }
-
-            var enumElement = (TypeElement) entry;
-            var index = getEnumIndex(enumElement);
-            if(index.isEmpty()) {
-                continue;
-            }
-
-            var messageElement = createMessageElement(enumElement);
-            var constantsCount = processEnumConstants(messageElement, index.getAsInt());
-            if(constantsCount != 0) {
-                continue;
-            }
-
-            printWarning("No constants found", enumElement);
+    private void processEnum(TypeElement enumElement) {
+        var index = getEnumIndex(enumElement);
+        if(index.isEmpty()) {
+            return;
         }
+
+        var messageElement = createMessageElement(enumElement);
+        var constantsCount = processEnumConstants(messageElement, index.getAsInt());
+        if(constantsCount != 0) {
+            return;
+        }
+
+        printWarning("No constants found", enumElement);
     }
 
     private long processEnumConstants(ProtobufMessageElement messageElement, int index) {
@@ -459,6 +531,25 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         }
 
         printError("Duplicated enum constant: %s and %s with index %s".formatted(variableName, error.get(), value), enumElement);
+    }
+
+    private List<TypeElement> getProtobufObjects(RoundEnvironment roundEnv) {
+        return getElements(roundEnv.getRootElements())
+                .stream()
+                .filter(entry -> isSubType(entry.asType(), protoObjectType))
+                .toList();
+    }
+
+    private Set<TypeElement> getElements(Collection<? extends Element> elements) {
+        var results = new HashSet<TypeElement>();
+        for(var element : elements) {
+            if(element instanceof TypeElement typeElement) {
+                results.add(typeElement);
+                results.addAll(getElements(typeElement.getEnclosedElements()));
+            }
+        }
+
+        return results;
     }
 
     private void printWarning(String msg, Element constructor) {

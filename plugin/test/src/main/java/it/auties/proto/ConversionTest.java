@@ -1,7 +1,9 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufConverter;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.Data;
@@ -30,7 +32,7 @@ public class ConversionTest {
     @Test
     @SneakyThrows
     public void testRepeated() {
-        var someMessage = new SomeRepeatedMessage(new SomeRepeatedMessage.ArrayList1<>(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3"))));
+        var someMessage = new SomeRepeatedMessage(new SomeRepeatedMessage.ArrayList1(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3"))));
         var encoded = Protobuf.writeMessage(someMessage);
         var decoded = Protobuf.readMessage(encoded, SomeRepeatedMessage.class);
         Assertions.assertEquals(someMessage.wrappers(), decoded.wrappers());
@@ -40,8 +42,7 @@ public class ConversionTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class SomeMessage {
+    public static class SomeMessage implements ProtobufObject {
         @ProtobufProperty(index = 1, type = STRING)
         private Wrapper wrapper;
     }
@@ -50,21 +51,29 @@ public class ConversionTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class SomeRepeatedMessage {
+    public static class SomeRepeatedMessage implements ProtobufObject {
         @ProtobufProperty(
                 index = 1,
                 type = STRING,
                 repeated = true
         )
         @Default
-        private ArrayList1<Wrapper> wrappers = new ArrayList1<>();
+        private ArrayList1<String> wrappers = new ArrayList1<>();
 
-        public static class ArrayList1<E> extends ArrayList<E> {
+        public static class ArrayList1<E> extends ArrayList2<Wrapper> {
             public ArrayList1() {
             }
 
-            public ArrayList1(Collection<? extends E> c) {
+            public ArrayList1(Collection<Wrapper> c) {
+                super(c);
+            }
+        }
+
+        public static class ArrayList2<X> extends ArrayList<X> implements Collection<X> {
+            public ArrayList2() {
+            }
+
+            public ArrayList2(Collection<X> c) {
                 super(c);
             }
         }

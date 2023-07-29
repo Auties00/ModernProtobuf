@@ -1,6 +1,8 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -20,10 +22,9 @@ public class PackedTest {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @ProtobufMessage
     public record SomeMessage(
             @ProtobufProperty(index = 1, type = UINT32, repeated = true) ArrayList<Integer> content
-    ) {
+    ) implements ProtobufObject {
 
     }
 }

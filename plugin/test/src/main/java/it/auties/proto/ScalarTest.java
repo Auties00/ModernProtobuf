@@ -1,6 +1,8 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -112,8 +114,7 @@ public class ScalarTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class ModernScalarMessage  {
+    public static class ModernScalarMessage implements ProtobufObject {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.FIXED32

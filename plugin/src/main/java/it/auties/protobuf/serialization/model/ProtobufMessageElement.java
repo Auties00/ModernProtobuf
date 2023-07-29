@@ -22,7 +22,7 @@ public class ProtobufMessageElement {
     private ClassReader classReader;
 
     public ProtobufMessageElement(String binaryName, TypeElement typeElement, Path targetFile) {
-        this.classType = Type.getObjectType(binaryName.replaceAll("\\.", "/"));
+        this.classType = Type.getObjectType(binaryName);
         this.typeElement = typeElement;
         this.targetFile = targetFile;
         this.properties = new LinkedHashMap<>();
@@ -87,6 +87,7 @@ public class ProtobufMessageElement {
                 property.type(),
                 type.argumentType(),
                 type.rawType(),
+                type.isEnum(),
                 property.required(),
                 property.repeated(),
                 property.packed()

@@ -1,7 +1,9 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.exception.ProtobufSerializationException;
+import it.auties.protobuf.model.ProtobufObject;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -37,8 +39,7 @@ public class ModifierTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class RequiredMessage {
+    public static class RequiredMessage implements ProtobufObject {
         @ProtobufProperty(index = 1, type = STRING, required = true)
         // @NonNull (Removed for testing purposes)
         private String required;

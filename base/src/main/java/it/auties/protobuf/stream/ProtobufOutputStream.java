@@ -1,15 +1,33 @@
 package it.auties.protobuf.stream;
 
+import it.auties.protobuf.Protobuf;
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 public final class ProtobufOutputStream {
+    private static final MethodHandle MESSAGE_HANDLE;
+
+    static {
+        try {
+            // Generated at compile time
+            //noinspection JavaLangInvokeHandleSignature
+            MESSAGE_HANDLE = MethodHandles.publicLookup()
+                    .findVirtual(ProtobufObject.class, Protobuf.SERIALIZATION_METHOD, MethodType.methodType(byte[].class, ProtobufVersion.class));
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private final ProtobufVersion version;
     private final ByteArrayOutputStream buffer;
 
@@ -31,7 +49,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeInt32(fieldNumber, value));
+        for (var value : values) {
+            writeInt32(fieldNumber, value);
+        }
     }
     
     public void writeInt32(int fieldNumber, Integer value) {
@@ -48,7 +68,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeUInt32(fieldNumber, value));
+        for (var value : values) {
+            writeUInt32(fieldNumber, value);
+        }
     }
 
     public void writeUInt32(int fieldNumber, Integer value) {
@@ -65,7 +87,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeFloat(fieldNumber, value));
+        for (var value : values) {
+            writeFloat(fieldNumber, value);
+        }
     }
     
     public void writeFloat(int fieldNumber, Float value) {
@@ -81,7 +105,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeFixed32(fieldNumber, value));
+        for (var value : values) {
+            writeFixed32(fieldNumber, value);
+        }
     }
     
     public void writeFixed32(int fieldNumber, Integer value) {
@@ -98,8 +124,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-
-        values.forEach(value -> writeInt64(fieldNumber, value));
+        for (var value : values) {
+            writeInt64(fieldNumber, value);
+        }
     }
     
     public void writeInt64(int fieldNumber, Long value) {
@@ -115,7 +142,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeUInt64(fieldNumber, value));
+        for (var value : values) {
+            writeUInt64(fieldNumber, value);
+        }
     }
     
     public void writeUInt64(int fieldNumber, Long value) {
@@ -132,7 +161,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeDouble(fieldNumber, value));
+        for (var value : values) {
+            writeDouble(fieldNumber, value);
+        }
     }
     
     public void writeDouble(int fieldNumber, Double value) {
@@ -148,8 +179,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-
-        values.forEach(value -> writeFixed64(fieldNumber, value));
+        for (var value : values) {
+            writeFixed64(fieldNumber, value);
+        }
     }
 
     public void writeFixed64(int fieldNumber, Long value) {
@@ -166,7 +198,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeBool(fieldNumber, value));
+        for (var value : values) {
+            writeBool(fieldNumber, value);
+        }
     }
 
     public void writeBool(int fieldNumber, Boolean value) {
@@ -183,7 +217,9 @@ public final class ProtobufOutputStream {
             return;
         }
 
-        values.forEach(value -> writeString(fieldNumber, value));
+        for (var value : values) {
+            writeString(fieldNumber, value);
+        }
     }
 
     public void writeString(int fieldNumber, String value) {
@@ -195,12 +231,37 @@ public final class ProtobufOutputStream {
         writeStringNoTag(value);
     }
 
+    public void writeMessage(int fieldNumber, Collection<? extends ProtobufObject> values) {
+        if(values == null){
+            return;
+        }
+
+        for (var value : values) {
+            writeMessage(fieldNumber, value);
+        }
+    }
+
+    public void writeMessage(int fieldNumber, ProtobufObject value) {
+        try {
+            if(value == null){
+                return;
+            }
+
+            writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+            writeBytesNoTag((byte[]) MESSAGE_HANDLE.invokeExact(value, version));
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Cannot invoke serialization method", throwable);
+        }
+    }
+
     public void writeBytes(int fieldNumber, Collection<byte[]> values) {
         if(values == null){
             return;
         }
 
-        values.forEach(value -> writeBytes(fieldNumber, value));
+        for (var value : values) {
+            writeBytes(fieldNumber, value);
+        }
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {

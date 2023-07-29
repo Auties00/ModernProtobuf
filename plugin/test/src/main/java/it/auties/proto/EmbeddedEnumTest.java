@@ -1,8 +1,9 @@
+package it.auties.proto;
+
 import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -24,8 +25,7 @@ public class EmbeddedEnumTest {
 
     @Getter
     @Accessors(fluent = true)
-    @ProtobufEnum
-    public enum Type {
+    public enum Type implements ProtobufObject {
         FIRST(0),
         SECOND(1),
         THIRD(10);
@@ -40,9 +40,8 @@ public class EmbeddedEnumTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class SomeMessage {
-        @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
+    public static class SomeMessage implements ProtobufObject {
+        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
         private AnotherMessage content;
     }
 
@@ -50,9 +49,8 @@ public class EmbeddedEnumTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    @ProtobufMessage
-    public static class AnotherMessage {
-        @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
+    public static class AnotherMessage implements ProtobufObject {
+        @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
         private Type type;
     }
 }

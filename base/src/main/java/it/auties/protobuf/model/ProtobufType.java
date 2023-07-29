@@ -12,7 +12,6 @@ import java.util.*;
 @Accessors(fluent = true)
 public enum ProtobufType {
     MESSAGE(Object.class, Object.class, false),
-    ENUM(Enum.class, Enum.class, false),
     FLOAT(float.class, Float.class, true),
     DOUBLE(double.class, Double.class, true),
     BOOL(boolean.class, Boolean.class, true),

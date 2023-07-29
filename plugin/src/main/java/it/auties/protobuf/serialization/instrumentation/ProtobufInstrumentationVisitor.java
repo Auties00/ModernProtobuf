@@ -1,11 +1,10 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.LocalVariablesSorter;
+
+import java.util.function.Consumer;
 
 public abstract class ProtobufInstrumentationVisitor {
     protected final ProtobufMessageElement element;
@@ -61,6 +60,28 @@ public abstract class ProtobufInstrumentationVisitor {
             case 5 -> visitor.visitInsn(Opcodes.ICONST_5);
             default -> visitor.visitIntInsn(Opcodes.BIPUSH, value);
         }
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    protected void createWhileStatement(int operator, Runnable preparer, Consumer<Label> whileBranch, Runnable outerBranch) {
+        var whileOuterLabel = new Label();
+        methodVisitor.visitLabel(whileOuterLabel);
+        preparer.run();
+        var whileInnerLabel = new Label();
+        methodVisitor.visitJumpInsn(operator, whileInnerLabel);
+        outerBranch.run();
+        methodVisitor.visitLabel(whileInnerLabel);
+        whileBranch.accept(whileOuterLabel);
+        methodVisitor.visitJumpInsn(Opcodes.GOTO, whileOuterLabel);
+    }
+
+    // Creates an if statement
+    protected void createIfStatement(MethodVisitor visitor, int instruction, Runnable trueBranch, Runnable falseBranch) {
+        var trueBranchLabel = new Label();
+        visitor.visitJumpInsn(instruction, trueBranchLabel);
+        falseBranch.run();
+        visitor.visitLabel(trueBranchLabel);
+        trueBranch.run();
     }
 
     protected int createLocalVariable(Type type) {
