@@ -49,11 +49,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return null;
     }
 
-    @Override
-    public int argsCount() {
-        return 1;
-    }
-
     // Writes all properties to the output stream
     private void writeProperties(int outputStreamId) {
         element.properties()

@@ -2,6 +2,7 @@ package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.model.ProtobufWireType;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -12,6 +13,8 @@ public class ProtobufInputStream {
     private final ProtobufVersion version;
     private final byte[] buffer;
     private final int limit;
+    private int wireType;
+    private int index;
     private int pos;
 
     public ProtobufInputStream(ProtobufVersion version, byte[] buffer) {
@@ -21,67 +24,142 @@ public class ProtobufInputStream {
         this.pos = 0;
     }
 
-    public int readTag() {
-        return isAtEnd() ? 0 : readInt32();
+    public boolean readTag() {
+        if(isAtEnd()) {
+            this.wireType = 0;
+            return false;
+        }
+
+        var rawTag = readInt32NoCheck();
+        this.wireType = rawTag & 7;
+        this.index = rawTag >>> 3;
+        return true;
     }
 
     public List<Float> readFloatPacked() {
-        var results = new ArrayList<Float>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readFloat());
-        }
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Float>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
+                while (!input.isAtEnd()){
+                    results.add(input.readFloat());
+                }
 
-        return results;
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFloat());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
-    public List<Double> readDoublePacked() {
-        var results = new ArrayList<Double>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readDouble());
-        }
 
-        return results;
+    public List<Double> readDoublePacked() {
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Double>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
+                while (!input.isAtEnd()){
+                    results.add(input.readDouble());
+                }
+
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readDouble());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
 
     public List<Integer> readInt32Packed() {
-        var results = new ArrayList<Integer>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readInt32());
-        }
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Integer>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
+                while (!input.isAtEnd()){
+                    results.add(input.readInt32());
+                }
 
-        return results;
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt32());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
 
     public List<Long> readInt64Packed() {
-        var results = new ArrayList<Long>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readInt64());
-        }
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Long>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
+                while (!input.isAtEnd()){
+                    results.add(input.readInt64());
+                }
 
-        return results;
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt64());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
 
     public List<Integer> readFixed32Packed() {
-        var results = new ArrayList<Integer>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readInt32());
-        }
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Integer>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
+                while (!input.isAtEnd()){
+                    results.add(input.readFixed32());
+                }
 
-        return results;
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFixed32());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
 
     public List<Long> readFixed64Packed() {
-        var results = new ArrayList<Long>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readInt64());
-        }
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Long>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
+                while (!input.isAtEnd()){
+                    results.add(input.readFixed64());
+                }
 
-        return results;
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readFixed64());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
+    }
+
+    public List<Boolean> readBoolPacked(){
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
+                var results = new ArrayList<Boolean>();
+                var input = new ProtobufInputStream(version, readBytes());
+                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
+                while (!input.isAtEnd()){
+                    results.add(input.readBool());
+                }
+
+                yield results;
+            }
+
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readBool());
+            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+        };
     }
 
     public float readFloat() {
@@ -96,21 +174,19 @@ public class ProtobufInputStream {
         return readInt64() == 1;
     }
 
-    public List<Boolean> readBoolPacked(){
-        var results = new ArrayList<Boolean>();
-        var input = new ProtobufInputStream(version, readBytes());
-        while (!input.isAtEnd()){
-            results.add(input.readInt64() == 1);
-        }
-
-        return results;
-    }
-
     public String readString() {
         return new String(readBytes(), StandardCharsets.UTF_8);
     }
 
     public int readInt32() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
+            throw ProtobufDeserializationException.invalidTag(wireType);
+        }
+
+        return readInt32NoCheck();
+    }
+
+    private int readInt32NoCheck() {
         fspath:
         {
             int tempPos = pos;
@@ -146,8 +222,12 @@ public class ProtobufInputStream {
 
         return (int) readVarInt64Slow();
     }
-
+    
     public long readInt64() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
+            throw ProtobufDeserializationException.invalidTag(wireType);
+        }
+        
         fspath:
         {
             int tempPos = pos;
@@ -218,6 +298,10 @@ public class ProtobufInputStream {
     }
 
     public int readFixed32() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_FIXED32) {
+            throw ProtobufDeserializationException.invalidTag(wireType);
+        }
+        
         var tempPos = this.pos;
         if (this.limit - tempPos < 4) {
             throw ProtobufDeserializationException.truncatedMessage();
@@ -227,8 +311,12 @@ public class ProtobufInputStream {
         this.pos = tempPos + 4;
         return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
     }
-
+    
     public long readFixed64() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_FIXED64) {
+            throw ProtobufDeserializationException.invalidTag(wireType);
+        }
+        
         int tempPos = this.pos;
         if (this.limit - tempPos < 8) {
             throw ProtobufDeserializationException.truncatedMessage();
@@ -244,6 +332,10 @@ public class ProtobufInputStream {
     }
 
     public byte[] readBytes() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
+            throw ProtobufDeserializationException.invalidTag(wireType);
+        }
+        
         var size = this.readInt32();
         if (size > 0 && size <= this.limit - this.pos) {
             this.pos += size;
@@ -263,7 +355,7 @@ public class ProtobufInputStream {
         return pos >= limit;
     }
 
-    public int position() {
-        return pos;
+    public int index() {
+        return index;
     }
 }

@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import static it.auties.protobuf.model.ProtobufType.STRING;
@@ -32,7 +31,7 @@ public class ConversionTest {
     @Test
     @SneakyThrows
     public void testRepeated() {
-        var someMessage = new SomeRepeatedMessage(new SomeRepeatedMessage.ArrayList1(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3"))));
+        var someMessage = new SomeRepeatedMessage(new ArrayList<>(List.of(new Wrapper("Hello World 1"), new Wrapper("Hello World 2"), new Wrapper("Hello World 3"))));
         var encoded = Protobuf.writeMessage(someMessage);
         var decoded = Protobuf.readMessage(encoded, SomeRepeatedMessage.class);
         Assertions.assertEquals(someMessage.wrappers(), decoded.wrappers());
@@ -58,25 +57,7 @@ public class ConversionTest {
                 repeated = true
         )
         @Default
-        private ArrayList1<String> wrappers = new ArrayList1<>();
-
-        public static class ArrayList1<E> extends ArrayList2<Wrapper> {
-            public ArrayList1() {
-            }
-
-            public ArrayList1(Collection<Wrapper> c) {
-                super(c);
-            }
-        }
-
-        public static class ArrayList2<X> extends ArrayList<X> implements Collection<X> {
-            public ArrayList2() {
-            }
-
-            public ArrayList2(Collection<X> c) {
-                super(c);
-            }
-        }
+        private ArrayList<Wrapper> wrappers = new ArrayList<>();
     }
 
     record Wrapper(String value) {
