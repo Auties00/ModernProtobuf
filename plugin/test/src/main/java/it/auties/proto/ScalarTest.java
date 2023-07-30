@@ -18,6 +18,10 @@ public class ScalarTest {
                 .setString("Hello, this is an automated test!")
                 .build();
         var modernDecoded = Protobuf.readMessage(googleMessage.toByteArray(), ModernScalarMessage.class);
+        equals(modernDecoded, googleMessage);
+        var modernEncoded = Protobuf.writeMessage(modernDecoded);
+        var modernDecoded1 = Protobuf.readMessage(modernEncoded, ModernScalarMessage.class);
+        equals(modernDecoded, modernDecoded1);
     }
 
     private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {

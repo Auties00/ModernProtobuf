@@ -65,36 +65,36 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Creates the body of the deserializer for a message
     private void createMessageDeserializer() {
         var inputStreamId = createInputStream();
-        var properties = createdLocalDeserializedVariables();
+        createdLocalDeserializedVariables();
         var loopStart = new Label();
         methodVisitor.visitLabel(loopStart);
         pushHasNextTagToStack(inputStreamId);
         var loopBody = new Label();
         methodVisitor.visitJumpInsn(Opcodes.IFNE, loopBody);
-        createReturnDeserializedValue(properties);
+        createReturnDeserializedValue();
         methodVisitor.visitLabel(loopBody);
-        createPropertiesDeserializer(loopStart, properties, inputStreamId);
-    }
-
-    // Creates the body of the while method to deserialize properties
-    private void createPropertiesDeserializer(Label loopLabel, Map<ProtobufPropertyStub, Integer> properties, int inputStreamId) {
         pushPropertyIndexToStack(inputStreamId);
-        var unknownPropertyLabel = new Label();
         var indexes = getPropertiesIndexes();
-        var knownLabels = IntStream.range(0, indexes.length)
-                .mapToObj(ignored -> new Label())
-                .toArray(Label[]::new);
+        var knownLabels = createLabels(indexes);
         methodVisitor.visitLookupSwitchInsn(
-                unknownPropertyLabel,
+                loopStart,
                 indexes,
                 knownLabels
         );
-        methodVisitor.visitLabel(unknownPropertyLabel);
-        createUnknownPropertyDeserializer(loopLabel);
         for(var index = 0; index < knownLabels.length; index++) {
             methodVisitor.visitLabel(knownLabels[index]);
-            createKnownPropertyDeserializer(loopLabel, properties, inputStreamId, index);
+            createKnownPropertyDeserializer(
+                    loopStart,
+                    inputStreamId,
+                    index
+            );
         }
+    }
+
+    private static Label[] createLabels(int[] indexes) {
+        return IntStream.range(0, indexes.length)
+                .mapToObj(ignored -> new Label())
+                .toArray(Label[]::new);
     }
 
     // Pushes the property's index to the stack
@@ -118,15 +118,14 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a property that is in the model
-    private void createKnownPropertyDeserializer(Label loopLabel, Map<ProtobufPropertyStub, Integer> properties, int inputStreamId, int index) {
+    private void createKnownPropertyDeserializer(Label loopLabel, int inputStreamId, int index) {
         try {
             var property = element.properties().get(index);
-            var fieldId = properties.get(property);
             var repeated = property.repeated();
             if(repeated) {
                 methodVisitor.visitVarInsn(
                         getLoadInstruction(property.fieldType()),
-                        fieldId
+                        property.fieldId().get()
                 );
             }
             createStreamDeserialization(property, inputStreamId);
@@ -144,7 +143,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             } else {
                 methodVisitor.visitVarInsn(
                         getStoreInstruction(property.fieldType()),
-                        fieldId
+                        property.fieldId().get()
                 );
             }
             methodVisitor.visitJumpInsn(
@@ -201,15 +200,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         deserializeMessageFromBytes(property);
     }
 
-    // Creates an instruction to break out of the switch statement as the property isn't known
-    // According to the Protobuf spec, unknown properties shouldn't throw an error
-    private void createUnknownPropertyDeserializer(Label loopLabel) {
-        methodVisitor.visitJumpInsn(
-                Opcodes.GOTO,
-                loopLabel
-        );
-    }
-
     // Returns an array of all known indexes
     private int[] getPropertiesIndexes() {
         return element.properties()
@@ -220,11 +210,8 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Returns the deserialized value by calling the message's constructor
     // it also checks that all required fields are filled
-    private void createReturnDeserializedValue(LinkedHashMap<ProtobufPropertyStub, Integer> properties) {
-        properties.entrySet()
-                .stream()
-                .filter(entry -> entry.getKey().required())
-                .forEach(entry -> applyNullCheck(entry.getKey(), entry.getValue()));
+    private void createReturnDeserializedValue() {
+        applyNullChecks();
         methodVisitor.visitTypeInsn(
                 Opcodes.NEW,
                 element.classType().getInternalName()
@@ -232,11 +219,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         methodVisitor.visitInsn(
                 Opcodes.DUP
         );
-        var constructorArgsDescriptor = properties.entrySet()
-                .stream()
-                .peek(entry -> methodVisitor.visitVarInsn(getLoadInstruction(entry.getKey().fieldType()), entry.getValue()))
-                .map(entry -> entry.getKey().javaType().getDescriptor())
-                .collect(Collectors.joining(""));
+        var constructorArgsDescriptor = loadLocalVariablesIntoStack();
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESPECIAL,
                 element.classType().getInternalName(),
@@ -247,6 +230,21 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         methodVisitor.visitInsn(
                 Opcodes.ARETURN
         );
+    }
+
+    private void applyNullChecks() {
+        element.properties()
+                .stream()
+                .filter(ProtobufPropertyStub::required)
+                .forEach(this::applyNullCheck);
+    }
+
+    private String loadLocalVariablesIntoStack() {
+        return element.properties()
+                .stream()
+                .peek(entry -> methodVisitor.visitVarInsn(getLoadInstruction(entry.fieldType()), entry.fieldId().get()))
+                .map(entry -> entry.javaType().getDescriptor())
+                .collect(Collectors.joining(""));
     }
 
     // Reads the wire tag and index of the next field from the input stream
@@ -338,11 +336,11 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Invokes Objects.requireNonNull on a required field
-    private void applyNullCheck(ProtobufPropertyStub property, int localVariableId) {
+    private void applyNullCheck(ProtobufPropertyStub property) {
         try {
             methodVisitor.visitVarInsn(
-                    Opcodes.ALOAD,
-                    getLoadInstruction(property.fieldType())
+                    getLoadInstruction(property.fieldType()),
+                    property.fieldId().get()
             );
             methodVisitor.visitLdcInsn(
                     "Missing required field: " + property.name()
@@ -364,19 +362,18 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Creates a Map that links every property to a local variable that holds its deserialized value
     // A LinkedHashMap is used to preserve the order of the properties
-    private LinkedHashMap<ProtobufPropertyStub, Integer> createdLocalDeserializedVariables() {
-        return element.properties()
-                .stream()
-                .map(entry -> Map.entry(entry, createLocalDeserializeVariable(entry)))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first, LinkedHashMap::new));
+    private void createdLocalDeserializedVariables() {
+        for(var property : element.properties()) {
+            createLocalDeserializeVariable(property);
+        }
     }
 
     // Creates a local variable to store a property's deserialized value
-    private int createLocalDeserializeVariable(ProtobufPropertyStub property) {
+    private void createLocalDeserializeVariable(ProtobufPropertyStub property) {
         pushDeserializedValueDefaultValueToStack(property);
         var id = createLocalVariable(property.fieldType());
         methodVisitor.visitVarInsn(getStoreInstruction(property.fieldType()), id);
-        return id;
+        property.fieldId().set(id);
     }
 
     private int getLoadInstruction(Type type) {

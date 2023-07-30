@@ -37,7 +37,6 @@ import java.util.stream.IntStream;
         "it.auties.protobuf.annotation.ProtobufEnumIndex"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
-@SupportedOptions("output")
 public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListener {
     private Map<String, ProtobufMessageElement> results;
     private Trees trees;
@@ -107,7 +106,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processElement(ProtobufMessageElement element) {
-        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_FRAMES);
+        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_MAXS);
         element.classReader().accept(classWriter, 0);
         if(!element.isEnum()){
             createSerializer(classWriter, element);

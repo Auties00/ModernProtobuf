@@ -81,17 +81,7 @@ public class ProtobufMessageElement {
 
         var fieldName = element.getSimpleName().toString();
         var fieldIndex = property.index();
-        var result = new ProtobufPropertyStub(
-                fieldIndex,
-                fieldName,
-                property.type(),
-                type.argumentType(),
-                type.rawType(),
-                type.isEnum(),
-                property.required(),
-                property.repeated(),
-                property.packed()
-        );
+        var result = new ProtobufPropertyStub(fieldIndex, fieldName, type, property);
         return Optional.ofNullable(properties.put(fieldIndex, result));
     }
 }
