@@ -1,33 +1,17 @@
 package it.auties.protobuf.stream;
 
-import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufEnum;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 public final class ProtobufOutputStream {
-    private static final MethodHandle MESSAGE_HANDLE;
-
-    static {
-        try {
-            // Generated at compile time
-            //noinspection JavaLangInvokeHandleSignature
-            MESSAGE_HANDLE = MethodHandles.publicLookup()
-                    .findVirtual(ProtobufObject.class, Protobuf.SERIALIZATION_METHOD, MethodType.methodType(byte[].class, ProtobufVersion.class));
-        } catch (NoSuchMethodException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private final ProtobufVersion version;
     private final ByteArrayOutputStream buffer;
 
@@ -231,7 +215,7 @@ public final class ProtobufOutputStream {
         writeStringNoTag(value);
     }
 
-    public void writeMessage(int fieldNumber, Collection<? extends ProtobufObject> values) {
+    public void writeMessage(int fieldNumber, Collection<? extends ProtobufMessage> values) {
         if(values == null){
             return;
         }
@@ -241,14 +225,37 @@ public final class ProtobufOutputStream {
         }
     }
 
-    public void writeMessage(int fieldNumber, ProtobufObject value) {
+    public void writeMessage(int fieldNumber, ProtobufMessage value) {
         try {
             if(value == null){
                 return;
             }
 
             writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeBytesNoTag((byte[]) MESSAGE_HANDLE.invokeExact(value, version));
+            writeBytesNoTag(value.toEncodedProtobuf(version));
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Cannot invoke serialization method", throwable);
+        }
+    }
+
+    public void writeEnum(int fieldNumber, Collection<? extends ProtobufEnum> values) {
+        if(values == null){
+            return;
+        }
+
+        for (var value : values) {
+            writeEnum(fieldNumber, value);
+        }
+    }
+
+    public void writeEnum(int fieldNumber, ProtobufEnum value) {
+        try {
+            if(value == null){
+                return;
+            }
+
+            writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
+            writeInt32NoTag(value.index());
         } catch (Throwable throwable) {
             throw new RuntimeException("Cannot invoke serialization method", throwable);
         }

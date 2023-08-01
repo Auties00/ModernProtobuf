@@ -27,7 +27,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
 
     @Override
     public ProtobufType protobufType() {
-        return ProtobufType.MESSAGE;
+        return ProtobufType.OBJECT;
     }
 
     @Override

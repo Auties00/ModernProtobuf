@@ -11,7 +11,7 @@ import java.util.*;
 @AllArgsConstructor
 @Accessors(fluent = true)
 public enum ProtobufType {
-    MESSAGE(Object.class, Object.class, false),
+    OBJECT(Object.class, Object.class, false),
     FLOAT(float.class, Float.class, true),
     DOUBLE(double.class, Double.class, true),
     BOOL(boolean.class, Boolean.class, true),

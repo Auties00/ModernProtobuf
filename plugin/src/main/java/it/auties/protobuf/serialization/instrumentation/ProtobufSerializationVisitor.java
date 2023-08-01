@@ -1,6 +1,7 @@
 package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufEnum;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
@@ -23,8 +24,9 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected void doInstrumentation() {
+        checkRequiredProperties();
         var outputStreamId = createOutputStream();
-        writeProperties(outputStreamId);
+        element.properties().forEach(property -> writeProperty(outputStreamId, property));
         createReturnSerializedValue(outputStreamId);
     }
 
@@ -49,12 +51,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return null;
     }
 
-    // Writes all properties to the output stream
-    private void writeProperties(int outputStreamId) {
-        element.properties()
-                .forEach(property -> writeProperty(outputStreamId, property));
-    }
-
     // Writes a property to the output stream
     private void writeProperty(int outputStreamId, ProtobufPropertyStub property) {
         methodVisitor.visitVarInsn(
@@ -70,8 +66,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 property
         );
         boxValueIfNecessary(
-                convertedType.orElse(fieldType),
-                readMethod
+                convertedType.orElse(fieldType)
         );
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
@@ -97,22 +92,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return fieldType;
     }
 
-    private void boxValueIfNecessary(Type fieldType, Method readMethod) {
-        if (fieldType.getSort() == Type.OBJECT || fieldType.getSort() == Type.ARRAY) {
-            return;
-        }
-
-        var paramTypes = readMethod.getParameterTypes();
-        var paramToSerializeType = Type.getType(paramTypes[paramTypes.length - 1]);
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKESTATIC,
-                paramToSerializeType.getInternalName(),
-                "valueOf",
-                "(%s)%s".formatted(fieldType.getDescriptor(), paramToSerializeType.getDescriptor()),
-                false
-        );
-    }
-
     private Optional<Type> createJavaPropertySerializer(ProtobufPropertyStub property) {
         var methodName = getJavaPropertyConverterMethodName(property);
         if(methodName.isEmpty()) {
@@ -135,22 +114,12 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     // TODO: Support @ProtobufConverter
-    // TODO: Support dynamic enum index field
     private Optional<String> getJavaPropertyConverterMethodName(ProtobufPropertyStub property) {
-        if(property.isEnum()) {
-            return Optional.of("index");
-        }
-
         return Optional.empty();
     }
 
     // TODO: Support @ProtobufConverter
-    // TODO: Support dynamic enum index field
     private Optional<Type> getJavaPropertyConverterDescriptor(ProtobufPropertyStub property) {
-        if(property.isEnum()) {
-            return Optional.of(Type.getType("()I"));
-        }
-
         return Optional.empty();
     }
 
@@ -181,15 +150,15 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         try {
             var clazz = ProtobufOutputStream.class;
             if(annotation.isEnum()) {
-                return annotation.repeated() ? clazz.getMethod("writeInt32", int.class, Collection.class)
-                        : clazz.getMethod("writeInt32", int.class, Integer.class);
+                return annotation.repeated() ? clazz.getMethod("writeEnum", int.class, Collection.class)
+                        : clazz.getMethod("writeEnum", int.class, ProtobufEnum.class);
             }
 
             return switch (annotation.protoType()) {
                 case STRING ->
                         annotation.repeated() ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
-                case MESSAGE ->
-                        annotation.repeated() ? clazz.getMethod("writeMessage", int.class, Collection.class) : clazz.getMethod("writeMessage", int.class, ProtobufObject.class);
+                case OBJECT ->
+                        annotation.repeated() ? clazz.getMethod("writeMessage", int.class, Collection.class) : clazz.getMethod("writeMessage", int.class, ProtobufMessage.class);
                 case BYTES ->
                         annotation.repeated() ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BOOL ->

@@ -20,7 +20,7 @@ public class ProtobufDeserializationException extends ProtobufException {
         return new ProtobufDeserializationException("A message contained an invalid tag: %s".formatted(tag));
     }
 
-    public static ProtobufDeserializationException missingMandatoryField(String name) {
-        return new ProtobufDeserializationException("A message didn't contain a mandatory field: %s".formatted(name));
+    public static ProtobufDeserializationException invalidWireType(int tag) {
+        return new ProtobufDeserializationException("A message contained an invalid wire type: %s".formatted(tag));
     }
 }

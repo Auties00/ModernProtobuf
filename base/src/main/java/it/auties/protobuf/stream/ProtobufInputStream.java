@@ -30,7 +30,7 @@ public class ProtobufInputStream {
             return false;
         }
 
-        var rawTag = readInt32NoCheck();
+        var rawTag = readInt32Unchecked();
         this.wireType = rawTag & 7;
         this.index = rawTag >>> 3;
         return true;
@@ -183,10 +183,10 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidTag(wireType);
         }
 
-        return readInt32NoCheck();
+        return readInt32Unchecked();
     }
 
-    private int readInt32NoCheck() {
+    private int readInt32Unchecked() {
         fspath:
         {
             int tempPos = pos;
@@ -336,7 +336,7 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidTag(wireType);
         }
         
-        var size = this.readInt32();
+        var size = this.readInt32Unchecked();
         if (size > 0 && size <= this.limit - this.pos) {
             this.pos += size;
             return Arrays.copyOfRange(buffer, pos - size, pos);

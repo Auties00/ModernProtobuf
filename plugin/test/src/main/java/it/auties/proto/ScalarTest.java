@@ -1,8 +1,9 @@
 package it.auties.proto;
 
+import com.google.protobuf.ByteString;
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -16,6 +17,7 @@ public class ScalarTest {
     public void encodeScalarTypes() {
         var googleMessage = ScalarMessage.newBuilder()
                 .setString("Hello, this is an automated test!")
+                .setBytes(ByteString.copyFromUtf8("Hello, this is an automated test!"))
                 .build();
         var modernDecoded = Protobuf.readMessage(googleMessage.toByteArray(), ModernScalarMessage.class);
         equals(modernDecoded, googleMessage);
@@ -118,7 +120,7 @@ public class ScalarTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class ModernScalarMessage implements ProtobufObject {
+    public static class ModernScalarMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.FIXED32

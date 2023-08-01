@@ -2,7 +2,7 @@ package it.auties.proto;
 
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,7 +42,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class ModernBetaRepeatedMessage implements ProtobufObject {
+    public static class ModernBetaRepeatedMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.INT32,
@@ -52,7 +52,7 @@ public class RepeatedTest {
 
         @ProtobufProperty(
                 index = 2,
-                type = ProtobufType.MESSAGE,
+                type = ProtobufType.OBJECT,
                 repeated = true
         )
         private ArrayList<ModernRepeatedMessage> content2;
@@ -63,7 +63,7 @@ public class RepeatedTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class ModernRepeatedMessage implements ProtobufObject {
+    public static class ModernRepeatedMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.INT32,

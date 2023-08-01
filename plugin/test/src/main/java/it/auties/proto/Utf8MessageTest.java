@@ -2,7 +2,7 @@ package it.auties.proto;
 
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -36,7 +36,7 @@ public class Utf8MessageTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class UtfMessage implements ProtobufObject {
+    public static class UtfMessage implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = STRING)
         private String content;
     }

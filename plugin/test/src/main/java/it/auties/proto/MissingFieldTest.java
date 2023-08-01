@@ -2,7 +2,7 @@ package it.auties.proto;
 
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -27,7 +27,7 @@ public class MissingFieldTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class Serializable implements ProtobufObject {
+    public static class Serializable implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = STRING)
         private String content;
 
@@ -45,7 +45,7 @@ public class MissingFieldTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class Deserializable implements ProtobufObject {
+    public static class Deserializable implements ProtobufMessage {
         @ProtobufProperty(index = 3, type = STRING)
         private String content2;
     }

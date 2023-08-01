@@ -2,7 +2,7 @@ package it.auties.proto;
 
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.Builder;
 import lombok.Data;
@@ -26,7 +26,7 @@ public class MixedNotationsTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufObject {
+    public static class SomeMessage implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = ProtobufType.STRING)
         private String content;
     }

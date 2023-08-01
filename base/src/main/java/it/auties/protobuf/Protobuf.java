@@ -2,6 +2,8 @@ package it.auties.protobuf;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.exception.ProtobufSerializationException;
+import it.auties.protobuf.model.ProtobufEnum;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufVersion;
 import lombok.NonNull;
 
@@ -125,12 +127,11 @@ public class Protobuf {
      * @param message the message to serialize
      * @return a non-null byte array
      */
-    public byte[] write(Object message) {
+    public byte[] write(ProtobufMessage message) {
         try {
-            var method = message.getClass().getMethod(SERIALIZATION_METHOD, ProtobufVersion.class);
-            return (byte[]) method.invoke(message, version);
-        } catch (Throwable exception) {
-            throw new ProtobufSerializationException(exception);
+            return message.toEncodedProtobuf(version);
+        }catch (Throwable throwable) {
+            throw new ProtobufSerializationException(throwable);
         }
     }
 
@@ -140,12 +141,31 @@ public class Protobuf {
      * @param message the message to serialize
      * @return a non-null byte array
      */
-    public static byte[] writeMessage(Object message) {
+    public static byte[] writeMessage(ProtobufMessage message) {
         try {
-            var method = message.getClass().getMethod(SERIALIZATION_METHOD, ProtobufVersion.class);
-            return (byte[]) method.invoke(message, defaultVersion);
-        } catch (Throwable exception) {
-            throw new ProtobufSerializationException(exception);
+            return message.toEncodedProtobuf(defaultVersion);
+        }catch (Throwable throwable) {
+            throw new ProtobufSerializationException(throwable);
         }
+    }
+
+    /**
+     * Serializes an enum as an integer
+     *
+     * @param protobufEnum the enum to serialize
+     * @return an unsigned int
+     */
+    public int write(ProtobufEnum protobufEnum) {
+        return protobufEnum.index();
+    }
+
+    /**
+     * Serializes an enum as an integer
+     *
+     * @param protobufEnum the enum to serialize
+     * @return an unsigned int
+     */
+    public static int writeEnum(ProtobufEnum protobufEnum) {
+        return protobufEnum.index();
     }
 }

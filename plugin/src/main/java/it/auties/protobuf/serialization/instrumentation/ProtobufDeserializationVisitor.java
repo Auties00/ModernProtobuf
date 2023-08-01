@@ -12,7 +12,9 @@ import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -64,23 +66,31 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Creates the body of the deserializer for a message
     private void createMessageDeserializer() {
+        // ProtobufInputStream stream = new ProtobufInputStream(var0, var1);
         var inputStreamId = createInputStream();
+
+        // [<type> var<index> = <defaultValue>, ...]
         createdLocalDeserializedVariables();
+
+        // while(input.readTag())
         var loopStart = new Label();
+        var loopEnd = new Label();
         methodVisitor.visitLabel(loopStart);
         pushHasNextTagToStack(inputStreamId);
-        var loopBody = new Label();
-        methodVisitor.visitJumpInsn(Opcodes.IFNE, loopBody);
-        createReturnDeserializedValue();
-        methodVisitor.visitLabel(loopBody);
+        methodVisitor.visitJumpInsn(Opcodes.IFEQ, loopEnd);
+
+        // switch(input.index())
         pushPropertyIndexToStack(inputStreamId);
         var indexes = getPropertiesIndexes();
         var knownLabels = createLabels(indexes);
+        var defaultCaseLabel = new Label();
         methodVisitor.visitLookupSwitchInsn(
-                loopStart,
+                defaultCaseLabel,
                 indexes,
                 knownLabels
         );
+
+        // cases
         for(var index = 0; index < knownLabels.length; index++) {
             methodVisitor.visitLabel(knownLabels[index]);
             createKnownPropertyDeserializer(
@@ -89,9 +99,40 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                     index
             );
         }
+        methodVisitor.visitLabel(defaultCaseLabel);
+        createUnknownPropertyDeserializer(loopStart, inputStreamId);
+
+        // return new <type>(params)
+        methodVisitor.visitLabel(loopEnd);
+        createReturnDeserializedValue();
     }
 
-    private static Label[] createLabels(int[] indexes) {
+    private void createUnknownPropertyDeserializer(Label loopStart, int inputStreamId) {
+        try {
+            methodVisitor.visitVarInsn(
+                    Opcodes.ALOAD,
+                    inputStreamId
+            );
+            methodVisitor.visitMethodInsn(
+                    Opcodes.INVOKEVIRTUAL,
+                    Type.getType(ProtobufInputStream.class).getInternalName(),
+                    "readBytes",
+                    Type.getMethodDescriptor(ProtobufInputStream.class.getMethod("readBytes")),
+                    false
+            );
+            methodVisitor.visitInsn(
+                    Opcodes.POP
+            );
+            methodVisitor.visitJumpInsn(
+                    Opcodes.GOTO,
+                    loopStart
+            );
+        }catch (NoSuchMethodException exception) {
+            throw new RuntimeException("Missing readUnknown in ProtobufInputStream", exception);
+        }
+    }
+
+    private Label[] createLabels(int[] indexes) {
         return IntStream.range(0, indexes.length)
                 .mapToObj(ignored -> new Label())
                 .toArray(Label[]::new);
@@ -118,27 +159,30 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     // Creates a deserializer for a property that is in the model
-    private void createKnownPropertyDeserializer(Label loopLabel, int inputStreamId, int index) {
+    private void createKnownPropertyDeserializer(Label loopStart, int inputStreamId, int index) {
         try {
             var property = element.properties().get(index);
             var repeated = property.repeated();
             if(repeated) {
                 methodVisitor.visitVarInsn(
-                        getLoadInstruction(property.fieldType()),
+                        Opcodes.ALOAD,
                         property.fieldId().get()
                 );
             }
-            createStreamDeserialization(property, inputStreamId);
-            if(property.protoType() == ProtobufType.MESSAGE) {
-                deserializeObject(property);
-            }
+            var deserializedValueType = createStreamDeserialization(property, inputStreamId);
             if (repeated) {
+                boxValueIfNecessary(
+                        deserializedValueType
+                );
                 methodVisitor.visitMethodInsn(
                         Opcodes.INVOKEVIRTUAL,
                         property.wrapperType().getInternalName(),
                         "add",
                         Type.getMethodDescriptor(Collection.class.getMethod("add", Object.class)),
                         false
+                );
+                methodVisitor.visitInsn(
+                        Opcodes.POP
                 );
             } else {
                 methodVisitor.visitVarInsn(
@@ -148,14 +192,21 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             }
             methodVisitor.visitJumpInsn(
                     Opcodes.GOTO,
-                    loopLabel
+                    loopStart
             );
         }catch (NoSuchMethodException exception) {
             throw new RuntimeException("Cannot create message deserializer", exception);
         }
     }
 
-    private void createStreamDeserialization(ProtobufPropertyStub property, int inputStreamId) throws NoSuchMethodException {
+    private Type createStreamDeserialization(ProtobufPropertyStub property, int inputStreamId) throws NoSuchMethodException {
+        if(property.protoType() == ProtobufType.OBJECT && !property.isEnum()) {
+            methodVisitor.visitVarInsn(
+                    Opcodes.ALOAD,
+                    0
+            );
+        }
+
         methodVisitor.visitVarInsn(
                 Opcodes.ALOAD,
                 inputStreamId
@@ -166,38 +217,46 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKEVIRTUAL,
                 Type.getType(ProtobufInputStream.class).getInternalName(),
-                method,
-                Type.getMethodDescriptor(ProtobufInputStream.class.getMethod(method)),
+                method.name(),
+                method.type().getDescriptor(),
                 false
         );
+        if (property.protoType() != ProtobufType.OBJECT) {
+            return method.type().getReturnType();
+        }
+
+        if (property.isEnum()) {
+            deserializeEnumFromInt(property);
+        }else {
+            deserializeMessageFromBytes(property);
+        }
+
+        return property.javaType();
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
-    private String getDeserializerStreamMethod(ProtobufPropertyStub annotation) {
-        if(annotation.isEnum()) {
-            return annotation.packed() ? "readInt32Packed" : "readInt32";
+    private DeserializerMethod getDeserializerStreamMethod(ProtobufPropertyStub annotation) {
+        try {
+            var name = annotation.isEnum() ? annotation.packed() ? "readInt32Packed" : "readInt32" : switch (annotation.protoType()) {
+                case STRING -> "readString";
+                case OBJECT, BYTES -> "readBytes";
+                case BOOL -> annotation.packed() ? "readBoolPacked" : "readBool";
+                case INT32, SINT32, UINT32 -> annotation.packed() ? "readInt32Packed" : "readInt32";
+                case FLOAT -> annotation.packed() ? "readFloatPacked" : "readFloat";
+                case DOUBLE -> annotation.packed() ? "readDoublePacked" : "readDouble";
+                case FIXED32, SFIXED32 -> annotation.packed() ? "readFixed32Packed" : "readFixed32";
+                case INT64, SINT64, UINT64 -> annotation.packed() ? "readInt64Packed" : "readInt64";
+                case FIXED64, SFIXED64 -> annotation.packed() ? "readFixed64Packed" : "readFixed64";
+            };
+            var descriptor = Type.getMethodDescriptor(ProtobufInputStream.class.getMethod(name));
+            return new DeserializerMethod(name, Type.getMethodType(descriptor));
+        }catch (NoSuchMethodException exception) {
+            throw new RuntimeException("Missing deserialization stream method", exception);
         }
-
-        return switch (annotation.protoType()) {
-            case STRING -> "readString";
-            case MESSAGE, BYTES -> "readBytes";
-            case BOOL -> annotation.packed() ? "readBoolPacked" : "readBool";
-            case INT32, SINT32, UINT32 -> annotation.packed() ? "readInt32Packed" : "readInt32";
-            case FLOAT -> annotation.packed() ? "readFloatPacked" : "readFloat";
-            case DOUBLE -> annotation.packed() ? "readDoublePacked" : "readDouble";
-            case FIXED32, SFIXED32 -> annotation.packed() ? "readFixed32Packed" : "readFixed32";
-            case INT64, SINT64, UINT64 -> annotation.packed() ? "readInt64Packed" :  "readInt64";
-            case FIXED64, SFIXED64 -> annotation.packed() ? "readFixed64Packed" : "readFixed64";
-        };
     }
 
-    private void deserializeObject(ProtobufPropertyStub property) {
-        if (property.isEnum()) {
-            deserializeEnumFromInt(property);
-            return;
-        }
+    private record DeserializerMethod(String name, Type type) {
 
-        deserializeMessageFromBytes(property);
     }
 
     // Returns an array of all known indexes
@@ -211,7 +270,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Returns the deserialized value by calling the message's constructor
     // it also checks that all required fields are filled
     private void createReturnDeserializedValue() {
-        applyNullChecks();
+        checkRequiredProperties();
         methodVisitor.visitTypeInsn(
                 Opcodes.NEW,
                 element.classType().getInternalName()
@@ -232,18 +291,11 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         );
     }
 
-    private void applyNullChecks() {
-        element.properties()
-                .stream()
-                .filter(ProtobufPropertyStub::required)
-                .forEach(this::applyNullCheck);
-    }
-
     private String loadLocalVariablesIntoStack() {
         return element.properties()
                 .stream()
                 .peek(entry -> methodVisitor.visitVarInsn(getLoadInstruction(entry.fieldType()), entry.fieldId().get()))
-                .map(entry -> entry.javaType().getDescriptor())
+                .map(entry -> entry.fieldType().getDescriptor())
                 .collect(Collectors.joining(""));
     }
 
@@ -305,59 +357,43 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Deserializes an Enum or null object from an index
     private void deserializeEnumFromInt(ProtobufPropertyStub property) {
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKESTATIC,
-                property.javaType().getInternalName(),
-                Protobuf.DESERIALIZATION_ENUM_METHOD,
-                "(I)Ljava/lang/Optional;",
-                false
-        );
-        methodVisitor.visitInsn(
-                Opcodes.ACONST_NULL
-        );
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKEVIRTUAL,
-                Type.getType(Optional.class).getInternalName(),
-                "orElse",
-                "(Ljava/lang/Object;)%s".formatted(element.classType()),
-                false
-        );
+        try {
+            methodVisitor.visitMethodInsn(
+                    Opcodes.INVOKESTATIC,
+                    property.javaType().getInternalName(),
+                    Protobuf.DESERIALIZATION_ENUM_METHOD,
+                    "(I)Ljava/util/Optional;",
+                    false
+            );
+            methodVisitor.visitInsn(
+                    Opcodes.ACONST_NULL
+            );
+            methodVisitor.visitMethodInsn(
+                    Opcodes.INVOKEVIRTUAL,
+                    Type.getType(Optional.class).getInternalName(),
+                    "orElse",
+                    Type.getMethodDescriptor(Optional.class.getMethod("orElse", Object.class)),
+                    false
+            );
+            methodVisitor.visitTypeInsn(
+                    Opcodes.CHECKCAST,
+                    property.javaType().getInternalName()
+            );
+        }catch (NoSuchMethodException exception) {
+            throw new RuntimeException("Missing orElse in Optional", exception);
+        }
     }
 
     // Deserializes a message from bytes
     private void deserializeMessageFromBytes(ProtobufPropertyStub property) {
+        var protoVersion = Type.getType(ProtobufVersion.class);
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 property.javaType().getInternalName(),
                 Protobuf.DESERIALIZATION_CLASS_METHOD,
-                "([B)L%s;".formatted(property.javaType().getInternalName()),
+                "(%s[B)L%s;".formatted(protoVersion.getDescriptor(), property.javaType().getInternalName()),
                 false
         );
-    }
-
-    // Invokes Objects.requireNonNull on a required field
-    private void applyNullCheck(ProtobufPropertyStub property) {
-        try {
-            methodVisitor.visitVarInsn(
-                    getLoadInstruction(property.fieldType()),
-                    property.fieldId().get()
-            );
-            methodVisitor.visitLdcInsn(
-                    "Missing required field: " + property.name()
-            );
-            methodVisitor.visitMethodInsn(
-                    Opcodes.INVOKESTATIC,
-                    Type.getType(Objects.class).getInternalName(),
-                    "requireNonNull",
-                    Type.getMethodDescriptor(Objects.class.getMethod("requireNonNull", Object.class, String.class)),
-                    false
-            );
-            methodVisitor.visitInsn(
-                    Opcodes.POP
-            );
-        } catch (NoSuchMethodException throwable) {
-            throw new RuntimeException("Cannot write message null check", throwable);
-        }
     }
 
     // Creates a Map that links every property to a local variable that holds its deserialized value
@@ -374,28 +410,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         var id = createLocalVariable(property.fieldType());
         methodVisitor.visitVarInsn(getStoreInstruction(property.fieldType()), id);
         property.fieldId().set(id);
-    }
-
-    private int getLoadInstruction(Type type) {
-        return switch (type.getSort()) {
-            case Type.OBJECT, Type.ARRAY -> Opcodes.ALOAD;
-            case Type.INT, Type.BOOLEAN, Type.CHAR, Type.SHORT, Type.BYTE -> Opcodes.ILOAD;
-            case Type.FLOAT -> Opcodes.FLOAD;
-            case Type.DOUBLE -> Opcodes.DLOAD;
-            case Type.LONG -> Opcodes.LLOAD;
-            default -> throw new RuntimeException("Unexpected type: " + type.getClassName());
-        };
-    }
-
-    private int getStoreInstruction(Type type) {
-        return switch (type.getSort()) {
-            case Type.OBJECT, Type.ARRAY -> Opcodes.ASTORE;
-            case Type.INT, Type.BOOLEAN, Type.CHAR, Type.SHORT, Type.BYTE -> Opcodes.ISTORE;
-            case Type.FLOAT -> Opcodes.FSTORE;
-            case Type.DOUBLE -> Opcodes.DSTORE;
-            case Type.LONG -> Opcodes.LSTORE;
-            default -> throw new RuntimeException("Unexpected type: " + type.getClassName());
-        };
     }
 
     // Pushes to the stack the correct default value for the local variable created by createDeserializedField
@@ -455,7 +469,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             );
             methodVisitor.visitInvokeDynamicInsn(
                     "test",
-                    "(I)Z",
+                    "(I)Ljava/util/function/Predicate;",
                     new Handle(
                             Opcodes.H_INVOKESTATIC,
                             Type.getType(LambdaMetafactory.class).getInternalName(),
@@ -490,49 +504,55 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Creates a lambda that looks like this:
     // (ProtobufEnum entry) -> entry.index == index
     private Object[] createEnumConstructorLambda() {
-        var lambdaName = "lambda$of$0";
-        var lambdaDescriptor = "(I%s)Z".formatted(element.classType());
-        var predicateLambdaMethod = classWriter.visitMethod(
-                Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
-                lambdaName,
-                lambdaDescriptor,
-                null,
-                new String[0]
-        );
-        predicateLambdaMethod.visitCode();
-        predicateLambdaMethod.visitVarInsn(
-                Opcodes.ALOAD,
-                1
-        );
-        predicateLambdaMethod.visitFieldInsn(
-                Opcodes.GETFIELD,
-                element.classType().getInternalName(),
-                "index",
-                "I"
-        );
-        predicateLambdaMethod.visitVarInsn(
-                Opcodes.ILOAD,
-                0
-        );
-        var trueBranchLabel = new Label();
-        predicateLambdaMethod.visitJumpInsn(Opcodes.IF_ICMPNE, trueBranchLabel);
-        predicateLambdaMethod.visitInsn(Opcodes.ICONST_1);
-        predicateLambdaMethod.visitInsn(Opcodes.IRETURN);
-        predicateLambdaMethod.visitLabel(trueBranchLabel);
-        predicateLambdaMethod.visitInsn(Opcodes.ICONST_0);
-        predicateLambdaMethod.visitInsn(Opcodes.IRETURN);
-        predicateLambdaMethod.visitMaxs(-1,-1);
-        predicateLambdaMethod.visitEnd();
-        return new Object[]{
-                Type.getType("(Ljava/lang/Object;)Z"),
-                new Handle(
-                        Opcodes.H_INVOKESTATIC,
-                        element.classType().getInternalName(),
-                        lambdaName,
-                        lambdaDescriptor,
-                        false
-                ),
-                Type.getType("(I)Z")
-        };
+        try {
+            var lambdaName = "lambda$of$0";
+            var lambdaDescriptor = "(I%s)Z".formatted(element.classType());
+            var predicateLambdaMethod = classWriter.visitMethod(
+                    Opcodes.ACC_PRIVATE + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
+                    lambdaName,
+                    lambdaDescriptor,
+                    null,
+                    new String[0]
+            );
+            predicateLambdaMethod.visitCode();
+            predicateLambdaMethod.visitVarInsn(
+                    Opcodes.ALOAD,
+                    1
+            );
+            predicateLambdaMethod.visitFieldInsn(
+                    Opcodes.GETFIELD,
+                    element.classType().getInternalName(),
+                    "index",
+                    "I"
+            );
+            predicateLambdaMethod.visitVarInsn(
+                    Opcodes.ILOAD,
+                    0
+            );
+            var returnLabel = new Label();
+            var trueBranchLabel = new Label();
+            predicateLambdaMethod.visitJumpInsn(Opcodes.IF_ICMPNE, trueBranchLabel);
+            predicateLambdaMethod.visitInsn(Opcodes.ICONST_1);
+            predicateLambdaMethod.visitJumpInsn(Opcodes.GOTO, returnLabel);
+            predicateLambdaMethod.visitLabel(trueBranchLabel);
+            predicateLambdaMethod.visitInsn(Opcodes.ICONST_0);
+            predicateLambdaMethod.visitLabel(returnLabel);
+            predicateLambdaMethod.visitInsn(Opcodes.IRETURN);
+            predicateLambdaMethod.visitMaxs(-1,-1);
+            predicateLambdaMethod.visitEnd();
+            return new Object[]{
+                    Type.getMethodType(Type.getMethodDescriptor(Predicate.class.getMethod("test", Object.class))),
+                    new Handle(
+                            Opcodes.H_INVOKESTATIC,
+                            element.classType().getInternalName(),
+                            lambdaName,
+                            lambdaDescriptor,
+                            false
+                    ),
+                    Type.getType("(%s)Z".formatted(element.classType()))
+            };
+        }catch (NoSuchMethodException exception) {
+            throw new RuntimeException("Missing test in Predicate", exception);
+        }
     }
 }

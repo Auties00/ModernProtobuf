@@ -3,7 +3,7 @@ package it.auties.proto;
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufConverter;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.Data;
@@ -41,7 +41,7 @@ public class ConversionTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufObject {
+    public static class SomeMessage implements ProtobufMessage {
         @ProtobufProperty(index = 1, type = STRING)
         private Wrapper wrapper;
     }
@@ -50,7 +50,7 @@ public class ConversionTest {
     @Builder
     @Data
     @Accessors(fluent = true)
-    public static class SomeRepeatedMessage implements ProtobufObject {
+    public static class SomeRepeatedMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
                 type = STRING,

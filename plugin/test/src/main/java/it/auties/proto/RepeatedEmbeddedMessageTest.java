@@ -2,7 +2,7 @@ package it.auties.proto;
 
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufObject;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,10 +36,10 @@ public class RepeatedEmbeddedMessageTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufObject {
+    public static class SomeMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
-                type = ProtobufType.MESSAGE,
+                type = ProtobufType.OBJECT,
                 repeated = true
         )
         private ArrayList<AnotherMessage> content;
@@ -51,10 +51,10 @@ public class RepeatedEmbeddedMessageTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufObject {
+    public static class AnotherMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
-                type = ProtobufType.MESSAGE,
+                type = ProtobufType.OBJECT,
                 repeated = true
         )
         private ArrayList<FinalMessage> content;
@@ -65,7 +65,7 @@ public class RepeatedEmbeddedMessageTest {
     @Data
     @Builder
     @Accessors(fluent = true)
-    public static class FinalMessage implements ProtobufObject {
+    public static class FinalMessage implements ProtobufMessage {
         @ProtobufProperty(
                 index = 1,
                 type = ProtobufType.INT32,

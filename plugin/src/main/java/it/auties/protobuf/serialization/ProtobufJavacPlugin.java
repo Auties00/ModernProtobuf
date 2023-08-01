@@ -10,6 +10,8 @@ import com.sun.source.util.TaskListener;
 import com.sun.source.util.Trees;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufEnum;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
@@ -42,17 +44,21 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private Trees trees;
     private TypeMirror objectType;
     private TypeMirror protoObjectType;
+    private TypeMirror protoMessageType;
+    private TypeMirror protoEnumType;
     private TypeMirror collectionType;
     private Path outputDirectory;
 
     @Override
     public synchronized void init(ProcessingEnvironment wrapperProcessingEnv) {
-        var unwrapProcessingEnv = unwrapProcessingEnv(wrapperProcessingEnv);
-        super.init(unwrapProcessingEnv);
+        var unwrappedProcessingEnv = unwrapProcessingEnv(wrapperProcessingEnv);
+        super.init(unwrappedProcessingEnv);
         this.results = new HashMap<>();
         this.trees = Trees.instance(processingEnv);
         this.objectType = getType(Object.class);
         this.protoObjectType = getType(ProtobufObject.class);
+        this.protoMessageType = getType(ProtobufMessage.class);
+        this.protoEnumType = getType(ProtobufEnum.class);
         this.collectionType = getCollectionType();
         this.outputDirectory = getOutputDirectory();
         var task = JavacTask.instance(processingEnv);
@@ -106,7 +112,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processElement(ProtobufMessageElement element) {
-        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_MAXS);
+        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_FRAMES);
         element.classReader().accept(classWriter, 0);
         if(!element.isEnum()){
             createSerializer(classWriter, element);
@@ -144,15 +150,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private void checkAnnotations(RoundEnvironment roundEnv) {
         checkAnnotations(
                 roundEnv,
-                protoObjectType,
+                protoMessageType,
                 ProtobufProperty.class,
-                "All fields annotated with @ProtobufProperty should be enclosed by a class or record that implements ProtobufObject"
+                "All fields annotated with @ProtobufProperty should be enclosed by a class or record that implements ProtobufMessage"
         );
         checkAnnotations(
                 roundEnv,
-                protoObjectType,
+                protoEnumType,
                 ProtobufEnumIndex.class,
-                "All parameters annotated with @ProtobufEnumIndex should be enclosed by an enum that implements ProtobufObject"
+                "All parameters annotated with @ProtobufEnumIndex should be enclosed by an enum that implements ProtobufEnum"
         );
     }
 
@@ -223,6 +229,10 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         var propertyAnnotation = variableElement.getAnnotation(ProtobufProperty.class);
         if(propertyAnnotation == null) {
             return false;
+        }
+
+        if(propertyAnnotation.required() && !isValidRequiredProperty(variableElement)) {
+            return true;
         }
 
         if(propertyAnnotation.packed() && !isValidPackedProperty(variableElement, propertyAnnotation)) {
@@ -406,6 +416,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
 
     private boolean isSubType(TypeMirror child, TypeMirror parent) {
         return processingEnv.getTypeUtils().isSubtype(child, parent);
+    }
+
+    private boolean isValidRequiredProperty(VariableElement variableElement) {
+        if(variableElement.asType().getKind().isPrimitive()) {
+            printError("Required properties cannot be primitives", variableElement);
+            return false;
+        }
+
+        return true;
     }
 
     private boolean isValidPackedProperty(VariableElement variableElement, ProtobufProperty propertyAnnotation) {
