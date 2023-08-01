@@ -33,7 +33,12 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             createMessageDeserializer();
         }
     }
-    
+
+    @Override
+    public boolean shouldInstrument() {
+        return true;
+    }
+
     @Override
     protected int access() {
         return Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC;

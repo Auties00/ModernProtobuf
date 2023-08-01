@@ -19,18 +19,24 @@ public class ProtobufMessageElement {
     private final Path targetFile;
     private final Map<Integer, ProtobufPropertyStub> properties;
     private final Map<Integer, String> constants;
+    private final ProtobufEnumMetadata enumMetadata;
     private ClassReader classReader;
 
-    public ProtobufMessageElement(String binaryName, TypeElement typeElement, Path targetFile) {
+    public ProtobufMessageElement(String binaryName, TypeElement typeElement, Path targetFile, ProtobufEnumMetadata enumMetadata) {
         this.classType = Type.getObjectType(binaryName);
         this.typeElement = typeElement;
         this.targetFile = targetFile;
+        this.enumMetadata = enumMetadata;
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
     }
 
     public TypeElement element() {
         return typeElement;
+    }
+
+    public Optional<ProtobufEnumMetadata> enumMetadata() {
+        return Optional.of(enumMetadata);
     }
 
     public ClassReader classReader() {

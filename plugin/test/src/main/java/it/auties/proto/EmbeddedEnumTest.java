@@ -31,7 +31,9 @@ public class EmbeddedEnumTest {
         SECOND(1),
         THIRD(10);
 
+        @ProtobufEnumIndex
         private final int index;
+
         Type(@ProtobufEnumIndex int index) {
             this.index = index;
         }

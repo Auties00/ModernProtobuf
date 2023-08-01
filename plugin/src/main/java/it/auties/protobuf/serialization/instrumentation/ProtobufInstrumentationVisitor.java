@@ -19,6 +19,10 @@ public abstract class ProtobufInstrumentationVisitor {
     }
 
     public void instrument() {
+        if(!shouldInstrument()) {
+            return;
+        }
+
         var access = access();
         var descriptor = descriptor();
         var visitor = classWriter.visitMethod(
@@ -38,6 +42,8 @@ public abstract class ProtobufInstrumentationVisitor {
         methodVisitor.visitMaxs(-1, -1);
         methodVisitor.visitEnd();
     }
+
+    public abstract boolean shouldInstrument();
 
     protected abstract void doInstrumentation();
 
@@ -161,6 +167,17 @@ public abstract class ProtobufInstrumentationVisitor {
             case Type.FLOAT -> Opcodes.FSTORE;
             case Type.DOUBLE -> Opcodes.DSTORE;
             case Type.LONG -> Opcodes.LSTORE;
+            default -> throw new RuntimeException("Unexpected type: " + type.getClassName());
+        };
+    }
+
+    protected int getReturnInstruction(Type type) {
+        return switch (type.getSort()) {
+            case Type.OBJECT, Type.ARRAY -> Opcodes.ARETURN;
+            case Type.INT, Type.BOOLEAN, Type.CHAR, Type.SHORT, Type.BYTE -> Opcodes.IRETURN;
+            case Type.FLOAT -> Opcodes.FRETURN;
+            case Type.DOUBLE -> Opcodes.DRETURN;
+            case Type.LONG -> Opcodes.LRETURN;
             default -> throw new RuntimeException("Unexpected type: " + type.getClassName());
         };
     }

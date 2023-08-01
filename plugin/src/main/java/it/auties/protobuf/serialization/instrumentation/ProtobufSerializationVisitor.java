@@ -10,12 +10,15 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 
-import static it.auties.protobuf.Protobuf.SERIALIZATION_METHOD;
+import static it.auties.protobuf.Protobuf.SERIALIZATION_CLASS_METHOD;
+import static it.auties.protobuf.Protobuf.SERIALIZATION_ENUM_METHOD;
 
 public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor {
     public ProtobufSerializationVisitor(ProtobufMessageElement element, ClassWriter classWriter) {
@@ -24,6 +27,49 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected void doInstrumentation() {
+        if(element.isEnum()) {
+            createEnumSerializer();
+        }else {
+            createMessageSerializer();
+        }
+    }
+
+    @Override
+    public boolean shouldInstrument() {
+        return !element.isEnum() || !hasEnumSerializationMethod();
+    }
+
+    private boolean hasEnumSerializationMethod() {
+        return element.element().getEnclosedElements()
+                .stream()
+                .anyMatch(this::isEnumSerializationMethod);
+    }
+
+    private boolean isEnumSerializationMethod(Element entry) {
+        return entry instanceof ExecutableElement executableElement
+                && executableElement.getSimpleName().contentEquals(name())
+                && executableElement.getParameters().isEmpty();
+    }
+
+
+    private void createEnumSerializer() {
+        methodVisitor.visitVarInsn(
+                Opcodes.ALOAD,
+                0 // this
+        );
+        var metadata = element.enumMetadata().orElseThrow();
+        methodVisitor.visitFieldInsn(
+                Opcodes.GETFIELD,
+                element.classType().getInternalName(),
+                metadata.field().getSimpleName().toString(),
+                metadata.fieldType().getDescriptor()
+        );
+        methodVisitor.visitInsn(
+                getReturnInstruction(metadata.fieldType())
+        );
+    }
+
+    private void createMessageSerializer() {
         checkRequiredProperties();
         var outputStreamId = createOutputStream();
         element.properties().forEach(property -> writeProperty(outputStreamId, property));
@@ -37,11 +83,15 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     
     @Override
     public String name() {
-        return SERIALIZATION_METHOD;
+        return element.isEnum() ? SERIALIZATION_ENUM_METHOD : SERIALIZATION_CLASS_METHOD;
     }
     
     @Override
     public String descriptor() {
+        if(element.isEnum()) {
+            return "()I";
+        }
+
         var versionType = Type.getType(ProtobufVersion.class);
         return "(L%s;)[B".formatted(versionType.getInternalName());
     }

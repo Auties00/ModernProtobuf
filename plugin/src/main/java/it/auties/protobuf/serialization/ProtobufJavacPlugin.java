@@ -1,9 +1,6 @@
 package it.auties.protobuf.serialization;
 
-import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.LiteralTree;
-import com.sun.source.tree.NewClassTree;
-import com.sun.source.tree.VariableTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
@@ -15,6 +12,7 @@ import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
+import it.auties.protobuf.serialization.model.ProtobufEnumMetadata;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import org.objectweb.asm.ClassWriter;
@@ -114,10 +112,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private void processElement(ProtobufMessageElement element) {
         var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_FRAMES);
         element.classReader().accept(classWriter, 0);
-        if(!element.isEnum()){
-            createSerializer(classWriter, element);
-        }
-
+        createSerializer(classWriter, element);
         createDeserializer(classWriter, element);
         writeResult(classWriter, element.targetFile());
     }
@@ -190,22 +185,16 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processMessage(TypeElement message) {
-        var messageElement = createMessageElement(message);
+        var binaryName = getBinaryName(message);
+        var targetFile = outputDirectory.resolve(binaryName + ".class");
+        var messageElement = new ProtobufMessageElement(binaryName, message, targetFile, null);
+        results.put(binaryName, messageElement);
         var propertiesCount = processProperties(messageElement);
         if(propertiesCount != 0) {
             return;
         }
 
         printWarning("No properties found", message);
-    }
-
-    private ProtobufMessageElement createMessageElement(Element element) {
-        var typeElement = (TypeElement) element;
-        var binaryName = getBinaryName(typeElement);
-        var targetFile = outputDirectory.resolve(binaryName + ".class");
-        var result = new ProtobufMessageElement(binaryName, typeElement, targetFile);
-        results.put(binaryName, result);
-        return result;
     }
 
     private String getBinaryName(TypeElement element) {
@@ -442,13 +431,12 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processEnum(TypeElement enumElement) {
-        var index = getEnumIndex(enumElement);
-        if(index.isEmpty()) {
+        var messageElement = createEnumElement(enumElement);
+        if(messageElement.isEmpty()) {
             return;
         }
 
-        var messageElement = createMessageElement(enumElement);
-        var constantsCount = processEnumConstants(messageElement, index.getAsInt());
+        var constantsCount = processEnumConstants(messageElement.get());
         if(constantsCount != 0) {
             return;
         }
@@ -456,53 +444,126 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         printWarning("No constants found", enumElement);
     }
 
-    private long processEnumConstants(ProtobufMessageElement messageElement, int index) {
+    private long processEnumConstants(ProtobufMessageElement messageElement) {
         var enumTree = (ClassTree) trees.getTree(messageElement.element());
         return enumTree.getMembers()
                 .stream()
                 .filter(member -> member instanceof VariableTree)
                 .map(member -> (VariableTree) member)
-                .peek(variableTree -> processEnumConstant(messageElement, messageElement.element(), variableTree, index))
+                .peek(variableTree -> processEnumConstant(messageElement, messageElement.element(), variableTree))
                 .count();
     }
 
-    private OptionalInt getEnumIndex(TypeElement enumElement) {
-        var constructors = getConstructors(enumElement);
-        var index = -1;
-        for (var constructor : constructors) {
-            var match = getProtobufEnumIndexParameters(constructor);
-            switch (match.length) {
-                case 0 -> {}
-                case 1 -> {
-                    if (index != -1) {
-                        printError("Duplicated protobuf constructor: an enum should provide only one constructor with a scalar parameter annotated with @ProtobufEnumIndex", constructor);
-                    }
-
-                    index = match[0];
-                }
-                default -> printError("Duplicated protobuf enum index: an enum's constructor should provide only one parameter annotated with @ProtobufEnumIndex", constructor);
-            }
-        }
-
-        if (index == -1) {
+    private Optional<ProtobufMessageElement> createEnumElement(TypeElement enumElement) {
+        var binaryName = getBinaryName(enumElement);
+        var targetFile = outputDirectory.resolve(binaryName + ".class");
+        var metadata = getEnumMetadata(enumElement);
+        if (metadata.isEmpty()) {
             printError("Missing protobuf enum constructor: an enum should provide a constructor with a scalar parameter annotated with @ProtobufEnumIndex", enumElement);
-            return OptionalInt.empty();
+            return Optional.empty();
         }
 
-        return OptionalInt.of(index);
+        if(metadata.get().isUnknown()) {
+            return Optional.empty();
+        }
+
+        var result = new ProtobufMessageElement(binaryName, enumElement, targetFile, metadata.get());
+        results.put(binaryName, result);
+        return Optional.of(result);
     }
 
-    private int[] getProtobufEnumIndexParameters(ExecutableElement constructor) {
+    private Optional<ProtobufEnumMetadata> getEnumMetadata(TypeElement enumElement) {
+        var fields = getEnumFields(enumElement);
+        return getConstructors(enumElement)
+                .stream()
+                .map(constructor -> getEnumMetadata(constructor, fields))
+                .flatMap(Optional::stream)
+                .reduce((first, second) -> {
+                    printError("Duplicated protobuf constructor: an enum should provide only one constructor with a scalar parameter annotated with @ProtobufEnumIndex", second.constructor());
+                    return first;
+                });
+    }
+
+    private Optional<ProtobufEnumMetadata> getEnumMetadata(ExecutableElement constructor, ProtobufEnumFields fields) {
+        var constructorTree = trees.getTree(constructor);
         return IntStream.range(0, constructor.getParameters().size())
-                .filter(i -> hasEnumIndex(constructor, i))
-                .toArray();
+                .filter(index -> hasProtobufIndexAnnotation(constructor, index))
+                .mapToObj(index -> getEnumMetadata(constructor, constructor.getParameters().get(index), index, constructorTree, fields))
+                .reduce((first, second) -> {
+                    printError("Duplicated protobuf enum index: an enum's constructor should provide only one parameter annotated with @ProtobufEnumIndex", second.parameter());
+                    return first;
+                });
     }
 
-    private boolean hasEnumIndex(ExecutableElement constructor, int i) {
-        var annotation = constructor.getParameters()
-                .get(i)
-                .getAnnotation(ProtobufEnumIndex.class);
-        return annotation != null;
+    private boolean hasProtobufIndexAnnotation(ExecutableElement constructor, int index) {
+        return constructor.getParameters()
+                .get(index)
+                .getAnnotation(ProtobufEnumIndex.class) != null;
+    }
+
+    private ProtobufEnumMetadata getEnumMetadata(ExecutableElement constructor, VariableElement parameter, int index, MethodTree constructorTree, ProtobufEnumFields fields) {
+        if(fields.enumIndexField() != null) {
+            return new ProtobufEnumMetadata(constructor, fields.enumIndexField(), toAsmType(fields.enumIndexField().asType()), parameter, index);
+        }
+
+        return constructorTree.getBody()
+                .getStatements()
+                .stream()
+                .filter(constructorEntry -> constructorEntry instanceof ExpressionStatementTree)
+                .map(constructorEntry -> ((ExpressionStatementTree) constructorEntry).getExpression())
+                .filter(constructorEntry -> constructorEntry instanceof AssignmentTree)
+                .map(constructorEntry -> (AssignmentTree) constructorEntry)
+                .filter(assignmentTree -> isEnumIndexParameterAssignment(assignmentTree, parameter))
+                .map(this::getAssignmentExpressionName)
+                .flatMap(Optional::stream)
+                .map(fields.fields()::get)
+                .filter(Objects::nonNull)
+                .reduce((first, second) -> {
+                    printError("Duplicated assignment: the parameter annotated with @ProtobufEnumIndex can be assigned to a single local field", second);
+                    return first;
+                })
+                .map(fieldElement -> new ProtobufEnumMetadata(constructor, fieldElement, toAsmType(fieldElement.asType()), parameter, index))
+                .orElseGet(() -> {
+                    printError("Missing or too complex assignment: the parameter annotated with @ProtobufEnumIndex should be assigned to a local field", constructor);
+                    printError("If the assignment is too complex for the compiler to evaluate, annotate the local field directly with @ProtobufEnumIndex", constructor);
+                    return ProtobufEnumMetadata.unknown();
+                });
+    }
+
+    private boolean isEnumIndexParameterAssignment(AssignmentTree assignmentTree, VariableElement parameter) {
+        return assignmentTree.getExpression() instanceof IdentifierTree identifierTree
+                && identifierTree.getName().equals(parameter.getSimpleName());
+    }
+
+    private Optional<Name> getAssignmentExpressionName(AssignmentTree assignmentTree) {
+        if(assignmentTree.getExpression() instanceof IdentifierTree fieldIdentifier) {
+            return Optional.of(fieldIdentifier.getName());
+        }else if(assignmentTree.getExpression() instanceof MemberSelectTree memberSelectTree) {
+            return Optional.of(memberSelectTree.getIdentifier());
+        }else {
+            return Optional.empty();
+        }
+    }
+
+    private ProtobufEnumFields getEnumFields(TypeElement enumElement) {
+        var fields = new HashMap<Name, VariableElement>();
+        for (var entry : enumElement.getEnclosedElements()) {
+            if (!(entry instanceof VariableElement variableElement)) {
+                continue;
+            }
+
+            if(variableElement.getAnnotation(ProtobufEnumIndex.class) != null) {
+                return new ProtobufEnumFields(variableElement, null);
+            }
+
+            fields.put(variableElement.getSimpleName(), variableElement);
+        }
+
+        return new ProtobufEnumFields(null, fields);
+    }
+
+    private record ProtobufEnumFields(VariableElement enumIndexField, Map<Name, VariableElement> fields) {
+
     }
 
     private List<ExecutableElement> getConstructors(TypeElement enumElement) {
@@ -514,7 +575,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
                 .toList();
     }
 
-    private void processEnumConstant(ProtobufMessageElement messageElement, TypeElement enumElement, VariableTree enumConstantTree, int index) {
+    private void processEnumConstant(ProtobufMessageElement messageElement, TypeElement enumElement, VariableTree enumConstantTree) {
         if (!(enumConstantTree.getInitializer() instanceof NewClassTree newClassTree)) {
             return;
         }
@@ -531,7 +592,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
             return;
         }
 
-        var indexArgument = newClassTree.getArguments().get(index);
+        var indexArgument = newClassTree.getArguments().get(messageElement.enumMetadata().orElseThrow().parameterIndex());
         if (!(indexArgument instanceof LiteralTree literalTree)) {
             printError("%s's index must be a constant value".formatted(variableName), enumElement);
             return;
