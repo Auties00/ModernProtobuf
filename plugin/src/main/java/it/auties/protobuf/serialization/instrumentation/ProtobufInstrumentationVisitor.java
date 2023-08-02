@@ -123,11 +123,11 @@ public abstract class ProtobufInstrumentationVisitor {
                         Opcodes.GETFIELD,
                         element.classType().getInternalName(),
                         property.name(),
-                        property.fieldType().getDescriptor()
+                        property.type().fieldType().getDescriptor()
                 );
             }else {
                 methodVisitor.visitVarInsn(
-                        getLoadInstruction(property.fieldType()),
+                        getLoadInstruction(property.type().fieldType()),
                         localVariableId
                 );
             }

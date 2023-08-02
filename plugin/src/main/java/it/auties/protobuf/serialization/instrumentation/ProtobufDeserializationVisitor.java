@@ -4,6 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyConverter;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import org.objectweb.asm.*;
@@ -181,7 +182,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 );
                 methodVisitor.visitMethodInsn(
                         Opcodes.INVOKEVIRTUAL,
-                        property.wrapperType().getInternalName(),
+                        property.type().fieldType().getInternalName(),
                         "add",
                         Type.getMethodDescriptor(Collection.class.getMethod("add", Object.class)),
                         false
@@ -191,7 +192,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 );
             } else {
                 methodVisitor.visitVarInsn(
-                        getStoreInstruction(property.fieldType()),
+                        getStoreInstruction(property.type().fieldType()),
                         property.fieldId().get()
                 );
             }
@@ -205,7 +206,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     private Type createStreamDeserialization(ProtobufPropertyStub property, int inputStreamId) throws NoSuchMethodException {
-        if(property.protoType() == ProtobufType.OBJECT && !property.isEnum()) {
+        if(property.protoType() == ProtobufType.OBJECT && !property.type().isEnum()) {
             methodVisitor.visitVarInsn(
                     Opcodes.ALOAD,
                     0
@@ -226,23 +227,36 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                 method.type().getDescriptor(),
                 false
         );
-        if (property.protoType() != ProtobufType.OBJECT) {
-            return method.type().getReturnType();
+
+        if (property.protoType() == ProtobufType.OBJECT) {
+            if (property.type().isEnum()) {
+                deserializeEnumFromInt(property);
+            }else {
+                deserializeMessageFromBytes(property);
+            }
         }
 
-        if (property.isEnum()) {
-            deserializeEnumFromInt(property);
-        }else {
-            deserializeMessageFromBytes(property);
-        }
+        return property.type().converter()
+                .map(converter -> invokeConverter(property, converter))
+                .orElseGet(() -> property.protoType() != ProtobufType.OBJECT ? method.type().getReturnType() : property.type().implementationType());
+    }
 
-        return property.javaType();
+    private Type invokeConverter(ProtobufPropertyStub property, ProtobufPropertyConverter converter) {
+        methodVisitor.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                property.type().implementationType().getInternalName(),
+                converter.deserializerName(),
+                converter.deserializerDescriptor(),
+                false
+        );
+        var asmType = Type.getMethodType(converter.deserializerDescriptor());
+        return asmType.getReturnType();
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private DeserializerMethod getDeserializerStreamMethod(ProtobufPropertyStub annotation) {
         try {
-            var name = annotation.isEnum() ? annotation.packed() ? "readInt32Packed" : "readInt32" : switch (annotation.protoType()) {
+            var name = annotation.type().isEnum() ? annotation.packed() ? "readInt32Packed" : "readInt32" : switch (annotation.protoType()) {
                 case STRING -> "readString";
                 case OBJECT, BYTES -> "readBytes";
                 case BOOL -> annotation.packed() ? "readBoolPacked" : "readBool";
@@ -299,8 +313,8 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     private String loadLocalVariablesIntoStack() {
         return element.properties()
                 .stream()
-                .peek(entry -> methodVisitor.visitVarInsn(getLoadInstruction(entry.fieldType()), entry.fieldId().get()))
-                .map(entry -> entry.fieldType().getDescriptor())
+                .peek(entry -> methodVisitor.visitVarInsn(getLoadInstruction(entry.type().fieldType()), entry.fieldId().get()))
+                .map(entry -> entry.type().fieldType().getDescriptor())
                 .collect(Collectors.joining(""));
     }
 
@@ -365,7 +379,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         try {
             methodVisitor.visitMethodInsn(
                     Opcodes.INVOKESTATIC,
-                    property.javaType().getInternalName(),
+                    property.type().implementationType().getInternalName(),
                     Protobuf.DESERIALIZATION_ENUM_METHOD,
                     "(I)Ljava/util/Optional;",
                     false
@@ -382,7 +396,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             );
             methodVisitor.visitTypeInsn(
                     Opcodes.CHECKCAST,
-                    property.javaType().getInternalName()
+                    property.type().implementationType().getInternalName()
             );
         }catch (NoSuchMethodException exception) {
             throw new RuntimeException("Missing orElse in Optional", exception);
@@ -394,9 +408,9 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
         var protoVersion = Type.getType(ProtobufVersion.class);
         methodVisitor.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
-                property.javaType().getInternalName(),
+                property.type().implementationType().getInternalName(),
                 Protobuf.DESERIALIZATION_CLASS_METHOD,
-                "(%s[B)L%s;".formatted(protoVersion.getDescriptor(), property.javaType().getInternalName()),
+                "(%s[B)L%s;".formatted(protoVersion.getDescriptor(), property.type().implementationType().getInternalName()),
                 false
         );
     }
@@ -412,39 +426,40 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     // Creates a local variable to store a property's deserialized value
     private void createLocalDeserializeVariable(ProtobufPropertyStub property) {
         pushDeserializedValueDefaultValueToStack(property);
-        var id = createLocalVariable(property.fieldType());
-        methodVisitor.visitVarInsn(getStoreInstruction(property.fieldType()), id);
+        var id = createLocalVariable(property.type().fieldType());
+        methodVisitor.visitVarInsn(getStoreInstruction(property.type().fieldType()), id);
         property.fieldId().set(id);
     }
 
     // Pushes to the stack the correct default value for the local variable created by createDeserializedField
     private void pushDeserializedValueDefaultValueToStack(ProtobufPropertyStub property) {
-        if(property.wrapperType() != null){
-            methodVisitor.visitTypeInsn(
-                    Opcodes.NEW,
-                    property.wrapperType().getInternalName()
-            );
-            methodVisitor.visitInsn(
-                    Opcodes.DUP
-            );
-            methodVisitor.visitMethodInsn(
-                    Opcodes.INVOKESPECIAL,
-                    property.wrapperType().getInternalName(),
-                    "<init>",
-                    "()V",
-                    false
-            );
-            return;
-        }
+        switch (property.type().implementationType().getSort()) {
+            case Type.OBJECT, Type.ARRAY -> {
+                if (!property.repeated()) {
+                    methodVisitor.visitInsn(Opcodes.ACONST_NULL);
+                    return;
+                }
 
-        var sort = property.javaType().getSort();
-        switch (sort) {
-            case Type.OBJECT, Type.ARRAY ->  methodVisitor.visitInsn(Opcodes.ACONST_NULL);
+                methodVisitor.visitTypeInsn(
+                        Opcodes.NEW,
+                        property.type().wrapperType().getInternalName()
+                );
+                methodVisitor.visitInsn(
+                        Opcodes.DUP
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKESPECIAL,
+                        property.type().wrapperType().getInternalName(),
+                        "<init>",
+                        "()V",
+                        false
+                );
+            }
             case Type.INT, Type.BOOLEAN, Type.CHAR, Type.SHORT, Type.BYTE -> methodVisitor.visitInsn(Opcodes.ICONST_0);
             case Type.FLOAT -> methodVisitor.visitInsn(Opcodes.FCONST_0);
             case Type.DOUBLE -> methodVisitor.visitInsn(Opcodes.DCONST_0);
             case Type.LONG -> methodVisitor.visitInsn(Opcodes.LCONST_0);
-            default -> throw new RuntimeException("Unexpected type: " + property.javaType().getClassName());
+            default -> throw new RuntimeException("Unexpected type: " + property.type().implementationType().getClassName());
         }
     }
 
