@@ -33,7 +33,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return type;
     }
 
-    public ProtobufFieldStatement type(ProtobufTypeReference type) {
+    public ProtobufFieldStatement setType(ProtobufTypeReference type) {
         this.type = type;
         return this;
     }
@@ -42,7 +42,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return index;
     }
 
-    public ProtobufFieldStatement index(int index) {
+    public ProtobufFieldStatement setIndex(int index) {
         this.index = index;
         return this;
     }
@@ -51,7 +51,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return modifier;
     }
 
-    public ProtobufFieldStatement modifier(Modifier modifier) {
+    public ProtobufFieldStatement setModifier(Modifier modifier) {
         this.modifier = modifier;
         return this;
     }
@@ -60,7 +60,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return packed;
     }
 
-    public ProtobufFieldStatement packed(boolean packed) {
+    public ProtobufFieldStatement setPacked(boolean packed) {
         this.packed = packed;
         return this;
     }
@@ -69,7 +69,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return deprecated;
     }
 
-    public ProtobufFieldStatement deprecated(boolean deprecated) {
+    public ProtobufFieldStatement setDeprecated(boolean deprecated) {
         this.deprecated = deprecated;
         return this;
     }
@@ -78,7 +78,7 @@ public final class ProtobufFieldStatement extends ProtobufStatement {
         return defaultValue;
     }
 
-    public ProtobufFieldStatement defaultValue(String defaultValue) {
+    public ProtobufFieldStatement setDefaultValue(String defaultValue) {
         this.defaultValue = defaultValue;
         return this;
     }

@@ -9,7 +9,7 @@ public record ProtobufPrimitiveType(ProtobufType protobufType) implements Protob
 
     public ProtobufPrimitiveType {
         if(protobufType == ProtobufType.OBJECT){
-            throw new IllegalArgumentException("A primitive protobufType cannot wrap a message");
+            throw new IllegalArgumentException("A primitive type cannot wrap a message");
         }
     }
 

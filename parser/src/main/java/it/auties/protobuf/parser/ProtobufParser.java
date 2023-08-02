@@ -4,6 +4,7 @@ import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
 import it.auties.protobuf.parser.statement.*;
+import it.auties.protobuf.parser.statement.ProtobufFieldStatement.Modifier;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import lombok.AllArgsConstructor;
@@ -41,7 +42,6 @@ public final class ProtobufParser {
     private final StreamTokenizer tokenizer;
     private final Deque<ProtobufObject<?>> objectsQueue;
     private final Deque<Instruction> instructions;
-    private final Deque<Set<Integer>> knowIndexes;
     private InstructionState instructionState;
     private ProtobufFieldStatement field;
     private FieldState fieldState;
@@ -65,7 +65,6 @@ public final class ProtobufParser {
         this.objectsQueue = new LinkedList<>();
         this.instructions = new LinkedList<>();
         this.instructionState = InstructionState.DECLARATION;
-        this.knowIndexes = new LinkedList<>();
         tokenizer.wordChars('_', '_');
         tokenizer.wordChars('"', '"');
         tokenizer.wordChars('\'', '\'');
@@ -190,7 +189,6 @@ public final class ProtobufParser {
                 }
 
                 instructions.removeLast();
-                knowIndexes.removeLast();
                 this.instructionState = InstructionState.DECLARATION;
             }
 
@@ -198,8 +196,6 @@ public final class ProtobufParser {
                 var object = objectsQueue.pollLast();
                 ProtobufSyntaxException.check(hasAnyConstants(object),
                         "Illegal enum or oneof without any constants", tokenizer.lineno());
-                ProtobufSyntaxException.check(hasDefaultEnumConstant(object),
-                        "Proto3 enums require a constant with index 0", tokenizer.lineno());
                 ProtobufSyntaxException.check(isValidReservable(object),
                         "Illegal use of reserved field", tokenizer.lineno());
                 var scope = objectsQueue.peekLast();
@@ -212,7 +208,6 @@ public final class ProtobufParser {
                 }
 
                 instructions.removeLast();
-                knowIndexes.removeLast();
                 this.instructionState = InstructionState.OPTIONS;
             }
 
@@ -277,12 +272,6 @@ public final class ProtobufParser {
                 || object instanceof ProtobufMessageStatement;
     }
 
-    private boolean hasDefaultEnumConstant(ProtobufObject<?> object) {
-        return document.version() != PROTOBUF_3
-                || !(object instanceof ProtobufEnumStatement enumStatement)
-                || enumStatement.statements().stream().anyMatch(entry -> entry.index() == 0);
-    }
-
     private void handleBodyState(String token, Instruction instruction) {
         switch (instructionState) {
             case DECLARATION -> createBody(instruction, token);
@@ -298,7 +287,6 @@ public final class ProtobufParser {
                     default -> {
                         createBody(nestedInstruction, nextToken());
                         instructions.add(nestedInstruction);
-                        knowIndexes.add(new HashSet<>());
                         this.instructionState = InstructionState.DECLARATION;
                     }
                 }
@@ -381,9 +369,9 @@ public final class ProtobufParser {
                || (token.startsWith("'") && token.endsWith("'"));
     }
 
-    private ProtobufObject<?> checkFieldParent(ProtobufObject<?> scope, ProtobufFieldStatement.Modifier modifier) {
-        if (modifier != ProtobufFieldStatement.Modifier.NOTHING) {
-            ProtobufSyntaxException.check(document.version() == PROTOBUF_2 || modifier != ProtobufFieldStatement.Modifier.REQUIRED,
+    private ProtobufObject<?> checkFieldParent(ProtobufObject<?> scope, Modifier modifier) {
+        if (modifier != Modifier.NOTHING) {
+            ProtobufSyntaxException.check(document.version() == PROTOBUF_2 || modifier != Modifier.REQUIRED,
                     "Support for the required label was dropped in proto3", tokenizer.lineno());
             ProtobufSyntaxException.check(scope instanceof ProtobufMessageStatement,
                     "Expected message scope for field declaration", tokenizer.lineno());
@@ -408,7 +396,7 @@ public final class ProtobufParser {
 
     private void attributeField(String token) {
         switch (fieldState) {
-            case MODIFIER -> field.type(ProtobufTypeReference.of(token));
+            case MODIFIER -> field.setType(ProtobufTypeReference.of(token));
             case TYPE -> {
                 ProtobufSyntaxException.check(isLegalName(token), "Illegal field name: %s",
                         tokenizer.lineno(), token);
@@ -420,10 +408,11 @@ public final class ProtobufParser {
             case INDEX -> {
                 var index = parseIndex(token, field.parent().statementType() == ProtobufStatementType.ENUM)
                         .orElseThrow(() -> new ProtobufSyntaxException("Missing or illegal index: %s".formatted(token), tokenizer.lineno()));
-                ProtobufSyntaxException.check(!knowIndexes.getLast().contains(index),
+                ProtobufSyntaxException.check(!field.parent().hasIndex(index),
                         "Duplicated index %s", tokenizer.lineno(), index);
-                knowIndexes.getLast().add(index);
-                field.index(index);
+                field.setIndex(index);
+                ProtobufSyntaxException.check(isValidEnumConstant(),
+                        "Proto3 enums require the first constant to have index 0", tokenizer.lineno());
             }
             case OPTIONS_START ->
                     ProtobufSyntaxException.check(isArrayStart(token),
@@ -434,12 +423,12 @@ public final class ProtobufParser {
                             "Expected assignment operator after field option", tokenizer.lineno());
             case OPTIONS_VALUE -> {
                 switch (fieldOptionName) {
-                    case "packed" -> field.packed(Boolean.parseBoolean(token));
-                    case "deprecated" -> field.deprecated(Boolean.parseBoolean(token));
+                    case "packed" -> field.setPacked(Boolean.parseBoolean(token));
+                    case "deprecated" -> field.setDeprecated(Boolean.parseBoolean(token));
                     case "default" -> {
                         ProtobufSyntaxException.check(document.version() != PROTOBUF_3,
                                 "Support for default values was dropped in proto3", tokenizer.lineno());
-                        field.defaultValue(token);
+                        field.setDefaultValue(token);
                     }
                     default ->
                             LOGGER.log(System.Logger.Level.WARNING, "Unrecognized field option: %s=%s%n".formatted(fieldOptionName, token));
@@ -457,30 +446,36 @@ public final class ProtobufParser {
         }
     }
 
+    private boolean isValidEnumConstant() {
+        return field.parent().statementType() != ProtobufStatementType.ENUM
+                || document.version() != PROTOBUF_3
+                || !field.parent().statements().isEmpty()
+                || field.index() == 0;
+    }
+
     private void createField(String token) {
         var scope = objectsQueue.peekLast();
-        var modifier = ProtobufFieldStatement.Modifier.of(token);
+        var modifier = Modifier.of(token);
         var parent = checkFieldParent(scope, modifier);
         this.field = new ProtobufFieldStatement(document.packageName(), parent);
-        field.modifier(modifier);
+        field.setModifier(modifier);
         this.fieldState = FieldState.MODIFIER;
-        if (modifier != ProtobufFieldStatement.Modifier.NOTHING) {
+        if (modifier != Modifier.NOTHING) {
             return;
         }
 
         switch (parent.statementType()) {
             case MESSAGE -> {
                 if (document.version() == PROTOBUF_3) {
-                    field.type(ProtobufTypeReference.of(token));
+                    field.setType(ProtobufTypeReference.of(token));
                     this.fieldState = FieldState.TYPE;
                 }
             }
             case ONE_OF -> {
-                field.type(ProtobufTypeReference.of(token));
+                field.setType(ProtobufTypeReference.of(token));
                 this.fieldState = FieldState.TYPE;
             }
             case ENUM -> {
-
                 field.setName(token);
                 this.fieldState = FieldState.NAME;
             }
@@ -531,7 +526,6 @@ public final class ProtobufParser {
         ProtobufSyntaxException.check(instruction != Instruction.UNKNOWN,
                 "Unknown instruction: %s", tokenizer.lineno(), token);
         instructions.add(instruction);
-        knowIndexes.add(new HashSet<>());
         this.instructionState = InstructionState.DECLARATION;
     }
 

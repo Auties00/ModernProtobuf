@@ -1,11 +1,8 @@
 package it.auties.protobuf.parser.statement;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
 public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends ProtobufStatement
@@ -78,5 +75,20 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 }
             })
             .toList();
+    }
+
+    public boolean hasIndex(int index) {
+        return statements().stream()
+                .filter(entry -> entry instanceof ProtobufFieldStatement)
+                .map(entry -> (ProtobufFieldStatement) entry)
+                .anyMatch(entry -> entry.index() == index);
+    }
+
+    public Set<Integer> indexes() {
+        return statements().stream()
+                .filter(entry -> entry instanceof ProtobufFieldStatement)
+                .map(entry -> (ProtobufFieldStatement) entry)
+                .map(ProtobufFieldStatement::index)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }
