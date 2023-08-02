@@ -18,10 +18,10 @@ import java.util.stream.Collectors;
 
 public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     public void generate(List<CompilationUnit> classPool, boolean mutable) {
-        document.statements()
+        var results = document.statements()
                 .stream()
-                .collect(Collectors.toMap(ProtobufStatement::qualifiedCanonicalPath, statement -> generate(statement, mutable, classPool)))
-                .forEach(this::writeOrThrow);
+                .collect(Collectors.toMap(ProtobufStatement::qualifiedCanonicalPath, entry -> generate(entry, mutable, classPool)));
+        results.forEach(this::writeOrThrow);
     }
 
     private void writeOrThrow(String path, CompilationUnit unit) {
@@ -36,6 +36,7 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.MAX_ENUM_CONSTANTS_TO_ALIGN_HORIZONTALLY, 0));
             var printer = new DefaultPrettyPrinter(configuration);
             var result = printer.print(unit);
+            Files.createDirectories(output.getParent());
             Files.writeString(output, result);
         } catch (IOException exception) {
             throw new UncheckedIOException("Cannot write output", exception);
@@ -45,12 +46,12 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     public CompilationUnit generate(ProtobufObject<?> object, boolean mutable, List<CompilationUnit> classPool) {
         Objects.requireNonNull(directory, "Cannot generate files without a target directory");
         if (object instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(msg, mutable, classPool, directory.toPath());
+            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, classPool, directory.toPath());
             return schema.generate();
         }
 
         if (object instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(enm, classPool, directory.toPath());
+            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
             return schema.generate();
         }
 
@@ -59,16 +60,14 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
 
     public void update(ProtobufObject<?> statement, boolean mutable, List<CompilationUnit> classPool) {
         if (statement instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(msg, mutable, classPool, directory.toPath());
-            schema.update()
-                    .ifPresent(entry -> writeOrThrow(msg.qualifiedCanonicalPath(), entry));
+            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, classPool, directory.toPath());
+            schema.update().ifPresent(entry -> writeOrThrow(msg.qualifiedCanonicalPath(), entry));
             return;
         }
 
         if (statement instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(enm, classPool, directory.toPath());
-            schema.update()
-                    .ifPresent(entry -> writeOrThrow(enm.qualifiedCanonicalPath(), entry));
+            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
+            schema.update().ifPresent(entry -> writeOrThrow(enm.qualifiedCanonicalPath(), entry));
             return;
         }
 

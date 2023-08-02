@@ -34,9 +34,8 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
             names = {"-o", "--output"},
             description = "The directory where the generated classes should be outputted, by default a directory named proto-out will be created in your working directory"
     )
-    private File output = Path.of("")
+    private File output = Path.of("proto-out/")
             .toAbsolutePath()
-            .resolve("proto-out")
             .toFile();
 
     @Option(

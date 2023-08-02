@@ -6,21 +6,22 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.EnumDeclaration;
-import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
+import com.github.javaparser.ast.type.ArrayType;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.annotation.ProtobufReserved;
+import it.auties.protobuf.model.ProtobufEnum;
+import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
-import it.auties.protobuf.parser.statement.ProtobufObject;
-import it.auties.protobuf.parser.statement.ProtobufReservable;
+import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.util.LogProvider;
-import it.auties.protobuf.tool.util.StringUtils;
 import lombok.NonNull;
 
 import java.nio.file.Path;
@@ -46,15 +47,28 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
 
     protected boolean mutable;
 
-    SchemaCreator(@NonNull V protoStatement, boolean mutable, @NonNull List<CompilationUnit> classPool, Path output) {
+    SchemaCreator(String packageName, @NonNull V protoStatement, boolean mutable, @NonNull List<CompilationUnit> classPool, Path output) {
         this.protoStatement = protoStatement;
         this.classPool = classPool;
         this.mutable = mutable;
-        this.output =output;
-        this.packageName = output != null ? getPackageName(output).orElse(null) : null;
+        this.output = output;
+        this.packageName = getPackageName(packageName, output);
     }
 
-    private Optional<String> getPackageName(Path output){
+    private String getPackageName(String packageName, Path output) {
+        if (packageName != null) {
+            return packageName;
+        }
+
+        if (output != null) {
+            return inferPackageName(output)
+                    .orElse(null);
+        }
+
+        return null;
+    }
+
+    private Optional<String> inferPackageName(Path output){
         var outputDir = output.toString()
                 .replaceAll("\\\\", ".")
                 .replaceAll("/", ".");
@@ -85,7 +99,7 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
         oneOfImplementMap.put(className, declaration);
     }
 
-    Optional<ClassOrInterfaceDeclaration> getDeferredImplementation(String className){
+    Optional<ClassOrInterfaceDeclaration> getDeferredImplementation(String className) {
         return Optional.ofNullable(oneOfImplementMap.remove(className));
     }
 
@@ -124,10 +138,18 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
             compilationUnit.setPackageDeclaration(packageName);
         }
 
+        compilationUnit.addImport(ProtobufMessage.class.getName());
+        if(protoStatement.statementType() == ProtobufStatementType.ENUM || protoStatement.getStatementRecursive(ProtobufEnumStatement.class).isPresent()){
+            compilationUnit.addImport(ProtobufEnum.class.getName());
+            compilationUnit.addImport(ProtobufEnumIndex.class.getName());
+            compilationUnit.addImport(Override.class.getName());
+        }
+
         if(!protoStatement.statements().isEmpty()){
             compilationUnit.addImport(ProtobufProperty.class.getName());
-            compilationUnit.addImport(ProtobufType.class.getName());
+            compilationUnit.addImport(ProtobufType.class.getName(), true, true);
         }
+
         if(hasReservedFields()){
             compilationUnit.addImport(ProtobufReserved.class.getName());
         }
@@ -196,27 +218,6 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
         ctEnum.addAnnotation(annotation);
     }
 
-    private record SimilarString(String name, String oldName, double similarity) implements Comparable<SimilarString> {
-        private SimilarString(String comparable, String name, String oldName){
-            this(name, oldName, StringUtils.similarity(comparable, name));
-        }
-
-        public boolean isSuggestion(){
-            return similarity > 0.5;
-        }
-
-        @Override
-        public String toString() {
-            return oldName == null ? name
-                    : "%s(java name: %s)".formatted(name, oldName);
-        }
-
-        @Override
-        public int compareTo(SimilarString o) {
-            return Double.compare(o.similarity(), similarity());
-        }
-    }
-
     void linkToParent(Node parent, TypeDeclaration<?> ctClass) {
         if(parent instanceof CompilationUnit compilationUnit){
             compilationUnit.addType(ctClass);
@@ -228,7 +229,7 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
     }
 
     void addImplementedType(ClassOrInterfaceDeclaration ctInterface, TypeDeclaration<?> target) {
-        var simpleName = qualifiedMinimalName(target, ctInterface);
+        var simpleName = getQualifiedName(target, ctInterface);
         var nodeWithImplements = (NodeWithImplements<?>) target;
         addImplementedType(simpleName, nodeWithImplements);
     }
@@ -241,21 +242,49 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
         nodeWithImplements.addImplementedType(ctInterface);
     }
 
-    String qualifiedMinimalName(TypeDeclaration<?> scopeDeclaration, TypeDeclaration<?> typeDeclaration) {
+    String getQualifiedName(TypeDeclaration<?> scopeDeclaration, TypeDeclaration<?> typeDeclaration) {
         var scope = scopeDeclaration.getFullyQualifiedName()
                 .orElseThrow(() -> new IllegalStateException("Declaration node isn't attached to any leaf"));
         var type = typeDeclaration.getFullyQualifiedName()
                 .orElseThrow(() -> new IllegalStateException("Target node isn't attached to any leaf"));
-        return qualifiedMinimalName(scope, type);
+        return getQualifiedName(scope, type);
     }
 
-    String qualifiedMinimalName(TypeDeclaration<?> scopeDeclaration, String type) {
+    String getQualifiedName(TypeDeclaration<?> scopeDeclaration, String type) {
         var scope = scopeDeclaration.getFullyQualifiedName()
                 .orElseThrow(() -> new IllegalStateException("Target node isn't attached to any leaf"));
-        return qualifiedMinimalName(scope, type);
+        return getQualifiedName(scope, type);
     }
 
-    private String qualifiedMinimalName(String scope, String type) {
+    private String getQualifiedName(String scope, String type) {
+        if(type.startsWith("java.") && !type.contains("<")) {
+            return type.substring(type.lastIndexOf(".") + 1);
+        }
+
+        var parsedType = StaticJavaParser.parseType(type);
+        if(parsedType.isPrimitiveType()) {
+            return type;
+        }
+
+        if(parsedType instanceof ArrayType arrayType) {
+            return getQualifiedName(scope, arrayType.getComponentType().toString()) + "[]";
+        }
+
+        if(parsedType instanceof ClassOrInterfaceType classOrInterfaceType && classOrInterfaceType.getTypeArguments().isPresent()) {
+            return getQualifiedName(scope, classOrInterfaceType.getNameWithScope()) +
+                    "<" +
+                    classOrInterfaceType.getTypeArguments()
+                            .get()
+                            .stream()
+                            .map(entry -> getQualifiedName(scope, entry.toString()))
+                            .collect(Collectors.joining(", ")) +
+                    ">";
+        }
+
+        return buildQualifiedMinimalName(scope, type);
+    }
+
+    private String buildQualifiedMinimalName(String scope, String type) {
         var scopeParts = scope.split("\\.");
         var typeParts = type.split("\\.");
         var result = new StringBuilder();

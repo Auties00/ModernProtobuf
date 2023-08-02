@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+@SuppressWarnings("unused")
 public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends ProtobufStatement
         permits ProtobufDocument, ProtobufReservable, ProtobufOneOfStatement {
     private final Map<String, T> statements;
@@ -30,14 +31,13 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
     }
 
     @SuppressWarnings("unchecked")
-    public <V extends ProtobufStatement> Optional<? extends V> getStatement(String name, Class<? extends V> clazz){
+    public <V extends ProtobufStatement> Optional<V> getStatement(String name, Class<V> clazz){
         return getStatement(name)
                 .filter(entry -> clazz.isAssignableFrom(entry.getClass()))
                 .map(entry -> (V) entry);
     }
 
-    @SuppressWarnings("unused")
-    public <V extends ProtobufStatement> Optional<? extends V> getStatementRecursive(String name, Class<? extends V> clazz){
+    public <V extends ProtobufStatement> Optional<V> getStatementRecursive(String name, Class<V> clazz){
         var child = getStatement(name, clazz);
         return child.isPresent() ? child : statements().stream()
                 .filter(entry -> ProtobufObject.class.isAssignableFrom(entry.getClass()))
@@ -46,7 +46,25 @@ public abstract sealed class ProtobufObject<T extends ProtobufStatement> extends
                 .findFirst();
     }
 
-    @SuppressWarnings({"unused", "unchecked"})
+    @SuppressWarnings({"unchecked"})
+    public <V extends ProtobufStatement> Optional<V> getStatementRecursive(Class<V> clazz){
+        return statements().stream()
+                .map((T entry) -> {
+                    if(clazz.isAssignableFrom(entry.getClass())){
+                        return Optional.of((V) entry);
+                    }
+
+                    if(entry instanceof ProtobufObject<?> object){
+                        return object.getStatementRecursive(clazz);
+                    }
+
+                    return Optional.<V>empty();
+                })
+                .flatMap(Optional::stream)
+                .findFirst();
+    }
+
+    @SuppressWarnings({"unchecked"})
     public <V extends ProtobufStatement> List<V> getStatementsRecursive(Class<V> clazz){
         return statements().stream()
             .mapMulti((T entry, Consumer<V> consumer) -> {

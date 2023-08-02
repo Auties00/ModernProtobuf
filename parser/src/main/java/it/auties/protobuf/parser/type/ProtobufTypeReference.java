@@ -9,8 +9,7 @@ public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, Pro
     boolean isPrimitive();
 
     static ProtobufTypeReference of(String type){
-        var protobufType = ProtobufType.of(type)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown type: " +  type));
+        var protobufType = ProtobufType.of(type).orElse(OBJECT);
         return protobufType == OBJECT ? ProtobufObjectType.unattributed(type) : ProtobufPrimitiveType.of(protobufType);
     }
 }
