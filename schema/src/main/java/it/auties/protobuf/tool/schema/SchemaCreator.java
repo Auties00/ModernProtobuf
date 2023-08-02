@@ -6,6 +6,7 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.EnumDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -127,6 +128,24 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
         ANY
     }
 
+    Optional<MethodDeclaration> getMethod(TypeDeclaration<?> typeDeclaration, String name) {
+        var results = typeDeclaration.getMethodsByName(name);
+        if(results.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(results.get(0));
+    }
+
+    Optional<? extends TypeDeclaration<?>> getTypeMember(TypeDeclaration<?> typeDeclaration, String name) {
+        return typeDeclaration.getMembers()
+                .stream()
+                .filter(entry -> entry instanceof TypeDeclaration<?>)
+                .map(entry -> (TypeDeclaration<?>) entry)
+                .filter(entry -> entry.getNameAsString().equals(name))
+                .findFirst();
+    }
+
     CompilationUnitResult createCompilationUnit(boolean isEnum) {
         var existing = getTypeDeclaration(protoStatement.name(), isEnum ? QueryType.ENUM : QueryType.MESSAGE);
         if(existing.isPresent()){
@@ -235,7 +254,7 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
     }
 
     void addImplementedType(String ctInterface, NodeWithImplements<?> nodeWithImplements) {
-        if(nodeWithImplements.getImplementedTypes().stream().anyMatch(entry -> Objects.equals(entry.getNameAsString(), ctInterface))){
+        if(nodeWithImplements.getImplementedTypes().stream().anyMatch(entry -> Objects.equals(entry.getNameWithScope(), ctInterface))){
             return;
         }
 

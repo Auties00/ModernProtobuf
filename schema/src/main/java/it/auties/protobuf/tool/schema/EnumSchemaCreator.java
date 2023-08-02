@@ -47,16 +47,18 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         addImplementedType(ProtobufEnum.class.getSimpleName(), ctEnum);
         getDeferredImplementation(protoStatement.name())
                 .ifPresent(entry -> addImplementedType(entry, ctEnum));
-        addEnumConstants(ctEnum);
-        addIndex(ctEnum);
+        createEnumConstructor(ctEnum);
+        createEnumConstants(ctEnum);
+        createIndexField(ctEnum);
+        createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
     }
 
-    private void addEnumConstants(EnumDeclaration ctEnum) {
-        protoStatement.statements().forEach(statement -> addEnumConstant(ctEnum, statement));
+    private void createEnumConstants(EnumDeclaration ctEnum) {
+        protoStatement.statements().forEach(statement -> createEnumConstant(ctEnum, statement));
     }
 
-    private void addEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
+    private void createEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         var existing = getEnumConstant(ctEnum, statement);
         if(existing.isPresent()){
             return;
@@ -86,9 +88,21 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         return intExpression.asNumber().intValue() == statement.index();
     }
 
-    private void addIndex(EnumDeclaration ctEnum) {
+    private void createIndexField(EnumDeclaration ctEnum) {
+        if(ctEnum.getFieldByName("index").isPresent()) {
+            return;
+        }
+
         var intType = parseType("int");
         ctEnum.addField(intType, "index", Modifier.Keyword.PRIVATE, Modifier.Keyword.FINAL);
+    }
+
+    private void createEnumConstructor(EnumDeclaration ctEnum) {
+        if(!ctEnum.getConstructors().isEmpty()) {
+            return;
+        }
+
+        var intType = parseType("int");
         var constructor = ctEnum.addConstructor();
         var indexParameter = new Parameter(intType, "index");
         indexParameter.addAnnotation(new MarkerAnnotationExpr(ProtobufEnumIndex.class.getSimpleName()));
@@ -97,12 +111,21 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         var selectParameterExpression = new NameExpr("index");
         var assignment = new AssignExpr(selectFieldExpression, selectParameterExpression, AssignExpr.Operator.ASSIGN);
         constructor.getBody().addStatement(assignment);
+    }
+
+    private void createIndexAccessor(EnumDeclaration ctEnum) {
+        if(getMethod(ctEnum, "index").isPresent()) {
+            return;
+        }
+
+        var intType = parseType("int");
         var method = new MethodDeclaration();
         method.setPublic(true);
         method.setType(intType);
         method.setName("index");
         method.addAnnotation(new MarkerAnnotationExpr(Override.class.getSimpleName()));
         var body = new BlockStmt();
+        var selectFieldExpression = new FieldAccessExpr(new ThisExpr(), "index");
         body.addStatement(new ReturnStmt(selectFieldExpression));
         method.setBody(body);
         ctEnum.addMember(method);
@@ -116,8 +139,10 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         }
 
         var ctEnum = (EnumDeclaration) result.get().result();
-        addEnumConstants(ctEnum);
-        addIndex(ctEnum);
+        createEnumConstructor(ctEnum);
+        createEnumConstants(ctEnum);
+        createIndexField(ctEnum);
+        createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
         return result.map(QueryResult::compilationUnit);
     }
