@@ -4,12 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,39 +32,20 @@ public class RepeatedTest {
         Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
     }
 
-    @AllArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class ModernBetaRepeatedMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.INT32,
-                repeated = true
-        )
-        private ArrayList<Integer> content;
+    public record ModernBetaRepeatedMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.INT32, repeated = true)
+            ArrayList<Integer> content,
+            @ProtobufProperty(index = 2, type = ProtobufType.OBJECT, repeated = true)
+            ArrayList<ModernRepeatedMessage> content2
+    ) implements ProtobufMessage {
 
-        @ProtobufProperty(
-                index = 2,
-                type = ProtobufType.OBJECT,
-                repeated = true
-        )
-        private ArrayList<ModernRepeatedMessage> content2;
     }
 
-    @AllArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class ModernRepeatedMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.INT32,
-                repeated = true
-        )
-        private ArrayList<Integer> content;
+    public record ModernRepeatedMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.INT32, repeated = true)
+            ArrayList<Integer> content
+    ) implements ProtobufMessage {
+
     }
 
     public interface RepeatedMessageOrBuilder extends com.google.protobuf.MessageLiteOrBuilder {

@@ -5,9 +5,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
-import lombok.*;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -114,90 +112,35 @@ public class ScalarTest {
         com.google.protobuf.ByteString getBytes();
     }
 
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class ModernScalarMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.FIXED32
-        )
-        private int fixed32;
+    public record ModernScalarMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.FIXED32)
+            int fixed32,
+            @ProtobufProperty(index = 2, type = ProtobufType.SFIXED32)
+            int sfixed32,
+            @ProtobufProperty(index = 3, type = ProtobufType.INT32)
+            int int32,
+            @ProtobufProperty(index = 4, type = ProtobufType.UINT32)
+            int uint32,
+            @ProtobufProperty(index = 5, type = ProtobufType.FIXED64)
+            long fixed64,
+            @ProtobufProperty(index = 6, type = ProtobufType.SFIXED64)
+            long sfixed64,
+            @ProtobufProperty(index = 7, type = ProtobufType.INT64)
+            long int64,
+            @ProtobufProperty(index = 8, type = ProtobufType.UINT64)
+            long uint64,
+            @ProtobufProperty(index = 9, type = ProtobufType.FLOAT)
+            float _float,
+            @ProtobufProperty(index = 10, type = ProtobufType.DOUBLE)
+            double _double,
+            @ProtobufProperty(index = 11, type = ProtobufType.BOOL)
+            boolean bool,
+            @ProtobufProperty(index = 12, type = ProtobufType.STRING)
+            String string,
+            @ProtobufProperty(index = 13, type = ProtobufType.BYTES)
+            byte[] bytes
+    ) implements ProtobufMessage {
 
-        @ProtobufProperty(
-                index = 2,
-                type = ProtobufType.SFIXED32
-        )
-        private int sfixed32;
-
-        @ProtobufProperty(
-                index = 3,
-                type = ProtobufType.INT32
-        )
-        private int int32;
-
-        @ProtobufProperty(
-                index = 4,
-                type = ProtobufType.UINT32
-        )
-        private int uint32;
-
-        @ProtobufProperty(
-                index = 5,
-                type = ProtobufType.FIXED64
-        )
-        private long fixed64;
-
-        @ProtobufProperty(
-                index = 6,
-                type = ProtobufType.SFIXED64
-        )
-        private long sfixed64;
-
-        @ProtobufProperty(
-                index = 7,
-                type = ProtobufType.INT64
-        )
-        private long int64;
-
-        @ProtobufProperty(
-                index = 8,
-                type = ProtobufType.UINT64
-        )
-        private long uint64;
-
-        @ProtobufProperty(
-                index = 9,
-                type = ProtobufType.FLOAT
-        )
-        private float _float;
-
-        @ProtobufProperty(
-                index = 10,
-                type = ProtobufType.DOUBLE
-        )
-        private double _double;
-
-        @ProtobufProperty(
-                index = 11,
-                type = ProtobufType.BOOL
-        )
-        private boolean bool;
-
-        @ProtobufProperty(
-                index = 12,
-                type = ProtobufType.STRING
-        )
-        private String string;
-
-        @ProtobufProperty(
-                index = 13,
-                type = ProtobufType.BYTES
-        )
-        private byte[] bytes;
     }
 
     public static final class ScalarMessage extends

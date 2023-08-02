@@ -11,9 +11,13 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.model.ProtobufVersion;
 import org.openjdk.jmh.annotations.*;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,9 +26,21 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 2)
-@Measurement(iterations = 5)
+@Warmup(iterations = 1)
+@Measurement(iterations = 3)
 public class PerformanceBenchmark {
+    private static final MethodHandle readMessageHandle;
+
+    static {
+        try {
+            //noinspection JavaLangInvokeHandleSignature
+            readMessageHandle = MethodHandles.publicLookup()
+                    .findStatic(ModernScalarMessage.class, Protobuf.DESERIALIZATION_CLASS_METHOD, MethodType.methodType(ModernScalarMessage.class, ProtobufVersion.class, byte[].class));
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException("Missing method handle", exception);
+        }
+    }
+
     private static final int ITERATIONS = 1_000;
     private static final byte[] SERIALIZED_INPUT;
     private static final ObjectReader JACKSON_READER;
@@ -55,9 +71,10 @@ public class PerformanceBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
-    public void modernProtobufPerformance() {
+    public void modernProtobufPerformance() throws Throwable {
         for (var i = 0; i < ITERATIONS; ++i) {
-            Protobuf.readMessage(SERIALIZED_INPUT, ModernScalarMessage.class);
+            @SuppressWarnings("unused")
+            ModernScalarMessage result = (ModernScalarMessage) readMessageHandle.invokeExact(ProtobufVersion.PROTOBUF_2, SERIALIZED_INPUT);
         }
     }
 

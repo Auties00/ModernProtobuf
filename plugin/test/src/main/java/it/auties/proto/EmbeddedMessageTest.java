@@ -3,11 +3,7 @@ package it.auties.proto;
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,21 +22,18 @@ public class EmbeddedMessageTest {
         Assertions.assertEquals(anotherMessage.content(), decoded.content().content());
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = OBJECT)
-        private AnotherMessage content;
+
+    public record SomeMessage(
+            @ProtobufProperty(index = 1, type = OBJECT)
+            AnotherMessage content
+    ) implements ProtobufMessage {
+
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 3, type = STRING)
-        private String content;
+    public record AnotherMessage(
+            @ProtobufProperty(index = 3, type = STRING)
+            String content
+    ) implements ProtobufMessage {
+
     }
 }

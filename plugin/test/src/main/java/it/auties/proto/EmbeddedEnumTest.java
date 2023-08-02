@@ -6,9 +6,9 @@ import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
-import lombok.*;
+import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -39,21 +39,17 @@ public class EmbeddedEnumTest {
         }
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
-        private AnotherMessage content;
+    public record SomeMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
+            AnotherMessage content
+    ) implements ProtobufMessage {
+
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 3, type = ProtobufType.OBJECT)
-        private Type type;
+    public record AnotherMessage(
+            @ProtobufProperty(index = 3, type = ProtobufType.OBJECT)
+            Type type
+    ) implements ProtobufMessage {
+
     }
 }

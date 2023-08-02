@@ -50,7 +50,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFloat());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -68,7 +68,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readDouble());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -86,7 +86,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt32());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -104,7 +104,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt64());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -122,7 +122,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFixed32());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -140,7 +140,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readFixed64());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -158,7 +158,7 @@ public class ProtobufInputStream {
             }
 
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readBool());
-            default -> throw ProtobufDeserializationException.invalidTag(wireType);
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
@@ -180,7 +180,7 @@ public class ProtobufInputStream {
 
     public int readInt32() {
         if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
-            throw ProtobufDeserializationException.invalidTag(wireType);
+            throw ProtobufDeserializationException.invalidWireType(wireType);
         }
 
         return readInt32Unchecked();
@@ -225,7 +225,7 @@ public class ProtobufInputStream {
     
     public long readInt64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
-            throw ProtobufDeserializationException.invalidTag(wireType);
+            throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
         fspath:
@@ -299,7 +299,7 @@ public class ProtobufInputStream {
 
     public int readFixed32() {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED32) {
-            throw ProtobufDeserializationException.invalidTag(wireType);
+            throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
         var tempPos = this.pos;
@@ -314,7 +314,7 @@ public class ProtobufInputStream {
     
     public long readFixed64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED64) {
-            throw ProtobufDeserializationException.invalidTag(wireType);
+            throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
         int tempPos = this.pos;
@@ -333,7 +333,7 @@ public class ProtobufInputStream {
 
     public byte[] readBytes() {
         if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
-            throw ProtobufDeserializationException.invalidTag(wireType);
+            throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
         var size = this.readInt32Unchecked();

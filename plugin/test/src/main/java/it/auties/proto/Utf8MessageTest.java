@@ -3,11 +3,7 @@ package it.auties.proto;
 import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -32,12 +28,10 @@ public class Utf8MessageTest {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class UtfMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = STRING)
-        private String content;
+    public record UtfMessage(
+            @ProtobufProperty(index = 1, type = STRING)
+            String content
+    ) implements ProtobufMessage {
+
     }
 }

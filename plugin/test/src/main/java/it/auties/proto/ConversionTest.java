@@ -4,12 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufConverter;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
-import lombok.Builder;
-import lombok.Builder.Default;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,27 +32,22 @@ public class ConversionTest {
         Assertions.assertEquals(someMessage.wrappers(), decoded.wrappers());
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = STRING)
-        private Wrapper wrapper;
+    public record SomeMessage(
+            @ProtobufProperty(index = 1, type = STRING)
+            Wrapper wrapper
+    ) implements ProtobufMessage {
+
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class SomeRepeatedMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = STRING,
-                repeated = true
-        )
-        @Default
-        private ArrayList<Wrapper> wrappers = new ArrayList<>();
+    public record SomeRepeatedMessage(
+            @ProtobufProperty(
+                    index = 1,
+                    type = STRING,
+                    repeated = true
+            )
+            ArrayList<Wrapper> wrappers
+    ) implements ProtobufMessage {
+
     }
 
     record Wrapper(String value) {

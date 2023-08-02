@@ -1,11 +1,8 @@
 package it.auties.protobuf.exception;
 
-public class ProtobufException extends RuntimeException {
-    public ProtobufException(String description) {
-        super(description);
-    }
+import lombok.experimental.StandardException;
 
-    public ProtobufException(String message, Throwable cause) {
-        super(message, cause);
-    }
+@StandardException
+public class ProtobufException extends RuntimeException {
+
 }

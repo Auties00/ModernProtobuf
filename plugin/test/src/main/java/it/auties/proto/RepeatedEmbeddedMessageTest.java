@@ -4,12 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,46 +26,24 @@ public class RepeatedEmbeddedMessageTest {
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
-    @AllArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class SomeMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.OBJECT,
-                repeated = true
-        )
-        private ArrayList<AnotherMessage> content;
+    public record SomeMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.OBJECT, repeated = true)
+            ArrayList<AnotherMessage> content
+    ) implements ProtobufMessage {
     }
 
 
-    @AllArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class AnotherMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.OBJECT,
-                repeated = true
-        )
-        private ArrayList<FinalMessage> content;
+    public record AnotherMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.OBJECT, repeated = true)
+            ArrayList<FinalMessage> content
+    ) implements ProtobufMessage {
+
     }
 
-    @AllArgsConstructor
-    @Jacksonized
-    @Data
-    @Builder
-    @Accessors(fluent = true)
-    public static class FinalMessage implements ProtobufMessage {
-        @ProtobufProperty(
-                index = 1,
-                type = ProtobufType.INT32,
-                repeated = true
-        )
-        private ArrayList<Integer> content;
+    public record FinalMessage(
+            @ProtobufProperty(index = 1, type = ProtobufType.INT32, repeated = true)
+            ArrayList<Integer> content
+    ) implements ProtobufMessage {
+
     }
 }

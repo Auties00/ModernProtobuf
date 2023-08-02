@@ -4,11 +4,7 @@ import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.exception.ProtobufSerializationException;
 import it.auties.protobuf.model.ProtobufMessage;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
-import lombok.extern.jackson.Jacksonized;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,16 +31,11 @@ public class ModifierTest {
         }
     }
 
-    @Jacksonized
-    @Builder
-    @Data
-    @Accessors(fluent = true)
-    public static class RequiredMessage implements ProtobufMessage {
-        @ProtobufProperty(index = 1, type = STRING, required = true)
-        // @NonNull (Removed for testing purposes)
-        private String required;
+    public record RequiredMessage(
+            @ProtobufProperty(index = 1, type = STRING, required = true)
+            String required,
+            @ProtobufProperty(index = 2, type = STRING) String optional
+    ) implements ProtobufMessage {
 
-        @ProtobufProperty(index = 2, type = STRING)
-        private String optional;
     }
 }

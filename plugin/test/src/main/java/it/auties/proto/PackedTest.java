@@ -23,7 +23,8 @@ public class PackedTest {
     }
 
     public record SomeMessage(
-            @ProtobufProperty(index = 1, type = UINT32, repeated = true) ArrayList<Integer> content
+            @ProtobufProperty(index = 1, type = UINT32, repeated = true)
+            ArrayList<Integer> content
     ) implements ProtobufMessage {
 
     }
