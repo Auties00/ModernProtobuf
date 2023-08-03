@@ -26,7 +26,7 @@ import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_3;
 import static java.util.Objects.requireNonNullElse;
 
 public final class ProtobufParser {
-    private static final System.Logger LOGGER = System.getLogger("Protobuf");
+    private static final System.Logger LOGGER = System.getLogger("ModernProtobuf");
     private static final String STATEMENT_END = ";";
     private static final String OBJECT_START = "{";
     private static final String OBJECT_END = "}";
@@ -70,7 +70,7 @@ public final class ProtobufParser {
         tokenizer.wordChars('\'', '\'');
     }
 
-    public ProtobufDocument tokenizeAndParse() {
+    public ProtobufDocument parse() {
         String token;
         while ((token = nextToken()) != null) {
             handleToken(token);

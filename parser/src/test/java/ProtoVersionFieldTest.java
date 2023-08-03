@@ -13,7 +13,7 @@ public class ProtoVersionFieldTest {
         Objects.requireNonNull(proto2Source);
 
         var parser = new ProtobufParser(Path.of(proto2Source.toURI()));
-        var document = parser.tokenizeAndParse();
+        var document = parser.parse();
         System.out.println(document);
     }
 
@@ -23,7 +23,7 @@ public class ProtoVersionFieldTest {
         Objects.requireNonNull(proto2Source);
 
         var parser = new ProtobufParser(Path.of(proto2Source.toURI()));
-        var document = parser.tokenizeAndParse();
+        var document = parser.parse();
         System.out.println(document);
     }
 }

@@ -15,6 +15,6 @@ public class IllegalScopeTest {
         Objects.requireNonNull(proto2Source);
 
         var parser = new ProtobufParser(Path.of(proto2Source.toURI()));
-        Assertions.assertThrows(ProtobufTypeException.class, parser::tokenizeAndParse);
+        Assertions.assertThrows(ProtobufTypeException.class, parser::parse);
     }
 }

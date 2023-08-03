@@ -78,7 +78,7 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
     private ProtobufDocument generateAST() throws IOException {
         log.log(Level.INFO, "Generating AST for protobuf file...");
         var parser = new ProtobufParser(protobuf);
-        var document = parser.tokenizeAndParse();
+        var document = parser.parse();
         log.log(Level.INFO, "Generated AST successfully");
         return document;
     }

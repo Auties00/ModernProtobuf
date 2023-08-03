@@ -50,7 +50,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
         try {
             log.log(Level.INFO, "Generating AST for protobuf file...");
             var parser = new ProtobufParser(protobuf);
-            var document = parser.tokenizeAndParse();
+            var document = parser.parse();
             log.log(Level.INFO, "Generated AST successfully");
             log.log(Level.INFO, "Creating AST model from existing Java classes...");
             var classPool = AstUtils.createClassPool(input);

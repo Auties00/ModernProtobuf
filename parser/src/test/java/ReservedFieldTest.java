@@ -15,7 +15,7 @@ public class ReservedFieldTest {
         Objects.requireNonNull(source);
 
         var parser = new ProtobufParser(Path.of(source.toURI()));
-        var document = parser.tokenizeAndParse();
+        var document = parser.parse();
         System.out.println(document);
     }
 
@@ -26,7 +26,7 @@ public class ReservedFieldTest {
 
         Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
             var parser = new ProtobufParser(Path.of(source.toURI()));
-            var document = parser.tokenizeAndParse();
+            var document = parser.parse();
             System.out.println(document);
         });
     }
@@ -38,7 +38,7 @@ public class ReservedFieldTest {
 
         Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
             var parser = new ProtobufParser(Path.of(source.toURI()));
-            var document = parser.tokenizeAndParse();
+            var document = parser.parse();
             System.out.println(document);
         });
     }

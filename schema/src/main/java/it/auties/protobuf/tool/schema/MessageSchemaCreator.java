@@ -9,6 +9,7 @@ import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.expr.AssignExpr.Operator;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
+import com.github.javaparser.ast.nodeTypes.NodeWithType;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
@@ -26,9 +27,7 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import lombok.NonNull;
 
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
 import static com.github.javaparser.StaticJavaParser.parseType;
@@ -76,49 +75,81 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
     }
 
     private void addAllArgsConstructor(ClassOrInterfaceDeclaration ctClass) {
-        var constructor = new ConstructorDeclaration();
-        ctClass.addMember(constructor);
-        constructor.setPublic(true);
-        constructor.setName(ctClass.getName());
-        var body = new BlockStmt();
-        constructor.setBody(body);
+        var constructorBody = new BlockStmt();
+        var parameters = new ArrayList<Parameter>();
         for (var field : ctClass.getFields()) {
             var property = field.getAnnotationByClass(ProtobufProperty.class);
             if (property.isEmpty() || !(property.get() instanceof NormalAnnotationExpr annotationExpr)) {
                 continue;
             }
 
-            createAccessors(ctClass, field);
             var required = isRequired(annotationExpr);
             for (var variable : field.getVariables()) {
+                var variableName = variable.getNameAsString();
+                createGetter(ctClass, variable, variableName);
+                createSetter(ctClass, variable, variableName);
                 var parameter = new Parameter();
-                parameter.setType(getQualifiedName(ctClass, variable.getNameAsString()));
-                parameter.setName(variable.getName());
-                constructor.addParameter(parameter);
+                parameter.setType(variable.getType());
+                parameter.setName(variableName);
+                parameters.add(parameter);
                 var assignment = new AssignExpr();
-                var fieldAccess = new FieldAccessExpr(new ThisExpr(), variable.getNameAsString());
+                var fieldAccess = new FieldAccessExpr(new ThisExpr(), variableName);
                 assignment.setTarget(fieldAccess);
                 assignment.setOperator(Operator.ASSIGN);
                 var value = getClassAssignmentValue(variable, required);
                 assignment.setValue(value);
-                body.addStatement(assignment);
+                constructorBody.addStatement(assignment);
             }
         }
+
+        if(hasConstructor(ctClass, parameters)) {
+            return;
+        }
+
+        var constructor = new ConstructorDeclaration();
+        ctClass.addMember(constructor);
+        constructor.setPublic(true);
+        constructor.setName(ctClass.getName());
+        constructor.setParameters(NodeList.nodeList(parameters));
+        constructor.setBody(constructorBody);
     }
 
-    private void createAccessors(ClassOrInterfaceDeclaration ctClass, FieldDeclaration field) {
-        var accessor = new MethodDeclaration();
-        accessor.setPublic(true);
-        var sampleVariable = field.getVariable(0);
-        accessor.setType(getQualifiedName(ctClass, sampleVariable.getNameAsString()));
-        var methodName = sampleVariable.getNameAsString();
-        accessor.setName(methodName);
-        var accessorBody = new BlockStmt();
-        accessor.setBody(accessorBody);
-        var fieldAccess = new NameExpr(methodName);
-        accessorBody.addStatement(new ReturnStmt(fieldAccess));
-        ctClass.addMember(accessor);
-        field.createSetter();
+    private boolean hasConstructor(ClassOrInterfaceDeclaration ctClass, List<Parameter> parameters) {
+        var paramTypes = parameters.stream()
+                .map(NodeWithType::getTypeAsString)
+                .toArray(String[]::new);
+        return ctClass.getConstructorByParameterTypes(paramTypes)
+                .isPresent();
+    }
+
+    private void createSetter(ClassOrInterfaceDeclaration ctClass, VariableDeclarator variable, String variableName) {
+        var setterName = "set" + variableName.substring(0, 1).toUpperCase(Locale.ROOT) + variableName.substring(1);
+        if (getMethod(ctClass, setterName).isPresent()) {
+            return;
+        }
+
+        var setter = ctClass.addMethod(setterName, Keyword.PUBLIC);
+        setter.addParameter(new Parameter(variable.getType(), variableName));
+        var blockStmt = new BlockStmt();
+        setter.setBody(blockStmt);
+        var assignment = new AssignExpr();
+        var fieldAccess = new FieldAccessExpr(new ThisExpr(), variableName);
+        assignment.setTarget(fieldAccess);
+        assignment.setOperator(Operator.ASSIGN);
+        assignment.setValue(new NameExpr(variableName));
+        blockStmt.addStatement(assignment);
+    }
+
+    private void createGetter(ClassOrInterfaceDeclaration ctClass, VariableDeclarator variable, String variableName) {
+        if (getMethod(ctClass, variableName).isPresent()) {
+            return;
+        }
+
+        var getter = ctClass.addMethod(variableName, Keyword.PUBLIC);
+        getter.setType(variable.getType());
+        var blockStmt = new BlockStmt();
+        getter.setBody(blockStmt);
+        blockStmt.addStatement(new ReturnStmt(variableName));
     }
 
     private Expression getClassAssignmentValue(VariableDeclarator variable, boolean required) {
@@ -163,7 +194,8 @@ final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement>
             return parameterType;
         }
 
-        var field = new FieldDeclaration(NodeList.nodeList(Modifier.publicModifier()), parameterType.type(), fieldStatement.name());
+        var type = parseType(getQualifiedName(ctClass, parameterType.type().toString()));
+        var field = new FieldDeclaration(NodeList.nodeList(Modifier.publicModifier()), type, fieldStatement.name());
         var annotation = new NormalAnnotationExpr();
         annotation.setName(ProtobufProperty.class.getSimpleName());
         annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index())));
