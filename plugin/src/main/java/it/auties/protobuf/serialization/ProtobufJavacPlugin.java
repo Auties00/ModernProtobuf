@@ -213,12 +213,34 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         var targetFile = outputDirectory.resolve(binaryName + ".class");
         var messageElement = new ProtobufMessageElement(binaryName, message, targetFile, null);
         results.put(binaryName, messageElement);
-        var propertiesCount = processProperties(messageElement);
-        if(propertiesCount != 0) {
+        var types = processProperties(messageElement);
+        if(types.isEmpty()) {
+            printWarning("No properties found", message);
             return;
         }
 
-        printWarning("No properties found", message);
+        if(hasPropertiesConstructor(message, types)) {
+            return;
+        }
+
+        printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
+    }
+
+    private boolean hasPropertiesConstructor(TypeElement message, List<TypeMirror> expectedParameterTypes) {
+        return message.getEnclosedElements()
+                .stream()
+                .filter(entry -> entry instanceof ExecutableElement)
+                .map(entry -> (ExecutableElement) entry)
+                .filter(entry -> entry.getKind() == ElementKind.CONSTRUCTOR)
+                .anyMatch(entry -> isApplicableConstructor(expectedParameterTypes, entry));
+    }
+
+    // No var args support as it's not needed
+    private boolean isApplicableConstructor(List<TypeMirror> expectedParameterTypes, ExecutableElement constructor) {
+        var expectedSize = expectedParameterTypes.size();
+        var constructorParameters = constructor.getParameters();
+        return expectedSize == constructorParameters.size()
+                && IntStream.range(0, expectedSize).allMatch(index -> isSubType(constructorParameters.get(index).asType(), expectedParameterTypes.get(index)));
     }
 
     private String getBinaryName(TypeElement element) {
@@ -228,14 +250,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
                 .replaceAll("\\.", "/");
     }
 
-    private long processProperties(ProtobufMessageElement messageElement) {
+    private List<TypeMirror> processProperties(ProtobufMessageElement messageElement) {
         return messageElement.element()
                 .getEnclosedElements()
                 .stream()
                 .filter(entry -> entry instanceof VariableElement)
                 .map(entry -> (VariableElement) entry)
                 .filter(variableElement -> processProperty(messageElement, variableElement))
-                .count();
+                .map(VariableElement::asType)
+                .toList();
     }
 
     private boolean processProperty(ProtobufMessageElement messageElement, VariableElement variableElement) {

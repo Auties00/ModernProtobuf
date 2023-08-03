@@ -1,5 +1,6 @@
 package it.auties.protobuf.parser.statement;
 
+import it.auties.protobuf.Protobuf;
 import it.auties.protobuf.model.ProtobufVersion;
 
 import java.util.LinkedHashMap;
@@ -11,7 +12,7 @@ public final class ProtobufDocument extends ProtobufObject<ProtobufObject<?>> {
 
     public ProtobufDocument() {
         super(null, null,null);
-        this.version = ProtobufVersion.defaultVersion();
+        this.version = Protobuf.defaultVersion();
         this.options = new LinkedHashMap<>();
     }
 

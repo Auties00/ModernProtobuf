@@ -17,10 +17,6 @@ public enum ProtobufVersion {
 
     private final String versionCode;
 
-    public static ProtobufVersion defaultVersion() {
-        return PROTOBUF_2;
-    }
-
     public static Optional<ProtobufVersion> of(@NonNull String name) {
         return Arrays.stream(values())
                 .filter(entry -> name.contains(entry.versionCode()))
