@@ -3275,7 +3275,7 @@ public final class Scalar {
 
 Reading that the schema is so much smaller, you might think that I had to compromise on performance.
 Let's benchmark how much it takes to deserialize 1000 times a message created from the ScalarMessage.proto example:
-[Here is the source for the test in case you want to run it yourself.](https://github.com/Auties00/ModernProtobuf/tree/master/plugin/test/src/test/java/it/auties/proto/benchmark/PerformanceBenchmark.java)
+[Here is the source for the test in case you want to run it yourself.](https://github.com/Auties00/ModernProtobuf/tree/master/plugin/test/src/main/java/it/auties/proto/benchmark/PerformanceBenchmark.java)
 Here are the results:
 ```
 Benchmark                                       Mode  Cnt    Score   Error  Units
