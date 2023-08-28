@@ -1,5 +1,5 @@
 package it.auties.protobuf.model;
 
-public interface ProtobufObject {
+public sealed interface ProtobufObject permits ProtobufEnum, ProtobufMessage {
 
 }

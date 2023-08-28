@@ -1,7 +1,6 @@
 package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
-import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.nio.charset.StandardCharsets;
@@ -10,15 +9,13 @@ import java.util.Arrays;
 import java.util.List;
 
 public class ProtobufInputStream {
-    private final ProtobufVersion version;
     private final byte[] buffer;
     private final int limit;
     private int wireType;
     private int index;
     private int pos;
 
-    public ProtobufInputStream(ProtobufVersion version, byte[] buffer) {
-        this.version = version;
+    public ProtobufInputStream(byte[] buffer) {
         this.buffer = buffer;
         this.limit = buffer.length;
         this.pos = 0;
@@ -40,7 +37,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Float>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isAtEnd()){
                     results.add(input.readFloat());
@@ -58,7 +55,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Double>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isAtEnd()){
                     results.add(input.readDouble());
@@ -76,7 +73,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readInt32());
@@ -94,7 +91,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readInt64());
@@ -112,7 +109,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isAtEnd()){
                     results.add(input.readFixed32());
@@ -130,7 +127,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isAtEnd()){
                     results.add(input.readFixed64());
@@ -148,7 +145,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Boolean>();
-                var input = new ProtobufInputStream(version, readBytes());
+                var input = new ProtobufInputStream(readBytes());
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readBool());

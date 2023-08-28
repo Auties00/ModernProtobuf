@@ -1,6 +1,7 @@
 package it.auties.protobuf.serialization.model;
 
-public record ProtobufPropertyConverter(String serializerName, String serializerDescriptor, String deserializerName,
-                                        String deserializerDescriptor) {
+import javax.lang.model.element.ExecutableElement;
+
+public record ProtobufPropertyConverter(ExecutableElement serializer, ExecutableElement deserializer) {
 
 }

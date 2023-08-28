@@ -1,48 +1,61 @@
 package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.model.ProtobufEnum;
-import it.auties.protobuf.model.ProtobufMessage;
-import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufPropertyConverter;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 import it.auties.protobuf.stream.ProtobufOutputStream;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.Optional;
-
-import static it.auties.protobuf.Protobuf.SERIALIZATION_CLASS_METHOD;
-import static it.auties.protobuf.Protobuf.SERIALIZATION_ENUM_METHOD;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor {
-    public ProtobufSerializationVisitor(ProtobufMessageElement element, ClassWriter classWriter) {
-        super(element, classWriter);
+    public ProtobufSerializationVisitor(ProtobufMessageElement element, PrintWriter writer) {
+        super(element, writer);
     }
 
     @Override
     protected void doInstrumentation() {
-        if(element.isEnum()) {
+        if(message.isEnum()) {
             createEnumSerializer();
         }else {
             createMessageSerializer();
         }
     }
 
+    private void createEnumSerializer() {
+        var fieldName = message.enumMetadata()
+                .orElseThrow(() -> new NoSuchElementException("Missing metadata from enum"))
+                .field()
+                .getSimpleName();
+        writer.println("        return protoInputObject.%s;".formatted(fieldName));
+    }
+
+    private void createMessageSerializer() {
+        createRequiredPropertiesNullCheck();
+        writer.println("        var outputStream = new ProtobufOutputStream();");
+        message.properties().forEach(this::writeProperty);
+        writer.println("        return outputStream.toByteArray();");
+    }
+
+    private void createRequiredPropertiesNullCheck() {
+        message.properties()
+                .stream()
+                .filter(ProtobufPropertyStub::required)
+                .forEach(entry -> writer.println("        Objects.requireNonNull(protoInputObject.%s(), \"Missing required property: %s\");".formatted(entry.name(), entry.name())));
+    }
+
     @Override
     public boolean shouldInstrument() {
-        return !element.isEnum() || !hasEnumSerializationMethod();
+        return !message.isEnum() || !hasEnumSerializationMethod();
     }
 
     private boolean hasEnumSerializationMethod() {
-        return element.element().getEnclosedElements()
+        return message.element().getEnclosedElements()
                 .stream()
                 .anyMatch(this::isEnumSerializationMethod);
     }
@@ -53,293 +66,95 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 && executableElement.getParameters().isEmpty();
     }
 
-
-    private void createEnumSerializer() {
-        methodVisitor.visitVarInsn(
-                Opcodes.ALOAD,
-                0 // this
-        );
-        var metadata = element.enumMetadata().orElseThrow();
-        methodVisitor.visitFieldInsn(
-                Opcodes.GETFIELD,
-                element.classType().getInternalName(),
-                metadata.field().getSimpleName().toString(),
-                metadata.fieldType().getDescriptor()
-        );
-        methodVisitor.visitInsn(
-                getReturnInstruction(metadata.fieldType())
-        );
-    }
-
-    private void createMessageSerializer() {
-        checkRequiredProperties();
-        var outputStreamId = createOutputStream();
-        element.properties().forEach(property -> writeProperty(outputStreamId, property));
-        createReturnSerializedValue(outputStreamId);
+    @Override
+    protected List<String> modifiers() {
+        return List.of("public", "static");
     }
 
     @Override
-    public int access() {
-        return Opcodes.ACC_PUBLIC;
-    }
-    
-    @Override
-    public String name() {
-        return element.isEnum() ? SERIALIZATION_ENUM_METHOD : SERIALIZATION_CLASS_METHOD;
-    }
-    
-    @Override
-    public String descriptor() {
-        if(element.isEnum()) {
-            return "()I";
-        }
-
-        var versionType = Type.getType(ProtobufVersion.class);
-        return "(L%s;)[B".formatted(versionType.getInternalName());
+    protected String returnType() {
+        return message.isEnum() ? "int" : "byte[]";
     }
 
     @Override
-    protected String signature() {
-        return null;
+    public String name() {
+        return "encode";
+    }
+
+    @Override
+    protected List<String> parametersTypes() {
+        return List.of(message.element().getSimpleName().toString());
+    }
+
+    @Override
+    protected List<String> parametersNames() {
+        return List.of("protoInputObject");
     }
 
     // Writes a property to the output stream
-    private void writeProperty(int outputStreamId, ProtobufPropertyStub property) {
-        if (property.repeated() && property.type().converter().isPresent()) {
-            writeRepeatedConvertedPropertySerializer(outputStreamId, property);
-        }else {
-            writeAnyPropertySerializer(outputStreamId, property);
+    private void writeProperty(ProtobufPropertyStub property) {
+        if (property.repeated()) {
+            writeRepeatedPropertySerializer(property);
+        } else {
+            writeAnyPropertySerializer(property, null, 3);
         }
     }
 
-    private void writeAnyPropertySerializer(int outputStreamId, ProtobufPropertyStub property) {
-        var nullLabel = createFieldNullCheck(property);
-        methodVisitor.visitVarInsn(
-                Opcodes.ALOAD,
-                outputStreamId
-        );
-        pushIntToStack(
-                property.index()
-        );
-        var fieldType = loadPropertyIntoStack(property);
-        var readMethod = getSerializerStreamMethod(property);
-        var convertedType = createJavaPropertySerializer(
-                property
-        );
-        boxValueIfNecessary(
-                convertedType.orElse(fieldType)
-        );
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKEVIRTUAL,
-                Type.getType(ProtobufOutputStream.class).getInternalName(),
-                readMethod.getName(),
-                Type.getMethodDescriptor(readMethod),
-                false
-        );
-        nullLabel.ifPresent(methodVisitor::visitLabel);
+    private void writeRepeatedPropertySerializer(ProtobufPropertyStub property) {
+        writer.println("        if(protoInputObject.%s() != null) {".formatted(property.name()));
+        var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
+        writer.println("            for(var %s : protoInputObject.%s()) {".formatted(localVariableName, property.name()));
+        writeAnyPropertySerializer(property, localVariableName, 5);
+        writer.println("            }");
+        writer.println("        }");
     }
 
-    private Optional<Label> createFieldNullCheck(ProtobufPropertyStub property) {
-        if (property.type().converter().isEmpty()) {
-            return Optional.empty();
+    private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName, int indentationLevel) {
+        var hasConverter = property.type().converter().isPresent();
+        if (hasConverter) {
+            if(overridePropertyName != null) {
+                writer.println("    %sif(%s != null)".formatted("   ".repeat(indentationLevel), overridePropertyName));
+            }else {
+                writer.println("    %sif(protoInputObject.%s() != null)".formatted("   ".repeat(indentationLevel), property.name()));
+            };
         }
 
-        var nullFieldLabel = new Label();
-        loadPropertyIntoStack(property);
-        methodVisitor.visitJumpInsn(
-                Opcodes.IFNULL,
-                nullFieldLabel
-        );
-        return Optional.of(nullFieldLabel);
+        var writeMethod = getSerializerStreamMethod(property);
+        var writeValue = getWriteValue(property, overridePropertyName);
+        var convertedValue = applyConverter(property, writeValue, hasConverter);
+        var writeIndentation = "   ".repeat(hasConverter ? indentationLevel + 1 : indentationLevel);
+        writer.println("%soutputStream.%s(%s, %s);".formatted(writeIndentation, writeMethod.getName(), property.index(), convertedValue));
     }
 
-    private void writeRepeatedConvertedPropertySerializer(int outputStreamId, ProtobufPropertyStub property) {
-       try {
-           var nullFieldLabel = createFieldNullCheck(property)
-                   .orElseThrow(() -> new IllegalStateException("Missing label for converted property"));
-           var iteratorId = createLocalVariable(Type.getType(Iterator.class));
-           var fieldType = loadPropertyIntoStack(property);
-           methodVisitor.visitMethodInsn(
-                   Opcodes.INVOKEINTERFACE,
-                   Type.getType(Collection.class).getInternalName(),
-                   "iterator",
-                   Type.getMethodDescriptor(Collection.class.getMethod("iterator")),
-                   true
-           );
-           methodVisitor.visitVarInsn(
-                   Opcodes.ASTORE,
-                   iteratorId
-           );
-           var loopStart = new Label();
-           methodVisitor.visitLabel(
-                   loopStart
-           );
-           methodVisitor.visitVarInsn(
-                   Opcodes.ALOAD,
-                   iteratorId
-           );
-           methodVisitor.visitMethodInsn(
-                   Opcodes.INVOKEINTERFACE,
-                   Type.getType(Iterator.class).getInternalName(),
-                   "hasNext",
-                   Type.getMethodDescriptor(Iterator.class.getMethod("hasNext")),
-                   true
-           );
-           methodVisitor.visitJumpInsn(
-                   Opcodes.IFEQ,
-                   nullFieldLabel
-           );
-           var nextId = createLocalVariable(property.type().implementationType());
-           methodVisitor.visitVarInsn(
-                   Opcodes.ALOAD,
-                   iteratorId
-           );
-           methodVisitor.visitMethodInsn(
-                   Opcodes.INVOKEINTERFACE,
-                   Type.getType(Iterator.class).getInternalName(),
-                   "next",
-                   Type.getMethodDescriptor(Iterator.class.getMethod("next")),
-                   true
-           );
-           methodVisitor.visitTypeInsn(
-                   Opcodes.CHECKCAST,
-                   property.type().implementationType().getInternalName()
-           );
-           methodVisitor.visitVarInsn(
-                   getStoreInstruction(property.type().implementationType()),
-                   nextId
-           );
-           var nullNextLabel = new Label();
-           methodVisitor.visitVarInsn(
-                   getLoadInstruction(property.type().implementationType()),
-                   nextId
-           );
-           methodVisitor.visitJumpInsn(
-                   Opcodes.IFNULL,
-                   nullNextLabel
-           );
-           methodVisitor.visitVarInsn(
-                   Opcodes.ALOAD,
-                   outputStreamId
-           );
-           pushIntToStack(
-                   property.index()
-           );
-           methodVisitor.visitVarInsn(
-                   getLoadInstruction(property.type().implementationType()),
-                   nextId
-           );
-           var readMethod = getSerializerStreamMethod(
-                   property
-           );
-           var convertedType = createJavaPropertySerializer(
-                   property
-           );
-           boxValueIfNecessary(
-                   convertedType.orElse(fieldType)
-           );
-           methodVisitor.visitMethodInsn(
-                   Opcodes.INVOKEVIRTUAL,
-                   Type.getType(ProtobufOutputStream.class).getInternalName(),
-                   readMethod.getName(),
-                   Type.getMethodDescriptor(readMethod),
-                   false
-           );
-           methodVisitor.visitLabel(nullNextLabel);
-           methodVisitor.visitJumpInsn(
-                   Opcodes.GOTO,
-                   loopStart
-           );
-           methodVisitor.visitLabel(nullFieldLabel);
-       }catch (NoSuchMethodException exception) {
-           throw new RuntimeException("Missing method", exception);
-       }
-    }
-
-    private Type loadPropertyIntoStack(ProtobufPropertyStub property) {
-        methodVisitor.visitVarInsn(
-                Opcodes.ALOAD,
-                0 // this
-        );
-        methodVisitor.visitFieldInsn(
-                Opcodes.GETFIELD,
-                element.classType().getInternalName(),
-                property.name(),
-                property.type().fieldType().getDescriptor()
-        );
-        return property.type().fieldType();
-    }
-
-    private Optional<Type> createJavaPropertySerializer(ProtobufPropertyStub property) {
-        var methodName = getJavaPropertyConverterMethodName(property);
-        if(methodName.isEmpty()) {
-            return Optional.empty();
+    private String getWriteValue(ProtobufPropertyStub property, String overridePropertyName) {
+        var result = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.name());
+        if (property.protoType() != ProtobufType.OBJECT) {
+            return result;
         }
 
-        var methodDescriptor = getJavaPropertyConverterDescriptor(property);
-        if(methodDescriptor.isEmpty()) {
-            return Optional.empty();
+        var spec = getSpecName(property.type().implementationType());
+        return "%s.encode(%s)".formatted(spec, result);
+    }
+
+    private String applyConverter(ProtobufPropertyStub property, String writeValue, boolean hasConverter) {
+        if (!hasConverter) {
+            return writeValue;
         }
 
-        methodVisitor.visitMethodInsn(
-                Opcodes.INVOKEVIRTUAL,
-                property.type().implementationType().getInternalName(),
-                methodName.get(),
-                methodDescriptor.get(),
-                false
-        );
-        var asmMethodType = Type.getMethodType(methodDescriptor.get());
-        return Optional.of(asmMethodType.getReturnType());
-    }
-
-    private Optional<String> getJavaPropertyConverterMethodName(ProtobufPropertyStub property) {
-        return property.type()
-                .converter()
-                .map(ProtobufPropertyConverter::serializerName);
-    }
-
-    private Optional<String> getJavaPropertyConverterDescriptor(ProtobufPropertyStub property) {
-        return property.type()
-                .converter()
-                .map(ProtobufPropertyConverter::serializerDescriptor);
-    }
-
-    // Returns the serialized value
-    private void createReturnSerializedValue(int outputStreamId) {
-       try {
-           methodVisitor.visitVarInsn(
-                   Opcodes.ALOAD,
-                   outputStreamId
-           );
-           methodVisitor.visitMethodInsn(
-                   Opcodes.INVOKEVIRTUAL,
-                   Type.getType(ProtobufOutputStream.class).getInternalName(),
-                   "toByteArray",
-                   Type.getMethodDescriptor(ProtobufOutputStream.class.getMethod("toByteArray")),
-                   false
-           );
-           methodVisitor.visitInsn(
-                   Opcodes.ARETURN
-           );
-       }catch (NoSuchMethodException exception) {
-           throw new RuntimeException("Missing toByteArray method", exception);
-       }
+        var propertyType = property.type();
+        var propertyConverter = propertyType.converter().orElseThrow();
+        return "%s.%s()".formatted(writeValue, propertyConverter.serializer().getSimpleName());
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
         try {
             var clazz = ProtobufOutputStream.class;
-            if(annotation.type().isEnum()) {
-                return isConcreteRepeated(annotation) ? clazz.getMethod("writeEnum", int.class, Collection.class)
-                        : clazz.getMethod("writeEnum", int.class, ProtobufEnum.class);
-            }
-
             return switch (annotation.protoType()) {
                 case STRING ->
                         isConcreteRepeated(annotation) ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
                 case OBJECT ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeMessage", int.class, Collection.class) : clazz.getMethod("writeMessage", int.class, ProtobufMessage.class);
+                        annotation.type().isEnum() ? clazz.getMethod("writeInt32", int.class, Integer.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BYTES ->
                         isConcreteRepeated(annotation) ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BOOL ->
@@ -368,38 +183,5 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     private boolean isConcreteRepeated(ProtobufPropertyStub annotation) {
         return annotation.repeated() && annotation.type().converter().isEmpty();
-    }
-
-    // Creates a ProtobufOutputStream from the first parameter of the method(ProtobufVersion)
-    private int createOutputStream() {
-        try {
-            var outputStreamType = Type.getType(ProtobufOutputStream.class);
-            methodVisitor.visitTypeInsn(
-                    Opcodes.NEW,
-                    outputStreamType.getInternalName()
-            );
-            methodVisitor.visitInsn(
-                    Opcodes.DUP
-            );
-            methodVisitor.visitVarInsn(
-                    Opcodes.ALOAD,
-                    1
-            );
-            methodVisitor.visitMethodInsn(
-                    Opcodes.INVOKESPECIAL,
-                    outputStreamType.getInternalName(),
-                    "<init>",
-                    Type.getConstructorDescriptor(ProtobufOutputStream.class.getConstructor(ProtobufVersion.class)),
-                    false
-            );
-            var localVariableId = createLocalVariable(outputStreamType);
-            methodVisitor.visitVarInsn(
-                    Opcodes.ASTORE,
-                    localVariableId
-            );
-            return localVariableId;
-        }catch (NoSuchMethodException throwable) {
-            throw new RuntimeException("Cannot create input stream var", throwable);
-        }
     }
 }

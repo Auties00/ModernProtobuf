@@ -1,31 +1,20 @@
 package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.Type;
 
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 public class ProtobufMessageElement {
-    private final Type classType;
     private final TypeElement typeElement;
-    private final Path targetFile;
     private final Map<Integer, ProtobufPropertyStub> properties;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
-    private ClassReader classReader;
 
-    public ProtobufMessageElement(String binaryName, TypeElement typeElement, Path targetFile, ProtobufEnumMetadata enumMetadata) {
-        this.classType = Type.getObjectType(binaryName);
+    public ProtobufMessageElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
         this.typeElement = typeElement;
-        this.targetFile = targetFile;
         this.enumMetadata = enumMetadata;
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
@@ -35,33 +24,20 @@ public class ProtobufMessageElement {
         return typeElement;
     }
 
+    public String generatedClassName() {
+        var name = new StringBuilder();
+        var element = element();
+        while (element.getEnclosingElement() instanceof TypeElement parent) {
+            name.append(parent.getSimpleName());
+            element = parent;
+        }
+
+        name.append(element().getSimpleName());
+        return name + "Spec";
+    }
+
     public Optional<ProtobufEnumMetadata> enumMetadata() {
         return Optional.of(enumMetadata);
-    }
-
-    public ClassReader classReader() {
-        if(classReader == null) {
-            createClassReader();
-        }
-
-        return classReader;
-    }
-
-    private void createClassReader() {
-        try {
-            var read = Files.readAllBytes(targetFile);
-            this.classReader = new ClassReader(read);
-        }catch (IOException throwable) {
-            throw new UncheckedIOException("Cannot read .class", throwable);
-        }
-    }
-
-    public Path targetFile() {
-        return targetFile;
-    }
-
-    public Type classType() {
-        return classType;
     }
 
     public List<ProtobufPropertyStub> properties() {

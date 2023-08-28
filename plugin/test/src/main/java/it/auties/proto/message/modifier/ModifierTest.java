@@ -1,14 +1,8 @@
-package it.auties.proto;
+package it.auties.proto.message.modifier;
 
-import it.auties.protobuf.Protobuf;
-import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.exception.ProtobufSerializationException;
-import it.auties.protobuf.model.ProtobufMessage;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import static it.auties.protobuf.model.ProtobufType.STRING;
 
 public class ModifierTest {
     @Test
@@ -22,20 +16,13 @@ public class ModifierTest {
         Assertions.assertTrue(encode(alternated), "Alternated fields didn't pass compilation");
     }
 
-    private boolean encode(ProtobufMessage object) {
+    private boolean encode(RequiredMessage object) {
         try {
-            Protobuf.writeMessage(object);
+            RequiredMessageSpec.encode(object);
             return true;
-        } catch (ProtobufSerializationException exception) {
+        } catch (Throwable exception) {
             return false;
         }
     }
 
-    public record RequiredMessage(
-            @ProtobufProperty(index = 1, type = STRING, required = true)
-            String required,
-            @ProtobufProperty(index = 2, type = STRING) String optional
-    ) implements ProtobufMessage {
-
-    }
 }

@@ -1,9 +1,6 @@
 package it.auties.protobuf.serialization;
 
 import com.sun.source.tree.*;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskListener;
 import com.sun.source.util.Trees;
 import it.auties.protobuf.annotation.ProtobufConverter;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
@@ -13,24 +10,19 @@ import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
-import it.auties.protobuf.serialization.model.ProtobufEnumMetadata;
-import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufPropertyConverter;
-import it.auties.protobuf.serialization.model.ProtobufPropertyType;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Type;
+import it.auties.protobuf.serialization.model.*;
+import it.auties.protobuf.stream.ProtobufInputStream;
+import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.tools.Diagnostic;
-import javax.tools.StandardLocation;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.IntStream;
 
@@ -39,30 +31,24 @@ import java.util.stream.IntStream;
         "it.auties.protobuf.annotation.ProtobufEnumIndex"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
-public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListener {
-    private Map<String, ProtobufMessageElement> results;
+public class ProtobufJavacPlugin extends AbstractProcessor {
     private Trees trees;
     private TypeMirror objectType;
     private TypeMirror protoObjectType;
     private TypeMirror protoMessageType;
     private TypeMirror protoEnumType;
     private TypeMirror collectionType;
-    private Path outputDirectory;
 
     @Override
     public synchronized void init(ProcessingEnvironment wrapperProcessingEnv) {
         var unwrappedProcessingEnv = unwrapProcessingEnv(wrapperProcessingEnv);
         super.init(unwrappedProcessingEnv);
-        this.results = new HashMap<>();
         this.trees = Trees.instance(processingEnv);
         this.objectType = getType(Object.class);
         this.protoObjectType = getType(ProtobufObject.class);
         this.protoMessageType = getType(ProtobufMessage.class);
         this.protoEnumType = getType(ProtobufEnum.class);
         this.collectionType = getCollectionType();
-        this.outputDirectory = getOutputDirectory();
-        var task = JavacTask.instance(processingEnv);
-        task.addTaskListener(this);
     }
 
     private ProcessingEnvironment unwrapProcessingEnv(ProcessingEnvironment wrapper) {
@@ -72,17 +58,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
             return (ProcessingEnvironment) unwrapMethod.invoke(null, ProcessingEnvironment.class, wrapper);
         } catch (ReflectiveOperationException exception) {
             return wrapper;
-        }
-    }
-
-    private Path getOutputDirectory() {
-        try {
-            var result = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", "dummy");
-            var path = Path.of(result.toUri());
-            Files.deleteIfExists(path);
-            return path.getParent();
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Cannot create resource to determine class output path", exception);
         }
     }
 
@@ -103,47 +78,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     private TypeMirror getCollectionType() {
         var element = processingEnv.getElementUtils().getTypeElement(Collection.class.getName());
         return erase(element.asType());
-    }
-
-    @Override
-    public void finished(TaskEvent event) {
-        if(event.getKind() != TaskEvent.Kind.GENERATE) {
-            return;
-        }
-
-        var binaryName = getBinaryName(event.getTypeElement());
-        var result = results.get(binaryName);
-        if(result == null) {
-            return;
-        }
-
-        processElement(result);
-    }
-
-    private void processElement(ProtobufMessageElement element) {
-        var classWriter = new ClassWriter(element.classReader(), ClassWriter.COMPUTE_FRAMES);
-        element.classReader().accept(classWriter, 0);
-        createSerializer(classWriter, element);
-        createDeserializer(classWriter, element);
-        writeResult(classWriter, element.targetFile());
-    }
-
-    private void createSerializer(ClassWriter classWriter, ProtobufMessageElement element) {
-        var serializationVisitor = new ProtobufSerializationVisitor(element, classWriter);
-        serializationVisitor.instrument();
-    }
-
-    private void createDeserializer(ClassWriter classWriter, ProtobufMessageElement element) {
-        var deserializationVisitor = new ProtobufDeserializationVisitor(element, classWriter);
-        deserializationVisitor.instrument();
-    }
-
-    private void writeResult(ClassWriter classWriter, Path outputFile) {
-        try {
-            Files.write(outputFile, classWriter.toByteArray());
-        }catch (IOException exception) {
-            throw new UncheckedIOException("Cannot write instrumented class", exception);
-        }
     }
 
     @Override
@@ -198,32 +132,89 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private void processObjects(RoundEnvironment roundEnv) {
-        var objects = getProtobufObjects(roundEnv);
-        for(var object : objects) {
-            switch (object.getKind()) {
-                case ENUM -> processEnum(object);
-                case RECORD, CLASS -> processMessage(object);
-                default -> printError("Only classes, records and enums can implement ProtobufObject", object);
+        try {
+            var objects = getProtobufObjects(roundEnv);
+            for(var object : objects) {
+                var result = processElement(object);
+                if (result.isEmpty()) {
+                    continue;
+                }
+
+                var packageName = processingEnv.getElementUtils().getPackageOf(result.get().element());
+                var simpleGeneratedClassName = result.get().generatedClassName();
+                var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
+                var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
+                try (var writer = new PrintWriter(sourceFile.openWriter())) {
+                    if(packageName != null) {
+                        writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
+                    }
+
+                    var imports = getImports(result.get());
+                    imports.forEach(entry -> writer.println("import %s;".formatted(entry)));
+                    if(!imports.isEmpty()){
+                        writer.println();
+                    }
+
+                    writer.println("public class %s {".formatted(result.get().generatedClassName()));
+                    var serializationVisitor = new ProtobufSerializationVisitor(result.get(), writer);
+                    serializationVisitor.instrument();
+                    var deserializationVisitor = new ProtobufDeserializationVisitor(result.get(), writer);
+                    deserializationVisitor.instrument();
+                    writer.println("}");
+                }
             }
+        }catch (IOException exception) {
+            throw new UncheckedIOException("Cannot open writer", exception);
         }
     }
 
-    private void processMessage(TypeElement message) {
-        var binaryName = getBinaryName(message);
-        var targetFile = outputDirectory.resolve(binaryName + ".class");
-        var messageElement = new ProtobufMessageElement(binaryName, message, targetFile, null);
-        results.put(binaryName, messageElement);
+    protected List<String> getImports(ProtobufMessageElement message) {
+        if(message.isEnum()) {
+            return List.of(
+                    message.element().getQualifiedName().toString(),
+                    Arrays.class.getName(),
+                    Optional.class.getName()
+            );
+        }
+
+        var imports = new ArrayList<String>();
+        imports.add(message.element().getQualifiedName().toString());
+        imports.add(ProtobufInputStream.class.getName());
+        imports.add(ProtobufOutputStream.class.getName());
+        if (message.properties().stream().anyMatch(ProtobufPropertyStub::required)) {
+            imports.add(Objects.class.getName());
+        }
+
+        return Collections.unmodifiableList(imports);
+    }
+
+    private Optional<ProtobufMessageElement> processElement(TypeElement object) {
+        return switch (object.getKind()) {
+            case ENUM -> processEnum(object);
+            case RECORD, CLASS -> processMessage(object);
+            default -> processUnknown(object);
+        };
+    }
+
+    private Optional<ProtobufMessageElement> processUnknown(TypeElement object) {
+        printError("Only classes, records and enums can implement ProtobufObject", object);
+        return Optional.empty();
+    }
+
+    private Optional<ProtobufMessageElement> processMessage(TypeElement message) {
+        var messageElement = new ProtobufMessageElement(message, null);
         var types = processProperties(messageElement);
         if(types.isEmpty()) {
             printWarning("No properties found", message);
-            return;
+            return Optional.of(messageElement);
         }
 
-        if(hasPropertiesConstructor(message, types)) {
-            return;
+        if (!hasPropertiesConstructor(message, types)) {
+            printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
+            return Optional.empty();
         }
 
-        printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
+        return Optional.of(messageElement);
     }
 
     private boolean hasPropertiesConstructor(TypeElement message, List<TypeMirror> expectedParameterTypes) {
@@ -241,13 +232,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         var constructorParameters = constructor.getParameters();
         return expectedSize == constructorParameters.size()
                 && IntStream.range(0, expectedSize).allMatch(index -> isSubType(constructorParameters.get(index).asType(), expectedParameterTypes.get(index)));
-    }
-
-    private String getBinaryName(TypeElement element) {
-        return processingEnv.getElementUtils()
-                .getBinaryName(element)
-                .toString()
-                .replaceAll("\\.", "/");
     }
 
     private List<TypeMirror> processProperties(ProtobufMessageElement messageElement) {
@@ -280,7 +264,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         }
 
         var type = getImplementationType(variableElement, propertyAnnotation);
-        System.out.println(type);
         if(type.isEmpty()) {
             return true;
         }
@@ -295,39 +278,38 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private Optional<ProtobufPropertyType> getImplementationType(VariableElement fieldElement, ProtobufProperty property) {
-        var fieldAstType = fieldElement.asType();
-        var fieldAsmType = toAsmType(erase(fieldAstType));
+        var fieldType = fieldElement.asType();
         var implementationAstType = getExplicitImplementationType(fieldElement, property);
         if (!property.repeated()) {
+            var rawFieldType = erase(fieldType);
             var result = new ProtobufPropertyType(
-                    fieldAsmType,
-                    implementationAstType.map(this::toAsmType).orElse(fieldAsmType),
+                    rawFieldType,
+                    implementationAstType.orElse(rawFieldType),
                     null,
-                    getNullableConverter(property, implementationAstType.orElse(null), fieldAstType),
-                    isEnum(fieldAstType)
+                    getNullableConverter(property, implementationAstType.orElse(null), fieldType),
+                    isEnum(fieldType)
             );
             return Optional.of(result);
         }
 
-        var argumentAstType = (DeclaredType) getCollectionType(fieldAstType)
-                .orElse(null);
-        if(argumentAstType == null) {
-            printError("Type inference error: cannot determine collection's type.\nSpecify the implementation explicitly in @ProtobufProperty", fieldElement);
+        var collectionTypeParameter = (DeclaredType) getCollectionType(fieldType).orElse(null);
+        if(collectionTypeParameter == null) {
+            printError("Type inference error: cannot determine collection's type. Specify the implementation explicitly in @ProtobufProperty", fieldElement);
             return Optional.empty();
         }
 
-        var type = implementationAstType.orElse(argumentAstType);
+        var actualCollectionTypeParameter = implementationAstType.orElse(collectionTypeParameter);
         var result = new ProtobufPropertyType(
-                toAsmType(argumentAstType),
-                toAsmType(type),
-                fieldAsmType,
-                getNullableConverter(property, implementationAstType.orElse(null), type),
-                isEnum(type)
+                collectionTypeParameter,
+                actualCollectionTypeParameter,
+                fieldType,
+                getNullableConverter(property, implementationAstType.orElse(null), actualCollectionTypeParameter),
+                isEnum(actualCollectionTypeParameter)
         );
         return Optional.of(result);
     }
 
-    private ProtobufPropertyConverter getNullableConverter(ProtobufProperty property, DeclaredType implementation, TypeMirror fieldType) {
+    private ProtobufPropertyConverter getNullableConverter(ProtobufProperty property, TypeMirror implementation, TypeMirror fieldType) {
         if (implementation == null) {
             var wrapperType = getType(property.type().wrappedType());
             if (isSameType(fieldType, getType(property.type().primitiveType())) || isSubType(fieldType, wrapperType)) {
@@ -379,24 +361,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
             return Optional.empty();
         }
 
-        var serializerName = serializer.getSimpleName().toString();
-        var serializerDescriptor = getMethodDescriptor(serializer);
-        var deserializerName = deserializer.getSimpleName().toString();
-        var deserializerDescriptor = getMethodDescriptor(deserializer);
-        var result = new ProtobufPropertyConverter(serializerName, serializerDescriptor, deserializerName, deserializerDescriptor);
+        var result = new ProtobufPropertyConverter(serializer, deserializer);
         return Optional.of(result);
-    }
-
-    private String getMethodDescriptor(ExecutableElement element) {
-        var builder = new StringBuilder();
-        builder.append("(");
-        element.getParameters()
-                .stream()
-                .map(parameter -> toAsmType(parameter.asType()))
-                .forEach(builder::append);
-        builder.append(")");
-        builder.append(toAsmType(element.getReturnType()));
-        return builder.toString();
     }
 
     private boolean isDeserializer(ExecutableElement entry, TypeMirror fieldAstType) {
@@ -411,26 +377,34 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
                 && isSubType(fieldAstType, entry.getReturnType());
     }
 
-    private Optional<DeclaredType> getExplicitImplementationType(VariableElement element, ProtobufProperty property) {
+    private Optional<TypeMirror> getExplicitImplementationType(VariableElement element, ProtobufProperty property) {
         var rawImplementation = getMirroredImplementation(property);
-        if (isSameType(rawImplementation, objectType)) {
+        if(rawImplementation.isEmpty()) {
             return Optional.empty();
         }
 
-        if(rawImplementation.asElement().getModifiers().contains(Modifier.ABSTRACT)) {
+        if (isSameType(rawImplementation.get(), objectType)) {
+            return Optional.empty();
+        }
+
+        if(rawImplementation.get().asElement().getModifiers().contains(Modifier.ABSTRACT)) {
             printError("Illegal implementation type: concrete class or record type required", element);
             return Optional.empty();
         }
-        
-        return Optional.of(rawImplementation);
+
+        return Optional.of(rawImplementation.get());
     }
 
-    private DeclaredType getMirroredImplementation(ProtobufProperty property) {
+    private Optional<DeclaredType> getMirroredImplementation(ProtobufProperty property) {
         try {
             var implementation = property.implementation();
             throw new IllegalArgumentException(implementation.toString());
         }catch (MirroredTypeException exception) {
-            return (DeclaredType) exception.getTypeMirror();
+            if(exception.getTypeMirror() instanceof DeclaredType declaredType) {
+                return Optional.of(declaredType);
+            }
+
+            return Optional.empty();
         }
     }
 
@@ -510,33 +484,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         return processingEnv.getTypeUtils().erasure(declaredType);
     }
 
-    private Type toAsmType(TypeMirror mirror) {
-        if(mirror.getKind() == TypeKind.ARRAY) {
-            var arrayType = (ArrayType) mirror;
-            var argumentType = toAsmType(arrayType.getComponentType());
-            return Type.getType("[" + argumentType.getDescriptor());
-        }
-
-        if (!mirror.getKind().isPrimitive()) {
-            var declaredType = (DeclaredType) mirror;
-            var typeElement = (TypeElement) declaredType.asElement();
-            var binaryName = getBinaryName(typeElement);
-            return Type.getObjectType(binaryName);
-        }
-
-        return switch (mirror.getKind()) {
-            case BOOLEAN -> Type.BOOLEAN_TYPE;
-            case BYTE -> Type.BYTE_TYPE;
-            case SHORT -> Type.SHORT_TYPE;
-            case INT -> Type.INT_TYPE;
-            case LONG -> Type.LONG_TYPE;
-            case CHAR -> Type.CHAR_TYPE;
-            case FLOAT -> Type.FLOAT_TYPE;
-            case DOUBLE -> Type.DOUBLE_TYPE;
-            default -> throw new IllegalStateException("Unexpected value: " + mirror.getKind());
-        };
-    }
-
     private boolean checkRepeatedField(VariableElement variableElement) {
         if (isSubType(variableElement.asType(), collectionType)) {
             return true;
@@ -573,18 +520,19 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         return true;
     }
 
-    private void processEnum(TypeElement enumElement) {
+    private Optional<ProtobufMessageElement> processEnum(TypeElement enumElement) {
         var messageElement = createEnumElement(enumElement);
         if(messageElement.isEmpty()) {
-            return;
+            return messageElement;
         }
 
         var constantsCount = processEnumConstants(messageElement.get());
         if(constantsCount != 0) {
-            return;
+            return messageElement;
         }
 
         printWarning("No constants found", enumElement);
+        return messageElement;
     }
 
     private long processEnumConstants(ProtobufMessageElement messageElement) {
@@ -598,8 +546,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
     }
 
     private Optional<ProtobufMessageElement> createEnumElement(TypeElement enumElement) {
-        var binaryName = getBinaryName(enumElement);
-        var targetFile = outputDirectory.resolve(binaryName + ".class");
         var metadata = getEnumMetadata(enumElement);
         if (metadata.isEmpty()) {
             printError("Missing protobuf enum constructor: an enum should provide a constructor with a scalar parameter annotated with @ProtobufEnumIndex", enumElement);
@@ -610,8 +556,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
             return Optional.empty();
         }
 
-        var result = new ProtobufMessageElement(binaryName, enumElement, targetFile, metadata.get());
-        results.put(binaryName, result);
+        var result = new ProtobufMessageElement(enumElement, metadata.get());
         return Optional.of(result);
     }
 
@@ -646,7 +591,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
 
     private ProtobufEnumMetadata getEnumMetadata(ExecutableElement constructor, VariableElement parameter, int index, MethodTree constructorTree, ProtobufEnumFields fields) {
         if(fields.enumIndexField() != null) {
-            return new ProtobufEnumMetadata(constructor, fields.enumIndexField(), toAsmType(fields.enumIndexField().asType()), parameter, index);
+            return new ProtobufEnumMetadata(constructor, fields.enumIndexField(), parameter, index);
         }
 
         return constructorTree.getBody()
@@ -662,10 +607,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
                 .map(fields.fields()::get)
                 .filter(Objects::nonNull)
                 .reduce((first, second) -> {
-                    printError("Duplicated assignment: the parameter annotated with @ProtobufEnumIndex can be assigned to a single local field", second);
+                    printError("Duplicated assignment: the parameter annotated with @ProtobufEnumIndex must be assigned to a single local field", second);
                     return first;
                 })
-                .map(fieldElement -> new ProtobufEnumMetadata(constructor, fieldElement, toAsmType(fieldElement.asType()), parameter, index))
+                .map(fieldElement -> {
+                    checkProtobufEnumIndexField(fieldElement);
+                    return new ProtobufEnumMetadata(constructor, fieldElement, parameter, index);
+                })
                 .orElseGet(() -> {
                     printError("Missing or too complex assignment: the parameter annotated with @ProtobufEnumIndex should be assigned to a local field", constructor);
                     printError("If the assignment is too complex for the compiler to evaluate, annotate the local field directly with @ProtobufEnumIndex", constructor);
@@ -696,6 +644,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
             }
 
             if(variableElement.getAnnotation(ProtobufEnumIndex.class) != null) {
+                checkProtobufEnumIndexField(variableElement);
                 return new ProtobufEnumFields(variableElement, null);
             }
 
@@ -703,6 +652,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor implements TaskListen
         }
 
         return new ProtobufEnumFields(null, fields);
+    }
+
+    private void checkProtobufEnumIndexField(VariableElement variableElement) {
+        if (!variableElement.getModifiers().contains(Modifier.PRIVATE)) {
+            return;
+        }
+
+        printError("Weak visibility: the field annotated with @ProtobufEnumIndex must have at least package-private visibility", variableElement);
     }
 
     private record ProtobufEnumFields(VariableElement enumIndexField, Map<Name, VariableElement> fields) {

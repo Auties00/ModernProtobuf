@@ -1,9 +1,5 @@
 package it.auties.protobuf.model;
 
-import it.auties.protobuf.exception.ProtobufAnnotationProcessorException;
+public non-sealed interface ProtobufMessage extends ProtobufObject {
 
-public interface ProtobufMessage extends ProtobufObject {
-    default byte[] toEncodedProtobuf(@SuppressWarnings("unused") ProtobufVersion version) {
-        throw new ProtobufAnnotationProcessorException();
-    }
 }

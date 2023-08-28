@@ -1,8 +1,5 @@
 package it.auties.protobuf.stream;
 
-import it.auties.protobuf.model.ProtobufEnum;
-import it.auties.protobuf.model.ProtobufMessage;
-import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.io.ByteArrayOutputStream;
@@ -12,11 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 public final class ProtobufOutputStream {
-    private final ProtobufVersion version;
     private final ByteArrayOutputStream buffer;
 
-    public ProtobufOutputStream(ProtobufVersion version) {
-        this.version = version;
+    public ProtobufOutputStream() {
         this.buffer = new ByteArrayOutputStream();
     }
 
@@ -213,52 +208,6 @@ public final class ProtobufOutputStream {
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeStringNoTag(value);
-    }
-
-    public void writeMessage(int fieldNumber, Collection<? extends ProtobufMessage> values) {
-        if(values == null){
-            return;
-        }
-
-        for (var value : values) {
-            writeMessage(fieldNumber, value);
-        }
-    }
-
-    public void writeMessage(int fieldNumber, ProtobufMessage value) {
-        try {
-            if(value == null){
-                return;
-            }
-
-            writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeBytesNoTag(value.toEncodedProtobuf(version));
-        } catch (Throwable throwable) {
-            throw new RuntimeException("Cannot invoke serialization method", throwable);
-        }
-    }
-
-    public void writeEnum(int fieldNumber, Collection<? extends ProtobufEnum> values) {
-        if(values == null){
-            return;
-        }
-
-        for (var value : values) {
-            writeEnum(fieldNumber, value);
-        }
-    }
-
-    public void writeEnum(int fieldNumber, ProtobufEnum value) {
-        try {
-            if(value == null){
-                return;
-            }
-
-            writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-            writeInt32NoTag(value.index());
-        } catch (Throwable throwable) {
-            throw new RuntimeException("Cannot invoke serialization method", throwable);
-        }
     }
 
     public void writeBytes(int fieldNumber, Collection<byte[]> values) {

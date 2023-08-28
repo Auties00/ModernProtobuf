@@ -22,4 +22,8 @@ public enum ProtobufVersion {
                 .filter(entry -> name.contains(entry.versionCode()))
                 .findFirst();
     }
+
+    public static ProtobufVersion defaultVersion() {
+        return PROTOBUF_2;
+    }
 }

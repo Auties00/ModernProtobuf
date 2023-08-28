@@ -1,39 +1,38 @@
 package it.auties.protobuf.serialization.model;
 
-import org.objectweb.asm.Type;
-
+import javax.lang.model.type.TypeMirror;
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufPropertyType {
-    private final Type propertyType;
-    private final Type implementationType;
-    private final Type wrapperType;
+    private final TypeMirror property;
+    private final TypeMirror implementation;
+    private final TypeMirror wrapper;
     private final ProtobufPropertyConverter converter;
     private final boolean isEnum;
 
-    public ProtobufPropertyType(Type propertyType, Type implementationType, Type wrapperType, ProtobufPropertyConverter converter, boolean isEnum) {
-        this.propertyType = propertyType;
-        this.implementationType = implementationType;
-        this.wrapperType = wrapperType;
+    public ProtobufPropertyType(TypeMirror property, TypeMirror implementation, TypeMirror wrapperType, ProtobufPropertyConverter converter, boolean isEnum) {
+        this.property = property;
+        this.implementation = implementation;
+        this.wrapper = wrapperType;
         this.converter = converter;
         this.isEnum = isEnum;
     }
 
-    public Type fieldType() {
-        return Objects.requireNonNullElse(wrapperType, implementationType);
+    public TypeMirror fieldType() {
+        return Objects.requireNonNullElse(wrapper, implementation);
     }
 
-    public Type propertyType() {
-        return propertyType;
+    public TypeMirror propertyType() {
+        return property;
     }
 
-    public Type implementationType() {
-        return implementationType;
+    public TypeMirror implementationType() {
+        return implementation;
     }
 
-    public Type wrapperType() {
-        return wrapperType;
+    public TypeMirror wrapperType() {
+        return wrapper;
     }
 
     public Optional<ProtobufPropertyConverter> converter() {
