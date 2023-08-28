@@ -38,7 +38,7 @@
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
                             <artifactId>protobuf-serialization-plugin</artifactId>
-                            <version>2.0.6</version>
+                            <version>2.0.0</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
                     <compilerArgs>
@@ -53,7 +53,7 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>2.0.6</version>
+            <version>2.0.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
