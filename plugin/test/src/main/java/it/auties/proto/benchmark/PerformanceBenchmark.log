@@ -1,0 +1,142 @@
+/home/alessandro/.jdks/azul-17.0.7/bin/java -javaagent:/snap/intellij-idea-community/454/lib/idea_rt.jar=36121:/snap/intellij-idea-community/454/bin -Dfile.encoding=UTF-8 -classpath /home/alessandro/IdeaProjects/ModernProtobuf/plugin/test/target/classes:/home/alessandro/IdeaProjects/ModernProtobuf/base/target/classes:/home/alessandro/.m2/repository/org/projectlombok/lombok/1.18.28/lombok-1.18.28.jar:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-java/3.24.2/protobuf-java-3.24.2.jar:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-javalite/3.24.2/protobuf-javalite-3.24.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-core/1.35/jmh-core-1.35.jar:/home/alessandro/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/home/alessandro/.m2/repository/org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.35/jmh-generator-annprocess-1.35.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-protobuf/2.14.0/jackson-dataformat-protobuf-2.14.0.jar:/home/alessandro/.m2/repository/com/squareup/protoparser/4.0.3/protoparser-4.0.3.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.14.0/jackson-databind-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.14.0/jackson-annotations-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.14.0/jackson-core-2.14.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter/5.9.0/junit-jupiter-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.0/junit-jupiter-api-5.9.0.jar:/home/alessandro/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-commons/1.9.0/junit-platform-commons-1.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.9.0/junit-jupiter-params-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.0/junit-jupiter-engine-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-engine/1.9.0/junit-platform-engine-1.9.0.jar:/home/alessandro/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar org.openjdk.jmh.Main it.auties.proto.benchmark.PerformanceBenchmark.*
+# JMH version: 1.35
+# VM version: JDK 17.0.7, OpenJDK 64-Bit Server VM, 17.0.7+7-LTS
+# VM invoker: /home/alessandro/.jdks/azul-17.0.7/bin/java
+# VM options: -javaagent:/snap/intellij-idea-community/454/lib/idea_rt.jar=36121:/snap/intellij-idea-community/454/bin -Dfile.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 10 s each
+# Measurement: 5 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: it.auties.proto.benchmark.PerformanceBenchmark.googleLiteProtobuf
+
+# Run progress: 0.00% complete, ETA 00:05:20
+# Fork: 1 of 1
+# Warmup Iteration   1: 173.244 us/op
+# Warmup Iteration   2: 171.395 us/op
+# Warmup Iteration   3: 171.473 us/op
+Iteration   1: 169.699 us/op
+Iteration   2: 170.122 us/op
+Iteration   3: 170.150 us/op
+Iteration   4: 169.938 us/op
+Iteration   5: 169.785 us/op
+
+
+Result "it.auties.proto.benchmark.PerformanceBenchmark.googleLiteProtobuf":
+  169.939 ±(99.9%) 0.769 us/op [Average]
+  (min, avg, max) = (169.699, 169.939, 170.150), stdev = 0.200
+  CI (99.9%): [169.170, 170.707] (assumes normal distribution)
+
+
+# JMH version: 1.35
+# VM version: JDK 17.0.7, OpenJDK 64-Bit Server VM, 17.0.7+7-LTS
+# VM invoker: /home/alessandro/.jdks/azul-17.0.7/bin/java
+# VM options: -javaagent:/snap/intellij-idea-community/454/lib/idea_rt.jar=36121:/snap/intellij-idea-community/454/bin -Dfile.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 10 s each
+# Measurement: 5 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: it.auties.proto.benchmark.PerformanceBenchmark.googleProtobuf
+
+# Run progress: 25.00% complete, ETA 00:04:02
+# Fork: 1 of 1
+# Warmup Iteration   1: 108.961 us/op
+# Warmup Iteration   2: 108.688 us/op
+# Warmup Iteration   3: 108.350 us/op
+Iteration   1: 108.383 us/op
+Iteration   2: 108.195 us/op
+Iteration   3: 108.116 us/op
+Iteration   4: 107.945 us/op
+Iteration   5: 107.960 us/op
+
+
+Result "it.auties.proto.benchmark.PerformanceBenchmark.googleProtobuf":
+  108.120 ±(99.9%) 0.698 us/op [Average]
+  (min, avg, max) = (107.945, 108.120, 108.383), stdev = 0.181
+  CI (99.9%): [107.422, 108.818] (assumes normal distribution)
+
+
+# JMH version: 1.35
+# VM version: JDK 17.0.7, OpenJDK 64-Bit Server VM, 17.0.7+7-LTS
+# VM invoker: /home/alessandro/.jdks/azul-17.0.7/bin/java
+# VM options: -javaagent:/snap/intellij-idea-community/454/lib/idea_rt.jar=36121:/snap/intellij-idea-community/454/bin -Dfile.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 10 s each
+# Measurement: 5 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: it.auties.proto.benchmark.PerformanceBenchmark.jacksonProtobuf
+
+# Run progress: 50.00% complete, ETA 00:02:41
+# Fork: 1 of 1
+# Warmup Iteration   1: 525.331 us/op
+# Warmup Iteration   2: 521.032 us/op
+# Warmup Iteration   3: 520.401 us/op
+Iteration   1: 520.491 us/op
+Iteration   2: 520.908 us/op
+Iteration   3: 520.888 us/op
+Iteration   4: 522.094 us/op
+Iteration   5: 520.967 us/op
+
+
+Result "it.auties.proto.benchmark.PerformanceBenchmark.jacksonProtobuf":
+  521.070 ±(99.9%) 2.321 us/op [Average]
+  (min, avg, max) = (520.491, 521.070, 522.094), stdev = 0.603
+  CI (99.9%): [518.748, 523.391] (assumes normal distribution)
+
+
+# JMH version: 1.35
+# VM version: JDK 17.0.7, OpenJDK 64-Bit Server VM, 17.0.7+7-LTS
+# VM invoker: /home/alessandro/.jdks/azul-17.0.7/bin/java
+# VM options: -javaagent:/snap/intellij-idea-community/454/lib/idea_rt.jar=36121:/snap/intellij-idea-community/454/bin -Dfile.encoding=UTF-8
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 10 s each
+# Measurement: 5 iterations, 10 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: it.auties.proto.benchmark.PerformanceBenchmark.modernProtobufPerformance
+
+# Run progress: 75.00% complete, ETA 00:01:20
+# Fork: 1 of 1
+# Warmup Iteration   1: 104.180 us/op
+# Warmup Iteration   2: 104.103 us/op
+# Warmup Iteration   3: 104.202 us/op
+Iteration   1: 104.230 us/op
+Iteration   2: 103.997 us/op
+Iteration   3: 104.066 us/op
+Iteration   4: 104.284 us/op
+Iteration   5: 103.888 us/op
+
+
+Result "it.auties.proto.benchmark.PerformanceBenchmark.modernProtobufPerformance":
+  104.093 ±(99.9%) 0.630 us/op [Average]
+  (min, avg, max) = (103.888, 104.093, 104.284), stdev = 0.164
+  CI (99.9%): [103.463, 104.723] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:05:22
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                       Mode  Cnt    Score   Error  Units
+PerformanceBenchmark.googleLiteProtobuf         avgt    5  169.939 ± 0.769  us/op
+PerformanceBenchmark.googleProtobuf             avgt    5  108.120 ± 0.698  us/op
+PerformanceBenchmark.jacksonProtobuf            avgt    5  521.070 ± 2.321  us/op
+PerformanceBenchmark.modernProtobufPerformance  avgt    5  104.093 ± 0.630  us/op
+
+Process finished with exit code 0

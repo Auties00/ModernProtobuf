@@ -24,7 +24,7 @@ public class PerformanceBenchmark {
     private static final ObjectReader JACKSON_READER;
     static {
         try {
-            SERIALIZED_INPUT = ScalarMessage.newBuilder()
+            SERIALIZED_INPUT = Scalar.ScalarMessage.newBuilder()
                     .setString("Hello, this is an automated test")
                     .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
                     .setFixed32(Integer.MAX_VALUE)
@@ -73,7 +73,16 @@ public class PerformanceBenchmark {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void googleProtobuf() throws InvalidProtocolBufferException {
         for (var i = 0; i < ITERATIONS; ++i) {
-            ScalarMessage.parseFrom(SERIALIZED_INPUT);
+            Scalar.ScalarMessage.parseFrom(SERIALIZED_INPUT);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleLiteProtobuf() throws InvalidProtocolBufferException {
+        for (var i = 0; i < ITERATIONS; ++i) {
+            LiteScalar.ScalarMessage.parseFrom(SERIALIZED_INPUT);
         }
     }
 }
