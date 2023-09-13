@@ -7,6 +7,8 @@ import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -110,12 +112,12 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName, int indentationLevel) {
-        var hasConverter = property.type().converter().isPresent();
+        var hasConverter = !property.type().converters().isEmpty();
         if (hasConverter) {
             if(overridePropertyName != null) {
-                writer.println("    %sif(%s != null)".formatted("   ".repeat(indentationLevel), overridePropertyName));
+                writer.println("%sif(%s != null)".formatted("   ".repeat(indentationLevel), overridePropertyName));
             }else {
-                writer.println("    %sif(protoInputObject.%s() != null)".formatted("   ".repeat(indentationLevel), property.name()));
+                writer.println("%sif(protoInputObject.%s() != null)".formatted("   ".repeat(indentationLevel), property.name()));
             };
         }
 
@@ -141,9 +143,16 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
             return writeValue;
         }
 
-        var propertyType = property.type();
-        var propertyConverter = propertyType.converter().orElseThrow();
-        return "%s.%s()".formatted(writeValue, propertyConverter.serializer().getSimpleName());
+        var result = writeValue;
+        for(var converter : property.type().converters()) {
+            if(converter.serializer().getModifiers().contains(Modifier.STATIC)) {
+                var converterWrapperClass = (TypeElement) converter.serializer().getEnclosingElement();
+                result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converter.serializer().getSimpleName(), result);
+            }else {
+                result = "%s.%s(%s)".formatted(result, converter.serializer().getSimpleName(), String.join(", ", converter.serializerArguments()));
+            }
+        }
+        return result;
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
@@ -182,6 +191,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     private boolean isConcreteRepeated(ProtobufPropertyStub annotation) {
-        return annotation.repeated() && annotation.type().converter().isEmpty();
+        return annotation.repeated() && annotation.type().converters().isEmpty();
     }
 }

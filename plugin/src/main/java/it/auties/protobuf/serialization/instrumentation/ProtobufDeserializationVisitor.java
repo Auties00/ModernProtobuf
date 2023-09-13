@@ -4,12 +4,26 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.util.concurrent.atomic.*;
 
 public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisitor {
+    private static final Set<String> OPTIONAL_TYPES = Set.of(
+            Optional.class.getName(),
+            OptionalInt.class.getName(),
+            OptionalLong.class.getName(),
+            OptionalDouble.class.getName()
+    );
+    private static final Set<String> ATOMIC_TYPES = Set.of(
+            AtomicReference.class.getName(),
+            AtomicInteger.class.getName(),
+            AtomicLong.class.getName(),
+            AtomicBoolean.class.getName()
+    );
     public ProtobufDeserializationVisitor(ProtobufMessageElement element, PrintWriter writer) {
         super(element, writer);
     }
@@ -136,21 +150,36 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     private String getConvertedValue(ProtobufPropertyStub property, String readValue) {
-        var converter = property.type().converter();
-        if (converter.isEmpty()) {
-            return readValue;
+        var result = readValue;
+        for(var converter : property.type().converters()) {
+            var deserializer = converter.deserializer();
+            if(deserializer.getKind() == ElementKind.CONSTRUCTOR) {
+                var converterWrapperClass = (TypeElement) deserializer.getEnclosingElement();
+                result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
+            }else {
+                var converterWrapperClass = (TypeElement) deserializer.getEnclosingElement();
+                var converterMethodName = deserializer.getSimpleName();
+                result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
+            }
         }
-
-        var converterWrapperClass = property.type().implementationType();
-        var converterMethodName = converter.get()
-                .deserializer()
-                .getSimpleName();
-        return "%s.%s(%s)".formatted(converterWrapperClass, converterMethodName, readValue);
+        return result;
     }
 
     private String getPropertyDefaultValue(ProtobufPropertyStub property) {
         return switch (property.type().implementationType().getKind()) {
             case DECLARED, ARRAY -> {
+                if(property.type().fieldType() instanceof DeclaredType declaredType
+                        && declaredType.asElement() instanceof TypeElement typeElement
+                        && OPTIONAL_TYPES.contains(typeElement.getQualifiedName().toString())) {
+                    yield "%s.empty()".formatted(typeElement.getQualifiedName());
+                }
+
+                if(property.type().fieldType() instanceof DeclaredType declaredType
+                        && declaredType.asElement() instanceof TypeElement typeElement
+                        && ATOMIC_TYPES.contains(typeElement.getQualifiedName().toString())) {
+                    yield "new %s()".formatted(typeElement.getQualifiedName());
+                }
+
                 if (!property.repeated()) {
                     yield "null";
                 }

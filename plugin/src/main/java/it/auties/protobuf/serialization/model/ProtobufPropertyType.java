@@ -1,30 +1,27 @@
 package it.auties.protobuf.serialization.model;
 
 import javax.lang.model.type.TypeMirror;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public final class ProtobufPropertyType {
-    private final TypeMirror property;
+    private final TypeMirror fieldType;
     private final TypeMirror implementation;
     private final TypeMirror wrapper;
-    private final ProtobufPropertyConverter converter;
+    private final List<ProtobufConverterElement> converters;
     private final boolean isEnum;
 
-    public ProtobufPropertyType(TypeMirror property, TypeMirror implementation, TypeMirror wrapperType, ProtobufPropertyConverter converter, boolean isEnum) {
-        this.property = property;
-        this.implementation = implementation;
+    public ProtobufPropertyType(TypeMirror fieldType, TypeMirror implementationType, TypeMirror wrapperType, boolean isEnum) {
+        this.fieldType = fieldType;
+        this.implementation = implementationType;
         this.wrapper = wrapperType;
-        this.converter = converter;
+        this.converters = new ArrayList<>();
         this.isEnum = isEnum;
     }
 
     public TypeMirror fieldType() {
-        return Objects.requireNonNullElse(wrapper, implementation);
-    }
-
-    public TypeMirror propertyType() {
-        return property;
+        return fieldType;
     }
 
     public TypeMirror implementationType() {
@@ -35,8 +32,16 @@ public final class ProtobufPropertyType {
         return wrapper;
     }
 
-    public Optional<ProtobufPropertyConverter> converter() {
-        return Optional.ofNullable(converter);
+    public void addNullableConverter(ProtobufConverterElement converter) {
+        if (converter == null) {
+            return;
+        }
+
+        converters.add(converter);
+    }
+
+    public List<ProtobufConverterElement> converters() {
+        return Collections.unmodifiableList(converters);
     }
 
     public boolean isEnum() {

@@ -3,19 +3,23 @@ package it.auties.protobuf.serialization.model;
 import it.auties.protobuf.annotation.ProtobufProperty;
 
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 import java.util.*;
 
 public class ProtobufMessageElement {
     private final TypeElement typeElement;
     private final Map<Integer, ProtobufPropertyStub> properties;
+    private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
 
     public ProtobufMessageElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
+        this.builders = new ArrayList<>();
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
     }
@@ -24,7 +28,11 @@ public class ProtobufMessageElement {
         return typeElement;
     }
 
-    public String generatedClassName() {
+    public String getGeneratedClassNameBySuffix(String suffix) {
+       return getGeneratedClassNameByName(element().getSimpleName() + suffix);
+    }
+
+    public String getGeneratedClassNameByName(String className) {
         var name = new StringBuilder();
         var element = element();
         while (element.getEnclosingElement() instanceof TypeElement parent) {
@@ -32,8 +40,7 @@ public class ProtobufMessageElement {
             element = parent;
         }
 
-        name.append(element().getSimpleName());
-        return name + "Spec";
+        return className;
     }
 
     public Optional<ProtobufEnumMetadata> enumMetadata() {
@@ -65,5 +72,21 @@ public class ProtobufMessageElement {
         var fieldIndex = property.index();
         var result = new ProtobufPropertyStub(fieldIndex, fieldName, type, property);
         return Optional.ofNullable(properties.put(fieldIndex, result));
+    }
+
+    public void addBuilder(String className, List<? extends VariableElement> parameters, ExecutableElement executableElement) {
+        builders.add(new ProtobufBuilderElement(className, parameters, executableElement));
+    }
+
+    public List<ProtobufBuilderElement> builders() {
+        return Collections.unmodifiableList(builders);
+    }
+
+    public List<TypeMirror> propertiesTypes() {
+        return properties.values()
+                .stream()
+                .map(ProtobufPropertyStub::type)
+                .map(ProtobufPropertyType::fieldType)
+                .toList();
     }
 }

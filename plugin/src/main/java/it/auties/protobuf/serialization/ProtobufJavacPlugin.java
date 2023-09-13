@@ -2,9 +2,11 @@ package it.auties.protobuf.serialization;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.Trees;
+import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufConverter;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.extension.OptionalExtension;
 import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufObject;
@@ -24,6 +26,7 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.concurrent.atomic.*;
 import java.util.stream.IntStream;
 
 @SupportedAnnotationTypes({
@@ -38,6 +41,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private TypeMirror protoMessageType;
     private TypeMirror protoEnumType;
     private TypeMirror collectionType;
+    private Map<String, ProtobufConverterElement> optionalTypes;
+    private Map<String, ProtobufConverterElement> atomicTypes;
 
     @Override
     public synchronized void init(ProcessingEnvironment wrapperProcessingEnv) {
@@ -48,7 +53,60 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         this.protoObjectType = getType(ProtobufObject.class);
         this.protoMessageType = getType(ProtobufMessage.class);
         this.protoEnumType = getType(ProtobufEnum.class);
+        var optionalType = (DeclaredType) getType(Optional.class);
+        var optionalExtensionType = (DeclaredType) getType(OptionalExtension.class);
+        var optionalDeserializer = getMandatoryMethod(optionalType, "ofNullable");
+        var optionalSerializer = getMandatoryMethod(optionalType, "orElse");
+        var optionalIntDeserializer = getMandatoryMethod(optionalExtensionType, "ofNullableInt");
+        var optionalIntSerializer = getMandatoryMethod(optionalExtensionType, "toNullableInt");
+        var optionalLongDeserializer = getMandatoryMethod(optionalExtensionType, "ofNullableLong");
+        var optionalLongSerializer = getMandatoryMethod(optionalExtensionType, "toNullableLong");
+        var optionalDoubleDeserializer = getMandatoryMethod(optionalExtensionType, "ofNullableDouble");
+        var optionalDoubleSerializer = getMandatoryMethod(optionalExtensionType, "toNullableDouble");
+        this.optionalTypes = Map.of(
+                Optional.class.getName(),
+                new ProtobufConverterElement(optionalSerializer, optionalDeserializer, "null"),
+                OptionalInt.class.getName(),
+                new ProtobufConverterElement(optionalIntSerializer, optionalIntDeserializer),
+                OptionalLong.class.getName(),
+                new ProtobufConverterElement(optionalLongSerializer, optionalLongDeserializer),
+                OptionalDouble.class.getName(),
+                new ProtobufConverterElement(optionalDoubleSerializer, optionalDoubleDeserializer)
+        );
+        var atomicReferenceType = (DeclaredType) getType(AtomicReference.class);
+        var atomicReferenceDeserializer = getMandatoryMethod(atomicReferenceType, "<init>");
+        var atomicReferenceSerializer = getMandatoryMethod(atomicReferenceType, "get");
+        var atomicIntegerType = (DeclaredType) getType(AtomicInteger.class);
+        var atomicIntegerDeserializer = getMandatoryMethod(atomicIntegerType, "<init>");
+        var atomicIntegerSerializer = getMandatoryMethod(atomicIntegerType, "get");
+        var atomicLongType = (DeclaredType) getType(AtomicLong.class);
+        var atomicLongDeserializer = getMandatoryMethod(atomicLongType, "<init>");
+        var atomicLongSerializer = getMandatoryMethod(atomicLongType, "get");
+        var atomicBooleanType = (DeclaredType) getType(AtomicBoolean.class);
+        var atomicBooleanDeserializer = getMandatoryMethod(atomicBooleanType, "<init>");
+        var atomicBooleanSerializer = getMandatoryMethod(atomicBooleanType, "get");
+        this.atomicTypes = Map.of(
+                AtomicReference.class.getName(),
+                new ProtobufConverterElement(atomicReferenceSerializer, atomicReferenceDeserializer),
+                AtomicInteger.class.getName(),
+                new ProtobufConverterElement(atomicIntegerSerializer, atomicIntegerDeserializer),
+                AtomicLong.class.getName(),
+                new ProtobufConverterElement(atomicLongSerializer, atomicLongDeserializer),
+                AtomicBoolean.class.getName(),
+                new ProtobufConverterElement(atomicBooleanSerializer, atomicBooleanDeserializer)
+        );
         this.collectionType = getCollectionType();
+    }
+
+    private ExecutableElement getMandatoryMethod(DeclaredType type, String method) {
+        return type.asElement()
+                .getEnclosedElements()
+                .stream()
+                .filter(entry -> entry instanceof ExecutableElement)
+                .map(entry -> (ExecutableElement) entry)
+                .filter(entry -> entry.getSimpleName().contentEquals(method))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchMethodError("Missing method " + method));
     }
 
     private ProcessingEnvironment unwrapProcessingEnv(ProcessingEnvironment wrapper) {
@@ -104,14 +162,36 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .stream()
                 .map(entry -> (ExecutableElement) entry)
                 .forEach(this::checkConverter);
+        roundEnv.getElementsAnnotatedWith(ProtobufBuilder.class)
+                .stream()
+                .map(entry -> (ExecutableElement) entry)
+                .forEach(this::checkBuilder);
     }
 
+    private void checkBuilder(ExecutableElement entry) {
+        if(entry.getModifiers().contains(Modifier.PRIVATE)) {
+            printError("Weak visibility: a method annotated with @ProtobufBuilder must have at least package-private visibility", entry);
+            return;
+        }
+        
+        if(entry.getModifiers().contains(Modifier.STATIC)) {
+            return;
+        }
+
+        printError("Illegal method: a method annotated with @ProtobufBuilder must be static", entry);
+    }
+    
     private void checkConverter(ExecutableElement entry) {
+        if(entry.getModifiers().contains(Modifier.PRIVATE)) {
+            printError("Weak visibility: a method annotated with @ProtobufConverter must have at least package-private visibility", entry);
+            return;
+        }
+        
         var isStatic = entry.getModifiers().contains(Modifier.STATIC);
         if(isStatic && entry.getParameters().size() != 1) {
-            printError("Illegal method: a static method annotated with @ProtobufConverter should have a single parameter", entry);
+            printError("Illegal method: a static method annotated with @ProtobufConverter must have a single parameter", entry);
         }else if(!isStatic && !entry.getParameters().isEmpty()) {
-            printError("Illegal method: a method annotated with @ProtobufConverter should have no parameters", entry);
+            printError("Illegal method: a non-static method annotated with @ProtobufConverter mustn't have parameters", entry);
         }
     }
 
@@ -141,26 +221,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 var packageName = processingEnv.getElementUtils().getPackageOf(result.get().element());
-                var simpleGeneratedClassName = result.get().generatedClassName();
-                var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
-                var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
-                try (var writer = new PrintWriter(sourceFile.openWriter())) {
-                    if(packageName != null) {
-                        writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
-                    }
+                createSpecClass(result.get(), packageName);
+                if(result.get().isEnum()){
+                    continue;
+                }
 
-                    var imports = getImports(result.get());
-                    imports.forEach(entry -> writer.println("import %s;".formatted(entry)));
-                    if(!imports.isEmpty()){
-                        writer.println();
-                    }
-
-                    writer.println("public class %s {".formatted(result.get().generatedClassName()));
-                    var serializationVisitor = new ProtobufSerializationVisitor(result.get(), writer);
-                    serializationVisitor.instrument();
-                    var deserializationVisitor = new ProtobufDeserializationVisitor(result.get(), writer);
-                    deserializationVisitor.instrument();
-                    writer.println("}");
+                createBuilderClass(result.get(), null, packageName);
+                for (var builder : result.get().builders()) {
+                    createBuilderClass(result.get(), builder, packageName);
                 }
             }
         }catch (IOException exception) {
@@ -168,7 +236,31 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
     }
 
-    protected List<String> getImports(ProtobufMessageElement message) {
+    private void createSpecClass(ProtobufMessageElement result, PackageElement packageName) throws IOException {
+        var simpleGeneratedClassName = result.getGeneratedClassNameBySuffix("Spec");
+        var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
+        var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
+        try (var writer = new PrintWriter(sourceFile.openWriter())) {
+            if(packageName != null) {
+                writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
+            }
+
+            var imports = getSpecImports(result);
+            imports.forEach(entry -> writer.println("import %s;".formatted(entry)));
+            if(!imports.isEmpty()){
+                writer.println();
+            }
+
+            writer.println("public class %s {".formatted(simpleGeneratedClassName));
+            var serializationVisitor = new ProtobufSerializationVisitor(result, writer);
+            serializationVisitor.instrument();
+            var deserializationVisitor = new ProtobufDeserializationVisitor(result, writer);
+            deserializationVisitor.instrument();
+            writer.println("}");
+        }
+    }
+
+    protected List<String> getSpecImports(ProtobufMessageElement message) {
         if(message.isEnum()) {
             return List.of(
                     message.element().getQualifiedName().toString(),
@@ -188,6 +280,96 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Collections.unmodifiableList(imports);
     }
 
+    private void createBuilderClass(ProtobufMessageElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
+        var simpleGeneratedClassName = builderElement != null ? messageElement.getGeneratedClassNameByName(builderElement.name()) : messageElement.getGeneratedClassNameBySuffix("Builder");
+        var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
+        var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
+        try (var writer = new PrintWriter(sourceFile.openWriter())) {
+            if(packageName != null) {
+                writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
+            }
+
+            writer.println("public class %s {".formatted(simpleGeneratedClassName));
+            var invocationArgs = new ArrayList<String>();
+            List<ProtobufPropertyStub> properties = messageElement.properties();
+            if(builderElement != null) {
+                for(var parameter : builderElement.parameters()) {
+                    writer.println("    private %s %s;".formatted(parameter.asType(), parameter.getSimpleName()));
+                    invocationArgs.add(parameter.getSimpleName().toString());
+                }
+            }else {
+                for (var property : properties) {
+                    writer.println("    private %s %s;".formatted(property.type().fieldType(), property.name()));
+                    invocationArgs.add(property.name());
+                }
+            }
+            writer.println();
+            writer.println("    public %s() {".formatted(simpleGeneratedClassName));
+            writer.println("    }");
+            writer.println();
+            if(builderElement != null) {
+                for(var parameter : builderElement.parameters()) {
+                    writeBuilderSetter(writer, parameter.getSimpleName().toString(), parameter.asType(), simpleGeneratedClassName);
+                }
+            }else {
+                for(var property : properties) {
+                    writeBuilderSetter(writer, property.name(), property.type().fieldType(), simpleGeneratedClassName);
+                }
+            }
+            writer.println();
+            var resultQualifiedName = messageElement.element().getQualifiedName();
+            var invocationArgsJoined = String.join(", ", invocationArgs);
+            writer.println("    public %s build() {".formatted(resultQualifiedName));
+            var invocation = builderElement == null ? "new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined) : "%s.%s(%s)".formatted(resultQualifiedName, builderElement.delegate().getSimpleName(), invocationArgsJoined);
+            writer.println("        return %s;".formatted(invocation));
+            writer.println("    }");
+            writer.println("}");
+        }
+    }
+
+    private void writeBuilderSetter(PrintWriter writer, String fieldName, TypeMirror fieldType, String className) {
+        writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, fieldType, fieldName));
+        writer.println("        this.%s = %s;".formatted(fieldName, fieldName));
+        writer.println("        return this;");
+        writer.println("    }");
+        if (!(fieldType instanceof DeclaredType declaredType)) {
+            return;
+        }
+
+        if(!(declaredType.asElement() instanceof TypeElement typeElement)) {
+            return;
+        }
+
+        var optionalConverter = optionalTypes.get(typeElement.getQualifiedName().toString());
+        if(optionalConverter != null) {
+            var optionalValueType = getOptionalValueType(declaredType);
+            if(optionalValueType.isEmpty()) {
+                return;
+            }
+
+            writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, optionalValueType.get(), fieldName));
+            var converterWrapperClass = (TypeElement) optionalConverter.deserializer().getEnclosingElement();
+            writer.println("        this.%s = %s.%s(%s);".formatted(fieldName, converterWrapperClass.getQualifiedName(), optionalConverter.deserializer().getSimpleName(), fieldName));
+            writer.println("        return this;");
+            writer.println("    }");
+            return;
+        }
+
+        var atomicConverter = atomicTypes.get(typeElement.getQualifiedName().toString());
+        if(atomicConverter != null) {
+            var atomicValueType = getAtomicValueType(declaredType);
+            if(atomicValueType.isEmpty()) {
+                return;
+            }
+
+            writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, atomicValueType.get(), fieldName));
+            var converterWrapperClass = (TypeElement) atomicConverter.deserializer().getEnclosingElement();
+            writer.println("        this.%s = new %s(%s);".formatted(fieldName, converterWrapperClass.getQualifiedName(), fieldName));
+            writer.println("        return this;");
+            writer.println("    }");
+        }
+    }
+
     private Optional<ProtobufMessageElement> processElement(TypeElement object) {
         return switch (object.getKind()) {
             case ENUM -> processEnum(object);
@@ -203,13 +385,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
     private Optional<ProtobufMessageElement> processMessage(TypeElement message) {
         var messageElement = new ProtobufMessageElement(message, null);
-        var types = processProperties(messageElement);
-        if(types.isEmpty()) {
+        processMessage(messageElement);
+        if(messageElement.properties().isEmpty()) {
             printWarning("No properties found", message);
             return Optional.of(messageElement);
         }
 
-        if (!hasPropertiesConstructor(message, types)) {
+        if (!hasPropertiesConstructor(messageElement)) {
             printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
             return Optional.empty();
         }
@@ -217,13 +399,27 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.of(messageElement);
     }
 
-    private boolean hasPropertiesConstructor(TypeElement message, List<TypeMirror> expectedParameterTypes) {
-        return message.getEnclosedElements()
+
+    private void processMessage(ProtobufMessageElement messageElement) {
+        for (var entry : messageElement.element().getEnclosedElements()) {
+            if (entry instanceof VariableElement variableElement) {
+                processProperty(messageElement, variableElement);
+            }else if(entry instanceof ExecutableElement executableElement) {
+                var builder = executableElement.getAnnotation(ProtobufBuilder.class);
+                if(builder != null) {
+                    messageElement.addBuilder(builder.className(), executableElement.getParameters(), executableElement);
+                }
+            }
+        }
+    }
+
+    private boolean hasPropertiesConstructor(ProtobufMessageElement message) {
+        return message.element().getEnclosedElements()
                 .stream()
                 .filter(entry -> entry instanceof ExecutableElement)
                 .map(entry -> (ExecutableElement) entry)
                 .filter(entry -> entry.getKind() == ElementKind.CONSTRUCTOR)
-                .anyMatch(entry -> isApplicableConstructor(expectedParameterTypes, entry));
+                .anyMatch(entry -> isApplicableConstructor(message.propertiesTypes(), entry));
     }
 
     // No var args support as it's not needed
@@ -234,82 +430,112 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 && IntStream.range(0, expectedSize).allMatch(index -> isSubType(constructorParameters.get(index).asType(), expectedParameterTypes.get(index)));
     }
 
-    private List<TypeMirror> processProperties(ProtobufMessageElement messageElement) {
-        return messageElement.element()
-                .getEnclosedElements()
-                .stream()
-                .filter(entry -> entry instanceof VariableElement)
-                .map(entry -> (VariableElement) entry)
-                .filter(variableElement -> processProperty(messageElement, variableElement))
-                .map(VariableElement::asType)
-                .toList();
-    }
-
-    private boolean processProperty(ProtobufMessageElement messageElement, VariableElement variableElement) {
+    private void processProperty(ProtobufMessageElement messageElement, VariableElement variableElement) {
         var propertyAnnotation = variableElement.getAnnotation(ProtobufProperty.class);
         if(propertyAnnotation == null) {
-            return false;
+            return;
         }
 
         if(propertyAnnotation.required() && !isValidRequiredProperty(variableElement)) {
-            return true;
+            return;
         }
 
         if(propertyAnnotation.packed() && !isValidPackedProperty(variableElement, propertyAnnotation)) {
-           return true;
+           return;
         }
 
         if(propertyAnnotation.repeated() && !checkRepeatedField(variableElement)) {
-            return true;
+            return;
         }
 
         var type = getImplementationType(variableElement, propertyAnnotation);
         if(type.isEmpty()) {
-            return true;
+            return;
         }
 
         var error = messageElement.addProperty(variableElement, type.get(), propertyAnnotation);
         if(error.isEmpty()) {
-            return true;
+            return;
         }
 
         printError("Duplicated message property: %s and %s with index %s".formatted(variableElement.getSimpleName(), error.get().name(), propertyAnnotation.index()), variableElement);
-        return true;
     }
 
     private Optional<ProtobufPropertyType> getImplementationType(VariableElement fieldElement, ProtobufProperty property) {
         var fieldType = fieldElement.asType();
         var implementationAstType = getExplicitImplementationType(fieldElement, property);
-        if (!property.repeated()) {
-            var rawFieldType = erase(fieldType);
-            var result = new ProtobufPropertyType(
-                    rawFieldType,
-                    implementationAstType.orElse(rawFieldType),
-                    null,
-                    getNullableConverter(property, implementationAstType.orElse(null), fieldType),
-                    isEnum(fieldType)
-            );
+        if (property.repeated()) {
+            var collectionTypeParameter = (DeclaredType) getCollectionType(fieldType).orElse(null);
+            if (collectionTypeParameter == null) {
+                printError("Type inference error: cannot determine collection's type. Specify the implementation explicitly in @ProtobufProperty", fieldElement);
+                return Optional.empty();
+            }
+
+            var actualCollectionTypeParameter = implementationAstType.orElse(collectionTypeParameter);
+            var result = new ProtobufPropertyType(fieldType, actualCollectionTypeParameter, fieldType, isEnum(actualCollectionTypeParameter));
+            result.addNullableConverter(getNullableConverter(property, implementationAstType.orElse(null), actualCollectionTypeParameter));
             return Optional.of(result);
         }
 
-        var collectionTypeParameter = (DeclaredType) getCollectionType(fieldType).orElse(null);
-        if(collectionTypeParameter == null) {
-            printError("Type inference error: cannot determine collection's type. Specify the implementation explicitly in @ProtobufProperty", fieldElement);
-            return Optional.empty();
+        var rawFieldType = erase(fieldType);
+        var optionalConverter = optionalTypes.get(rawFieldType.toString());
+        if (optionalConverter != null) {
+            var declaredFieldType = (DeclaredType) fieldType;
+            var wrappedType = getOptionalValueType(declaredFieldType);
+            if (wrappedType.isEmpty()) {
+                return Optional.empty();
+            }
+
+            var rawWrappedType = erase(wrappedType.get());
+            var result = new ProtobufPropertyType(fieldType, implementationAstType.orElse(rawWrappedType), null, isEnum(rawWrappedType));
+            result.addNullableConverter(getNullableConverter(property, implementationAstType.orElse(null), rawWrappedType));
+            result.addNullableConverter(optionalConverter);
+            return Optional.of(result);
         }
 
-        var actualCollectionTypeParameter = implementationAstType.orElse(collectionTypeParameter);
-        var result = new ProtobufPropertyType(
-                collectionTypeParameter,
-                actualCollectionTypeParameter,
-                fieldType,
-                getNullableConverter(property, implementationAstType.orElse(null), actualCollectionTypeParameter),
-                isEnum(actualCollectionTypeParameter)
-        );
+        var atomicConverter = atomicTypes.get(rawFieldType.toString());
+        if (atomicConverter != null) {
+            var declaredFieldType = (DeclaredType) fieldType;
+            var wrappedType = getAtomicValueType(declaredFieldType);
+            if (wrappedType.isEmpty()) {
+                return Optional.empty();
+            }
+
+            var rawWrappedType = erase(wrappedType.get());
+            var result = new ProtobufPropertyType(fieldType, implementationAstType.orElse(rawWrappedType), null, isEnum(rawWrappedType));
+            result.addNullableConverter(getNullableConverter(property, implementationAstType.orElse(null), rawWrappedType));
+            result.addNullableConverter(atomicConverter);
+            return Optional.of(result);
+        }
+
+        var result = new ProtobufPropertyType(fieldType, implementationAstType.orElse(rawFieldType), null, isEnum(fieldType));
+        result.addNullableConverter(getNullableConverter(property, implementationAstType.orElse(null), rawFieldType));
         return Optional.of(result);
     }
 
-    private ProtobufPropertyConverter getNullableConverter(ProtobufProperty property, TypeMirror implementation, TypeMirror fieldType) {
+    private Optional<TypeMirror> getAtomicValueType(DeclaredType declaredFieldType) {
+        return switch (declaredFieldType.asElement().getSimpleName().toString()) {
+            case "AtomicReference" ->
+                    declaredFieldType.getTypeArguments().isEmpty() ? Optional.empty() : Optional.of(declaredFieldType.getTypeArguments().get(0));
+            case "AtomicInteger" -> Optional.of(getType(Integer.class));
+            case "AtomicLong" -> Optional.of(getType(Long.class));
+            case "AtomicBoolean" -> Optional.of(getType(Boolean.class));
+            default -> Optional.empty();
+        };
+    }
+
+    private Optional<TypeMirror> getOptionalValueType(DeclaredType declaredFieldType) {
+        return switch (declaredFieldType.asElement().getSimpleName().toString()) {
+            case "Optional" ->
+                    declaredFieldType.getTypeArguments().isEmpty() ? Optional.empty() : Optional.of(declaredFieldType.getTypeArguments().get(0));
+            case "OptionalLong" -> Optional.of(getType(Long.class));
+            case "OptionalInt" -> Optional.of(getType(Integer.class));
+            case "OptionalDouble" -> Optional.of(getType(Double.class));
+            default -> Optional.empty();
+        };
+    }
+
+    private ProtobufConverterElement getNullableConverter(ProtobufProperty property, TypeMirror implementation, TypeMirror fieldType) {
         if (implementation == null) {
             var wrapperType = getType(property.type().wrappedType());
             if (isSameType(fieldType, getType(property.type().primitiveType())) || isSubType(fieldType, wrapperType)) {
@@ -328,7 +554,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .orElse(null);
     }
 
-    private Optional<ProtobufPropertyConverter> getConverter(TypeMirror to, TypeMirror from) {
+    private Optional<ProtobufConverterElement> getConverter(TypeMirror to, TypeMirror from) {
         if (!(to instanceof DeclaredType declaredType)) {
             return Optional.empty();
         }
@@ -361,7 +587,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        var result = new ProtobufPropertyConverter(serializer, deserializer);
+        var result = new ProtobufConverterElement(serializer, deserializer);
         return Optional.of(result);
     }
 

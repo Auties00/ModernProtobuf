@@ -15,11 +15,11 @@ public class SchemaTest {
         var out = Path.of("src/test/java/").toAbsolutePath().toString();
 
         Assertions.assertDoesNotThrow(() -> {
-            new CommandLine(new BaseCommand()).execute("generate", proto, "--mutable", "--output", out);
+            new CommandLine(new BaseCommand()).execute("generate", proto, "--output", out);
         });
 
         Assertions.assertDoesNotThrow(() -> {
-            new CommandLine(new BaseCommand()).execute("update", proto, out, "--mutable");
+            new CommandLine(new BaseCommand()).execute("update", proto, out);
         });
     }
 }
