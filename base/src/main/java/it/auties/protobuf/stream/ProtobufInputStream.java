@@ -332,7 +332,11 @@ public class ProtobufInputStream {
         if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
-        
+
+        return readBytesUnchecked();
+    }
+
+    public byte[] readBytesUnchecked() {
         var size = this.readInt32Unchecked();
         if (size > 0 && size <= this.limit - this.pos) {
             this.pos += size;

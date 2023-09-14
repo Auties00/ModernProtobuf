@@ -81,7 +81,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     private void createMessageDeserializer() {
         writer.println("        if(input == null) {");
-        writer.println("                return null;");
+        writer.println("            return null;");
         writer.println("        }");
         // ProtobufInputStream stream = new ProtobufInputStream(var1);
         writer.println("        var inputStream = new ProtobufInputStream(input);");
@@ -106,7 +106,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             writer.println("                case %s -> %s;".formatted(property.index(), readAssignment));
             argumentsList.add(property.name());
         }
-        writer.println("                default -> inputStream.readBytes();");
+        writer.println("                default -> inputStream.readBytesUnchecked();");
         writer.println("            }");
         writer.println("        }");
 

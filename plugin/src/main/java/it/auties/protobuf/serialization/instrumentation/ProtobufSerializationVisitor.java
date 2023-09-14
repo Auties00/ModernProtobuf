@@ -20,6 +20,9 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected void doInstrumentation() {
+        writer.println("        if(protoInputObject == null) {");
+        writer.println("            return null;");
+        writer.println("        }");
         if(message.isEnum()) {
             createEnumSerializer();
         }else {
@@ -73,7 +76,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected String returnType() {
-        return message.isEnum() ? "int" : "byte[]";
+        return message.isEnum() ? "Integer" : "byte[]";
     }
 
     @Override
