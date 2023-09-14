@@ -23,7 +23,6 @@ import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.tool.util.LogProvider;
-import lombok.NonNull;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -36,10 +35,8 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
     private final static Set<CompilationUnit> compilationUnits = new HashSet<>();
     private static final Map<String, ClassOrInterfaceDeclaration> oneOfImplementMap = new HashMap<>();
 
-    @NonNull
     protected V protoStatement;
 
-    @NonNull
     protected List<CompilationUnit> classPool;
 
     protected Path output;
@@ -48,7 +45,7 @@ abstract sealed class SchemaCreator<V extends ProtobufObject<?>> implements LogP
 
     protected boolean mutable;
 
-    SchemaCreator(String packageName, @NonNull V protoStatement, boolean mutable, @NonNull List<CompilationUnit> classPool, Path output) {
+    SchemaCreator(String packageName, V protoStatement, boolean mutable, List<CompilationUnit> classPool, Path output) {
         this.protoStatement = protoStatement;
         this.classPool = classPool;
         this.mutable = mutable;

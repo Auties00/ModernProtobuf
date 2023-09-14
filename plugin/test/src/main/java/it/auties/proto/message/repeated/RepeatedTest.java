@@ -1,6 +1,6 @@
 package it.auties.proto.message.repeated;
 
-import lombok.SneakyThrows;
+import com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -9,8 +9,7 @@ import java.util.List;
 
 public class RepeatedTest {
     @Test
-    @SneakyThrows
-    public void testModifiers() {
+        public void testModifiers() throws InvalidProtocolBufferException {
         var repeatedMessage = new ModernRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)));
         var encoded = ModernRepeatedMessageSpec.encode(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
@@ -20,8 +19,7 @@ public class RepeatedTest {
     }
 
     @Test
-    @SneakyThrows
-    public void testMultipleModifiers(){
+        public void testMultipleModifiers(){
         var repeatedMessage = new ModernBetaRepeatedMessage(new ArrayList<>(List.of(1, 2, 3)), new ArrayList<>(List.of(new ModernRepeatedMessage(new ArrayList<>(List.of(1, 2, 3))))));
         var encoded = ModernBetaRepeatedMessageSpec.encode(repeatedMessage);
         var modernDecoded = ModernBetaRepeatedMessageSpec.decode(encoded);

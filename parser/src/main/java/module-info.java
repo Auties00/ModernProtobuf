@@ -1,5 +1,4 @@
 module it.auties.protobuf.parser {
-    requires static lombok;
     requires it.auties.protobuf.base;
     requires java.compiler;
 

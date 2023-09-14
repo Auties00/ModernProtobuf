@@ -1,15 +1,8 @@
 package it.auties.protobuf.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.experimental.Accessors;
+import java.util.Arrays;
+import java.util.Optional;
 
-import java.util.*;
-
-@Getter
-@AllArgsConstructor
-@Accessors(fluent = true)
 public enum ProtobufType {
     OBJECT(Object.class, Object.class, false),
     FLOAT(float.class, Float.class, true),
@@ -28,17 +21,33 @@ public enum ProtobufType {
     FIXED64(long.class, Long.class, true),
     SFIXED64(long.class, Long.class, true);
 
+    private final Class<?> primitiveType;
+
+    private final Class<?> wrappedType;
+
+    private final boolean packable;
+
+    ProtobufType(Class<?> primitiveType, Class<?> wrappedType, boolean packable) {
+        this.primitiveType = primitiveType;
+        this.wrappedType = wrappedType;
+        this.packable = packable;
+    }
+
     public static Optional<ProtobufType> of(String name) {
         return Arrays.stream(values())
                 .filter(entry -> entry.name().equalsIgnoreCase(name))
                 .findFirst();
     }
 
-    @NonNull
-    private final Class<?> primitiveType;
+    public Class<?> primitiveType() {
+        return this.primitiveType;
+    }
 
-    @NonNull
-    private final Class<?> wrappedType;
+    public Class<?> wrappedType() {
+        return this.wrappedType;
+    }
 
-    private final boolean isPackable;
+    public boolean isPackable() {
+        return this.packable;
+    }
 }

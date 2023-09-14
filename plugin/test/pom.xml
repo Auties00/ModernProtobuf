@@ -26,11 +26,6 @@
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>1.18.24</version>
-                        </annotationProcessorPath>
-                        <annotationProcessorPath>
                             <groupId>org.openjdk.jmh</groupId>
                             <artifactId>jmh-generator-annprocess</artifactId>
                             <version>1.35</version>
@@ -41,9 +36,6 @@
                             <version>2.0.0</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
-                    <compilerArgs>
-                        <compilerArg>--enable-preview</compilerArg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

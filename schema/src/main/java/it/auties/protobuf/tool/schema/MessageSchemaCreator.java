@@ -24,7 +24,6 @@ import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufOneOfStatement;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
-import lombok.NonNull;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -33,7 +32,7 @@ import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
 import static com.github.javaparser.StaticJavaParser.parseType;
 
 final class MessageSchemaCreator extends SchemaCreator<ProtobufMessageStatement> {
-    MessageSchemaCreator(String packageName, @NonNull ProtobufMessageStatement protoStatement, boolean mutable, @NonNull List<CompilationUnit> classPool, Path output) {
+    MessageSchemaCreator(String packageName, ProtobufMessageStatement protoStatement, boolean mutable, List<CompilationUnit> classPool, Path output) {
         super(packageName, protoStatement, mutable, classPool, output);
     }
 

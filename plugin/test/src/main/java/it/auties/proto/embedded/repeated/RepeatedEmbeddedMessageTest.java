@@ -1,6 +1,5 @@
 package it.auties.proto.embedded.repeated;
 
-import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -9,8 +8,7 @@ import java.util.List;
 
 public class RepeatedEmbeddedMessageTest {
     @Test
-    @SneakyThrows
-    public void testModifiers() {
+        public void testModifiers() {
         var finalMessage = new RepeatedEmbeddedMessage(new ArrayList<>(List.of(1, 2, 3)));
         var anotherFinalMessage = new RepeatedEmbeddedMessage(new ArrayList<>(List.of(4, 5, 6)));
         var lastFinalMessage = new RepeatedEmbeddedMessage(new ArrayList<>(List.of(7, 8, 9)));

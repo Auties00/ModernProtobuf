@@ -3,11 +3,7 @@ package it.auties.protobuf.parser.type;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
 import it.auties.protobuf.parser.statement.ProtobufObject;
-import lombok.Getter;
-import lombok.experimental.Accessors;
 
-@Getter
-@Accessors(fluent = true)
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
     private ProtobufObject<?> declaration;
@@ -33,6 +29,10 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
     @Override
     public boolean isPrimitive() {
         return false;
+    }
+
+    public String name() {
+        return name;
     }
 
     public ProtobufObject<?> declaration() {

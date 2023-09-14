@@ -15,7 +15,6 @@ import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement;
-import lombok.NonNull;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -24,7 +23,7 @@ import java.util.Optional;
 import static com.github.javaparser.StaticJavaParser.parseType;
 
 final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
-    EnumSchemaCreator(String packageName, @NonNull ProtobufEnumStatement protoStatement, @NonNull List<CompilationUnit> classPool, Path output) {
+    EnumSchemaCreator(String packageName, ProtobufEnumStatement protoStatement, List<CompilationUnit> classPool, Path output) {
         super(packageName, protoStatement, false, classPool, output);
     }
 

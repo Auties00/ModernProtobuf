@@ -1,9 +1,13 @@
 package it.auties.protobuf.exception;
 
-import lombok.experimental.StandardException;
-
-@StandardException
 public class ProtobufDeserializationException extends ProtobufException {
+    public ProtobufDeserializationException() {
+    }
+
+    public ProtobufDeserializationException(String message) {
+        super(message);
+    }
+
     public static ProtobufDeserializationException truncatedMessage() {
         return new ProtobufDeserializationException("A message ended unexpectedly in the middle of a field");
     }

@@ -1,13 +1,11 @@
 package it.auties.proto.message.modifier;
 
-import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class ModifierTest {
     @Test
-    @SneakyThrows
-    public void testModifiers() {
+        public void testModifiers() {
         var missing = new RequiredMessage(null, null);
         Assertions.assertFalse(encode(missing), "Missing mandatory field passed encoding");
         var correct = new RequiredMessage("something", "something");

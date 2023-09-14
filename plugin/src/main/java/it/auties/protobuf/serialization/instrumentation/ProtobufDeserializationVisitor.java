@@ -1,6 +1,7 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.serialization.model.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
 
@@ -79,6 +80,9 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     }
 
     private void createMessageDeserializer() {
+        writer.println("        if(input == null) {");
+        writer.println("                return null;");
+        writer.println("        }");
         // ProtobufInputStream stream = new ProtobufInputStream(var1);
         writer.println("        var inputStream = new ProtobufInputStream(input);");
 
@@ -137,7 +141,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     private String getReadValue(ProtobufPropertyStub property, String readMethod) {
         var reader = "inputStream.%s()".formatted(readMethod);
-        if (property.protoType() != ProtobufType.OBJECT) {
+        if (property.type().protobufType() != ProtobufType.OBJECT) {
             return reader;
         }
 
@@ -152,14 +156,15 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
     private String getConvertedValue(ProtobufPropertyStub property, String readValue) {
         var result = readValue;
         for(var converter : property.type().converters()) {
-            var deserializer = converter.deserializer();
-            if(deserializer.getKind() == ElementKind.CONSTRUCTOR) {
-                var converterWrapperClass = (TypeElement) deserializer.getEnclosingElement();
-                result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
-            }else {
-                var converterWrapperClass = (TypeElement) deserializer.getEnclosingElement();
-                var converterMethodName = deserializer.getSimpleName();
-                result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
+            if(converter instanceof ProtobufDeserializerElement deserializerElement) {
+                if (deserializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
+                    var converterWrapperClass = (TypeElement) deserializerElement.element().getEnclosingElement();
+                    result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
+                } else {
+                    var converterWrapperClass = (TypeElement) deserializerElement.element().getEnclosingElement();
+                    var converterMethodName = deserializerElement.element().getSimpleName();
+                    result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
+                }
             }
         }
         return result;
@@ -184,7 +189,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
                     yield "null";
                 }
 
-                yield "new %s()".formatted(property.type().wrapperType());
+                yield "new %s()".formatted(property.type().concreteCollectionType());
             }
             case INT, CHAR, SHORT, BYTE -> "0";
             case BOOLEAN -> "false";
@@ -197,7 +202,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private String getDeserializerStreamMethod(ProtobufPropertyStub property) {
-        return property.type().isEnum() ? property.packed() ? "readInt32Packed" : "readInt32" : switch (property.protoType()) {
+        return property.type().isEnum() ? property.packed() ? "readInt32Packed" : "readInt32" : switch (property.type().protobufType()) {
             case STRING -> "readString";
             case OBJECT, BYTES -> "readBytes";
             case BOOL -> property.packed() ? "readBoolPacked" : "readBool";

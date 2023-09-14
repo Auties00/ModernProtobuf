@@ -7,10 +7,6 @@ import it.auties.protobuf.parser.statement.*;
 import it.auties.protobuf.parser.statement.ProtobufFieldStatement.Modifier;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.experimental.Accessors;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,15 +47,15 @@ public final class ProtobufParser {
     private Integer reservedIndex;
     private boolean reservedIndexRange;
 
-    public ProtobufParser(@NonNull File file) throws IOException {
+    public ProtobufParser(File file) throws IOException {
         this(file.toPath());
     }
 
-    public ProtobufParser(@NonNull Path input) throws IOException {
+    public ProtobufParser(Path input) throws IOException {
         this(Files.readString(input));
     }
 
-    public ProtobufParser(@NonNull String input) {
+    public ProtobufParser(String input) {
         this.document = new ProtobufDocument();
         this.tokenizer = new StreamTokenizer(new StringReader(input));
         this.objectsQueue = new LinkedList<>();
@@ -608,9 +604,6 @@ public final class ProtobufParser {
         }
     }
 
-    @Getter
-    @AllArgsConstructor
-    @Accessors(fluent = true)
     private enum Instruction {
         UNKNOWN(false),
         PACKAGE(false),
@@ -623,12 +616,19 @@ public final class ProtobufParser {
         SERVICE(true);
 
         private final boolean hasBody;
+        Instruction(boolean hasBody) {
+            this.hasBody = hasBody;
+        }
 
-        public static Instruction of(@NonNull String name) {
+        public static Instruction of(String name) {
             return Arrays.stream(values())
                     .filter(entry -> entry.name().replaceAll("_", "").equalsIgnoreCase(name))
                     .findFirst()
                     .orElse(UNKNOWN);
+        }
+
+        public boolean hasBody() {
+            return hasBody;
         }
     }
 

@@ -1,14 +1,12 @@
 package it.auties.proto.compatibility.scalar;
 
 import com.google.protobuf.ByteString;
-import lombok.SneakyThrows;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class GoogleProtocTest {
     @Test
-    @SneakyThrows
-    public void encodeScalarTypes() {
+        public void encodeScalarTypes() {
         var googleMessage = GoogleScalarMessage.newBuilder()
                 .setString("Hello, this is an automated test!")
                 .setBytes(ByteString.copyFromUtf8("Hello, this is an automated test!"))

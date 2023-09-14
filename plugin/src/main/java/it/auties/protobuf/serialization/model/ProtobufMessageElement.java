@@ -6,7 +6,6 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeMirror;
 import java.util.*;
 
 public class ProtobufMessageElement {
@@ -40,7 +39,7 @@ public class ProtobufMessageElement {
             element = parent;
         }
 
-        return className;
+        return name + className;
     }
 
     public Optional<ProtobufEnumMetadata> enumMetadata() {
@@ -63,14 +62,14 @@ public class ProtobufMessageElement {
         return Optional.ofNullable(constants.put(fieldIndex, fieldName));
     }
 
-    public Optional<ProtobufPropertyStub> addProperty(VariableElement element, ProtobufPropertyType type, ProtobufProperty property) {
+    public Optional<ProtobufPropertyStub> addProperty(VariableElement element, ExecutableElement accessor, ProtobufPropertyType type, ProtobufProperty property) {
         if(property.ignored()) {
             return Optional.empty();
         }
 
         var fieldName = element.getSimpleName().toString();
         var fieldIndex = property.index();
-        var result = new ProtobufPropertyStub(fieldIndex, fieldName, type, property);
+        var result = new ProtobufPropertyStub(fieldIndex, fieldName, accessor, type, property);
         return Optional.ofNullable(properties.put(fieldIndex, result));
     }
 
@@ -80,13 +79,5 @@ public class ProtobufMessageElement {
 
     public List<ProtobufBuilderElement> builders() {
         return Collections.unmodifiableList(builders);
-    }
-
-    public List<TypeMirror> propertiesTypes() {
-        return properties.values()
-                .stream()
-                .map(ProtobufPropertyStub::type)
-                .map(ProtobufPropertyType::fieldType)
-                .toList();
     }
 }

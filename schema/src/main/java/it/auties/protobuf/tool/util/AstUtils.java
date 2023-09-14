@@ -2,7 +2,6 @@ package it.auties.protobuf.tool.util;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
-import lombok.experimental.UtilityClass;
 
 import java.io.File;
 import java.io.IOException;
@@ -11,9 +10,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
-@UtilityClass
 public class AstUtils implements LogProvider {
-    public List<CompilationUnit> createClassPool(File directory) {
+    public static List<CompilationUnit> createClassPool(File directory) {
         if(directory == null){
             return List.of();
         }
@@ -28,7 +26,7 @@ public class AstUtils implements LogProvider {
         }
     }
 
-    private Optional<CompilationUnit> parseClass(Path path) {
+    private static Optional<CompilationUnit> parseClass(Path path) {
         try {
             return Optional.of(StaticJavaParser.parse(path));
         } catch (IOException e) {

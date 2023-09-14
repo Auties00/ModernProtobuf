@@ -3,12 +3,10 @@ package it.auties.protobuf.serialization.instrumentation;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.ProtobufMessageElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.model.ProtobufSerializerElement;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.Collection;
@@ -122,15 +120,14 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         }
 
         var writeMethod = getSerializerStreamMethod(property);
-        var writeValue = getWriteValue(property, overridePropertyName);
-        var convertedValue = applyConverter(property, writeValue, hasConverter);
+        var convertedValue = applyConverter(property, overridePropertyName, hasConverter);
+        var writeValue = applyEncoder(property, convertedValue);
         var writeIndentation = "   ".repeat(hasConverter ? indentationLevel + 1 : indentationLevel);
-        writer.println("%soutputStream.%s(%s, %s);".formatted(writeIndentation, writeMethod.getName(), property.index(), convertedValue));
+        writer.println("%soutputStream.%s(%s, %s);".formatted(writeIndentation, writeMethod.getName(), property.index(), writeValue));
     }
 
-    private String getWriteValue(ProtobufPropertyStub property, String overridePropertyName) {
-        var result = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.name());
-        if (property.protoType() != ProtobufType.OBJECT) {
+    private String applyEncoder(ProtobufPropertyStub property, String result) {
+        if (property.type().protobufType() != ProtobufType.OBJECT) {
             return result;
         }
 
@@ -138,20 +135,26 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         return "%s.encode(%s)".formatted(spec, result);
     }
 
-    private String applyConverter(ProtobufPropertyStub property, String writeValue, boolean hasConverter) {
+    private String applyConverter(ProtobufPropertyStub property, String overridePropertyName, boolean hasConverter) {
+        var result = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.accessor().getSimpleName());
         if (!hasConverter) {
-            return writeValue;
+            return result;
         }
 
-        var result = writeValue;
         for(var converter : property.type().converters()) {
-            if(converter.serializer().getModifiers().contains(Modifier.STATIC)) {
-                var converterWrapperClass = (TypeElement) converter.serializer().getEnclosingElement();
-                result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converter.serializer().getSimpleName(), result);
-            }else {
-                result = "%s.%s(%s)".formatted(result, converter.serializer().getSimpleName(), String.join(", ", converter.serializerArguments()));
+            if(converter instanceof ProtobufSerializerElement serializerElement) {
+                if(serializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
+                    var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
+                    result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
+                }else if (serializerElement.element().getModifiers().contains(Modifier.STATIC)) {
+                    var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
+                    result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName(), result);
+                } else {
+                    result = "%s.%s(%s)".formatted(result, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
+                }
             }
         }
+
         return result;
     }
 
@@ -159,7 +162,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
         try {
             var clazz = ProtobufOutputStream.class;
-            return switch (annotation.protoType()) {
+            return switch (annotation.type().protobufType()) {
                 case STRING ->
                         isConcreteRepeated(annotation) ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
                 case OBJECT ->
@@ -186,7 +189,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                         isConcreteRepeated(annotation) ? clazz.getMethod("writeFixed64", int.class, Collection.class) : clazz.getMethod("writeFixed64", int.class, Long.class);
             };
         }catch (NoSuchMethodException exception) {
-            throw new RuntimeException("Missing serializer method", exception);
+            throw new RuntimeException("Missing element method", exception);
         }
     }
 

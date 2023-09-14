@@ -1,17 +1,15 @@
 package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufType;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import javax.lang.model.element.ExecutableElement;
 
-public record ProtobufPropertyStub(int index, String name, ProtobufType protoType, AtomicInteger fieldId, ProtobufPropertyType type, boolean required, boolean repeated, boolean packed) {
-    public ProtobufPropertyStub(int index, String name, ProtobufPropertyType type, ProtobufProperty annotation) {
+public record ProtobufPropertyStub(int index, String name, ExecutableElement accessor, ProtobufPropertyType type, boolean required, boolean repeated, boolean packed) {
+    public ProtobufPropertyStub(int index, String name, ExecutableElement accessor, ProtobufPropertyType type, ProtobufProperty annotation) {
         this(
                 index,
                 name,
-                annotation.type(),
-                new AtomicInteger(),
+                accessor,
                 type,
                 annotation.required(),
                 annotation.repeated(),
