@@ -13,7 +13,13 @@ import it.auties.protobuf.model.ProtobufObject;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.instrumentation.ProtobufDeserializationVisitor;
 import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVisitor;
-import it.auties.protobuf.serialization.model.*;
+import it.auties.protobuf.serialization.message.*;
+import it.auties.protobuf.serialization.converter.ProtobufConverterElement;
+import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.util.PropertyUtils;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
@@ -359,6 +365,12 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             }
             writer.println();
             writer.println("    public %s() {".formatted(simpleGeneratedClassName));
+            if(builderElement == null) {
+                for (var property : properties) {
+                    writer.println("        %s = %s;".formatted(property.name(), PropertyUtils.getPropertyDefaultValue(property)));
+                }
+            }
+
             writer.println("    }");
             writer.println();
             if(builderElement != null) {

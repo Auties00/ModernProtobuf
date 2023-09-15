@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.model;
+package it.auties.protobuf.serialization.converter;
 
 import javax.lang.model.element.ExecutableElement;
 

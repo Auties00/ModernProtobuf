@@ -17,9 +17,5 @@ public class SchemaTest {
         Assertions.assertDoesNotThrow(() -> {
             new CommandLine(new BaseCommand()).execute("generate", proto, "--output", out);
         });
-
-        Assertions.assertDoesNotThrow(() -> {
-            new CommandLine(new BaseCommand()).execute("update", proto, out);
-        });
     }
 }

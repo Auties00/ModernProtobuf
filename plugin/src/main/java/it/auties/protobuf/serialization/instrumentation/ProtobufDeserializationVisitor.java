@@ -1,30 +1,19 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.model.ProtobufDeserializerElement;
-import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.message.ProtobufMessageElement;
+import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.util.PropertyUtils;
 
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
 import java.io.PrintWriter;
-import java.util.*;
-import java.util.concurrent.atomic.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisitor {
-    private static final Set<String> OPTIONAL_TYPES = Set.of(
-            Optional.class.getName(),
-            OptionalInt.class.getName(),
-            OptionalLong.class.getName(),
-            OptionalDouble.class.getName()
-    );
-    private static final Set<String> ATOMIC_TYPES = Set.of(
-            AtomicReference.class.getName(),
-            AtomicInteger.class.getName(),
-            AtomicLong.class.getName(),
-            AtomicBoolean.class.getName()
-    );
     public ProtobufDeserializationVisitor(ProtobufMessageElement element, PrintWriter writer) {
         super(element, writer);
     }
@@ -88,7 +77,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
         // [<type> var<index> = <defaultValue>, ...]
         for(var property : message.properties()) {
-            var defaultValue = getPropertyDefaultValue(property);
+            var defaultValue = PropertyUtils.getPropertyDefaultValue(property);
             writer.println("        %s %s = %s;".formatted(property.type().fieldType(), property.name(), defaultValue));
         }
 
@@ -168,36 +157,6 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             }
         }
         return result;
-    }
-
-    private String getPropertyDefaultValue(ProtobufPropertyStub property) {
-        return switch (property.type().implementationType().getKind()) {
-            case DECLARED, ARRAY -> {
-                if(property.type().fieldType() instanceof DeclaredType declaredType
-                        && declaredType.asElement() instanceof TypeElement typeElement
-                        && OPTIONAL_TYPES.contains(typeElement.getQualifiedName().toString())) {
-                    yield "%s.empty()".formatted(typeElement.getQualifiedName());
-                }
-
-                if(property.type().fieldType() instanceof DeclaredType declaredType
-                        && declaredType.asElement() instanceof TypeElement typeElement
-                        && ATOMIC_TYPES.contains(typeElement.getQualifiedName().toString())) {
-                    yield "new %s()".formatted(typeElement.getQualifiedName());
-                }
-
-                if (!property.repeated()) {
-                    yield "null";
-                }
-
-                yield "new %s()".formatted(property.type().concreteCollectionType());
-            }
-            case INT, CHAR, SHORT, BYTE -> "0";
-            case BOOLEAN -> "false";
-            case FLOAT -> "0f";
-            case DOUBLE -> "0d";
-            case LONG -> "0l";
-            default -> throw new IllegalArgumentException("Unexpected type: " + property.type().implementationType());
-        };
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream

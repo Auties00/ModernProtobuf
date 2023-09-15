@@ -1,6 +1,7 @@
-package it.auties.protobuf.serialization.model;
+package it.auties.protobuf.serialization.property;
 
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.serialization.converter.ProtobufConverterElement;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;

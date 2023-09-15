@@ -1,9 +1,9 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.model.ProtobufMessageElement;
-import it.auties.protobuf.serialization.model.ProtobufPropertyStub;
-import it.auties.protobuf.serialization.model.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.message.ProtobufMessageElement;
+import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.*;

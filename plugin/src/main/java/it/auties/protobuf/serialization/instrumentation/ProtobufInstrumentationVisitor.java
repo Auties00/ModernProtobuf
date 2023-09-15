@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.serialization.model.ProtobufMessageElement;
+import it.auties.protobuf.serialization.message.ProtobufMessageElement;
 
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;

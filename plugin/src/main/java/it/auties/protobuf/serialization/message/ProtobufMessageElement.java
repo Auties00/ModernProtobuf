@@ -1,6 +1,8 @@
-package it.auties.protobuf.serialization.model;
+package it.auties.protobuf.serialization.message;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
