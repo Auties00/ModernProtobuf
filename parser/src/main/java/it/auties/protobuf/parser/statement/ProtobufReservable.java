@@ -1,6 +1,8 @@
 package it.auties.protobuf.parser.statement;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 public sealed abstract class ProtobufReservable<T extends ProtobufStatement> extends ProtobufObject<T>
