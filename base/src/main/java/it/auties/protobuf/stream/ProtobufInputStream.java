@@ -333,10 +333,6 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
 
-        return readBytesUnchecked();
-    }
-
-    public byte[] readBytesUnchecked() {
         var size = this.readInt32Unchecked();
         if (size > 0 && size <= this.limit - this.pos) {
             this.pos += size;
@@ -344,6 +340,15 @@ public class ProtobufInputStream {
         }
 
         return size == 0 ? new byte[0] : this.readBytes(size);
+    }
+
+    public void skipBytes() {
+        if(isAtEnd()) {
+            return;
+        }
+
+        var size = this.readInt32Unchecked();
+        this.pos += size;
     }
 
     private byte[] readBytes(int length) {

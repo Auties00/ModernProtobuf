@@ -95,7 +95,7 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
             writer.println("                case %s -> %s;".formatted(property.index(), readAssignment));
             argumentsList.add(property.name());
         }
-        writer.println("                default -> inputStream.readBytesUnchecked();");
+        writer.println("                default -> inputStream.skipBytes();");
         writer.println("            }");
         writer.println("        }");
 
