@@ -2,10 +2,11 @@ package it.auties.protobuf.serialization.property;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.converter.ProtobufConverterElement;
+import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public final class ProtobufPropertyType {
@@ -13,7 +14,8 @@ public final class ProtobufPropertyType {
     private final TypeMirror fieldType;
     private final TypeMirror implementation;
     private final TypeMirror concreteCollection;
-    private final List<ProtobufConverterElement> converters;
+    private final List<ProtobufSerializerElement> serializers;
+    private final List<ProtobufDeserializerElement> deserializers;
     private final boolean isEnum;
 
     public ProtobufPropertyType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, TypeMirror concreteCollection, boolean isEnum) {
@@ -21,7 +23,8 @@ public final class ProtobufPropertyType {
         this.fieldType = fieldType;
         this.implementation = implementationType;
         this.concreteCollection = concreteCollection;
-        this.converters = new ArrayList<>();
+        this.serializers = new ArrayList<>();
+        this.deserializers = new ArrayList<>();
         this.isEnum = isEnum;
     }
 
@@ -46,11 +49,18 @@ public final class ProtobufPropertyType {
             return;
         }
 
-        converters.add(converter);
+        switch (converter.type()) {
+            case SERIALIZER -> serializers.add((ProtobufSerializerElement) converter);
+            case DESERIALIZER -> deserializers.add((ProtobufDeserializerElement) converter);
+        }
     }
 
-    public List<ProtobufConverterElement> converters() {
-        return Collections.unmodifiableList(converters);
+    public List<ProtobufSerializerElement> serializers() {
+        return serializers;
+    }
+
+    public List<ProtobufDeserializerElement> deserializers() {
+        return deserializers;
     }
 
     public boolean isEnum() {

@@ -1,7 +1,6 @@
 package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.message.ProtobufMessageElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
 import it.auties.protobuf.serialization.util.PropertyUtils;
@@ -144,16 +143,14 @@ public class ProtobufDeserializationVisitor extends ProtobufInstrumentationVisit
 
     private String getConvertedValue(ProtobufPropertyStub property, String readValue) {
         var result = readValue;
-        for(var converter : property.type().converters()) {
-            if(converter instanceof ProtobufDeserializerElement deserializerElement) {
-                if (deserializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
-                    var converterWrapperClass = (TypeElement) deserializerElement.element().getEnclosingElement();
-                    result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
-                } else {
-                    var converterWrapperClass = (TypeElement) deserializerElement.element().getEnclosingElement();
-                    var converterMethodName = deserializerElement.element().getSimpleName();
-                    result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
-                }
+        for(var converter : property.type().deserializers()) {
+            if (converter.element().getKind() == ElementKind.CONSTRUCTOR) {
+                var converterWrapperClass = (TypeElement) converter.element().getEnclosingElement();
+                result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
+            } else {
+                var converterWrapperClass = (TypeElement) converter.element().getEnclosingElement();
+                var converterMethodName = converter.element().getSimpleName();
+                result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
             }
         }
         return result;

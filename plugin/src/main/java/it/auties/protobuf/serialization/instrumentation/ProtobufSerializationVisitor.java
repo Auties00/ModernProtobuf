@@ -9,6 +9,7 @@ import it.auties.protobuf.stream.ProtobufOutputStream;
 import javax.lang.model.element.*;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -20,9 +21,9 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected void doInstrumentation() {
-        writer.println("        if(protoInputObject == null) {");
-        writer.println("            return null;");
-        writer.println("        }");
+        writer.println("      if(protoInputObject == null) {");
+        writer.println("         return null;");
+        writer.println("      }");
         if(message.isEnum()) {
             createEnumSerializer();
         }else {
@@ -35,21 +36,21 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 .orElseThrow(() -> new NoSuchElementException("Missing metadata from enum"))
                 .field()
                 .getSimpleName();
-        writer.println("        return protoInputObject.%s;".formatted(fieldName));
+        writer.println("      return protoInputObject.%s;".formatted(fieldName));
     }
 
     private void createMessageSerializer() {
         createRequiredPropertiesNullCheck();
-        writer.println("        var outputStream = new ProtobufOutputStream();");
+        writer.println("      var outputStream = new ProtobufOutputStream();");
         message.properties().forEach(this::writeProperty);
-        writer.println("        return outputStream.toByteArray();");
+        writer.println("      return outputStream.toByteArray();");
     }
 
     private void createRequiredPropertiesNullCheck() {
         message.properties()
                 .stream()
                 .filter(ProtobufPropertyStub::required)
-                .forEach(entry -> writer.println("        Objects.requireNonNull(protoInputObject.%s(), \"Missing required property: %s\");".formatted(entry.name(), entry.name())));
+                .forEach(entry -> writer.println("      Objects.requireNonNull(protoInputObject.%s(), \"Missing required property: %s\");".formatted(entry.name(), entry.name())));
     }
 
     @Override
@@ -99,66 +100,101 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         if (property.repeated()) {
             writeRepeatedPropertySerializer(property);
         } else {
-            writeAnyPropertySerializer(property, null, 3);
+            writeAnyPropertySerializer(property, null);
         }
     }
 
     private void writeRepeatedPropertySerializer(ProtobufPropertyStub property) {
-        writer.println("        if(protoInputObject.%s() != null) {".formatted(property.name()));
+        writer.println("      if(protoInputObject.%s() != null) {".formatted(property.name()));
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("            for(var %s : protoInputObject.%s()) {".formatted(localVariableName, property.name()));
-        writeAnyPropertySerializer(property, localVariableName, 5);
-        writer.println("            }");
-        writer.println("        }");
+        writer.println("       for(var %s : protoInputObject.%s()) {".formatted(localVariableName, property.name()));
+        writeAnyPropertySerializer(property, localVariableName);
+        writer.println("       }");
+        writer.println("      }");
     }
 
-    private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName, int indentationLevel) {
-        var hasConverter = !property.type().converters().isEmpty();
-        if (hasConverter) {
-            if(overridePropertyName != null) {
-                writer.println("%sif(%s != null)".formatted("   ".repeat(indentationLevel), overridePropertyName));
-            }else {
-                writer.println("%sif(protoInputObject.%s() != null)".formatted("   ".repeat(indentationLevel), property.name()));
-            };
-        }
-
+    private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName) {
         var writeMethod = getSerializerStreamMethod(property);
-        var convertedValue = applyConverter(property, overridePropertyName, hasConverter);
-        var writeValue = applyEncoder(property, convertedValue);
-        var writeIndentation = "   ".repeat(hasConverter ? indentationLevel + 1 : indentationLevel);
-        writer.println("%soutputStream.%s(%s, %s);".formatted(writeIndentation, writeMethod.getName(), property.index(), writeValue));
-    }
-
-    private String applyEncoder(ProtobufPropertyStub property, String result) {
-        if (property.type().protobufType() != ProtobufType.OBJECT) {
-            return result;
+        var result = getVariables(property, overridePropertyName);
+        if(!result.converter()) {
+            var toWrite = result.variables().get(0).value();
+            var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), toWrite);
+            writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
+            return;
         }
 
-        var spec = getSpecName(property.type().implementationType());
-        return "%s.encode(%s)".formatted(spec, result);
-    }
-
-    private String applyConverter(ProtobufPropertyStub property, String overridePropertyName, boolean hasConverter) {
-        var result = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.accessor().getSimpleName());
-        if (!hasConverter) {
-            return result;
-        }
-
-        for(var converter : property.type().converters()) {
-            if(converter instanceof ProtobufSerializerElement serializerElement) {
-                if(serializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
-                    var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
-                    result = "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), result);
-                }else if (serializerElement.element().getModifiers().contains(Modifier.STATIC)) {
-                    var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
-                    result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName(), result);
-                } else {
-                    result = "%s.%s(%s)".formatted(result, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
-                }
+        String propertyName = null;
+        for(var index = 0; index < result.variables().size(); index++) {
+            var variable = result.variables().get(index);
+            writer.println(variable.value());
+            propertyName = property.name() + (index == 0 ? "" : index - 1);
+            if(!variable.primitive()) {
+                writer.println("if(%s != null) {".formatted(propertyName));
             }
         }
 
-        return result;
+        var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), propertyName);
+        writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
+        for(var variable : result.variables()) {
+            if(!variable.primitive()) {
+                writer.println("}");
+            }
+        }
+    }
+
+    private ProtobufPropertyVariables getVariables(ProtobufPropertyStub property, String overridePropertyName) {
+        var initializer = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.accessor().getSimpleName());
+        var converter = !property.type().serializers().isEmpty();
+        if (!converter) {
+            return new ProtobufPropertyVariables(false, List.of(new ProtobufPropertyVariable(initializer, property.type().fieldType().getKind().isPrimitive())));
+        }
+
+        var results = new ArrayList<ProtobufPropertyVariable>();
+        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(property.name(), initializer), property.type().fieldType().getKind().isPrimitive()));
+        var useMap = false;
+        var serializers = property.type().serializers();
+        for (var index = 0; index < serializers.size(); index++) {
+            var serializerElement = serializers.get(index);
+            var lastInitializer = index == 0 ? property.name() : property.name() + (index - 1);
+            var currentInitializer = property.name() + index;
+            var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer, useMap);
+            results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive()));
+            useMap |= serializerElement.optional();
+        }
+
+        return new ProtobufPropertyVariables(true, results);
+    }
+
+    private record ProtobufPropertyVariables(boolean converter, List<ProtobufPropertyVariable> variables) {
+
+    }
+
+    private record ProtobufPropertyVariable(String value, boolean primitive) {
+
+    }
+
+    private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer, boolean useMap) {
+        if (serializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
+            var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
+            return "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), lastInitializer);
+        }
+
+        if (serializerElement.element().getModifiers().contains(Modifier.STATIC)) {
+            var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
+            if (!useMap) {
+                return "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName(), lastInitializer);
+            }
+
+            var method = serializerElement.optional() ? "flatMap" : "map";
+            return "%s.%s(lambdaArg -> %s.%s(lambdaArg))".formatted(lastInitializer, method, converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName());
+        }
+
+        if (!useMap) {
+            return "%s.%s(%s)".formatted(lastInitializer, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
+        }
+
+        var method = serializerElement.optional() ? "flatMap" : "map";
+        return "%s.%s(lambdaArg -> lambdaArg.%s(%s))".formatted(lastInitializer, method, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
@@ -197,6 +233,6 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     private boolean isConcreteRepeated(ProtobufPropertyStub annotation) {
-        return annotation.repeated() && annotation.type().converters().isEmpty();
+        return annotation.repeated() && annotation.type().serializers().isEmpty();
     }
 }

@@ -110,13 +110,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var atomicBooleanSerializer = getMandatoryMethod(atomicBooleanType, "get");
         this.atomicSerializers = Map.of(
                 AtomicReference.class.getName(),
-                new ProtobufSerializerElement(atomicReferenceSerializer),
+                new ProtobufSerializerElement(atomicReferenceSerializer, false, false),
                 AtomicInteger.class.getName(),
-                new ProtobufSerializerElement(atomicIntegerSerializer),
+                new ProtobufSerializerElement(atomicIntegerSerializer, false, false),
                 AtomicLong.class.getName(),
-                new ProtobufSerializerElement(atomicLongSerializer),
+                new ProtobufSerializerElement(atomicLongSerializer, false, false),
                 AtomicBoolean.class.getName(),
-                new ProtobufSerializerElement(atomicBooleanSerializer)
+                new ProtobufSerializerElement(atomicBooleanSerializer, false, false)
         );
         this.atomicDeserializers = Map.of(
                 AtomicReference.class.getName(),
@@ -143,13 +143,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var optionalDoubleSerializer = getMandatoryMethod(optionalExtensionType, "toNullableDouble");
         this.optionalSerializers = Map.of(
                 Optional.class.getName(),
-                new ProtobufSerializerElement(optionalSerializer, "null"),
+                new ProtobufSerializerElement(optionalSerializer, false, false,"null"),
                 OptionalInt.class.getName(),
-                new ProtobufSerializerElement(optionalIntSerializer),
+                new ProtobufSerializerElement(optionalIntSerializer, false,false),
                 OptionalLong.class.getName(),
-                new ProtobufSerializerElement(optionalLongSerializer),
+                new ProtobufSerializerElement(optionalLongSerializer, false, false),
                 OptionalDouble.class.getName(),
-                new ProtobufSerializerElement(optionalDoubleSerializer)
+                new ProtobufSerializerElement(optionalDoubleSerializer, false, false)
         );
         this.optionalDeserializers = Map.of(
                 Optional.class.getName(),
@@ -713,7 +713,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         var results = new ArrayList<ProtobufConverterElement>();
         if(serializer != null) {
-            results.add(new ProtobufSerializerElement(serializer));
+            results.add(new ProtobufSerializerElement(serializer, serializer.getReturnType().getKind().isPrimitive(), isOptional(serializer)));
         }else {
             printError("Missing converter: cannot find a element for %s".formatted(from), invoker);
         }
@@ -725,6 +725,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         return Collections.unmodifiableList(results);
+    }
+
+    private boolean isOptional(ExecutableElement serializer) {
+        var erased = erase(serializer.getReturnType());
+        return optionalSerializers.get(erased.toString()) != null;
     }
 
     private boolean isDeserializer(ExecutableElement entry, TypeMirror fieldAstType) {
