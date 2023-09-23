@@ -568,7 +568,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             }
 
             var actualCollectionTypeParameter = implementationAstType.orElse(collectionTypeParameter);
-            var result = new ProtobufPropertyType(property.type(), field.asType(), actualCollectionTypeParameter, concreteCollectionType, isEnum(actualCollectionTypeParameter));
+            var result = new ProtobufPropertyType(property.type(), field.asType(), actualCollectionTypeParameter, concreteCollectionType, false, isEnum(actualCollectionTypeParameter));
             var converters = getPropertyConverters(field, implementationAstType.orElse(null), actualCollectionTypeParameter, property.type());
             converters.forEach(result::addNullableConverter);
             return Optional.of(result);
@@ -585,7 +585,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             }
 
             var rawWrappedType = erase(wrappedType.get());
-            var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(rawWrappedType), null, isEnum(rawWrappedType));
+            var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(rawWrappedType), null, isOptional(field.asType()), isEnum(rawWrappedType));
             result.addNullableConverter(optionalSerializers.get(rawAccessorType.toString()));
             var converters = getPropertyConverters(field, implementationAstType.orElse(null), rawWrappedType, property.type());
             converters.forEach(result::addNullableConverter);
@@ -602,7 +602,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             }
 
             var rawWrappedType = erase(wrappedType.get());
-            var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(rawWrappedType), null, isEnum(rawWrappedType));
+            var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(rawWrappedType), null, isOptional(field.asType()), isEnum(rawWrappedType));
             result.addNullableConverter(atomicSerializers.get(rawAccessorType.toString()));
             var converters = getPropertyConverters(field, implementationAstType.orElse(null), rawWrappedType, property.type());
             converters.forEach(result::addNullableConverter);
@@ -610,7 +610,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.of(result);
         }
 
-        var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(field.asType()), null, isEnum(rawFieldType));
+        var result = new ProtobufPropertyType(property.type(), field.asType(), implementationAstType.orElse(field.asType()), null, isOptional(field.asType()), isEnum(rawFieldType));
         result.addNullableConverter(optionalSerializers.get(rawAccessorType.toString()));
         result.addNullableConverter(atomicSerializers.get(rawAccessorType.toString()));
         var converters = getPropertyConverters(field, implementationAstType.orElse(null), field.asType(), property.type());
@@ -728,7 +728,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private boolean isOptional(ExecutableElement serializer) {
-        var erased = erase(serializer.getReturnType());
+       return isOptional(serializer.getReturnType());
+    }
+
+    private boolean isOptional(TypeMirror typeMirror) {
+        var erased = erase(typeMirror);
         return optionalSerializers.get(erased.toString()) != null;
     }
 

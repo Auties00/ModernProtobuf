@@ -16,15 +16,17 @@ public final class ProtobufPropertyType {
     private final TypeMirror concreteCollection;
     private final List<ProtobufSerializerElement> serializers;
     private final List<ProtobufDeserializerElement> deserializers;
+    private final boolean isOptional;
     private final boolean isEnum;
 
-    public ProtobufPropertyType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, TypeMirror concreteCollection, boolean isEnum) {
+    public ProtobufPropertyType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, TypeMirror concreteCollection, boolean isOptional, boolean isEnum) {
         this.protobufType = protobufType;
         this.fieldType = fieldType;
         this.implementation = implementationType;
         this.concreteCollection = concreteCollection;
         this.serializers = new ArrayList<>();
         this.deserializers = new ArrayList<>();
+        this.isOptional = isOptional;
         this.isEnum = isEnum;
     }
 
@@ -65,5 +67,13 @@ public final class ProtobufPropertyType {
 
     public boolean isEnum() {
         return isEnum;
+    }
+
+    public boolean isOptional() {
+        return isOptional;
+    }
+
+    public boolean isPrimitive() {
+        return fieldType.getKind().isPrimitive();
     }
 }

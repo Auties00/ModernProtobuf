@@ -116,7 +116,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName) {
         var writeMethod = getSerializerStreamMethod(property);
         var result = getVariables(property, overridePropertyName);
-        if(!result.converter()) {
+        if(!result.hasConverter()) {
             var toWrite = result.variables().get(0).value();
             var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), toWrite);
             writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
@@ -128,7 +128,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
             var variable = result.variables().get(index);
             writer.println(variable.value());
             propertyName = property.name() + (index == 0 ? "" : index - 1);
-            if(!variable.primitive()) {
+            if(!variable.isPrimitive() && !variable.isOptional()) {
                 writer.println("if(%s != null) {".formatted(propertyName));
             }
         }
@@ -136,7 +136,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), propertyName);
         writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
         for(var variable : result.variables()) {
-            if(!variable.primitive()) {
+            if(!variable.isPrimitive() && !variable.isOptional()) {
                 writer.println("}");
             }
         }
@@ -146,11 +146,11 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         var initializer = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.accessor().getSimpleName());
         var converter = !property.type().serializers().isEmpty();
         if (!converter) {
-            return new ProtobufPropertyVariables(false, List.of(new ProtobufPropertyVariable(initializer, property.type().fieldType().getKind().isPrimitive())));
+            return new ProtobufPropertyVariables(false, List.of(new ProtobufPropertyVariable(initializer, property.type().isPrimitive(), property.type().isOptional())));
         }
 
         var results = new ArrayList<ProtobufPropertyVariable>();
-        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(property.name(), initializer), property.type().fieldType().getKind().isPrimitive()));
+        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(property.name(), initializer), property.type().isPrimitive(), property.type().isOptional()));
         var useMap = false;
         var serializers = property.type().serializers();
         for (var index = 0; index < serializers.size(); index++) {
@@ -158,18 +158,18 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
             var lastInitializer = index == 0 ? property.name() : property.name() + (index - 1);
             var currentInitializer = property.name() + index;
             var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer, useMap);
-            results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive()));
+            results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive(), serializerElement.optional()));
             useMap |= serializerElement.optional();
         }
 
         return new ProtobufPropertyVariables(true, results);
     }
 
-    private record ProtobufPropertyVariables(boolean converter, List<ProtobufPropertyVariable> variables) {
+    private record ProtobufPropertyVariables(boolean hasConverter, List<ProtobufPropertyVariable> variables) {
 
     }
 
-    private record ProtobufPropertyVariable(String value, boolean primitive) {
+    private record ProtobufPropertyVariable(String value, boolean isPrimitive, boolean isOptional) {
 
     }
 
