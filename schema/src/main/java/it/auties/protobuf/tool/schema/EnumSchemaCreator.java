@@ -4,10 +4,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.EnumConstantDeclaration;
-import com.github.javaparser.ast.body.EnumDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
@@ -22,7 +19,7 @@ import java.util.Optional;
 
 import static com.github.javaparser.StaticJavaParser.parseType;
 
-final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
+final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStatement> {
     EnumSchemaCreator(String packageName, ProtobufEnumStatement protoStatement, List<CompilationUnit> classPool, Path output) {
         super(packageName, protoStatement, false, classPool, output);
     }
@@ -35,22 +32,24 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         }
 
         var fresh = compilationUnit.compilationUnit();
-        generate(fresh);
+        fresh.addType(generate(fresh));
         return fresh;
     }
 
     @Override
-    void generate(Node parent) {
+    TypeDeclaration<?> generate(Node parent) {
         var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name());
-        linkToParent(parent, ctEnum);
+        allMembers.add(ctEnum);
+        ctEnum.setParentNode(parent);
+        addNameAnnotation(ctEnum);
         addImplementedType(ProtobufEnum.class.getSimpleName(), ctEnum);
-        getDeferredImplementation(protoStatement.name())
-                .ifPresent(entry -> addImplementedType(entry, ctEnum));
+        getDeferredImplementations().forEach(entry -> addImplementedType(entry, ctEnum));
         createEnumConstructor(ctEnum);
         createEnumConstants(ctEnum);
         createIndexField(ctEnum);
         createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
+        return ctEnum;
     }
 
     private void createEnumConstants(EnumDeclaration ctEnum) {
@@ -122,7 +121,6 @@ final class EnumSchemaCreator extends SchemaCreator<ProtobufEnumStatement> {
         method.setPublic(true);
         method.setType(intType);
         method.setName("index");
-        method.addAnnotation(new MarkerAnnotationExpr(Override.class.getSimpleName()));
         var body = new BlockStmt();
         var selectFieldExpression = new FieldAccessExpr(new ThisExpr(), "index");
         body.addStatement(new ReturnStmt(selectFieldExpression));

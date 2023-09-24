@@ -13,15 +13,33 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
-    public void generate(List<CompilationUnit> classPool, boolean mutable) {
+    public void generate(List<CompilationUnit> classPool, boolean mutable, boolean nullable) {
         var results = document.statements()
                 .stream()
-                .collect(Collectors.toMap(ProtobufStatement::qualifiedCanonicalPath, entry -> generate(entry, mutable, classPool)));
+                .collect(Collectors.toMap(ProtobufStatement::qualifiedCanonicalPath, entry -> generate(entry, mutable, nullable, classPool)));
         results.forEach(this::writeOrThrow);
+    }
+
+    public CompilationUnit generate(ProtobufObject<?> object, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
+        Objects.requireNonNull(directory, "Cannot generate files without a target directory");
+        if (object instanceof ProtobufMessageStatement msg) {
+            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, nullable, classPool, directory.toPath());
+            return schema.generate();
+        }
+
+        if (object instanceof ProtobufEnumStatement enm) {
+            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
+            return schema.generate();
+        }
+
+        throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.name(), object.getClass().getName()));
     }
 
     private void writeOrThrow(String path, CompilationUnit unit) {
@@ -43,32 +61,24 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         }
     }
 
-    public CompilationUnit generate(ProtobufObject<?> object, boolean mutable, List<CompilationUnit> classPool) {
-        Objects.requireNonNull(directory, "Cannot generate files without a target directory");
-        if (object instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, classPool, directory.toPath());
-            return schema.generate();
-        }
-
-        if (object instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
-            return schema.generate();
-        }
-
-        throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.name(), object.getClass().getName()));
+    public void update(boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
+        var results = document.statements()
+                .stream()
+                .map(entry -> Map.entry(entry.qualifiedCanonicalPath(), update(entry, mutable, nullable, classPool)))
+                .flatMap(entry -> entry.getValue().isEmpty() ? Stream.empty() : Stream.of(Map.entry(entry.getKey(), entry.getValue().get())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        results.forEach(this::writeOrThrow);
     }
 
-    public void update(ProtobufObject<?> statement, boolean mutable, List<CompilationUnit> classPool) {
+    private Optional<CompilationUnit> update(ProtobufObject<?> statement, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
         if (statement instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, classPool, directory.toPath());
-            schema.update().ifPresent(entry -> writeOrThrow(msg.qualifiedCanonicalPath(), entry));
-            return;
+            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, nullable, classPool, directory.toPath());
+            return schema.update();
         }
 
         if (statement instanceof ProtobufEnumStatement enm) {
             var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
-            schema.update().ifPresent(entry -> writeOrThrow(enm.qualifiedCanonicalPath(), entry));
-            return;
+            return schema.update();
         }
 
         throw new IllegalArgumentException("Cannot find a schema updater for statement");

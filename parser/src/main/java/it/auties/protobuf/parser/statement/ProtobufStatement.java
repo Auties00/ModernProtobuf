@@ -35,22 +35,34 @@ public abstract sealed class ProtobufStatement permits ProtobufObject, ProtobufF
     }
 
     public String qualifiedName(){
-        return name == null ? name()
+        return name == null ? null
                 : nested() ? "%s$%s".formatted(parent.qualifiedName(), name())
                 : packageName == null ? name()
                 : "%s.%s".formatted(packageName(), name());
     }
 
+    public String qualifiedNameWithoutPackage(){
+        return name == null ? null
+                : nested() ? "%s$%s".formatted(parent.qualifiedNameWithoutPackage(), name())
+                : name();
+    }
+
     public String qualifiedCanonicalName(){
-        return name == null ? name()
-                : nested() ? "%s.%s".formatted(parent.qualifiedName(), name())
+        return name == null ? null
+                : nested() ? "%s.%s".formatted(parent.qualifiedCanonicalName(), name())
                 : packageName == null ? name()
                 : "%s.%s".formatted(packageName(), name());
     }
 
+    public String qualifiedCanonicalNameWithoutPackage(){
+        return name == null ? null
+                : nested() ? "%s.%s".formatted(parent.qualifiedCanonicalNameWithoutPackage(), name())
+                : name();
+    }
+
     public String qualifiedCanonicalPath(){
-        return name == null ? name()
-                : nested() ? "%s/%s".formatted(parent.qualifiedName(), name())
+        return name == null ? null
+                : nested() ? "%s/%s".formatted(parent.qualifiedCanonicalPath(), name())
                 : packageName == null ? name()
                 : "%s/%s".formatted(packageName(), name());
     }

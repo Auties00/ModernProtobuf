@@ -45,6 +45,12 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     )
     private boolean mutable = false;
 
+    @Option(
+            names = {"-n", "--nullable"},
+            description = "Whether the generated classes should have nullable fields (by default Optionals are used)"
+    )
+    private boolean nullable = false;
+
     @Override
     public Integer call() {
         try {
@@ -56,11 +62,8 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
             var classPool = AstUtils.createClassPool(input);
             log.log(Level.INFO, "Created AST model from existing Java classes");
             log.log(Level.INFO, "Starting update...");
-            for (var entry : document.statements()) {
-                log.log(Level.INFO, "Updating %s".formatted(entry.name()));
-                var creator = new ProtobufSchemaCreator(document, Objects.requireNonNullElse(output, input));
-                creator.update(entry, mutable, classPool);
-            }
+            var creator = new ProtobufSchemaCreator(document, Objects.requireNonNullElse(output, input));
+            creator.update(mutable, nullable, classPool);
             log.log(Level.INFO, "Finished update successfully");
             return 0;
         } catch (IOException ex) {

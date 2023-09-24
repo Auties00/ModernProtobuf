@@ -44,6 +44,12 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
     )
     private boolean mutable = false;
 
+    @Option(
+            names = {"-n", "--nullable"},
+            description = "Whether the generated classes should have nullable fields (by default Optionals are used)"
+    )
+    private boolean nullable = false;
+
     @Override
     public Integer call() {
         if (!createOutputDirectory()) {
@@ -86,7 +92,7 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
     private void generateSchema(List<CompilationUnit> classPool, ProtobufDocument ast) {
         log.log(Level.INFO, "Generating java classes from AST...");
         var generator = new ProtobufSchemaCreator(ast, output);
-        generator.generate(classPool, mutable);
+        generator.generate(classPool, mutable, nullable);
         log.log(Level.INFO, "Generated java classes successfully at %s".formatted(output));
     }
 }
