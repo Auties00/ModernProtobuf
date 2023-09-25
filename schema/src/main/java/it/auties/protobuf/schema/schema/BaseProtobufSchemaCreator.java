@@ -1,4 +1,4 @@
-package it.auties.protobuf.tool.schema;
+package it.auties.protobuf.schema.schema;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
@@ -18,7 +18,7 @@ import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.statement.*;
-import it.auties.protobuf.tool.util.LogProvider;
+import it.auties.protobuf.schema.util.LogProvider;
 
 import java.nio.file.Path;
 import java.util.*;

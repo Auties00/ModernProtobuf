@@ -1,4 +1,4 @@
-import it.auties.protobuf.tool.command.BaseCommand;
+import it.auties.protobuf.schema.command.BaseCommand;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;

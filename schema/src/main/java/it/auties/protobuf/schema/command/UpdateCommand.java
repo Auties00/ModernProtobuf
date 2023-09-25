@@ -1,9 +1,9 @@
-package it.auties.protobuf.tool.command;
+package it.auties.protobuf.schema.command;
 
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.tool.schema.ProtobufSchemaCreator;
-import it.auties.protobuf.tool.util.AstUtils;
-import it.auties.protobuf.tool.util.LogProvider;
+import it.auties.protobuf.schema.schema.ProtobufSchemaCreator;
+import it.auties.protobuf.schema.util.AstUtils;
+import it.auties.protobuf.schema.util.LogProvider;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;

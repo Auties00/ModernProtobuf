@@ -1,4 +1,4 @@
-package it.auties.protobuf.tool.util;
+package it.auties.protobuf.schema.util;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;

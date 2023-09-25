@@ -1,4 +1,4 @@
-package it.auties.protobuf.tool.schema;
+package it.auties.protobuf.schema.schema;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.printer.DefaultPrettyPrinter;

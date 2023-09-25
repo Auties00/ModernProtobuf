@@ -1,4 +1,4 @@
-package it.auties.protobuf.tool.command;
+package it.auties.protobuf.schema.command;
 
 import picocli.CommandLine.Command;
 

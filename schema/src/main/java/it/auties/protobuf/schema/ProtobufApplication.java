@@ -1,6 +1,6 @@
-package it.auties.protobuf.tool;
+package it.auties.protobuf.schema;
 
-import it.auties.protobuf.tool.command.BaseCommand;
+import it.auties.protobuf.schema.command.BaseCommand;
 import picocli.CommandLine;
 
 public class ProtobufApplication {
