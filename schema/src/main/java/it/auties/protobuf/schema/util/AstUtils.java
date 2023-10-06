@@ -1,6 +1,7 @@
 package it.auties.protobuf.schema.util;
 
-import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 
 import java.io.File;
@@ -17,7 +18,7 @@ public class AstUtils implements LogProvider {
         }
 
         try(var walker = Files.walk(directory.toPath())) {
-            return walker.filter(entry -> entry.endsWith(".java"))
+            return walker.filter(entry -> entry.toString().endsWith(".java"))
                     .map(AstUtils::parseClass)
                     .flatMap(Optional::stream)
                     .toList();
@@ -28,7 +29,10 @@ public class AstUtils implements LogProvider {
 
     private static Optional<CompilationUnit> parseClass(Path path) {
         try {
-            return Optional.of(StaticJavaParser.parse(path));
+            var config = new ParserConfiguration()
+                    .setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17);
+            var parser = new JavaParser(config);
+            return parser.parse(path).getResult();
         } catch (IOException e) {
             return Optional.empty();
         }

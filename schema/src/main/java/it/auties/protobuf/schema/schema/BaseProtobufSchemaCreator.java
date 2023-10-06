@@ -22,7 +22,9 @@ import it.auties.protobuf.schema.util.LogProvider;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObject<?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
     private static final String SRC_MAIN_JAVA = "src.main.java.";
@@ -103,10 +105,17 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObject<?>> imp
     }
 
     Optional<QueryResult> getTypeDeclaration(String qualifiedName, QueryType queryType) {
-        return allMembers.stream()
+        return Stream.of(allMembers.stream(), getClassPoolTypes())
+                .flatMap(Function.identity())
                 .map(member -> getTypeDeclarationAny(qualifiedName, queryType, member))
                 .flatMap(Optional::stream)
                 .findFirst();
+    }
+
+    private Stream<TypeDeclaration<?>> getClassPoolTypes() {
+        return classPool.stream()
+                .map(CompilationUnit::getTypes)
+                .flatMap(Collection::stream);
     }
 
     private Optional<QueryResult> getTypeDeclarationAny(String qualifiedName, QueryType queryType, TypeDeclaration<?> compilationUnitType) {
@@ -130,7 +139,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObject<?>> imp
         }
 
         var annotationName = readAnnotatedName(compilationUnitDeepChild);
-        var qualifiedNameWithoutPackage = qualifiedName.replaceFirst(Objects.requireNonNullElse(packageName, ""), "");
+        var qualifiedNameWithoutPackage = withoutPackage(qualifiedName);
         if (Objects.equals(compilationUnitDeepChild.getFullyQualifiedName().orElseThrow(), qualifiedName) || Objects.equals(annotationName, qualifiedNameWithoutPackage)) {
             return Optional.of(new QueryResult(compilationUnitDeepChild.findCompilationUnit().orElseThrow(), compilationUnitDeepChild));
         }
@@ -138,22 +147,35 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObject<?>> imp
         return Optional.empty();
     }
 
-    private String readAnnotatedName(TypeDeclaration<?> entry) {
-        return entry.getAnnotationByClass(ProtobufMessageName.class)
-                .filter(value -> value instanceof NormalAnnotationExpr)
-                .map(value -> (NormalAnnotationExpr) value)
-                .flatMap(this::readNameAnnotationValue)
-                .orElse(null);
+    private String withoutPackage(String qualifiedName) {
+        if(packageName == null) {
+            return qualifiedName;
+        }
+
+        return qualifiedName.replaceFirst(packageName + "\\.", "");
     }
 
-    private Optional<String> readNameAnnotationValue(NormalAnnotationExpr annotation) {
-        return annotation.getPairs()
-                .stream()
-                .filter(valuePair -> valuePair.getNameAsString().equals("value"))
-                .findFirst()
-                .filter(arg -> arg.getValue() instanceof StringLiteralExpr)
-                .map(arg -> (StringLiteralExpr) arg.getValue())
-                .map(StringLiteralExpr::asString);
+    private String readAnnotatedName(TypeDeclaration<?> entry) {
+        var annotation = entry.getAnnotationByClass(ProtobufMessageName.class)
+                .orElse(null);
+        if(annotation instanceof SingleMemberAnnotationExpr singleMemberAnnotationExpr && singleMemberAnnotationExpr.getMemberValue() instanceof StringLiteralExpr expr) {
+            return expr.asString();
+        }else if(annotation instanceof NormalAnnotationExpr normalAnnotationExpr) {
+            return normalAnnotationExpr.getPairs()
+                    .stream()
+                    .filter(valuePair -> valuePair.getNameAsString().equals("value"))
+                    .findFirst()
+                    .filter(arg -> arg.getValue() instanceof StringLiteralExpr)
+                    .map(arg -> (StringLiteralExpr) arg.getValue())
+                    .map(StringLiteralExpr::asString)
+                    .orElse(null);
+        }else {
+            if(annotation != null) {
+                log.log(System.Logger.Level.WARNING, "Unknown annotation type: " + annotation.getClass().getName());
+            }
+
+            return null;
+        }
     }
 
     record QueryResult(CompilationUnit compilationUnit, TypeDeclaration<?> result) {
