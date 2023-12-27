@@ -835,7 +835,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var previousTypeArguments = previousType.getTypeArguments();
         var previousElement = (TypeElement) previousType.asElement();
         var previousTypeParameters = previousElement.getTypeParameters();
-        for(var i = 0; i < previousTypeParameters.size(); i++) {
+        for(var i = 0; i < previousTypeParameters.size() && i < previousTypeArguments.size(); i++) {
             if(previousTypeParameters.get(i).getSimpleName().equals(currentTypeVarName)){
                 return Optional.of(previousTypeArguments.get(i));
             }
