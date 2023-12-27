@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.github.auties00</groupId>
         <artifactId>protobuf</artifactId>
-        <version>3.0.1</version>
+        <version>3.0.2</version>
     </parent>
 
     <artifactId>protobuf-serialization-plugin</artifactId>
@@ -35,7 +35,7 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>3.0.1</version>
+            <version>3.0.2</version>
         </dependency>
         <dependency>
             <groupId>io.github.classgraph</groupId>
