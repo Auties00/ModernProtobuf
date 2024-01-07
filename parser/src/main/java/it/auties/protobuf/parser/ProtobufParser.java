@@ -5,8 +5,6 @@ import it.auties.protobuf.parser.exception.ProtobufInternalException;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.tree.ProtobufImportTree;
-import it.auties.protobuf.parser.tree.ProtobufFieldModifier;
 import it.auties.protobuf.parser.type.ProtobufMapType;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufPrimitiveType;

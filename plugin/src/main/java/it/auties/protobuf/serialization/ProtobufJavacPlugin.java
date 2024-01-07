@@ -15,8 +15,8 @@ import it.auties.protobuf.serialization.instrumentation.ProtobufSerializationVis
 import it.auties.protobuf.serialization.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.object.ProtobufEnumMetadata;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 

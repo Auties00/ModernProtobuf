@@ -3,14 +3,17 @@ package it.auties.protobuf.serialization.instrumentation;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.*;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor {
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";

@@ -18,7 +18,6 @@ import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.tree.ProtobufFieldModifier;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.nio.file.Path;

@@ -25,8 +25,10 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import java.nio.file.Path;
 import java.util.*;
 
-import static com.github.javaparser.StaticJavaParser.*;
-import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.*;
+import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
+import static com.github.javaparser.StaticJavaParser.parseType;
+import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REPEATED;
+import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REQUIRED;
 
 final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessageTree> {
     private final List<FieldDeclaration> fields;
