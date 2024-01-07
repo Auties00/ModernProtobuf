@@ -7,10 +7,7 @@ import com.github.javaparser.printer.configuration.DefaultConfigurationOption;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration.ConfigOption;
 import com.github.javaparser.printer.configuration.imports.IntelliJImportOrderingStrategy;
-import it.auties.protobuf.parser.statement.ProtobufDocument;
-import it.auties.protobuf.parser.statement.ProtobufEnumStatement;
-import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
-import it.auties.protobuf.parser.statement.ProtobufObject;
+import it.auties.protobuf.parser.tree.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,26 +28,26 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         results.forEach(this::writeOrThrow);
     }
 
-    public CompilationUnit generate(ProtobufObject<?> object, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
+    public CompilationUnit generate(ProtobufTree object, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
         Objects.requireNonNull(directory, "Cannot generate files without a target directory");
-        if (object instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, nullable, classPool, directory.toPath());
+        if (object instanceof ProtobufMessageTree msg) {
+            var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
             return schema.generate();
         }
 
-        if (object instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
+        if (object instanceof ProtobufEnumTree enm) {
+            var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
             return schema.generate();
         }
 
-        throw new IllegalArgumentException("Cannot find a schema generator for statement %s(%s)".formatted(object.name(), object.getClass().getName()));
+        throw new IllegalArgumentException("Cannot find a schema generator for statement with type " + object.getClass().getName());
     }
 
     private void writeOrThrow(CompilationUnit unit) {
         try {
             var packageName = unit.getPackageDeclaration()
                     .map(NodeWithName::getNameAsString)
-                    .orElseGet(() -> Objects.requireNonNullElse(document.packageName(), ""))
+                    .orElseGet(() -> document.packageName().orElse(""))
                     .replaceAll("\\.", File.separator);
             var className = unit.getType(0).getNameAsString();
             var qualifiedCanonicalName = packageName.isEmpty() ? className : packageName + "/" + className;
@@ -58,7 +55,6 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
                     .flatMap(Arrays::stream)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             var output = Path.of(String.join(File.separator, outputParts) + ".java");
-            System.out.println(output);
             var configuration = new DefaultPrinterConfiguration();
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.ORDER_IMPORTS, true));
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.SORT_IMPORTS_STRATEGY, new IntelliJImportOrderingStrategy()));
@@ -84,14 +80,14 @@ public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
         results.forEach(this::writeOrThrow);
     }
 
-    private Optional<CompilationUnit> update(ProtobufObject<?> statement, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
-        if (statement instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(document.packageName(), msg, mutable, nullable, classPool, directory.toPath());
+    private Optional<CompilationUnit> update(ProtobufTree statement, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
+        if (statement instanceof ProtobufMessageTree msg) {
+            var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
             return schema.update();
         }
 
-        if (statement instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(document.packageName(), enm, classPool, directory.toPath());
+        if (statement instanceof ProtobufEnumTree enm) {
+            var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
             return schema.update();
         }
 

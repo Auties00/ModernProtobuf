@@ -11,9 +11,8 @@ public class NestedMessageTest {
     public void test() throws URISyntaxException, IOException {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("nested.proto");
         Objects.requireNonNull(proto2Source);
-
-        var parser = new ProtobufParser(Path.of(proto2Source.toURI()));
-        var document = parser.parse();
+        var parser = new ProtobufParser();
+        var document = parser.parseOnly(Path.of(proto2Source.toURI()));
         System.out.println(document);
     }
 }

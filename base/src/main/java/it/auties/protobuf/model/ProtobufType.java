@@ -1,10 +1,12 @@
 package it.auties.protobuf.model;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 
 public enum ProtobufType {
     OBJECT(Object.class, Object.class, false),
+    MAP(Map.class, Map.class, false),
     FLOAT(float.class, Float.class, true),
     DOUBLE(double.class, Double.class, true),
     BOOL(boolean.class, Boolean.class, true),

@@ -1,22 +1,25 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.statement.ProtobufMessageStatement;
-import it.auties.protobuf.parser.statement.ProtobufObject;
+import it.auties.protobuf.parser.tree.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.ProtobufObjectTree;
+
+import java.util.Objects;
+import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufObject<?> declaration;
+    private ProtobufObjectTree<?> declaration;
 
     public static ProtobufObjectType unattributed(String typeName){
-        return new ProtobufObjectType(typeName, null);
+        return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
     }
 
-    public static ProtobufObjectType attributed(String typeName, ProtobufMessageStatement typeDeclaration){
-        return new ProtobufObjectType(typeName, typeDeclaration);
+    public static ProtobufObjectType attributed(String typeName, ProtobufMessageTree typeDeclaration){
+        return new ProtobufObjectType(Objects.requireNonNull(typeName), Objects.requireNonNull(typeDeclaration));
     }
 
-    private ProtobufObjectType(String name, ProtobufMessageStatement declaration){
+    private ProtobufObjectType(String name, ProtobufMessageTree declaration){
         this.name = name;
         this.declaration = declaration;
     }
@@ -27,23 +30,25 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
     }
 
     @Override
-    public boolean isPrimitive() {
-        return false;
-    }
-
     public String name() {
         return name;
     }
 
-    public ProtobufObject<?> declaration() {
-        return declaration;
+    @Override
+    public String toString() {
+        return name;
     }
 
-    public boolean attributed(){
+    public Optional<ProtobufObjectTree<?>> declaration() {
+        return Optional.ofNullable(declaration);
+    }
+
+    @Override
+    public boolean isAttributed(){
         return declaration != null;
     }
 
-    public void attribute(ProtobufObject<?> statement) {
+    public void attribute(ProtobufObjectTree<?> statement) {
         this.declaration = statement;
     }
 }

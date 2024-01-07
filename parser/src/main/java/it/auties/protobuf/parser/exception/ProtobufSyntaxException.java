@@ -1,12 +1,8 @@
 package it.auties.protobuf.parser.exception;
 
-public class ProtobufSyntaxException extends IllegalArgumentException {
+public class ProtobufSyntaxException extends ProtobufParserException {
     public ProtobufSyntaxException(String message, int line, Object... args) {
-        super("%s at line %s".formatted(formatMessage(message, args), line));
-    }
-
-    private static String formatMessage(String message, Object[] args) {
-        return message == null ? null : message.formatted(args);
+        super(message, line, args);
     }
 
     public static void check(boolean condition, String message, int line, Object... args) {

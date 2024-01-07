@@ -7,8 +7,8 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.ArrayList;
 
 public record ModernRepeatedMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.INT32, repeated = true)
-        ArrayList<Integer> content
+        @ProtobufProperty(index = 1, type = ProtobufType.INT32)
+        ArrayList<Integer> repeatedData
 ) implements ProtobufMessage {
 
 }

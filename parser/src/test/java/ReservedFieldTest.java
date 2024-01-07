@@ -13,9 +13,8 @@ public class ReservedFieldTest {
     public void testValid() throws URISyntaxException, IOException {
         var source = ClassLoader.getSystemClassLoader().getResource("reserved_valid.proto");
         Objects.requireNonNull(source);
-
-        var parser = new ProtobufParser(Path.of(source.toURI()));
-        var document = parser.parse();
+        var parser = new ProtobufParser();
+        var document = parser.parseOnly(Path.of(source.toURI()));
         System.out.println(document);
     }
 
@@ -25,8 +24,8 @@ public class ReservedFieldTest {
         Objects.requireNonNull(source);
 
         Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
-            var parser = new ProtobufParser(Path.of(source.toURI()));
-            var document = parser.parse();
+            var parser = new ProtobufParser();
+            var document = parser.parseOnly(Path.of(source.toURI()));
             System.out.println(document);
         });
     }
@@ -37,8 +36,8 @@ public class ReservedFieldTest {
         Objects.requireNonNull(source);
 
         Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
-            var parser = new ProtobufParser(Path.of(source.toURI()));
-            var document = parser.parse();
+            var parser = new ProtobufParser();
+            var document = parser.parseOnly(Path.of(source.toURI()));
             System.out.println(document);
         });
     }

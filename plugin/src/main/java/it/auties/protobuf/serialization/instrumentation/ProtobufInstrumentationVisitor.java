@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization.instrumentation;
 
-import it.auties.protobuf.serialization.message.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufMessageElement;
 
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
@@ -65,7 +65,10 @@ public abstract class ProtobufInstrumentationVisitor {
     protected abstract List<String> parametersNames();
 
     protected String getSpecName(TypeMirror typeMirror) {
-        var declaredType = (DeclaredType) typeMirror;
+        if(!(typeMirror instanceof DeclaredType declaredType)) {
+            return "";
+        }
+
         var element = (TypeElement) declaredType.asElement();
         var parent = element.getEnclosingElement();
         String packageName = null;

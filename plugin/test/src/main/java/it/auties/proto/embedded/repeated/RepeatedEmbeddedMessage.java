@@ -7,7 +7,7 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.ArrayList;
 
 public record RepeatedEmbeddedMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.INT32, repeated = true)
+        @ProtobufProperty(index = 1, type = ProtobufType.INT32)
         ArrayList<Integer> content
 ) implements ProtobufMessage {
 

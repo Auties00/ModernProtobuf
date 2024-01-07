@@ -4,12 +4,17 @@ import it.auties.protobuf.model.ProtobufType;
 
 import static it.auties.protobuf.model.ProtobufType.OBJECT;
 
-public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, ProtobufObjectType {
+public sealed interface ProtobufTypeReference permits ProtobufPrimitiveType, ProtobufObjectType, ProtobufMapType {
+    String name();
     ProtobufType protobufType();
-    boolean isPrimitive();
+    boolean isAttributed();
 
     static ProtobufTypeReference of(String type){
         var protobufType = ProtobufType.of(type).orElse(OBJECT);
-        return protobufType == OBJECT ? ProtobufObjectType.unattributed(type) : ProtobufPrimitiveType.of(protobufType);
+        return switch (protobufType) {
+            case OBJECT ->  ProtobufObjectType.unattributed(type);
+            case MAP -> ProtobufMapType.unattributed();
+            default -> ProtobufPrimitiveType.attributed(protobufType);
+        };
     }
 }

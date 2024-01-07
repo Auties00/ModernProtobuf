@@ -8,7 +8,7 @@ public enum EnumType implements ProtobufEnum {
     SECOND(1),
     THIRD(10);
 
-    private final int index;
+    final int index;
 
     EnumType(@ProtobufEnumIndex int index) {
         this.index = index;

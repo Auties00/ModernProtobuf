@@ -7,20 +7,24 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufProperty {
     int index();
 
     ProtobufType type();
 
-    Class<?> implementation() default Object.class;
+    ProtobufType keyType() default ProtobufType.MAP;
+
+    ProtobufType valueType() default ProtobufType.MAP;
+
+    Class<?> overrideType() default Object.class;
+
+    Class<? extends ProtobufMixin> mixin() default ProtobufMixin.class;
 
     boolean required() default false;
 
     boolean ignored() default false;
-
-    boolean repeated() default false;
 
     boolean packed() default false;
 }

@@ -1,0 +1,5 @@
+syntax = "proto2";
+
+message Map {
+  map<string, string> e = 1;
+}

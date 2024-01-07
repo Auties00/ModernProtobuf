@@ -1,11 +1,15 @@
 package it.auties.protobuf.parser.exception;
 
-public class ProtobufTypeException extends IllegalArgumentException {
+public class ProtobufTypeException extends ProtobufParserException {
     public ProtobufTypeException(String message, Object... args) {
-        super(formatMessage(message, args));
+        super(message, null, args);
     }
 
-    private static String formatMessage(String message, Object[] args) {
-        return message == null ? null : message.formatted(args);
+    public static void check(boolean condition, String message, Object... args) {
+        if (condition) {
+            return;
+        }
+
+        throw new ProtobufTypeException(message, args);
     }
 }

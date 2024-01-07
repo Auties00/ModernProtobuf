@@ -7,73 +7,196 @@ import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-public final class ProtobufPropertyType {
-    private final ProtobufType protobufType;
-    private final TypeMirror fieldType;
-    private final TypeMirror implementation;
-    private final TypeMirror concreteCollection;
-    private final List<ProtobufSerializerElement> serializers;
-    private final List<ProtobufDeserializerElement> deserializers;
-    private final boolean isOptional;
-    private final boolean isEnum;
+public sealed interface ProtobufPropertyType {
+    ProtobufType protobufType();
+    List<ProtobufConverterElement> converters();
+    TypeMirror fieldType();
+    TypeMirror implementationType();
+    void addNullableConverter(ProtobufConverterElement element);
+    boolean isPrimitive();
+    boolean isEnum();
 
-    public ProtobufPropertyType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, TypeMirror concreteCollection, boolean isOptional, boolean isEnum) {
-        this.protobufType = protobufType;
-        this.fieldType = fieldType;
-        this.implementation = implementationType;
-        this.concreteCollection = concreteCollection;
-        this.serializers = new ArrayList<>();
-        this.deserializers = new ArrayList<>();
-        this.isOptional = isOptional;
-        this.isEnum = isEnum;
+    default List<ProtobufSerializerElement> serializers() {
+        return converters().stream()
+                .filter(entry -> entry instanceof ProtobufSerializerElement)
+                .map(entry -> (ProtobufSerializerElement) entry)
+                .toList();
     }
 
-    public ProtobufType protobufType() {
-        return protobufType;
+    default List<ProtobufDeserializerElement> deserializers() {
+        return converters().stream()
+                .filter(entry -> entry instanceof ProtobufDeserializerElement)
+                .map(entry -> (ProtobufDeserializerElement) entry)
+                .toList();
     }
 
-    public TypeMirror fieldType() {
-        return fieldType;
-    }
-
-    public TypeMirror implementationType() {
-        return implementation;
-    }
-
-    public TypeMirror concreteCollectionType() {
-        return concreteCollection;
-    }
-
-    public void addNullableConverter(ProtobufConverterElement converter) {
-        if (converter == null) {
-            return;
+    record NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, List<ProtobufConverterElement> converters, boolean isEnum) implements ProtobufPropertyType {
+        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, boolean isEnum) {
+            this(protobufType, fieldType, implementationType, new ArrayList<>(), isEnum);
         }
 
-        switch (converter.type()) {
-            case SERIALIZER -> serializers.add((ProtobufSerializerElement) converter);
-            case DESERIALIZER -> deserializers.add((ProtobufDeserializerElement) converter);
+        @Override
+        public boolean isPrimitive() {
+            return implementationType.getKind().isPrimitive();
+        }
+
+        @Override
+        public List<ProtobufConverterElement> converters() {
+            return Collections.unmodifiableList(converters);
+        }
+
+        @Override
+        public void addNullableConverter(ProtobufConverterElement element) {
+            if(element == null) {
+                return;
+            }
+
+            converters.add(element);
         }
     }
 
-    public List<ProtobufSerializerElement> serializers() {
-        return serializers;
+    record OptionalType(TypeMirror optionalType, NormalType value) implements ProtobufPropertyType {
+        @Override
+        public TypeMirror fieldType() {
+            return optionalType;
+        }
+
+        @Override
+        public TypeMirror implementationType() {
+            return value.implementationType();
+        }
+
+        @Override
+        public ProtobufType protobufType() {
+            return value.protobufType();
+        }
+
+        @Override
+        public boolean isEnum() {
+            return value.isEnum();
+        }
+
+        @Override
+        public boolean isPrimitive() {
+            return value.isPrimitive();
+        }
+
+        @Override
+        public List<ProtobufConverterElement> converters() {
+            return value.converters();
+        }
+
+        @Override
+        public void addNullableConverter(ProtobufConverterElement element) {
+            value.addNullableConverter(element);
+        }
     }
 
-    public List<ProtobufDeserializerElement> deserializers() {
-        return deserializers;
+    record AtomicType(TypeMirror atomicType, NormalType value) implements ProtobufPropertyType {
+        @Override
+        public TypeMirror fieldType() {
+            return atomicType;
+        }
+
+        @Override
+        public TypeMirror implementationType() {
+            return value.implementationType();
+        }
+
+        @Override
+        public ProtobufType protobufType() {
+            return value.protobufType();
+        }
+
+        @Override
+        public boolean isEnum() {
+            return value.isEnum();
+        }
+
+        @Override
+        public boolean isPrimitive() {
+            return value.isPrimitive();
+        }
+
+        @Override
+        public List<ProtobufConverterElement> converters() {
+            return value.converters();
+        }
+
+        @Override
+        public void addNullableConverter(ProtobufConverterElement element) {
+            value.addNullableConverter(element);
+        }
     }
 
-    public boolean isEnum() {
-        return isEnum;
+    record CollectionType(TypeMirror fieldType, TypeMirror collectionType, NormalType value) implements ProtobufPropertyType {
+        @Override
+        public TypeMirror fieldType() {
+            return fieldType;
+        }
+
+        @Override
+        public TypeMirror implementationType() {
+            return value.implementationType();
+        }
+
+        @Override
+        public ProtobufType protobufType() {
+            return value.protobufType();
+        }
+
+        @Override
+        public boolean isEnum() {
+            return value.isEnum();
+        }
+
+        @Override
+        public boolean isPrimitive() {
+            return value.isPrimitive();
+        }
+
+        @Override
+        public List<ProtobufConverterElement> converters() {
+            return value.converters();
+        }
+
+        @Override
+        public void addNullableConverter(ProtobufConverterElement element) {
+            value.addNullableConverter(element);
+        }
     }
 
-    public boolean isOptional() {
-        return isOptional;
-    }
+    record MapType(TypeMirror fieldType, TypeMirror mapType, NormalType keyType, NormalType valueType) implements ProtobufPropertyType {
+        public boolean isPrimitive() {
+           return false;
+        }
 
-    public boolean isPrimitive() {
-        return fieldType.getKind().isPrimitive();
+        @Override
+        public boolean isEnum() {
+            return false;
+        }
+
+        @Override
+        public TypeMirror implementationType() {
+            return fieldType;
+        }
+
+        @Override
+        public List<ProtobufConverterElement> converters() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void addNullableConverter(ProtobufConverterElement element) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProtobufType protobufType() {
+            return ProtobufType.MAP;
+        }
     }
 }

@@ -10,4 +10,5 @@ import java.lang.annotation.Target;
 public @interface ProtobufReserved {
     String[] names() default {};
     int[] indexes() default {};
+    int[] ranges() default {};
 }

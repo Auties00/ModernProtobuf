@@ -2,26 +2,27 @@ package it.auties.protobuf.serialization.instrumentation;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
-import it.auties.protobuf.serialization.message.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.*;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor {
+    private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";
+    private static final String DEFAULT_PARAMETER_NAME = "protoInputObject";
+
     public ProtobufSerializationVisitor(ProtobufMessageElement element, PrintWriter writer) {
         super(element, writer);
     }
 
     @Override
     protected void doInstrumentation() {
-        writer.println("      if(protoInputObject == null) {");
+        writer.println("      if(%s == null) {".formatted(DEFAULT_PARAMETER_NAME));
         writer.println("         return null;");
         writer.println("      }");
         if(message.isEnum()) {
@@ -36,21 +37,21 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
                 .orElseThrow(() -> new NoSuchElementException("Missing metadata from enum"))
                 .field()
                 .getSimpleName();
-        writer.println("      return protoInputObject.%s;".formatted(fieldName));
+        writer.println("      return %s.%s;".formatted(DEFAULT_PARAMETER_NAME, fieldName));
     }
 
     private void createMessageSerializer() {
         createRequiredPropertiesNullCheck();
-        writer.println("      var outputStream = new ProtobufOutputStream();");
+        writer.println("      var %s = new ProtobufOutputStream();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
         message.properties().forEach(this::writeProperty);
-        writer.println("      return outputStream.toByteArray();");
+        writer.println("      return %s.toByteArray();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
     }
 
     private void createRequiredPropertiesNullCheck() {
         message.properties()
                 .stream()
                 .filter(ProtobufPropertyStub::required)
-                .forEach(entry -> writer.println("      Objects.requireNonNull(protoInputObject.%s(), \"Missing required property: %s\");".formatted(entry.name(), entry.name())));
+                .forEach(entry -> writer.println("      Objects.requireNonNull(%s.%s(), \"Missing required property: %s\");".formatted(DEFAULT_PARAMETER_NAME, entry.name(), entry.name())));
     }
 
     @Override
@@ -92,49 +93,70 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
 
     @Override
     protected List<String> parametersNames() {
-        return List.of("protoInputObject");
+        return List.of(DEFAULT_PARAMETER_NAME);
     }
 
     // Writes a property to the output stream
     private void writeProperty(ProtobufPropertyStub property) {
-        if (property.repeated()) {
-            writeRepeatedPropertySerializer(property);
-        } else {
-            writeAnyPropertySerializer(property, null);
+        switch (property.type()) {
+            case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer(property, collectionType);
+            case ProtobufPropertyType.MapType mapType -> writeMapSerializer(property, mapType);
+            default -> writeSerializer(property.index(), property.name(), getAccessorCall(property), property.type(), DEFAULT_OUTPUT_STREAM_NAME);
         }
     }
 
-    private void writeRepeatedPropertySerializer(ProtobufPropertyStub property) {
-        writer.println("      if(protoInputObject.%s() != null) {".formatted(property.name()));
+    private String getAccessorCall(ProtobufPropertyStub property) {
+        return switch (property.accessor()) {
+            case ExecutableElement executableElement -> "%s.%s()".formatted(DEFAULT_PARAMETER_NAME, executableElement.getSimpleName());
+            case VariableElement variableElement -> "%s.%s".formatted(DEFAULT_PARAMETER_NAME, variableElement.getSimpleName());
+            default -> throw new IllegalStateException("Unexpected value: " + property.accessor());
+        };
+    }
+
+    private void writeRepeatedPropertySerializer(ProtobufPropertyStub property, ProtobufPropertyType.CollectionType collectionType) {
+        writer.println("      if(%s.%s() != null) {".formatted(DEFAULT_PARAMETER_NAME, property.name()));
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("       for(var %s : protoInputObject.%s()) {".formatted(localVariableName, property.name()));
-        writeAnyPropertySerializer(property, localVariableName);
+        writer.println("       for(var %s : %s.%s()) {".formatted(localVariableName, DEFAULT_PARAMETER_NAME, property.name()));
+        writeSerializer(property.index(), property.name(), localVariableName, collectionType.value(), DEFAULT_OUTPUT_STREAM_NAME);
         writer.println("       }");
         writer.println("      }");
     }
 
-    private void writeAnyPropertySerializer(ProtobufPropertyStub property, String overridePropertyName) {
-        var writeMethod = getSerializerStreamMethod(property);
-        var result = getVariables(property, overridePropertyName);
+    private void writeMapSerializer(ProtobufPropertyStub property, ProtobufPropertyType.MapType mapType) {
+        writer.println("      if(%s.%s() != null) {".formatted(DEFAULT_PARAMETER_NAME, property.name()));
+        var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
+        var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
+        writer.println("            for(var %s : %s.entrySet()) {".formatted(localVariableName, getAccessorCall(property)));
+        writer.println("                var %s = new ProtobufOutputStream();".formatted(localStreamName));
+        writeSerializer(1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
+        writeSerializer(2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
+        writer.println("                %s.writeBytes(%s, %s.toByteArray());".formatted(DEFAULT_OUTPUT_STREAM_NAME, property.index(), localStreamName));
+        writer.println("            }");
+        writer.println("      }");
+    }
+
+    private void writeSerializer(int index, String name, String caller, ProtobufPropertyType type, String streamName) {
+        var writeMethod = getSerializerStreamMethods(type);
+        var result = getVariables(name, caller, type);
         if(!result.hasConverter()) {
-            var toWrite = result.variables().get(0).value();
-            var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), toWrite);
-            writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
+            var toWrite = result.variables().getFirst().value();
+            var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecName(type.implementationType()), toWrite);
+            writer.println("%s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
             return;
         }
 
         String propertyName = null;
-        for(var index = 0; index < result.variables().size(); index++) {
-            var variable = result.variables().get(index);
+        for(var i = 0; i < result.variables().size(); i++) {
+            var variable = result.variables().get(i);
             writer.println(variable.value());
-            propertyName = property.name() + (index == 0 ? "" : index - 1);
+            propertyName = name + (i == 0 ? "" : i - 1);
             if(!variable.isPrimitive() && !variable.isOptional()) {
                 writer.println("if(%s != null) {".formatted(propertyName));
             }
         }
 
-        var toWriteConverted = property.type().protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecName(property.type().implementationType()), propertyName);
-        writer.println("outputStream.%s(%s, %s);".formatted(writeMethod.getName(), property.index(), toWriteConverted));
+        var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecName(type.implementationType()), propertyName);
+        writer.println("%s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
         for(var variable : result.variables()) {
             if(!variable.isPrimitive() && !variable.isOptional()) {
                 writer.println("}");
@@ -142,21 +164,22 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         }
     }
 
-    private ProtobufPropertyVariables getVariables(ProtobufPropertyStub property, String overridePropertyName) {
-        var initializer = overridePropertyName != null ? overridePropertyName : "protoInputObject.%s()".formatted(property.accessor().getSimpleName());
-        var converter = !property.type().serializers().isEmpty();
-        if (!converter) {
-            return new ProtobufPropertyVariables(false, List.of(new ProtobufPropertyVariable(initializer, property.type().isPrimitive(), property.type().isOptional())));
+    private ProtobufPropertyVariables getVariables(String name, String caller, ProtobufPropertyType type) {
+        var serializers = type.serializers();
+        var isPrimitive = type.isPrimitive();
+        var isOptional = type instanceof ProtobufPropertyType.OptionalType;
+        if (serializers.isEmpty()) {
+            var variable = new ProtobufPropertyVariable(caller, isPrimitive, isOptional);
+            return new ProtobufPropertyVariables(false, List.of(variable));
         }
 
         var results = new ArrayList<ProtobufPropertyVariable>();
-        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(property.name(), initializer), property.type().isPrimitive(), property.type().isOptional()));
+        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(name, caller), isPrimitive, isOptional));
         var useMap = false;
-        var serializers = property.type().serializers();
         for (var index = 0; index < serializers.size(); index++) {
             var serializerElement = serializers.get(index);
-            var lastInitializer = index == 0 ? property.name() : property.name() + (index - 1);
-            var currentInitializer = property.name() + index;
+            var lastInitializer = index == 0 ? name : name + (index - 1);
+            var currentInitializer = name + index;
             var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer, useMap);
             results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive(), serializerElement.optional()));
             useMap |= serializerElement.optional();
@@ -198,41 +221,42 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
-    private Method getSerializerStreamMethod(ProtobufPropertyStub annotation) {
+    private Method getSerializerStreamMethods(ProtobufPropertyType type) {
         try {
             var clazz = ProtobufOutputStream.class;
-            return switch (annotation.type().protobufType()) {
+            return switch (type.protobufType()) {
                 case STRING ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
                 case OBJECT ->
-                        annotation.type().isEnum() ? clazz.getMethod("writeInt32", int.class, Integer.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
+                        type.isEnum() ? clazz.getMethod("writeInt32", int.class, Integer.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BYTES ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BOOL ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeBool", int.class, Collection.class) : clazz.getMethod("writeBool", int.class, Boolean.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeBool", int.class, Collection.class) : clazz.getMethod("writeBool", int.class, Boolean.class);
                 case INT32, SINT32 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeInt32", int.class, Collection.class) : clazz.getMethod("writeInt32", int.class, Integer.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeInt32", int.class, Collection.class) : clazz.getMethod("writeInt32", int.class, Integer.class);
                 case UINT32 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeUInt32", int.class, Collection.class) : clazz.getMethod("writeUInt32", int.class, Integer.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeUInt32", int.class, Collection.class) : clazz.getMethod("writeUInt32", int.class, Integer.class);
                 case FLOAT ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeFloat", int.class, Collection.class) : clazz.getMethod("writeFloat", int.class, Float.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeFloat", int.class, Collection.class) : clazz.getMethod("writeFloat", int.class, Float.class);
                 case DOUBLE ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeDouble", int.class, Collection.class) : clazz.getMethod("writeDouble", int.class, Double.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeDouble", int.class, Collection.class) : clazz.getMethod("writeDouble", int.class, Double.class);
                 case FIXED32, SFIXED32 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeFixed32", int.class, Collection.class) : clazz.getMethod("writeFixed32", int.class, Integer.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeFixed32", int.class, Collection.class) : clazz.getMethod("writeFixed32", int.class, Integer.class);
                 case INT64, SINT64 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeInt64", int.class, Collection.class) : clazz.getMethod("writeInt64", int.class, Long.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeInt64", int.class, Collection.class) : clazz.getMethod("writeInt64", int.class, Long.class);
                 case UINT64 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeUInt64", int.class, Collection.class) : clazz.getMethod("writeUInt64", int.class, Long.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeUInt64", int.class, Collection.class) : clazz.getMethod("writeUInt64", int.class, Long.class);
                 case FIXED64, SFIXED64 ->
-                        isConcreteRepeated(annotation) ? clazz.getMethod("writeFixed64", int.class, Collection.class) : clazz.getMethod("writeFixed64", int.class, Long.class);
+                        isRepeatedWithoutConversion(type) ? clazz.getMethod("writeFixed64", int.class, Collection.class) : clazz.getMethod("writeFixed64", int.class, Long.class);
+                default -> throw new IllegalStateException("Unexpected value: " + type.protobufType());
             };
         }catch (NoSuchMethodException exception) {
             throw new RuntimeException("Missing element method", exception);
         }
     }
 
-    private boolean isConcreteRepeated(ProtobufPropertyStub annotation) {
-        return annotation.repeated() && annotation.type().serializers().isEmpty();
+    private boolean isRepeatedWithoutConversion(ProtobufPropertyType type) {
+        return type instanceof ProtobufPropertyType.CollectionType && type.serializers().isEmpty();
     }
 }

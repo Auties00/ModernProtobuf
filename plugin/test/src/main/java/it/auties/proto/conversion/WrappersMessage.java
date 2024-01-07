@@ -8,11 +8,7 @@ import java.util.ArrayList;
 import static it.auties.protobuf.model.ProtobufType.STRING;
 
 public record WrappersMessage(
-        @ProtobufProperty(
-                index = 1,
-                type = STRING,
-                repeated = true
-        )
+        @ProtobufProperty(index = 1, type = STRING)
         ArrayList<Wrapper> wrappers
 ) implements ProtobufMessage {
 

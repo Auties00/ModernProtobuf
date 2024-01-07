@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import static it.auties.protobuf.model.ProtobufType.UINT32;
 
 public record PackedMessage(
-        @ProtobufProperty(index = 1, type = UINT32, repeated = true, packed = true)
+        @ProtobufProperty(index = 1, type = UINT32, packed = true)
         ArrayList<Integer> content
 ) implements ProtobufMessage {
 

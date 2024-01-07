@@ -1,13 +1,10 @@
-package it.auties.protobuf.serialization.message;
+package it.auties.protobuf.serialization.object;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import java.util.*;
 
 public class ProtobufMessageElement {
@@ -64,15 +61,14 @@ public class ProtobufMessageElement {
         return Optional.ofNullable(constants.put(fieldIndex, fieldName));
     }
 
-    public Optional<ProtobufPropertyStub> addProperty(VariableElement element, ExecutableElement accessor, ProtobufPropertyType type, ProtobufProperty property) {
+    public Optional<ProtobufPropertyStub> addProperty(Element element, Element accessor, ProtobufPropertyType type, ProtobufProperty property) {
         if(property.ignored()) {
             return Optional.empty();
         }
 
         var fieldName = element.getSimpleName().toString();
-        var fieldIndex = property.index();
-        var result = new ProtobufPropertyStub(fieldIndex, fieldName, accessor, type, property);
-        return Optional.ofNullable(properties.put(fieldIndex, result));
+        var result = new ProtobufPropertyStub(fieldName, accessor, type, property);
+        return Optional.ofNullable(properties.put(property.index(), result));
     }
 
     public void addBuilder(String className, List<? extends VariableElement> parameters, ExecutableElement executableElement) {

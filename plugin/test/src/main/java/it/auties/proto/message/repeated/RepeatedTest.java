@@ -14,8 +14,8 @@ public class RepeatedTest {
         var encoded = ModernRepeatedMessageSpec.encode(repeatedMessage);
         var oldDecoded = RepeatedMessage.parseFrom(encoded);
         var modernDecoded = ModernRepeatedMessageSpec.decode(encoded);
-        Assertions.assertEquals(repeatedMessage.content(), modernDecoded.content());
-        Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.content());
+        Assertions.assertEquals(repeatedMessage.repeatedData(), modernDecoded.repeatedData());
+        Assertions.assertEquals(oldDecoded.getContentList(), modernDecoded.repeatedData());
     }
 
     @Test

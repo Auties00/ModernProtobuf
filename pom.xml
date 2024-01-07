@@ -88,7 +88,7 @@
 
     <properties>
         <junit.version>5.9.0</junit.version>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
     </properties>
 
     <build>

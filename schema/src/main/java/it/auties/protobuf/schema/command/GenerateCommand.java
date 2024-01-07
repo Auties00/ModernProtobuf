@@ -2,7 +2,7 @@ package it.auties.protobuf.schema.command;
 
 import com.github.javaparser.ast.CompilationUnit;
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.statement.ProtobufDocument;
+import it.auties.protobuf.parser.tree.ProtobufDocument;
 import it.auties.protobuf.schema.schema.ProtobufSchemaCreator;
 import it.auties.protobuf.schema.util.AstUtils;
 import it.auties.protobuf.schema.util.LogProvider;
@@ -83,8 +83,8 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
 
     private ProtobufDocument generateAST() throws IOException {
         log.log(Level.INFO, "Generating AST for protobuf file...");
-        var parser = new ProtobufParser(protobuf);
-        var document = parser.parse();
+        var parser = new ProtobufParser();
+        var document = parser.parseOnly(protobuf.toPath());
         log.log(Level.INFO, "Generated AST successfully");
         return document;
     }

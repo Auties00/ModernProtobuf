@@ -7,7 +7,7 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.ArrayList;
 
 public record RepeatedWrapperMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT, repeated = true)
+        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
         ArrayList<RepeatedEmbeddedWrapperMessage> content
 ) implements ProtobufMessage {
 }

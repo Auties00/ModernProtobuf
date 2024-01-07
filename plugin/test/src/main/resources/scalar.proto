@@ -17,4 +17,8 @@ message ScalarMessage {
   optional bool bool = 11;
   optional string string = 12;
   optional bytes bytes = 13;
+  oneof Abc {
+    optional string a = 141;
+    repeated string b = 141;
+  }
 }
