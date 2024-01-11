@@ -54,7 +54,7 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
         message.properties()
                 .stream()
                 .filter(ProtobufPropertyStub::required)
-                .forEach(entry -> writer.println("      Objects.requireNonNull(%s.%s(), \"Missing required property: %s\");".formatted(DEFAULT_PARAMETER_NAME, entry.name(), entry.name())));
+                .forEach(entry -> writer.println("      Objects.requireNonNull(%s, \"Missing required property: %s\");".formatted(getAccessorCall(entry), entry.name())));
     }
 
     @Override
@@ -117,19 +117,21 @@ public class ProtobufSerializationVisitor extends ProtobufInstrumentationVisitor
     }
 
     private void writeRepeatedPropertySerializer(ProtobufPropertyStub property, ProtobufPropertyType.CollectionType collectionType) {
-        writer.println("      if(%s.%s() != null) {".formatted(DEFAULT_PARAMETER_NAME, property.name()));
+        var accessorCall = getAccessorCall(property);
+        writer.println("      if(%s != null) {".formatted(accessorCall));
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("       for(var %s : %s.%s()) {".formatted(localVariableName, DEFAULT_PARAMETER_NAME, property.name()));
+        writer.println("       for(var %s : %s) {".formatted(localVariableName, accessorCall));
         writeSerializer(property.index(), property.name(), localVariableName, collectionType.value(), DEFAULT_OUTPUT_STREAM_NAME);
         writer.println("       }");
         writer.println("      }");
     }
 
     private void writeMapSerializer(ProtobufPropertyStub property, ProtobufPropertyType.MapType mapType) {
-        writer.println("      if(%s.%s() != null) {".formatted(DEFAULT_PARAMETER_NAME, property.name()));
+        var accessorCall = getAccessorCall(property);
+        writer.println("      if(%s != null) {".formatted(accessorCall));
         var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("            for(var %s : %s.entrySet()) {".formatted(localVariableName, getAccessorCall(property)));
+        writer.println("            for(var %s : %s.entrySet()) {".formatted(localVariableName, accessorCall));
         writer.println("                var %s = new ProtobufOutputStream();".formatted(localStreamName));
         writeSerializer(1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
         writeSerializer(2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
