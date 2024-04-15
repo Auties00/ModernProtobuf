@@ -1,5 +1,7 @@
 package it.auties.protobuf.annotation;
 
+import it.auties.protobuf.builtin.ProtobufDefaultMixins;
+import it.auties.protobuf.model.ProtobufMixin;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.lang.annotation.ElementType;
@@ -14,13 +16,23 @@ public @interface ProtobufProperty {
 
     ProtobufType type();
 
-    ProtobufType keyType() default ProtobufType.MAP;
-
-    ProtobufType valueType() default ProtobufType.MAP;
-
     Class<?> overrideType() default Object.class;
 
-    Class<? extends ProtobufMixin> mixin() default ProtobufMixin.class;
+    Class<?> overrideRepeatedType() default Object.class;
+
+    Class<?> overrideMapType() default Object.class;
+
+    ProtobufType mapKeyType() default ProtobufType.MAP;
+
+    Class<?> overrideMapKeyType() default Object.class;
+
+    ProtobufType mapValueType() default ProtobufType.MAP;
+
+    Class<?> overrideMapValueType() default Object.class;
+
+    Class<? extends ProtobufMixin>[] mixins() default {
+        ProtobufDefaultMixins.class
+    };
 
     boolean required() default false;
 

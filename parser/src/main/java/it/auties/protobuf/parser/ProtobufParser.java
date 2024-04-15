@@ -5,6 +5,7 @@ import it.auties.protobuf.parser.exception.ProtobufInternalException;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
 import it.auties.protobuf.parser.tree.*;
+import it.auties.protobuf.parser.tree.ProtobufObjectTree.*;
 import it.auties.protobuf.parser.type.ProtobufMapType;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufPrimitiveType;
@@ -147,9 +148,12 @@ public final class ProtobufParser {
         return Stream.of(documents, BUILT_INS)
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
-                .map(entry -> entry.qualifiedPath().map(path -> Map.entry(path, entry)))
-                .flatMap(Optional::stream)
+                .flatMap(this::getImport)
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private Stream<Map.Entry<String, ProtobufDocument>> getImport(ProtobufDocument entry) {
+        return entry.qualifiedPath().map(path -> Map.entry(path, entry)).stream();
     }
 
     private void attributeStatement(ProtobufTree statement) {
@@ -491,7 +495,7 @@ public final class ProtobufParser {
         var reserved = reservable.lastReserved().orElse(null);
         var didDeclareRange = Objects.equals(token, RANGE_OPERATOR);
         if(didDeclareRange) {
-            if(!(reserved instanceof ProtobufObjectTree<?>.ReservedIndexes indexes)) {
+            if(!(reserved instanceof ReservedIndexes indexes)) {
                 throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
             }
 
@@ -509,19 +513,19 @@ public final class ProtobufParser {
         }
 
         switch (reserved) {
-            case ProtobufObjectTree.ReservedIndexes reservedIndexes -> {
+            case ReservedIndexes reservedIndexes -> {
                 var index = parseIndex(token, false, false);
                 ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedIndexes.addValue(index.get()),
                         "Duplicate reserved index", tokenizer.lineno());
             }
-            case ProtobufObjectTree.ReservedNames reservedNames -> {
+            case ReservedNames reservedNames -> {
                 var literal = parseStringLiteral(token);
                 ProtobufSyntaxException.check(literal.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedNames.addValue(literal.get()),
                         "Duplicate reserved name", tokenizer.lineno());
             }
-            case ProtobufObjectTree.ReservedRange reservedRange -> {
+            case ReservedRange reservedRange -> {
                 var index = parseIndex(token, false, true);
                 ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedRange.setMax(index.get()),
@@ -568,7 +572,7 @@ public final class ProtobufParser {
         var extensions = extensible.lastExtension().orElse(null);
         var didDeclareRange = Objects.equals(token, RANGE_OPERATOR);
         if(didDeclareRange) {
-            if(!(extensions instanceof ProtobufObjectTree<?>.ExtensionsIndexes indexes)) {
+            if(!(extensions instanceof ExtensionsIndexes indexes)) {
                 throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
             }
 
@@ -586,13 +590,13 @@ public final class ProtobufParser {
         }
 
         switch (extensions) {
-            case ProtobufObjectTree.ExtensionsIndexes extensionsIndexes -> {
+            case ExtensionsIndexes extensionsIndexes -> {
                 var index = parseIndex(token, false, false);
                 ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(extensionsIndexes.addValue(index.get()),
                         "Duplicate extensions index", tokenizer.lineno());
             }
-            case ProtobufObjectTree.ExtensionsRange extensionsRange -> {
+            case ExtensionsRange extensionsRange -> {
                 var index = parseIndex(token, false, true);
                 ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(extensionsRange.setMax(index.get()),

@@ -1,0 +1,93 @@
+package it.auties.protobuf.serialization.support;
+
+import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyType;
+
+import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import java.util.Locale;
+
+public class Types {
+    private final ProcessingEnvironment processingEnv;
+    public Types(ProcessingEnvironment processingEnv) {
+        this.processingEnv = processingEnv;
+    }
+
+    // Convert a Java type into an AST type mirror
+    public TypeMirror getType(Class<?> type) {
+        if(type.isPrimitive()) {
+            var kind = TypeKind.valueOf(type.getName().toUpperCase(Locale.ROOT));
+            return processingEnv.getTypeUtils().getPrimitiveType(kind);
+        }
+
+        if(type.isArray()) {
+            return processingEnv.getTypeUtils().getArrayType(getType(type.getComponentType()));
+        }
+
+        var result = processingEnv.getElementUtils().getTypeElement(type.getName());
+        return erase(result.asType());
+    }
+
+    public boolean isEnum(TypeMirror mirror) {
+        return mirror instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.ENUM;
+    }
+
+    public boolean isSameType(TypeMirror firstType, Class<?> secondType) {
+        return isSameType(firstType, getType(secondType));
+    }
+
+    public boolean isSameType(TypeMirror firstType, TypeMirror secondType) {
+        return processingEnv.getTypeUtils().isSameType(erase(firstType), secondType);
+    }
+
+    public TypeMirror erase(TypeMirror typeMirror) {
+        var result = processingEnv.getTypeUtils().erasure(typeMirror);
+        return result == null ? typeMirror : result;
+    }
+
+    public boolean isSubType(TypeMirror child, Class<?> parent) {
+        return isSubType(child, getType(parent));
+    }
+
+    public boolean isSubType(TypeMirror child, TypeMirror parent) {
+        if(child instanceof PrimitiveType primitiveType) {
+            var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
+            child = boxed.asType();
+        }
+
+        if(parent instanceof PrimitiveType primitiveType) {
+            var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
+            parent = boxed.asType();
+        }
+
+        return processingEnv.getTypeUtils().isSubtype(erase(child), erase(parent));
+    }
+
+    public TypeMirror newType(Class<?> type, TypeMirror... typeArguments) {
+        var astType = getType(type);
+        if(!(astType instanceof DeclaredType declaredType)) {
+            return astType;
+        }
+
+        var element = (TypeElement) declaredType.asElement();
+        return processingEnv.getTypeUtils().getDeclaredType(element, typeArguments);
+    }
+
+    public String getDefaultValue(ProtobufPropertyStub stub) {
+        return switch (stub.type().implementationType().getKind()) {
+            case DECLARED, ARRAY -> stub.defaultValue();
+            case INT, CHAR, SHORT, BYTE -> "0";
+            case BOOLEAN -> "false";
+            case FLOAT -> "0f";
+            case DOUBLE -> "0d";
+            case LONG -> "0l";
+            default -> throw new IllegalStateException("Unexpected value: " + stub.type().descriptorElementType().getKind());
+        };
+    }
+}
