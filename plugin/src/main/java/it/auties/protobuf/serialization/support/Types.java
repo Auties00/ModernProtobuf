@@ -1,8 +1,5 @@
 package it.auties.protobuf.serialization.support;
 
-import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
-
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
@@ -11,6 +8,7 @@ import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import java.util.Locale;
+import java.util.Optional;
 
 public class Types {
     private final ProcessingEnvironment processingEnv;
@@ -79,15 +77,15 @@ public class Types {
         return processingEnv.getTypeUtils().getDeclaredType(element, typeArguments);
     }
 
-    public String getDefaultValue(ProtobufPropertyStub stub) {
-        return switch (stub.type().implementationType().getKind()) {
-            case DECLARED, ARRAY -> stub.defaultValue();
-            case INT, CHAR, SHORT, BYTE -> "0";
-            case BOOLEAN -> "false";
-            case FLOAT -> "0f";
-            case DOUBLE -> "0d";
-            case LONG -> "0l";
-            default -> throw new IllegalStateException("Unexpected value: " + stub.type().descriptorElementType().getKind());
-        };
+    public Optional<String> getName(TypeMirror type) {
+        if(!(type instanceof DeclaredType declaredType)) {
+            return Optional.empty();
+        }
+
+        if(!(declaredType.asElement() instanceof TypeElement typeElement)) {
+            return Optional.empty();
+        }
+
+        return Optional.ofNullable(typeElement.getQualifiedName().toString());
     }
 }

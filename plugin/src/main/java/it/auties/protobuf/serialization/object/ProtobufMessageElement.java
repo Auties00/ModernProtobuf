@@ -1,7 +1,7 @@
 package it.auties.protobuf.serialization.object;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 
 import javax.lang.model.element.*;
@@ -9,7 +9,7 @@ import java.util.*;
 
 public class ProtobufMessageElement {
     private final TypeElement typeElement;
-    private final Map<Integer, ProtobufPropertyStub> properties;
+    private final Map<Integer, ProtobufPropertyElement> properties;
     private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
@@ -45,7 +45,7 @@ public class ProtobufMessageElement {
         return Optional.of(enumMetadata);
     }
 
-    public List<ProtobufPropertyStub> properties() {
+    public List<ProtobufPropertyElement> properties() {
         return List.copyOf(properties.values());
     }
 
@@ -61,13 +61,13 @@ public class ProtobufMessageElement {
         return Optional.ofNullable(constants.put(fieldIndex, fieldName));
     }
 
-    public Optional<ProtobufPropertyStub> addProperty(Element element, Element accessor, ProtobufPropertyType type, ProtobufProperty property) {
+    public Optional<ProtobufPropertyElement> addProperty(Element element, Element accessor, ProtobufPropertyType type, ProtobufProperty property) {
         if(property.ignored()) {
             return Optional.empty();
         }
 
         var fieldName = element.getSimpleName().toString();
-        var result = new ProtobufPropertyStub(fieldName, accessor, type, property);
+        var result = new ProtobufPropertyElement(fieldName, accessor, type, property);
         return Optional.ofNullable(properties.put(property.index(), result));
     }
 

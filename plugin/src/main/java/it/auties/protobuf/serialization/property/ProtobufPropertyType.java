@@ -28,7 +28,7 @@ public sealed interface ProtobufPropertyType {
     // 2. Field type
     // !! Override type is ignored
     // Here are a couple of examples:
-    // 1. Type described by a field
+    // - Type described by a field
     //    Here the abstract type is int
     //    class Message implements ProtobufMessage {
     //         @ProtobufProperty(index = 1, type = UINT32)
@@ -126,6 +126,11 @@ public sealed interface ProtobufPropertyType {
     //    }
     TypeMirror implementationType();
 
+    // The default value of the type
+    // For a primitive type, the value is 0 (or false)
+    // For an object, it's null, or the default value assigned by @ProtobufDefaultValue in a ProtobufMixin registered in a @ProtobufProperty
+    String defaultValue();
+
     // Adds a nullable converter to the type
     void addNullableConverter(ProtobufConverterElement element);
 
@@ -155,9 +160,9 @@ public sealed interface ProtobufPropertyType {
                 .toList();
     }
 
-    record NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror implementationType, List<ProtobufConverterElement> converters, boolean isEnum) implements ProtobufPropertyType {
-        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, boolean isEnum) {
-            this(protobufType, fieldType, implementationType, new ArrayList<>(), isEnum);
+    record NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror implementationType, List<ProtobufConverterElement> converters, String defaultValue, boolean isEnum) implements ProtobufPropertyType {
+        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, String defaultValue, boolean isEnum) {
+            this(protobufType, fieldType, implementationType, new ArrayList<>(), defaultValue, isEnum);
         }
 
         @Override
@@ -180,15 +185,10 @@ public sealed interface ProtobufPropertyType {
         }
     }
 
-    record CollectionType(TypeMirror fieldType, TypeMirror collectionType, NormalType value) implements ProtobufPropertyType {
-        @Override
-        public TypeMirror descriptorElementType() {
-            return fieldType;
-        }
-
+    record CollectionType(TypeMirror descriptorElementType, NormalType value, String defaultValue) implements ProtobufPropertyType {
         @Override
         public TypeMirror implementationType() {
-            return value.implementationType();
+            return descriptorElementType;
         }
 
         @Override
@@ -213,11 +213,15 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public void addNullableConverter(ProtobufConverterElement element) {
+            if(element == null) {
+                return;
+            }
+
             value.addNullableConverter(element);
         }
     }
 
-    record MapType(TypeMirror descriptorElementType, TypeMirror mapType, NormalType keyType, NormalType valueType) implements ProtobufPropertyType {
+    record MapType(TypeMirror descriptorElementType, NormalType keyType, NormalType valueType, String defaultValue) implements ProtobufPropertyType {
         public boolean isPrimitive() {
            return false;
         }
@@ -234,12 +238,20 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public List<ProtobufConverterElement> converters() {
-            throw new UnsupportedOperationException();
+            var results = new ArrayList<ProtobufConverterElement>();
+            results.addAll(keyType.converters());
+            results.addAll(valueType.converters());
+            return Collections.unmodifiableList(results);
         }
 
         @Override
         public void addNullableConverter(ProtobufConverterElement element) {
-            throw new UnsupportedOperationException();
+            if(element == null) {
+                return;
+            }
+
+            keyType.addNullableConverter(element);
+            valueType.addNullableConverter(element);
         }
 
         @Override

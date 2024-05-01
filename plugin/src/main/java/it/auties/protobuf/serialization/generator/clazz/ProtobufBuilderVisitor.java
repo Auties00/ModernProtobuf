@@ -1,27 +1,28 @@
 package it.auties.protobuf.serialization.generator.clazz;
 
+import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 
 import javax.annotation.processing.Filer;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 
 public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
-    private final Map<String, ProtobufDeserializerElement> atomicDeserializers;
-    public ProtobufBuilderVisitor(Filer filer, Map<String, ProtobufDeserializerElement> atomicDeserializers) {
+    public ProtobufBuilderVisitor(Filer filer) {
         super(filer);
-        this.atomicDeserializers = atomicDeserializers;
     }
 
-    private void createBuilderClass(ProtobufMessageElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufMessageElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
         var simpleGeneratedClassName = builderElement != null ? messageElement.getGeneratedClassNameByName(builderElement.name()) : messageElement.getGeneratedClassNameBySuffix("Builder");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
@@ -39,7 +40,7 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 }
             }else {
                 for (var property : messageElement.properties()) {
-                    writer.println("    private %s %s;".formatted(property.type().descriptorElementType(), property.name()));
+                    writer.println("    private %s %s;".formatted(property.type().implementationType(), property.name()));
                     invocationArgs.add(property.name());
                 }
             }
@@ -47,7 +48,7 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
             writer.println("    public %s() {".formatted(simpleGeneratedClassName));
             if(builderElement == null) {
                 for (var property : messageElement.properties()) {
-                    writer.println("        %s = %s;".formatted(property.name(), property.defaultValue()));
+                    writer.println("        %s = %s;".formatted(property.name(), property.type().defaultValue()));
                 }
             }
 
@@ -55,14 +56,38 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
             writer.println();
             if(builderElement != null) {
                 for(var parameter : builderElement.parameters()) {
-                    writeBuilderSetter(writer, parameter.getSimpleName().toString(), parameter.asType(), simpleGeneratedClassName);
+                    var fieldName = parameter.getSimpleName().toString();
+                    writeBuilderSetter(writer, fieldName, fieldName, parameter.asType(), simpleGeneratedClassName);
                 }
             }else {
                 for(var property : messageElement.properties()) {
-                    writeBuilderSetter(writer, property.name(), property.type().descriptorElementType(), simpleGeneratedClassName);
+                    var done = false;
+                    for(var override : getBuilderOverloads(property)) {
+                        var enclosingElement = (TypeElement) override.element().getEnclosingElement();
+                        var fieldValue = override.element().getModifiers().contains(Modifier.STATIC)
+                                ? "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.element().getSimpleName(), property.name())
+                                : "new %s(%s)".formatted(enclosingElement.getQualifiedName(), property.name());
+                        writeBuilderSetter(
+                                writer,
+                                property.name(),
+                                fieldValue,
+                                override.parameterType(),
+                                simpleGeneratedClassName
+                        );
+                        done |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+                    }
+
+                    if(!done) {
+                        writeBuilderSetter(
+                                writer,
+                                property.name(),
+                                property.name(),
+                                property.type().implementationType(),
+                                simpleGeneratedClassName
+                        );
+                    }
                 }
             }
-            writer.println();
             var resultQualifiedName = messageElement.element().getQualifiedName();
             var invocationArgsJoined = String.join(", ", invocationArgs);
             writer.println("    public %s build() {".formatted(resultQualifiedName));
@@ -73,46 +98,26 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
         }
     }
 
-    private void writeBuilderSetter(PrintWriter writer, String fieldName, TypeMirror fieldType, String className) {
+    private List<ProtobufDeserializerElement> getBuilderOverloads(ProtobufPropertyElement element) {
+        var results = new ArrayList<ProtobufDeserializerElement>();
+        for(var converter : element.type().deserializers()) {
+            if(converter.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE) {
+                return List.of(converter);
+            }
+
+            if(converter.behaviour() != ProtobufDeserializer.BuilderBehaviour.DISCARD) {
+                results.add(converter);
+            }
+        }
+
+        return Collections.unmodifiableList(results);
+    }
+
+    private void writeBuilderSetter(PrintWriter writer, String fieldName, String fieldValue, TypeMirror fieldType, String className) {
         writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, fieldType, fieldName));
-        writer.println("        this.%s = %s;".formatted(fieldName, fieldName));
+        writer.println("        this.%s = %s;".formatted(fieldName, fieldValue));
         writer.println("        return this;");
         writer.println("    }");
-        if (!(fieldType instanceof DeclaredType declaredType)) {
-            return;
-        }
-
-        if(!(declaredType.asElement() instanceof TypeElement typeElement)) {
-            return;
-        }
-
-        var optionalConverter = optionalDeserializers.get(typeElement.getQualifiedName().toString());
-        if(optionalConverter != null) {
-            var optionalValueType = getOptionalValueType(declaredType);
-            if(optionalValueType.isEmpty()) {
-                return;
-            }
-
-            writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, optionalValueType.get(), fieldName));
-            var converterWrapperClass = (TypeElement) optionalConverter.element().getEnclosingElement();
-            writer.println("        this.%s = %s.%s(%s);".formatted(fieldName, converterWrapperClass.getQualifiedName(), optionalConverter.element().getSimpleName(), fieldName));
-            writer.println("        return this;");
-            writer.println("    }");
-            return;
-        }
-
-        var atomicConverter = atomicDeserializers.get(typeElement.getQualifiedName().toString());
-        if(atomicConverter != null) {
-            var atomicValueType = getAtomicValueType(declaredType);
-            if(atomicValueType.isEmpty()) {
-                return;
-            }
-
-            writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, atomicValueType.get(), fieldName));
-            var converterWrapperClass = (TypeElement) atomicConverter.element().getEnclosingElement();
-            writer.println("        this.%s = new %s(%s);".formatted(fieldName, converterWrapperClass.getQualifiedName(), fieldName));
-            writer.println("        return this;");
-            writer.println("    }");
-        }
+        writer.println();
     }
 }

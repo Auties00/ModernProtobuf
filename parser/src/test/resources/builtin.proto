@@ -1,0 +1,5 @@
+import "google/protobuf/wrappers.proto";
+
+message Message {
+    optional google.protobuf.Int64Value int64_value = 1;
+}

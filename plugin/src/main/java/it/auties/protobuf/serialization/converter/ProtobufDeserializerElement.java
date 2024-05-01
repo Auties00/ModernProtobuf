@@ -1,7 +1,10 @@
 package it.auties.protobuf.serialization.converter;
 
-import javax.lang.model.element.ExecutableElement;
+import it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour;
 
-public record ProtobufDeserializerElement(ExecutableElement element) implements ProtobufConverterElement {
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.type.TypeMirror;
+
+public record ProtobufDeserializerElement(ExecutableElement element, TypeMirror parameterType, BuilderBehaviour behaviour) implements ProtobufConverterElement {
 
 }

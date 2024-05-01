@@ -11,7 +11,6 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     private final LinkedHashMap<String, ProtobufOptionTree> options;
     private ProtobufOptionTree lastOption;
     private final LinkedHashMap<String, ProtobufImportTree> imports;
-    private ProtobufImportTree lastImport;
     private String packageName;
     private ProtobufVersion version;
 
@@ -60,7 +59,7 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     public String toString() {
         var builder = new StringBuilder();
         if(version != null){
-            builder.append("syntax = %s;".formatted(version.versionCode()));
+            builder.append("syntax = \"%s\";".formatted(version.versionCode()));
             builder.append("\n");
         }
 
@@ -89,7 +88,6 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     public ProtobufBodyTree addStatement(ProtobufDocumentChildTree statement) {
         if(statement instanceof ProtobufImportTree importStatement) {
             imports.put(importStatement.location(), importStatement);
-            this.lastImport = importStatement;
             return this;
         }else {
             return super.addStatement(statement);
@@ -201,10 +199,6 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
 
     public Collection<ProtobufImportTree> imports() {
         return Collections.unmodifiableCollection(imports.values());
-    }
-
-    public Optional<ProtobufImportTree> lastImport() {
-        return Optional.ofNullable(lastImport);
     }
 
     @Override

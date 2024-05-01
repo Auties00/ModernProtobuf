@@ -74,7 +74,7 @@ public final class ProtobufParser {
 
     public ProtobufDocument parse(String input) {
         var result = doParse(null, input);
-        attributeStatement(result);
+        attributeStatement(result, result);
         return result;
     }
 
@@ -91,7 +91,7 @@ public final class ProtobufParser {
             }
 
             attributeImports(results);
-            results.forEach(this::attributeStatement);
+            results.forEach(statement -> attributeStatement(statement, statement));
             return results;
         }
     }
@@ -103,7 +103,7 @@ public final class ProtobufParser {
 
         var result = doParse(path, Files.readString(path));
         attributeImports(List.of(result));
-        attributeStatement(result);
+        attributeStatement(result, result);
         return result;
     }
 
@@ -148,67 +148,43 @@ public final class ProtobufParser {
         return Stream.of(documents, BUILT_INS)
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
-                .flatMap(this::getImport)
+                .map(entry -> Map.entry(entry.qualifiedPath().orElse(entry.name().orElseThrow()), entry))
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    private Stream<Map.Entry<String, ProtobufDocument>> getImport(ProtobufDocument entry) {
-        return entry.qualifiedPath().map(path -> Map.entry(path, entry)).stream();
-    }
-
-    private void attributeStatement(ProtobufTree statement) {
+    private void attributeStatement(ProtobufDocument document, ProtobufTree statement) {
         switch (statement) {
             case ProtobufDocument documentStatement -> documentStatement.statements()
-                    .forEach(this::attributeStatement);
+                    .forEach(child -> attributeStatement(document, child));
             case ProtobufMessageTree messageStatement -> messageStatement.statements()
-                    .forEach(this::attributeStatement);
+                    .forEach(child -> attributeStatement(document, child));
             case ProtobufOneOfTree oneOfStatement -> oneOfStatement.statements()
-                    .forEach(this::attributeStatement);
-            case ProtobufTypedFieldTree fieldStatement -> attributeTypedStatement(fieldStatement, fieldStatement.type().orElse(null));
+                    .forEach(child -> attributeStatement(document, child));
+            case ProtobufTypedFieldTree fieldStatement -> attributeTypedStatement(document, fieldStatement, fieldStatement.type().orElse(null));
             default -> {}
         }
     }
 
-    private void attributeTypedStatement(ProtobufTypedFieldTree typedFieldTree, ProtobufTypeReference typeReference) {
+    private void attributeTypedStatement(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufTypeReference typeReference) {
         switch (typeReference) {
             case ProtobufMapType mapType -> {
-                attributeTypedStatement(typedFieldTree, mapType.keyType().orElseThrow());
-                attributeTypedStatement(typedFieldTree, mapType.valueType().orElseThrow());
+                attributeTypedStatement(document, typedFieldTree, mapType.keyType().orElseThrow());
+                attributeTypedStatement(document, typedFieldTree, mapType.valueType().orElseThrow());
             }
-            case ProtobufObjectType messageType -> attributeType(typedFieldTree, messageType);
+            case ProtobufObjectType messageType -> attributeType(document, typedFieldTree, messageType);
             case ProtobufPrimitiveType ignored -> {}
             case null -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
-    private void attributeType(ProtobufTypedFieldTree typedFieldTree, ProtobufObjectType fieldType) {
+    private void attributeType(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufObjectType fieldType) {
         if (fieldType.isAttributed()) {
             return;
         }
 
-        var type = getReferencedType(typedFieldTree, fieldType);
-        ProtobufTypeException.check(type.isPresent(),
-                "Cannot resolve type in field %s inside %s",
-                typedFieldTree,
-                typedFieldTree.parent().flatMap(ProtobufBodyTree::name).orElse(null));
-        fieldType.attribute(type.get());
-    }
-
-    private Optional<ProtobufObjectTree<?>> getReferencedType(ProtobufTypedFieldTree typedFieldTree, ProtobufObjectType messageType) {
-        if (!messageType.name().contains(TYPE_SELECTOR)) {
-            return getReferencedType(typedFieldTree, messageType.name());
-        }
-
-        var types = messageType.name().split(TYPE_SELECTOR_SPLITTER);
-        if(types.length == 0){
-            throw new ProtobufTypeException("Cannot resolve type %s in field %s inside %s",
-                    tokenizer.lineno(),
-                    typedFieldTree.type().map(ProtobufTypeReference::name).orElse(null),
-                    typedFieldTree.name(),
-                    typedFieldTree.parent().flatMap(ProtobufBodyTree::name).orElse(null));
-        }
-
-        var type = getReferencedType(typedFieldTree, types[0])
+        var accessed = fieldType.name();
+        var types = accessed.split(TYPE_SELECTOR_SPLITTER);
+        var type = getLocalType(typedFieldTree, types[0])
                 .orElse(null);
         for(var index = 1; index < types.length; index++){
             if(type == null) {
@@ -224,10 +200,22 @@ public final class ProtobufParser {
             );
         }
 
-        return Optional.ofNullable(type);
+        if(type == null) {
+            type = getImportedType(document, accessed).orElse(null);
+        }
+
+        if(type == null) {
+            throw new ProtobufTypeException("Cannot resolve type %s for field %s inside %s".formatted(
+                    typedFieldTree.type().map(ProtobufTypeReference::name).orElse("<missing>"),
+                    typedFieldTree.name().orElse("<missing>"),
+                    typedFieldTree.parent().flatMap(ProtobufBodyTree::name).orElse(null))
+            );
+        }
+
+        fieldType.attribute(type);
     }
 
-    private Optional<ProtobufObjectTree<?>> getReferencedType(ProtobufTypedFieldTree typedFieldTree, String accessed) {
+    private Optional<ProtobufObjectTree<?>> getLocalType(ProtobufTypedFieldTree typedFieldTree, String accessed) {
         var parent = typedFieldTree.parent().orElse(null);
         ProtobufObjectTree<?> innerType = null;
         while (parent != null && innerType == null){
@@ -236,7 +224,39 @@ public final class ProtobufParser {
             parent = parent.parent().orElse(null);
         }
 
-        return Optional.ofNullable(innerType);
+        if(innerType != null) {
+            return Optional.of(innerType);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<ProtobufObjectTree<?>> getImportedType(ProtobufDocument document, String accessed) {
+        for(var imported : document.imports()) {
+            var importedDocument = imported.document()
+                    .orElse(null);
+            if(importedDocument == null) {
+                continue;
+            }
+
+            var importedPackage = importedDocument.packageName()
+                    .orElse(null);
+            var importedName = importedPackage != null && accessed.startsWith(importedPackage + TYPE_SELECTOR) ? accessed.substring(importedPackage.length() + 1) : accessed;
+            var simpleImportName = importedName.split(TYPE_SELECTOR_SPLITTER);
+            ProtobufBodyTree<?> type = document;
+            for (var importPart : simpleImportName) {
+                type = type.getStatement(importPart, ProtobufObjectTree.class).orElse(null);
+                if (type == null) {
+                    break;
+                }
+            }
+
+            if(type instanceof ProtobufObjectTree<?> result) {
+                return Optional.of(result);
+            }
+        }
+
+        return Optional.empty();
     }
 
     private void handleToken(String token) {
@@ -401,23 +421,6 @@ public final class ProtobufParser {
                 "Illegal use of reserved field", tokenizer.lineno());
         ProtobufSyntaxException.check(isValidEnumConstant(object),
                 "Proto3 enums require the first constant to have index 0", tokenizer.lineno());
-        var scope = objects.peekLast();
-        if(scope == null){
-            if(!(object instanceof ProtobufDocumentChildTree childTree)) {
-                throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
-            }
-
-            document.addStatement(childTree);
-        }else if(scope instanceof ProtobufMessageTree message){
-            if(!(object instanceof ProtobufMessageChildTree childTree)) {
-                throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
-            }
-
-            message.addStatement(childTree);
-        }else {
-            throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
-        }
-
         jumpOutInstruction();
     }
 

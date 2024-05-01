@@ -26,7 +26,7 @@ public final class ProtobufModifiableFieldTree extends ProtobufTypedFieldTree im
         var modifier = Optional.ofNullable(this.modifier)
                 .filter(entry -> entry != ProtobufFieldModifier.NOTHING)
                 .map(entry -> entry + " ")
-                .orElse("[missing] ");
+                .orElse("");
         var type = Objects.requireNonNull(this.type, "[missing]");
         var name = Objects.requireNonNullElse(this.name, "[missing]");
         var index = Objects.requireNonNull(this.index, "[missing]");

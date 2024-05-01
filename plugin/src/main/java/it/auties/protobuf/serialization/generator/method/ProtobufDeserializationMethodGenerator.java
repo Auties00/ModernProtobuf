@@ -2,7 +2,7 @@ package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 
 import javax.lang.model.element.ElementKind;
@@ -78,7 +78,12 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
 
         // [<implementationType> var<index> = <defaultValue>, ...]
         for(var property : message.properties()) {
-            writer.println("        %s %s = %s;".formatted(property.type().descriptorElementType(), property.name(), property.defaultValue()));
+            var type = switch (property.type()) {
+                case ProtobufPropertyType.CollectionType collectionType -> collectionType.descriptorElementType();
+                case ProtobufPropertyType.MapType mapType -> mapType.descriptorElementType();
+                case ProtobufPropertyType.NormalType normalType -> normalType.implementationType();
+            };
+            writer.println("        %s %s = %s;".formatted(type, property.name(), property.type().defaultValue()));
         }
 
         // while(input.readTag())
@@ -102,21 +107,21 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         // Null check required properties
         message.properties()
                 .stream()
-                .filter(ProtobufPropertyStub::required)
+                .filter(ProtobufPropertyElement::required)
                 .forEach(this::checkRequiredProperty);
 
         // Return statement
         writer.println("        return new %s(%s);".formatted(message.element(), String.join(", ", argumentsList)));
     }
 
-    private void writeMapSerializer(ProtobufPropertyStub property, ProtobufPropertyType.MapType mapType) {
+    private void writeMapSerializer(ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
         writer.println("                case %s -> {".formatted(property.index()));
         var streamName = "%sInputStream".formatted(property.name());
         var keyName = "%sKey".formatted(property.name());
         var valueName = "%sValue".formatted(property.name());
         writer.println("                        var %s = new ProtobufInputStream(%s.readBytes());".formatted(streamName, DEFAULT_STREAM_NAME));
-        writer.println("                        %s %s = null;".formatted(mapType.keyType().descriptorElementType(), keyName));
-        writer.println("                        %s %s = null;".formatted(mapType.valueType().descriptorElementType(), valueName));
+        writer.println("                        %s %s = null;".formatted(mapType.keyType().implementationType(), keyName));
+        writer.println("                        %s %s = null;".formatted(mapType.valueType().implementationType(), valueName));
         var keyReadMethod = getDeserializerStreamMethod(mapType.keyType(), false);
         var keyReadValue = getReadValue(streamName, mapType.keyType(), keyReadMethod);
         var keyReadFunction = getConvertedValue(mapType.keyType(), keyReadValue);
@@ -141,7 +146,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         writer.println("                case %s -> %s;".formatted(index, readAssignment));
     }
 
-    private void checkRequiredProperty(ProtobufPropertyStub property) {
+    private void checkRequiredProperty(ProtobufPropertyElement property) {
         if (!(property.type() instanceof ProtobufPropertyType.CollectionType)) {
             writer.println("        Objects.requireNonNull(%s, \"Missing required property: %s\");".formatted(property.name(), property.name()));
             return;

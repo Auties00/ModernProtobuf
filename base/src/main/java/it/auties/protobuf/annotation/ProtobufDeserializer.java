@@ -7,6 +7,12 @@ import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ProtobufConverter {
+public @interface ProtobufDeserializer {
+    BuilderBehaviour builderBehaviour() default BuilderBehaviour.DISCARD;
 
+    enum BuilderBehaviour {
+        DISCARD,
+        ADD,
+        OVERRIDE
+    }
 }

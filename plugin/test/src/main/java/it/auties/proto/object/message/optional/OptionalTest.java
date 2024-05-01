@@ -3,8 +3,6 @@ package it.auties.proto.object.message.optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.OptionalLong;
-
 public class OptionalTest {
     @Test
     public void testBuilder() {
@@ -12,7 +10,7 @@ public class OptionalTest {
                 .optionalString("abc")
                 .optionalInt(123)
                 .optionalDouble(456D)
-                .optionalLong(OptionalLong.empty())
+                .optionalLong(null)
                 .build();
         var encoded = OptionalMessageSpec.encode(result);
         var decoded = OptionalMessageSpec.decode(encoded);

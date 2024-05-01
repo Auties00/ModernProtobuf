@@ -143,7 +143,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
         @Override
         public String toString() {
-            return "%s to %s".formatted(min, max == Integer.MAX_VALUE ? "max" : max);
+            return "%s to %s".formatted(min, max != null && max == Integer.MAX_VALUE ? "max" : max);
         }
     }
 

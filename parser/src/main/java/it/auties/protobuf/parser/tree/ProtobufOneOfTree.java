@@ -26,19 +26,13 @@ public final class ProtobufOneOfTree extends ProtobufIndexedBodyTree<ProtobufMod
 
     @Override
     public String toString() {
-        var builder = new StringBuilder()
-                .append("oneof")
-                .append(" ")
-                .append(Objects.requireNonNullElse(name, "[missing]"))
-                .append(" ")
-                .append("{")
-                .append("\n");
+        var builder = new StringBuilder();
+        builder.append(toLeveledString("oneof %s {\n".formatted(Objects.requireNonNullElse(name, "[missing]"))));
         statements().forEach(statement -> {
             builder.append(statement.toString());
             builder.append("\n");
         });
-
-        builder.append("}");
-        return toLeveledString(builder.toString());
+        builder.append(toLeveledString("}"));
+        return builder.toString();
     }
 }

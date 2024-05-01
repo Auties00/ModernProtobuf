@@ -5,11 +5,9 @@ import java.util.function.Consumer;
 
 public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree permits ProtobufDocument, ProtobufIndexedBodyTree {
     private String name;
-    private final List<T> statements;
-    private T firstStatement;
-    private T lastStatement;
+    private final LinkedList<T> statements;
     ProtobufBodyTree(){
-        this.statements = new ArrayList<>();
+        this.statements = new LinkedList<>();
     }
 
     public Optional<String> name() {
@@ -79,11 +77,11 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
     }
 
     public Optional<T> firstStatement() {
-        return Optional.ofNullable(firstStatement);
+        return Optional.ofNullable(statements.peekFirst());
     }
 
     public Optional<T> lastStatement() {
-        return Optional.ofNullable(lastStatement);
+        return Optional.ofNullable(statements.peekLast());
     }
 
     public ProtobufBodyTree addStatement(T statement){
@@ -92,10 +90,6 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
         }
 
         statements.add(statement);
-        if(firstStatement == null) {
-            this.firstStatement = statement;
-        }
-        this.lastStatement = statement;
         return this;
     }
 

@@ -14,6 +14,6 @@ public class UnexpectedTokensTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("unexpected_tokens.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        parser.parseOnly(Path.of(proto2Source.toURI()));
+        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 }

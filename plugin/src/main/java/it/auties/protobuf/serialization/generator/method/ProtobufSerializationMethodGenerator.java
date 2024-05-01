@@ -3,7 +3,7 @@ package it.auties.protobuf.serialization.generator.method;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyStub;
+import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
@@ -53,7 +53,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     private void createRequiredPropertiesNullCheck() {
         message.properties()
                 .stream()
-                .filter(ProtobufPropertyStub::required)
+                .filter(ProtobufPropertyElement::required)
                 .forEach(entry -> writer.println("      Objects.requireNonNull(%s, \"Missing required property: %s\");".formatted(getAccessorCall(entry), entry.name())));
     }
 
@@ -100,7 +100,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     }
 
     // Writes a property to the output stream
-    private void writeProperty(ProtobufPropertyStub property) {
+    private void writeProperty(ProtobufPropertyElement property) {
         switch (property.type()) {
             case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer(property, collectionType);
             case ProtobufPropertyType.MapType mapType -> writeMapSerializer(property, mapType);
@@ -108,7 +108,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         }
     }
 
-    private String getAccessorCall(ProtobufPropertyStub property) {
+    private String getAccessorCall(ProtobufPropertyElement property) {
         return switch (property.accessor()) {
             case ExecutableElement executableElement -> "%s.%s()".formatted(DEFAULT_PARAMETER_NAME, executableElement.getSimpleName());
             case VariableElement variableElement -> "%s.%s".formatted(DEFAULT_PARAMETER_NAME, variableElement.getSimpleName());
@@ -116,7 +116,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         };
     }
 
-    private void writeRepeatedPropertySerializer(ProtobufPropertyStub property, ProtobufPropertyType.CollectionType collectionType) {
+    private void writeRepeatedPropertySerializer(ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
         var accessorCall = getAccessorCall(property);
         writer.println("      if(%s != null) {".formatted(accessorCall));
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
@@ -126,7 +126,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         writer.println("      }");
     }
 
-    private void writeMapSerializer(ProtobufPropertyStub property, ProtobufPropertyType.MapType mapType) {
+    private void writeMapSerializer(ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
         var accessorCall = getAccessorCall(property);
         writer.println("      if(%s != null) {".formatted(accessorCall));
         var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
@@ -155,7 +155,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
             var variable = result.variables().get(i);
             writer.println(variable.value());
             propertyName = name + (i == 0 ? "" : i - 1);
-            if(!variable.isPrimitive() && !variable.isOptional()) {
+            if(!variable.isPrimitive()) {
                 writer.println("      if(%s != null) {".formatted(propertyName));
             }
         }
@@ -163,7 +163,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecFromObject(type.implementationType()), propertyName);
         writer.println("      %s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
         for(var variable : result.variables()) {
-            if(!variable.isPrimitive() && !variable.isOptional()) {
+            if(!variable.isPrimitive()) {
                 writer.println("}");
             }
         }
@@ -172,22 +172,19 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     private ProtobufPropertyVariables getVariables(String name, String caller, ProtobufPropertyType type) {
         var serializers = type.serializers();
         var isPrimitive = type.isPrimitive();
-        var isOptional = type instanceof ProtobufPropertyType.OptionalType;
         if (serializers.isEmpty()) {
-            var variable = new ProtobufPropertyVariable(caller, isPrimitive, isOptional);
+            var variable = new ProtobufPropertyVariable(caller, isPrimitive);
             return new ProtobufPropertyVariables(false, List.of(variable));
         }
 
         var results = new ArrayList<ProtobufPropertyVariable>();
-        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(name, caller), isPrimitive, isOptional));
-        var useMap = false;
+        results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(name, caller), isPrimitive));
         for (var index = 0; index < serializers.size(); index++) {
             var serializerElement = serializers.get(index);
             var lastInitializer = index == 0 ? name : name + (index - 1);
             var currentInitializer = name + index;
-            var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer, useMap);
-            results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive(), serializerElement.optional()));
-            useMap |= serializerElement.optional();
+            var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer);
+            results.add(new ProtobufPropertyVariable("var %s = %s;".formatted(currentInitializer, convertedInitializer), serializerElement.primitive()));
         }
 
         return new ProtobufPropertyVariables(true, results);
@@ -197,11 +194,11 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
 
     }
 
-    private record ProtobufPropertyVariable(String value, boolean isPrimitive, boolean isOptional) {
+    private record ProtobufPropertyVariable(String value, boolean isPrimitive) {
 
     }
 
-    private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer, boolean useMap) {
+    private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer) {
         if (serializerElement.element().getKind() == ElementKind.CONSTRUCTOR) {
             var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
             return "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), lastInitializer);
@@ -209,20 +206,10 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
 
         if (serializerElement.element().getModifiers().contains(Modifier.STATIC)) {
             var converterWrapperClass = (TypeElement) serializerElement.element().getEnclosingElement();
-            if (!useMap) {
-                return "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName(), lastInitializer);
-            }
-
-            var method = serializerElement.optional() ? "flatMap" : "map";
-            return "%s.%s(lambdaArg -> %s.%s(lambdaArg))".formatted(lastInitializer, method, converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName());
+            return "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.element().getSimpleName(), lastInitializer);
         }
 
-        if (!useMap) {
-            return "%s.%s(%s)".formatted(lastInitializer, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
-        }
-
-        var method = serializerElement.optional() ? "flatMap" : "map";
-        return "%s.%s(lambdaArg -> lambdaArg.%s(%s))".formatted(lastInitializer, method, serializerElement.element().getSimpleName(), String.join(", ", serializerElement.arguments()));
+        return "%s.%s()".formatted(lastInitializer, serializerElement.element().getSimpleName());
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream

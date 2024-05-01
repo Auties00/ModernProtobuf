@@ -3,6 +3,6 @@ module it.auties.protobuf.base {
     exports it.auties.protobuf.annotation;
     exports it.auties.protobuf.stream;
     exports it.auties.protobuf.model;
-    exports it.auties.protobuf.mixin;
+    exports it.auties.protobuf.builtin;
     requires jdk.unsupported;
 }

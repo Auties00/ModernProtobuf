@@ -29,7 +29,7 @@ public final class ProtobufImportTree extends ProtobufNestedTree implements Prot
         var path = Optional.ofNullable(document)
                 .flatMap(ProtobufDocument::qualifiedPath)
                 .map(entry -> "\"" + entry + "\"")
-                .orElse("[missing]");
+                .orElse(location);
         return "import " + path + ";";
     }
 
