@@ -217,7 +217,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             compilationUnit.setPackageDeclaration(packageName);
         }
 
-        if(protoStatement instanceof ProtobufMessageTree) {
+        if(protoStatement instanceof ProtobufMessageTree || protoStatement.getStatementRecursive(ProtobufMessageTree.class).isPresent()) {
             compilationUnit.addImport(ProtobufMessage.class.getName());
         }
 
@@ -227,7 +227,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             compilationUnit.addImport(ProtobufEnumIndex.class.getName());
         }
 
-        if(hasFields()){
+        if(hasFields(protoStatement)){
             compilationUnit.addImport(ProtobufProperty.class.getName());
             compilationUnit.addImport(ProtobufType.class.getName(), true, true);
             if(!nullable) {
@@ -261,20 +261,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
         return new CompilationUnitResult(compilationUnit, false);
     }
 
-    private boolean hasFields() {
-        return hasFields(protoStatement);
-    }
-
     private boolean hasFields(ProtobufObjectTree statement) {
-        return protoStatement instanceof ProtobufMessageTree messageTree && messageTree.statements()
+        return statement instanceof ProtobufMessageTree messageTree && messageTree.statements()
                 .stream()
-                .anyMatch(entry -> entry instanceof ProtobufModifiableFieldTree || hasFieldsDeep(statement));
-    }
-
-    private boolean hasFieldsDeep(ProtobufObjectTree<?> statement) {
-        return statement.statements()
-                .stream()
-                .anyMatch(entry -> entry instanceof ProtobufMessageTree messageStatement && hasFields(messageStatement));
+                .anyMatch(entry -> entry instanceof ProtobufModifiableFieldTree
+                        || (entry instanceof ProtobufMessageTree nestedMessageTree && hasFields(nestedMessageTree)));
     }
 
     record CompilationUnitResult(CompilationUnit compilationUnit, boolean existing){

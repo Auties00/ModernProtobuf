@@ -21,12 +21,12 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;
 import java.util.*;
 
-import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
-import static com.github.javaparser.StaticJavaParser.parseType;
+import static com.github.javaparser.StaticJavaParser.*;
 import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REPEATED;
 import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REQUIRED;
 
@@ -60,7 +60,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     @Override
     TypeDeclaration<?> generate(Node parent) {
         if(mutable){
-            var ctClass = new ClassOrInterfaceDeclaration(NodeList.nodeList(Modifier.publicModifier()), false, protoStatement.name().orElseThrow());
+            var ctClass = new ClassOrInterfaceDeclaration(NodeList.nodeList(Modifier.publicModifier()), false, AstUtils.toJavaName(protoStatement.name().orElseThrow()));
             allMembers.add(ctClass);
             ctClass.setParentNode(parent);
             if(!(parent instanceof CompilationUnit)) {
@@ -83,7 +83,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
             return ctClass;
         }
 
-        var ctRecord = new RecordDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name().orElseThrow());
+        var ctRecord = new RecordDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
         allMembers.add(ctRecord);
         ctRecord.setParentNode(parent);
         addNameAnnotation(ctRecord);
@@ -91,7 +91,6 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         getDeferredImplementations().forEach(entry -> addImplementedType(entry, ctRecord));
         addRecordMembers(ctRecord);
         addReservedAnnotation(ctRecord);
-        members.forEach(ctRecord::addMember);
         constructors.forEach(ctRecord::addMember);
         methods.forEach(ctRecord::addMember);
         members.forEach(ctRecord::addMember);
@@ -151,40 +150,41 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
             return;
         }
 
+        var javaStatementName = AstUtils.toJavaName(statementName);
         var setter = new MethodDeclaration();
         setter.setPublic(true);
         setter.setName(setterName);
-        setter.setType(ctClass.getNameAsString());
-        setter.addParameter(new Parameter(parseType(type.value().fieldType()), statementName));
+        setter.setType(AstUtils.toCanonicalJavaName(ctClass.getNameAsString()));
+        setter.addParameter(new Parameter(parseType(AstUtils.toCanonicalJavaName(type.value().fieldType())), javaStatementName));
         var blockStmt = new BlockStmt();
         setter.setBody(blockStmt);
         var assignment = new AssignExpr();
-        var fieldAccess = new FieldAccessExpr(new ThisExpr(), statementName);
+        var fieldAccess = new FieldAccessExpr(new ThisExpr(), javaStatementName);
         assignment.setTarget(fieldAccess);
         assignment.setOperator(Operator.ASSIGN);
-        assignment.setValue(new NameExpr(statementName));
+        assignment.setValue(new NameExpr(javaStatementName));
         blockStmt.addStatement(assignment);
         methods.add(setter);
         blockStmt.addStatement(new ReturnStmt(new ThisExpr()));
     }
 
     private void createGetter(ClassOrInterfaceDeclaration ctClass, ProtobufTypedFieldTree statement, MessageType type) {
-        if (getMethod(ctClass, statement.name().orElseThrow()).isPresent()) {
+        if (getMethod(ctClass, AstUtils.toJavaName(statement.name().orElseThrow())).isPresent()) {
             return;
         }
 
         var getter = new MethodDeclaration();
         getter.setPublic(true);
-        getter.setName(statement.name().orElseThrow());
-        getter.setType(type.value().accessorType());
+        getter.setName(AstUtils.toJavaName(statement.name().orElseThrow()));
+        getter.setType(AstUtils.toCanonicalJavaName(type.value().accessorType()));
         var blockStmt = new BlockStmt();
         getter.setBody(blockStmt);
-        var fieldExpression = new NameExpr(statement.name().orElseThrow());
+        var fieldExpression = new NameExpr(AstUtils.toJavaName(statement.name().orElseThrow()));
         var modifier = statement instanceof ProtobufModifiableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
         if(modifier == REQUIRED || modifier == REPEATED || nullable) {
             blockStmt.addStatement(new ReturnStmt(fieldExpression));
         } else {
-            var fieldAccess = new FieldAccessExpr(new ThisExpr(), statement.name().orElseThrow());
+            var fieldAccess = new FieldAccessExpr(new ThisExpr(), AstUtils.toJavaName(statement.name().orElseThrow()));
             var bodyStatement = switch (statement.type().orElseThrow().protobufType()) {
                 case DOUBLE -> {
                     var conditional = new ConditionalExpr();
@@ -267,8 +267,8 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         var field = new FieldDeclaration();
         field.setPublic(true);
         var variable = new VariableDeclarator();
-        variable.setType(parameterType.value().fieldType());
-        variable.setName(fieldStatement.name().orElseThrow());
+        variable.setType(AstUtils.toCanonicalJavaName(parameterType.value().fieldType()));
+        variable.setName(AstUtils.toJavaName(fieldStatement.name().orElseThrow()));
         field.addVariable(variable);
         var annotation = new NormalAnnotationExpr();
         annotation.setName(ProtobufProperty.class.getSimpleName());
@@ -277,9 +277,6 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         var modifier = fieldStatement instanceof ProtobufModifiableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
         if(modifier == REQUIRED) {
             annotation.addPair("required", new BooleanLiteralExpr(true));
-        }
-        if(modifier == REPEATED) {
-            annotation.addPair("repeated", new BooleanLiteralExpr(true));
         }
         field.addAnnotation(annotation);
         fields.add(field);
@@ -317,8 +314,8 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         }
 
         var parameter = new Parameter();
-        parameter.setName(fieldStatement.name().orElseThrow());
-        parameter.setType(parameterType.value().fieldType());
+        parameter.setName(AstUtils.toJavaName(fieldStatement.name().orElseThrow()));
+        parameter.setType(AstUtils.toCanonicalJavaName(parameterType.value().fieldType()));
         var annotation = new NormalAnnotationExpr();
         annotation.setName(ProtobufProperty.class.getSimpleName());
         annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index().orElseThrow())));
@@ -327,13 +324,10 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
             annotation.addPair("required", new BooleanLiteralExpr(true));
             var compactConstructor = getOrCreateCompactConstructor(ctRecord);
             var objectsExpression = new NameExpr(Objects.class.getSimpleName());
-            var missingFieldErrorExpression = new StringLiteralExpr("Missing mandatory field: " + fieldStatement.name().orElseThrow());
-            var selectFieldExpression = new NameExpr(fieldStatement.name().orElseThrow());
+            var missingFieldErrorExpression = new StringLiteralExpr("Missing mandatory field: " + AstUtils.toJavaName(fieldStatement.name().orElseThrow()));
+            var selectFieldExpression = new NameExpr(AstUtils.toJavaName(fieldStatement.name().orElseThrow()));
             var nullCheck = new MethodCallExpr(objectsExpression, "requireNonNull", NodeList.nodeList(selectFieldExpression, missingFieldErrorExpression));
             compactConstructor.getBody().addStatement(nullCheck);
-        }
-        if(fieldStatement.modifier().orElseThrow() == REPEATED) {
-            annotation.addPair("repeated", new BooleanLiteralExpr(true));
         }
         parameter.addAnnotation(annotation);
         ctRecord.addParameter(parameter);
@@ -376,22 +370,25 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
         var fieldStatementType = fieldStatement.type().orElseThrow();
         if (modifier == REPEATED || fieldStatementType.protobufType() != ProtobufType.OBJECT) {
-            var fieldName = fieldStatement.name().orElseThrow();
+            var fieldName = AstUtils.toJavaName(fieldStatement.name().orElseThrow());
             var wrapperQualifiedName = fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-            var wrapperRecord = createWrapperRecord(scope, wrapperQualifiedName, parseType(javaType.fieldType()));
-            var accessorType = "%s<%s>".formatted(Optional.class.getSimpleName(), wrapperQualifiedName);
+            var wrapperRecord = createWrapperRecord(scope, wrapperQualifiedName, parseType(AstUtils.toCanonicalJavaName(javaType.fieldType())));
+            var accessorType = nullable ? wrapperQualifiedName : "%s<%s>".formatted(Optional.class.getSimpleName(), wrapperQualifiedName);
             var fieldType = mutable ? wrapperQualifiedName : accessorType;
             return new MessageType(new MessageFieldType(fieldType, accessorType), wrapperRecord, null);
         }
 
         var fieldType = (ProtobufObjectType) fieldStatementType;
-        var wrapperQuery = getTypeDeclaration(fieldType.declaration().flatMap(ProtobufBodyTree::qualifiedCanonicalName).orElseThrow(), QueryType.ANY);
+        var fieldTypeName = fieldType.declaration()
+                .flatMap(ProtobufBodyTree::qualifiedCanonicalName)
+                .orElseThrow();
+        var wrapperQuery = getTypeDeclaration(fieldTypeName, QueryType.ANY);
         wrapperQuery.ifPresent(queryResult -> queryResult.result().addModifier(Keyword.FINAL));
         var recordType = wrapperQuery.map(QueryResult::result)
                 .map(entry -> entry.getFullyQualifiedName().orElseThrow())
                 .or(() -> Optional.of(fieldType.name()))
                 .get();
-        var messageAccessorType = "%s<%s>".formatted(Optional.class.getSimpleName(), recordType);
+        var messageAccessorType = nullable ? recordType : "%s<%s>".formatted(Optional.class.getSimpleName(), recordType);
         var messageFieldType = mutable ? recordType : messageAccessorType;
         return new MessageType(new MessageFieldType(messageFieldType, messageAccessorType), wrapperQuery.map(QueryResult::result).orElse(null), wrapperQuery.isPresent() ? null : fieldType.name());
     }
@@ -469,18 +466,26 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private CompactConstructorDeclaration getOrCreateCompactConstructor(RecordDeclaration ctRecord) {
-        var compactConstructors = ctRecord.getCompactConstructors();
-        if (!compactConstructors.isEmpty()) {
-            return compactConstructors.getFirst();
+        var definedCompactConstructors = ctRecord.getCompactConstructors();
+        if (!definedCompactConstructors.isEmpty()) {
+            return definedCompactConstructors.getFirst();
         }
 
-        var compactConstructor = new CompactConstructorDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name().orElseThrow());
+        var inProgressCompactConstructor = constructors.stream()
+                .filter(BodyDeclaration::isCompactConstructorDeclaration)
+                .map(entry -> (CompactConstructorDeclaration) entry)
+                .findFirst();
+        if(inProgressCompactConstructor.isPresent()) {
+            return inProgressCompactConstructor.get();
+        }
+
+        var compactConstructor = new CompactConstructorDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
         constructors.add(compactConstructor);
         return compactConstructor;
     }
 
     private void addNestedMessage(TypeDeclaration<?> ctRecord, ProtobufMessageTree messageStatement) {
-        var result = getTypeMember(ctRecord, messageStatement.name().orElseThrow());
+        var result = getTypeMember(ctRecord, AstUtils.toJavaName(messageStatement.name().orElseThrow()));
         if (result.isPresent()) {
             return;
         }
@@ -492,7 +497,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private void addNestedEnum(TypeDeclaration<?> ctRecord, ProtobufEnumTree enumStatement) {
-        var result = getTypeMember(ctRecord, enumStatement.name().orElseThrow());
+        var result = getTypeMember(ctRecord, AstUtils.toJavaName(enumStatement.name().orElseThrow()));
         if (result.isPresent()) {
             return;
         }
@@ -513,7 +518,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         for (var oneOfFieldStatement : oneOfStatement.statements()) {
             if(index++ != oneOfStatement.statements().size() - 1) {
                 var conditional = new IfStmt();
-                var fieldAccess = new FieldAccessExpr(new ThisExpr(), oneOfFieldStatement.name().orElseThrow());
+                var fieldAccess = new FieldAccessExpr(new ThisExpr(), AstUtils.toJavaName(oneOfFieldStatement.name().orElseThrow()));
                 if(mutable || nullable) {
                     var nullCheck = new BinaryExpr(fieldAccess, new NullLiteralExpr(), BinaryExpr.Operator.NOT_EQUALS);
                     conditional.setCondition(nullCheck);
@@ -531,7 +536,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 conditional.setThenStmt(thenBlock);
                 ctMethodBody.addStatement(conditional);
             }else {
-                var fieldAccess = new FieldAccessExpr(new ThisExpr(), oneOfFieldStatement.name().orElseThrow());
+                var fieldAccess = new FieldAccessExpr(new ThisExpr(), AstUtils.toJavaName(oneOfFieldStatement.name().orElseThrow()));
                 if(mutable && !nullable) {
                     ctMethodBody.addStatement(new ReturnStmt(new MethodCallExpr(new NameExpr(Optional.class.getSimpleName()), "of", NodeList.nodeList(fieldAccess))));
                 }else {
@@ -560,15 +565,15 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private MethodDeclaration createOneOfMethod(TypeDeclaration<?> typeDeclaration, ProtobufOneOfTree oneOfStatement, ClassOrInterfaceDeclaration ctInterface) {
-        var existing = getMethod(typeDeclaration, oneOfStatement.name().orElseThrow());
+        var existing = getMethod(typeDeclaration, AstUtils.toJavaName(oneOfStatement.name().orElseThrow()));
         if(existing.isPresent()) {
             return existing.get();
         }
 
         var ctMethod = new MethodDeclaration();
         ctMethod.setPublic(true);
-        ctMethod.setName(oneOfStatement.name().orElseThrow());
-        ctMethod.setType(nullable ? ctInterface.getNameAsString() : "%s<? extends %s>".formatted(Optional.class.getSimpleName(), ctInterface.getNameAsString()));
+        ctMethod.setName(AstUtils.toJavaName(oneOfStatement.name().orElseThrow()));
+        ctMethod.setType(AstUtils.toCanonicalJavaName(nullable ? ctInterface.getNameAsString() : "%s<? extends %s>".formatted(Optional.class.getSimpleName(), ctInterface.getNameAsString())));
         methods.add(ctMethod);
         return ctMethod;
     }

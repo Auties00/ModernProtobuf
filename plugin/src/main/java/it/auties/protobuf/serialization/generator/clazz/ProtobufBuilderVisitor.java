@@ -5,6 +5,8 @@ import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.support.CompilationUnitWriter;
+import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
@@ -12,7 +14,6 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,78 +24,91 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
     }
 
     public void createClass(ProtobufMessageElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
+        // Names
         var simpleGeneratedClassName = builderElement != null ? messageElement.getGeneratedClassNameByName(builderElement.name()) : messageElement.getGeneratedClassNameBySuffix("Builder");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
-        try (var writer = new PrintWriter(sourceFile.openWriter())) {
+
+        // Declare a new compilation unit
+        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
+            // If a package is available, write it in the compilation unit
             if(packageName != null) {
-                writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
+                compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
             }
 
-            writer.println("public class %s {".formatted(simpleGeneratedClassName));
-            var invocationArgs = new ArrayList<String>();
-            if(builderElement != null) {
-                for(var parameter : builderElement.parameters()) {
-                    writer.println("    private %s %s;".formatted(parameter.asType(), parameter.getSimpleName()));
-                    invocationArgs.add(parameter.getSimpleName().toString());
-                }
-            }else {
-                for (var property : messageElement.properties()) {
-                    writer.println("    private %s %s;".formatted(property.type().implementationType(), property.name()));
-                    invocationArgs.add(property.name());
-                }
-            }
-            writer.println();
-            writer.println("    public %s() {".formatted(simpleGeneratedClassName));
-            if(builderElement == null) {
-                for (var property : messageElement.properties()) {
-                    writer.println("        %s = %s;".formatted(property.name(), property.type().defaultValue()));
-                }
-            }
-
-            writer.println("    }");
-            writer.println();
-            if(builderElement != null) {
-                for(var parameter : builderElement.parameters()) {
-                    var fieldName = parameter.getSimpleName().toString();
-                    writeBuilderSetter(writer, fieldName, fieldName, parameter.asType(), simpleGeneratedClassName);
-                }
-            }else {
-                for(var property : messageElement.properties()) {
-                    var done = false;
-                    for(var override : getBuilderOverloads(property)) {
-                        var enclosingElement = (TypeElement) override.element().getEnclosingElement();
-                        var fieldValue = override.element().getModifiers().contains(Modifier.STATIC)
-                                ? "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.element().getSimpleName(), property.name())
-                                : "new %s(%s)".formatted(enclosingElement.getQualifiedName(), property.name());
-                        writeBuilderSetter(
-                                writer,
-                                property.name(),
-                                fieldValue,
-                                override.parameterType(),
-                                simpleGeneratedClassName
-                        );
-                        done |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+            // Declare the builder class
+            try(var builderClassWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
+                // Write the fields of the builder and collect them
+                var invocationArgs = new ArrayList<String>();
+                if(builderElement != null) {
+                    for(var parameter : builderElement.parameters()) {
+                        builderClassWriter.printFieldDeclaration(parameter.asType().toString(), parameter.getSimpleName().toString());
+                        invocationArgs.add(parameter.getSimpleName().toString());
                     }
-
-                    if(!done) {
-                        writeBuilderSetter(
-                                writer,
-                                property.name(),
-                                property.name(),
-                                property.type().implementationType(),
-                                simpleGeneratedClassName
-                        );
+                }else {
+                    for (var property : messageElement.properties()) {
+                        builderClassWriter.printFieldDeclaration(property.type().implementationType().toString(), property.name());
+                        invocationArgs.add(property.name());
                     }
                 }
+
+                // Separate fields and constructors
+                compilationUnitWriter.printClassSeparator();
+
+                // Write the builder's constructor
+                try(var builderConstructorWriter = builderClassWriter.printConstructorDeclaration(simpleGeneratedClassName)) {
+                    if (builderElement == null) {
+                        // Assign each field in the builder to its default value
+                        for (var property : messageElement.properties()) {
+                            builderConstructorWriter.printFieldAssignment(property.name(), property.type().defaultValue());
+                        }
+                    }
+                }
+
+                // Write the setters for each field in the builder
+                if(builderElement != null) {
+                    for(var parameter : builderElement.parameters()) {
+                        var fieldName = parameter.getSimpleName().toString();
+                        writeBuilderSetter(builderClassWriter, fieldName, fieldName, parameter.asType(), simpleGeneratedClassName);
+                    }
+                }else {
+                    for(var property : messageElement.properties()) {
+                        var done = false;
+                        for(var override : getBuilderOverloads(property)) {
+                            var enclosingElement = (TypeElement) override.element().getEnclosingElement();
+                            var fieldValue = override.element().getModifiers().contains(Modifier.STATIC)
+                                    ? "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.element().getSimpleName(), property.name())
+                                    : "new %s(%s)".formatted(enclosingElement.getQualifiedName(), property.name());
+                            writeBuilderSetter(
+                                    builderClassWriter,
+                                    property.name(),
+                                    fieldValue,
+                                    override.parameterType(),
+                                    simpleGeneratedClassName
+                            );
+                            done |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+                        }
+
+                        if(!done) { // If there are no overrides, don't print the default setter
+                            writeBuilderSetter(
+                                    builderClassWriter,
+                                    property.name(),
+                                    property.name(),
+                                    property.type().implementationType(),
+                                    simpleGeneratedClassName
+                            );
+                        }
+                    }
+                }
+
+                // Print the build method
+                var resultQualifiedName = messageElement.element().getQualifiedName();
+                try(var buildMethodWriter = builderClassWriter.printMethodDeclaration(resultQualifiedName.toString(), "build")) {
+                    var invocationArgsJoined = String.join(", ", invocationArgs);
+                    var invocation = builderElement == null ? "new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined) : "%s.%s(%s)".formatted(resultQualifiedName, builderElement.delegate().getSimpleName(), invocationArgsJoined);
+                    buildMethodWriter.printReturn(invocation);
+                }
             }
-            var resultQualifiedName = messageElement.element().getQualifiedName();
-            var invocationArgsJoined = String.join(", ", invocationArgs);
-            writer.println("    public %s build() {".formatted(resultQualifiedName));
-            var invocation = builderElement == null ? "new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined) : "%s.%s(%s)".formatted(resultQualifiedName, builderElement.delegate().getSimpleName(), invocationArgsJoined);
-            writer.println("        return %s;".formatted(invocation));
-            writer.println("    }");
-            writer.println("}");
         }
     }
 
@@ -113,11 +127,10 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
         return Collections.unmodifiableList(results);
     }
 
-    private void writeBuilderSetter(PrintWriter writer, String fieldName, String fieldValue, TypeMirror fieldType, String className) {
-        writer.println("    public %s %s(%s %s) {".formatted(className, fieldName, fieldType, fieldName));
-        writer.println("        this.%s = %s;".formatted(fieldName, fieldValue));
-        writer.println("        return this;");
-        writer.println("    }");
-        writer.println();
+    private void writeBuilderSetter(NestedClassWriter writer, String fieldName, String fieldValue, TypeMirror fieldType, String className) {
+        try(var setterWriter = writer.printMethodDeclaration(className, fieldName, "%s %s".formatted(fieldType, fieldName))) {
+            setterWriter.printFieldAssignment("this." + fieldName, fieldValue);
+            setterWriter.printReturn("this");
+        }
     }
 }

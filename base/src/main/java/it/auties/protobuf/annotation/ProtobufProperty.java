@@ -35,7 +35,8 @@ public @interface ProtobufProperty {
             ProtobufOptionalMixin.class,
             ProtobufUUIDMixin.class,
             ProtobufRepeatedMixin.class,
-            ProtobufMapMixin.class
+            ProtobufMapMixin.class,
+            ProtobufFutureMixin.class
     };
 
     boolean required() default false;

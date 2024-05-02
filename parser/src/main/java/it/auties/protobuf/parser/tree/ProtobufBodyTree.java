@@ -4,8 +4,8 @@ import java.util.*;
 import java.util.function.Consumer;
 
 public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree permits ProtobufDocument, ProtobufIndexedBodyTree {
-    private String name;
-    private final LinkedList<T> statements;
+    String name;
+    final LinkedList<T> statements;
     ProtobufBodyTree(){
         this.statements = new LinkedList<>();
     }
@@ -19,58 +19,11 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
         return this;
     }
 
-    public Optional<String> qualifiedName() {
-        if(this instanceof ProtobufDocument protobufDocument) {
-            return protobufDocument.packageName();
-        }
+    public abstract Optional<String> qualifiedName();
 
-        if(parent instanceof ProtobufObjectTree<?> objectTree) {
-            return objectTree.qualifiedName()
-                    .map(parentName -> name == null ? parentName : parentName + "$" + name)
-                    .or(this::name);
-        }
+    public abstract Optional<String> qualifiedCanonicalName();
 
-        return parent.name()
-                .map(parentName -> name == null ? parentName : parentName + "." + name)
-                .or(this::name);
-    }
-
-    public Optional<String> qualifiedCanonicalName() {
-        if(this instanceof ProtobufDocument protobufDocument) {
-            return protobufDocument.packageName()
-                    .map(packageName -> packageName.replaceAll("\\.", "/"));
-        }
-
-        if(parent instanceof ProtobufObjectTree<?> objectTree) {
-            return objectTree.qualifiedCanonicalName()
-                    .map(parentName -> name == null ? parentName : parentName + "." + name)
-                    .or(this::name);
-        }
-
-        return parent.name()
-                .map(parentName -> name == null ? parentName : parentName + "." + name)
-                .or(this::name);
-    }
-
-    public Optional<String> qualifiedPath() {
-        if(this instanceof ProtobufDocument protobufDocument) {
-            return protobufDocument.packageName();
-        }
-
-        if(parent().isEmpty()) {
-            return Optional.of(Objects.requireNonNullElse(name, ""));
-        }
-
-        if(parent instanceof ProtobufObjectTree<?> objectTree) {
-            return objectTree.qualifiedPath()
-                    .map(parentName -> name == null ? parentName : parentName + "/" + name)
-                    .or(this::name);
-        }
-
-        return parent.name()
-                .map(parentName -> name == null ? parentName : parentName + "/" + name)
-                .or(this::name);
-    }
+    public abstract Optional<String> qualifiedPath();
 
     public Collection<T> statements() {
         return Collections.unmodifiableCollection(statements);

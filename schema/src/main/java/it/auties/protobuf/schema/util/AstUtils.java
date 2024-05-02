@@ -4,6 +4,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 
+import javax.lang.model.SourceVersion;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,6 +13,18 @@ import java.util.List;
 import java.util.Optional;
 
 public class AstUtils implements LogProvider {
+    public static String toJavaName(String name) {
+        if(!SourceVersion.isName(name)) {
+            return "_" + name;
+        }
+
+        return name;
+    }
+
+    public static String toCanonicalJavaName(String name) {
+        return name.replaceAll("\\$", ".");
+    }
+
     public static List<CompilationUnit> createClassPool(File directory) {
         if(directory == null){
             return List.of();

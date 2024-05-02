@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.parser.tree.ProtobufIndexedBodyTree;
 import it.auties.protobuf.parser.tree.ProtobufMessageTree;
 import it.auties.protobuf.parser.tree.ProtobufObjectTree;
 
@@ -31,12 +32,14 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
 
     @Override
     public String name() {
-        return name;
+        return Optional.ofNullable(declaration)
+                .flatMap(ProtobufIndexedBodyTree::qualifiedCanonicalName)
+                .orElse(name);
     }
 
     @Override
     public String toString() {
-        return name;
+        return name();
     }
 
     public Optional<ProtobufObjectTree<?>> declaration() {

@@ -5,10 +5,10 @@ import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.*;
-import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -19,42 +19,48 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";
     private static final String DEFAULT_PARAMETER_NAME = "protoInputObject";
 
-    public ProtobufSerializationMethodGenerator(ProtobufMessageElement element, PrintWriter writer) {
+    public ProtobufSerializationMethodGenerator(ProtobufMessageElement element, NestedClassWriter writer) {
         super(element, writer);
     }
 
     @Override
-    protected void doInstrumentation() {
-        writer.println("      if(%s == null) {".formatted(DEFAULT_PARAMETER_NAME));
-        writer.println("         return null;");
-        writer.println("      }");
+    protected void doInstrumentation(NestedClassWriter writer) {
+        writer.println("if(%s == null) {".formatted(DEFAULT_PARAMETER_NAME));
+        writer.println("   return null;");
+        writer.println("}");
         if(message.isEnum()) {
-            createEnumSerializer();
+            createEnumSerializer(writer);
         }else {
-            createMessageSerializer();
+            createMessageSerializer(writer);
         }
     }
 
-    private void createEnumSerializer() {
+    private void createEnumSerializer(NestedClassWriter writer) {
         var fieldName = message.enumMetadata()
                 .orElseThrow(() -> new NoSuchElementException("Missing metadata from enum"))
                 .field()
                 .getSimpleName();
-        writer.println("      return %s.%s;".formatted(DEFAULT_PARAMETER_NAME, fieldName));
+        writer.println("return %s.%s;".formatted(DEFAULT_PARAMETER_NAME, fieldName));
     }
 
-    private void createMessageSerializer() {
-        createRequiredPropertiesNullCheck();
-        writer.println("      var %s = new ProtobufOutputStream();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
-        message.properties().forEach(this::writeProperty);
-        writer.println("      return %s.toByteArray();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
+    private void createMessageSerializer(NestedClassWriter writer) {
+        createRequiredPropertiesNullCheck(writer);
+        writer.println("var %s = new ProtobufOutputStream();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
+        for(var property : message.properties()) {
+            switch (property.type()) {
+                case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer(writer, property, collectionType);
+                case ProtobufPropertyType.MapType mapType -> writeMapSerializer(writer, property, mapType);
+                default -> writeSerializer(writer, property.index(), property.name(), getAccessorCall(property), property.type(), DEFAULT_OUTPUT_STREAM_NAME);
+            }
+        }
+        writer.println("return %s.toByteArray();".formatted(DEFAULT_OUTPUT_STREAM_NAME));
     }
 
-    private void createRequiredPropertiesNullCheck() {
+    private void createRequiredPropertiesNullCheck(NestedClassWriter writer) {
         message.properties()
                 .stream()
                 .filter(ProtobufPropertyElement::required)
-                .forEach(entry -> writer.println("      Objects.requireNonNull(%s, \"Missing required property: %s\");".formatted(getAccessorCall(entry), entry.name())));
+                .forEach(entry -> writer.println("Objects.requireNonNull(%s, \"Missing required property: %s\");".formatted(getAccessorCall(entry), entry.name())));
     }
 
     @Override
@@ -99,15 +105,6 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         return List.of(DEFAULT_PARAMETER_NAME);
     }
 
-    // Writes a property to the output stream
-    private void writeProperty(ProtobufPropertyElement property) {
-        switch (property.type()) {
-            case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer(property, collectionType);
-            case ProtobufPropertyType.MapType mapType -> writeMapSerializer(property, mapType);
-            default -> writeSerializer(property.index(), property.name(), getAccessorCall(property), property.type(), DEFAULT_OUTPUT_STREAM_NAME);
-        }
-    }
-
     private String getAccessorCall(ProtobufPropertyElement property) {
         return switch (property.accessor()) {
             case ExecutableElement executableElement -> "%s.%s()".formatted(DEFAULT_PARAMETER_NAME, executableElement.getSimpleName());
@@ -116,37 +113,37 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         };
     }
 
-    private void writeRepeatedPropertySerializer(ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
+    private void writeRepeatedPropertySerializer(NestedClassWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
         var accessorCall = getAccessorCall(property);
-        writer.println("      if(%s != null) {".formatted(accessorCall));
+        writer.println("if(%s != null) {".formatted(accessorCall));
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("       for(var %s : %s) {".formatted(localVariableName, accessorCall));
-        writeSerializer(property.index(), property.name(), localVariableName, collectionType.value(), DEFAULT_OUTPUT_STREAM_NAME);
-        writer.println("       }");
-        writer.println("      }");
+        writer.println("for(var %s : %s) {".formatted(localVariableName, accessorCall));
+        writeSerializer(writer, property.index(), property.name(), localVariableName, collectionType.value(), DEFAULT_OUTPUT_STREAM_NAME);
+        writer.println(" }");
+        writer.println("}");
     }
 
-    private void writeMapSerializer(ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
+    private void writeMapSerializer(NestedClassWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
         var accessorCall = getAccessorCall(property);
-        writer.println("      if(%s != null) {".formatted(accessorCall));
+        writer.println("if(%s != null) {".formatted(accessorCall));
         var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
         var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
-        writer.println("            for(var %s : %s.entrySet()) {".formatted(localVariableName, accessorCall));
-        writer.println("                var %s = new ProtobufOutputStream();".formatted(localStreamName));
-        writeSerializer(1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
-        writeSerializer(2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
-        writer.println("                %s.writeBytes(%s, %s.toByteArray());".formatted(DEFAULT_OUTPUT_STREAM_NAME, property.index(), localStreamName));
-        writer.println("            }");
+        writer.println("      for(var %s : %s.entrySet()) {".formatted(localVariableName, accessorCall));
+        writer.println("          var %s = new ProtobufOutputStream();".formatted(localStreamName));
+        writeSerializer(writer, 1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
+        writeSerializer(writer, 2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
+        writer.println("          %s.writeBytes(%s, %s.toByteArray());".formatted(DEFAULT_OUTPUT_STREAM_NAME, property.index(), localStreamName));
         writer.println("      }");
+        writer.println("}");
     }
 
-    private void writeSerializer(int index, String name, String caller, ProtobufPropertyType type, String streamName) {
+    private void writeSerializer(NestedClassWriter writer, int index, String name, String caller, ProtobufPropertyType type, String streamName) {
         var writeMethod = getSerializerStreamMethods(type);
         var result = getVariables(name, caller, type);
         if(!result.hasConverter()) {
             var toWrite = result.variables().getFirst().value();
             var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecFromObject(type.implementationType()), toWrite);
-            writer.println("      %s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
+            writer.println("%s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
             return;
         }
 
@@ -156,12 +153,12 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
             writer.println(variable.value());
             propertyName = name + (i == 0 ? "" : i - 1);
             if(!variable.isPrimitive()) {
-                writer.println("      if(%s != null) {".formatted(propertyName));
+                writer.println("if(%s != null) {".formatted(propertyName));
             }
         }
 
         var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? propertyName : "%s.encode(%s)".formatted(getSpecFromObject(type.implementationType()), propertyName);
-        writer.println("      %s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
+        writer.println("%s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
         for(var variable : result.variables()) {
             if(!variable.isPrimitive()) {
                 writer.println("}");

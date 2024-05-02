@@ -1,58 +1,45 @@
 package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
 
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
-import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public abstract class ProtobufMethodGenerator {
     protected final ProtobufMessageElement message;
-    protected final PrintWriter writer;
-
-    protected ProtobufMethodGenerator(ProtobufMessageElement message, PrintWriter writer) {
+    private final NestedClassWriter writer;
+    protected ProtobufMethodGenerator(ProtobufMessageElement message, NestedClassWriter writer) {
         this.message = message;
         this.writer = writer;
     }
 
-    public void instrument() {
+    public void generate() {
         if (!shouldInstrument()) {
             return;
         }
 
-        writer.print("    ");
-        writer.print(String.join(" ", modifiers()));
-        writer.print(" ");
-        writer.print(returnType());
-        writer.print(" ");
-        writer.print(name());
-        writer.print("(");
         var parametersTypes = parametersTypes();
         var parametersNames = parametersNames();
         if(parametersTypes.size() != parametersNames.size()) {
             throw new IllegalArgumentException("Parameters mismatch");
         }
 
-        var parametersTypesIterator = parametersTypes.iterator();
-        var parametersNamesIterator = parametersNames.iterator();
-        var parameters = new ArrayList<String>();
-        while (parametersTypesIterator.hasNext()) {
-            parameters.add("%s %s".formatted(parametersTypesIterator.next(), parametersNamesIterator.next()));
+        var parameters = IntStream.range(0, parametersTypes.size())
+                .mapToObj(index -> parametersTypes.get(index) + " " + parametersNames.get(index))
+                .toArray(String[]::new);
+        try(var methodWriter = writer.printMethodDeclaration(modifiers(), returnType(), name(), parameters)) {
+            doInstrumentation(methodWriter);
         }
-
-        writer.print(String.join(", ", parameters));
-        writer.print(") {\n");
-        doInstrumentation();
-        writer.println("    }\n");
     }
 
     public abstract boolean shouldInstrument();
 
-    protected abstract void doInstrumentation();
+    protected abstract void doInstrumentation(NestedClassWriter writer);
 
     protected abstract List<String> modifiers();
 

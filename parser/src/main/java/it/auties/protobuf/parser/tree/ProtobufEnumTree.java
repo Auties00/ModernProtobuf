@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
+import java.util.Optional;
+
 public final class ProtobufEnumTree extends ProtobufObjectTree<ProtobufEnumConstantTree> implements ProtobufDocumentChildTree, ProtobufMessageChildTree {
     public ProtobufEnumTree(String name) {
         super(name);

@@ -4,13 +4,13 @@ import it.auties.protobuf.serialization.generator.method.ProtobufDeserialization
 import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
 import it.auties.protobuf.serialization.object.ProtobufMessageElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.support.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.PackageElement;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.*;
 
 public class ProtobufSpecVisitor {
@@ -21,30 +21,40 @@ public class ProtobufSpecVisitor {
     }
 
     public void createClass(ProtobufMessageElement result, PackageElement packageName) throws IOException {
+        // Names
         var simpleGeneratedClassName = result.getGeneratedClassNameBySuffix("Spec");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
         var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
-        try (var writer = new PrintWriter(sourceFile.openWriter())) {
+
+        // Declare a new compilation unit
+        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
+            // If a package is available, write it in the compilation unit
             if(packageName != null) {
-                writer.println("package %s;\n".formatted(packageName.getQualifiedName()));
+                compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
             }
 
+            // Declare the imports needed for everything to work
             var imports = getSpecImports(result);
-            imports.forEach(entry -> writer.println("import %s;".formatted(entry)));
-            if(!imports.isEmpty()){
-                writer.println();
-            }
+            imports.forEach(compilationUnitWriter::printImportDeclaration);
 
-            writer.println("public class %s {".formatted(simpleGeneratedClassName));
-            var serializationVisitor = new ProtobufSerializationMethodGenerator(result, writer);
-            serializationVisitor.instrument();
-            var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result, writer);
-            deserializationVisitor.instrument();
-            writer.println("}");
+            // Separate imports from classes
+            compilationUnitWriter.printClassSeparator();
+
+            // Declare the spec class
+            try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
+                // Write the serializer
+                var serializationVisitor = new ProtobufSerializationMethodGenerator(result, classWriter);
+                serializationVisitor.generate();
+
+                // Write the deserializer
+                var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result, classWriter);
+                deserializationVisitor.generate();
+            }
         }
     }
 
-    protected List<String> getSpecImports(ProtobufMessageElement message) {
+    // Get the imports to include in the compilation unit
+    private List<String> getSpecImports(ProtobufMessageElement message) {
         if(message.isEnum()) {
             return List.of(
                     message.element().getQualifiedName().toString(),

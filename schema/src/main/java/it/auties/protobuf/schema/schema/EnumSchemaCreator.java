@@ -12,6 +12,7 @@ import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.parser.tree.ProtobufEnumTree;
 import it.auties.protobuf.parser.tree.ProtobufFieldTree;
+import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -38,7 +39,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
 
     @Override
     TypeDeclaration<?> generate(Node parent) {
-        var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), protoStatement.name().orElseThrow());
+        var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
         allMembers.add(ctEnum);
         ctEnum.setParentNode(parent);
         addNameAnnotation(ctEnum);
@@ -62,7 +63,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
             return;
         }
 
-        var name = ctEnum.addEnumConstant(statement.name().orElseThrow());
+        var name = ctEnum.addEnumConstant(AstUtils.toJavaName(statement.name().orElseThrow()));
         name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index().orElseThrow())));
     }
 

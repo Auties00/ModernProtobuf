@@ -50,6 +50,11 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
         return Optional.ofNullable(packageName);
     }
 
+    public Optional<String> packageNamePath() {
+        return packageName()
+                .map(packageName -> packageName.replaceAll("\\.", "/"));
+    }
+
     public ProtobufDocument setPackageName(String packageName) {
         this.packageName = packageName;
         return this;
@@ -177,20 +182,41 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
 
     @Override
     public Optional<String> qualifiedCanonicalName() {
-        return super.qualifiedCanonicalName()
-                .map(packageName -> name().map(name -> packageName + "." + name).orElse(packageName));
+        if(name == null && packageName == null) {
+            return Optional.empty();
+        }else if(name != null && packageName == null) {
+            return Optional.of(name);
+        }else if(name == null) {
+            return Optional.of(packageName);
+        }else {
+            return Optional.of(packageName + "." + name);
+        }
     }
 
     @Override
     public Optional<String> qualifiedPath() {
-        return super.qualifiedCanonicalName()
-                .map(packageName -> name().map(name -> packageName + "/" + name).orElse(packageName));
+        if(name == null && packageName == null) {
+            return Optional.empty();
+        }else if(name != null && packageName == null) {
+            return Optional.of(name);
+        }else if(name == null) {
+            return Optional.of(packageName);
+        }else {
+            return Optional.of(packageNamePath().orElseThrow() + "/" + name);
+        }
     }
 
     @Override
     public Optional<String> qualifiedName() {
-        return super.qualifiedName()
-                .map(packageName -> name().map(name -> packageName + "." + name).orElse(packageName));
+        if(name == null && packageName == null) {
+            return Optional.empty();
+        }else if(name != null && packageName == null) {
+            return Optional.of(name);
+        }else if(name == null) {
+            return Optional.of(packageName);
+        }else {
+            return Optional.of(packageName + "." + name);
+        }
     }
 
     public Optional<ProtobufImportTree> getImport(String fullyQualifiedName) {

@@ -15,6 +15,30 @@ public abstract sealed class ProtobufIndexedBodyTree<T extends ProtobufTree> ext
         return Optional.ofNullable(name);
     }
 
+    @Override
+    public Optional<String> qualifiedName() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedName())
+                .map(parentName -> name == null ? parentName : parentName + (parent instanceof ProtobufObjectTree<?> ? "$" : ".") + name)
+                .or(this::name);
+    }
+
+    @Override
+    public Optional<String> qualifiedCanonicalName() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedCanonicalName())
+                .map(parentName -> name == null ? parentName : parentName + "." + name)
+                .or(this::name);
+    }
+
+    @Override
+    public Optional<String> qualifiedPath() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageNamePath() : parent.qualifiedPath())
+                .map(parentName -> name == null ? parentName : parentName + "/" + name)
+                .or(this::name);
+    }
+
     public ProtobufIndexedBodyTree setName(String name) {
         this.name = name;
         return this;
