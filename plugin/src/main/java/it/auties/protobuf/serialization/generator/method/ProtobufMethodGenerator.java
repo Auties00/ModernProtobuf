@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization.generator.method;
 
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
 
 import javax.lang.model.element.PackageElement;
@@ -11,9 +11,9 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 public abstract class ProtobufMethodGenerator {
-    protected final ProtobufMessageElement message;
+    protected final ProtobufObjectElement message;
     private final NestedClassWriter writer;
-    protected ProtobufMethodGenerator(ProtobufMessageElement message, NestedClassWriter writer) {
+    protected ProtobufMethodGenerator(ProtobufObjectElement message, NestedClassWriter writer) {
         this.message = message;
         this.writer = writer;
     }

@@ -9,7 +9,7 @@ import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.generator.clazz.ProtobufBuilderVisitor;
 import it.auties.protobuf.serialization.generator.clazz.ProtobufSpecVisitor;
 import it.auties.protobuf.serialization.object.ProtobufEnumMetadata;
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.Converters;
 import it.auties.protobuf.serialization.support.Messages;
@@ -73,30 +73,31 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private void checkAnnotations(RoundEnvironment roundEnv) {
         checkEnclosing(
                 roundEnv,
-                ProtobufMessage.class,
                 ProtobufProperty.class,
-                "Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record that implements ProtobufMessage"
+                "Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record that implements ProtobufMessage",
+                ProtobufMessage.class
         );
 
         checkEnclosing(
                 roundEnv,
-                ProtobufMessage.class,
                 ProtobufGetter.class,
-                "Illegal enclosing class: a method annotated with @ProtobufGetter should be enclosed by a class or record that implements ProtobufMessage"
+                "Illegal enclosing class: a method annotated with @ProtobufGetter should be enclosed by a class or record that implements ProtobufMessage",
+                ProtobufMessage.class
         );
 
         checkEnclosing(
                 roundEnv,
-                ProtobufEnum.class,
                 ProtobufEnumIndex.class,
-                "Illegal enclosing class: a field or parameter annotated with @ProtobufEnumIndex should be enclosed by an enum that implements ProtobufEnum"
+                "Illegal enclosing class: a field or parameter annotated with @ProtobufEnumIndex should be enclosed by an enum that implements ProtobufEnum",
+                ProtobufEnum.class
         );
 
         checkEnclosing(
                 roundEnv,
-                ProtobufMixin.class,
                 ProtobufDefaultValue.class,
-                "Illegal enclosing class: a method annotated with @ProtobufDefaultValue should be enclosed by a class that implements ProtobufMixin"
+                "Illegal enclosing class: a method annotated with @ProtobufDefaultValue should be enclosed by a class that implements ProtobufMessage or ProtobufMixin",
+                ProtobufMessage.class,
+                ProtobufMixin.class
         );
 
         roundEnv.getElementsAnnotatedWith(ProtobufSerializer.class)
@@ -119,13 +120,29 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
-        if(entry.getModifiers().contains(Modifier.PUBLIC)) {
-            messages.printError("Weak visibility: a method annotated with @ProtobufDefaultValue must have at least public visibility", entry);
+        if(entry.getModifiers().contains(Modifier.PRIVATE)) {
+            messages.printError("Weak visibility: a method annotated with @ProtobufDefaultValue must have at least package-private visibility", entry);
             return;
         }
 
         if(!entry.getModifiers().contains(Modifier.STATIC)) {
             messages.printError("Illegal method: a method annotated with @ProtobufDefaultValue must be static", entry);
+        }
+    }
+
+    private void checkBuilderDelegate(Element entry) {
+        if(!(entry instanceof ExecutableElement)) {
+            messages.printError("Invalid element: only methods can be annotated with @ProtobufBuilder.Delegate", entry);
+            return;
+        }
+
+        if(entry.getModifiers().contains(Modifier.PRIVATE)) {
+            messages.printError("Weak visibility: a method annotated with @ProtobufBuilder.Delegate must have at least package-private visibility", entry);
+            return;
+        }
+
+        if(!entry.getModifiers().contains(Modifier.STATIC)) {
+            messages.printError("Illegal method: a method annotated with @ProtobufBuilder.Delegate must be static", entry);
         }
     }
 
@@ -187,16 +204,16 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
-        if(executableElement.getParameters().size() > 1) {
+        if(!types.isSubType(executableElement.getEnclosingElement().asType(), ProtobufMessage.class) && executableElement.getParameters().size() > 1) {
             messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must take exactly zero or one parameter", executableElement);
         }
     }
 
     // Utility method to check the scope
-    private void checkEnclosing(RoundEnvironment roundEnv, Class<?> type, Class<? extends Annotation> annotation, String error) {
+    private void checkEnclosing(RoundEnvironment roundEnv, Class<? extends Annotation> annotation, String error, Class<?>... allowedTypes) {
         roundEnv.getElementsAnnotatedWith(annotation)
                 .stream()
-                .filter(property -> !types.isSubType(getEnclosingTypeElement(property).asType(), type))
+                .filter(property -> Arrays.stream(allowedTypes).noneMatch(type -> types.isSubType(getEnclosingTypeElement(property).asType(), type)))
                 .forEach(property -> messages.printError(error, property));
     }
 
@@ -258,7 +275,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return results;
     }
 
-    private Optional<ProtobufMessageElement> processElement(TypeElement object) {
+    private Optional<ProtobufObjectElement> processElement(TypeElement object) {
         if(object.getModifiers().contains(Modifier.ABSTRACT)) {
             return Optional.empty();
         }
@@ -270,14 +287,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         };
     }
 
-    private Optional<ProtobufMessageElement> processMessage(TypeElement message) {
-        var messageElement = new ProtobufMessageElement(message, null);
+    private Optional<ProtobufObjectElement> processMessage(TypeElement message) {
+        var builderDelegate = getMessageDeserializer(message);
+        var messageElement = new ProtobufObjectElement(message, null, builderDelegate.orElse(null));
         processMessage(messageElement, messageElement.element());
         if(messageElement.properties().isEmpty()) {
             messages.printWarning("No properties found", message);
             return Optional.of(messageElement);
         }
-
 
         if (!hasPropertiesConstructor(messageElement)) {
             messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
@@ -287,8 +304,19 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.of(messageElement);
     }
 
+    private Optional<ExecutableElement> getMessageDeserializer(TypeElement message) {
+        return message.getEnclosedElements()
+                .stream()
+                .filter(entry -> entry instanceof ExecutableElement method && method.getAnnotation(ProtobufDeserializer.class) != null)
+                .map(entry -> (ExecutableElement) entry)
+                .reduce((first, second) -> {
+                    messages.printError("Duplicated protobuf builder delegate: a message should provide only one method annotated with @ProtobufDeserializer", second);
+                    return first;
+                });
+    }
 
-    private void processMessage(ProtobufMessageElement messageElement, TypeElement typeElement) {
+
+    private void processMessage(ProtobufObjectElement messageElement, TypeElement typeElement) {
         getSuperClass(typeElement)
                 .ifPresent(superClass -> processMessage(messageElement, superClass));
         for (var entry : typeElement.getEnclosedElements()) {
@@ -313,14 +341,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.ofNullable(superClassElement);
     }
 
-    private void processMethod(ProtobufMessageElement messageElement, ExecutableElement executableElement) {
+    private void processMethod(ProtobufObjectElement messageElement, ExecutableElement executableElement) {
         var builder = executableElement.getAnnotation(ProtobufBuilder.class);
         if(builder != null) {
             messageElement.addBuilder(builder.className(), executableElement.getParameters(), executableElement);
         }
     }
 
-    private boolean hasPropertiesConstructor(ProtobufMessageElement message) {
+    private boolean hasPropertiesConstructor(ProtobufObjectElement message) {
         return message.element()
                 .getEnclosedElements()
                 .stream()
@@ -347,7 +375,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 });
     }
 
-    private void processProperty(ProtobufMessageElement messageElement, VariableElement variableElement) {
+    private void processProperty(ProtobufObjectElement messageElement, VariableElement variableElement) {
         var propertyAnnotation = variableElement.getAnnotation(ProtobufProperty.class);
         if(propertyAnnotation == null) {
             return;
@@ -383,38 +411,17 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private Optional<String> getDefaultValue(TypeMirror type, List<TypeElement> mixins) {
+        if(type instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement classType) {
+            var selfDefaultValue = getDefaultValueFromAnnotation(type, classType);
+            if (selfDefaultValue.isPresent()) {
+                return selfDefaultValue;
+            }
+        }
+
         for(var mixin : mixins) {
-            ExecutableElement defaultValueProvider = null;
-            var defaultValueProviderCandidates = new ArrayList<ExecutableElement>();
-            for(var element : mixin.getEnclosedElements()) {
-                if(!(element instanceof ExecutableElement executableElement)) {
-                    continue;
-                }
-
-                var annotation = executableElement.getAnnotation(ProtobufDefaultValue.class);
-                if(annotation == null) {
-                    continue;
-                }
-
-                if(types.isSameType(type, executableElement.getReturnType())) {
-                    defaultValueProvider = executableElement;
-                    break;
-                }
-
-                if(types.isSubType(type, executableElement.getReturnType())){
-                    defaultValueProviderCandidates.add(executableElement);
-                }
-            }
-
-            if(defaultValueProvider != null) {
-                return Optional.of(mixin.getQualifiedName() + "." + defaultValueProvider.getSimpleName() + "()");
-            }
-
-            var bestMatch = defaultValueProviderCandidates.stream()
-                    .reduce((first, second) -> types.isSubType(first.getReturnType(), second.getReturnType()) ? first : second);
-            if(bestMatch.isPresent()) {
-                var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();
-                return Optional.of(bestMatchOwner.getQualifiedName() + "." + bestMatch.get().getSimpleName() + "()");
+            var mixinDefaultValue = getDefaultValueFromAnnotation(type, mixin);
+            if (mixinDefaultValue.isPresent()) {
+                return mixinDefaultValue;
             }
         }
 
@@ -426,6 +433,43 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             case LONG -> Optional.of("0l");
             default -> Optional.empty();
         };
+    }
+
+    private Optional<String> getDefaultValueFromAnnotation(TypeMirror type, TypeElement mixin) {
+        ExecutableElement defaultValueProvider = null;
+        var defaultValueProviderCandidates = new ArrayList<ExecutableElement>();
+        for(var element : mixin.getEnclosedElements()) {
+            if(!(element instanceof ExecutableElement executableElement)) {
+                continue;
+            }
+
+            var annotation = executableElement.getAnnotation(ProtobufDefaultValue.class);
+            if(annotation == null) {
+                continue;
+            }
+
+            if(types.isSameType(type, executableElement.getReturnType())) {
+                defaultValueProvider = executableElement;
+                break;
+            }
+
+            if(types.isSubType(type, executableElement.getReturnType())){
+                defaultValueProviderCandidates.add(executableElement);
+            }
+        }
+
+        if(defaultValueProvider != null) {
+            return Optional.of(mixin.getQualifiedName() + "." + defaultValueProvider.getSimpleName() + "()");
+        }
+
+        var bestMatch = defaultValueProviderCandidates.stream()
+                .reduce((first, second) -> types.isSubType(first.getReturnType(), second.getReturnType()) ? first : second);
+        if(bestMatch.isPresent()) {
+            var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();
+            return Optional.of(bestMatchOwner.getQualifiedName() + "." + bestMatch.get().getSimpleName() + "()");
+        }
+
+        return Optional.empty();
     }
 
     private TypeMirror getAccessorType(Element accessor) {
@@ -844,7 +888,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return false;
     }
 
-    private Optional<ProtobufMessageElement> processEnum(TypeElement enumElement) {
+    private Optional<ProtobufObjectElement> processEnum(TypeElement enumElement) {
         var messageElement = createEnumElement(enumElement);
         if(messageElement.isEmpty()) {
             return messageElement;
@@ -859,7 +903,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return messageElement;
     }
 
-    private long processEnumConstants(ProtobufMessageElement messageElement) {
+    private long processEnumConstants(ProtobufObjectElement messageElement) {
         var enumTree = (ClassTree) trees.getTree(messageElement.element());
         return enumTree.getMembers()
                 .stream()
@@ -869,7 +913,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .count();
     }
 
-    private Optional<ProtobufMessageElement> createEnumElement(TypeElement enumElement) {
+    private Optional<ProtobufObjectElement> createEnumElement(TypeElement enumElement) {
         var metadata = getEnumMetadata(enumElement);
         if (metadata.isEmpty()) {
             messages.printError("Missing protobuf enum constructor: an enum should provide a constructor with a scalar parameter annotated with @ProtobufEnumIndex", enumElement);
@@ -880,7 +924,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        var result = new ProtobufMessageElement(enumElement, metadata.get());
+        var result = new ProtobufObjectElement(enumElement, metadata.get(), null);
         return Optional.of(result);
     }
 
@@ -1004,7 +1048,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .toList();
     }
 
-    private void processEnumConstant(ProtobufMessageElement messageElement, TypeElement enumElement, VariableTree enumConstantTree) {
+    private void processEnumConstant(ProtobufObjectElement messageElement, TypeElement enumElement, VariableTree enumConstantTree) {
         if (!(enumConstantTree.getInitializer() instanceof NewClassTree newClassTree)) {
             return;
         }

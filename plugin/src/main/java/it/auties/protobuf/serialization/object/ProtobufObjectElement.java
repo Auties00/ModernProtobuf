@@ -7,16 +7,18 @@ import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import javax.lang.model.element.*;
 import java.util.*;
 
-public class ProtobufMessageElement {
+public class ProtobufObjectElement {
     private final TypeElement typeElement;
     private final Map<Integer, ProtobufPropertyElement> properties;
     private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
+    private final ExecutableElement deserializer;
 
-    public ProtobufMessageElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
+    public ProtobufObjectElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement deserializer) {
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
+        this.deserializer = deserializer;
         this.builders = new ArrayList<>();
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
@@ -72,10 +74,15 @@ public class ProtobufMessageElement {
     }
 
     public void addBuilder(String className, List<? extends VariableElement> parameters, ExecutableElement executableElement) {
-        builders.add(new ProtobufBuilderElement(className, parameters, executableElement));
+        var builderElement = new ProtobufBuilderElement(className, parameters, executableElement);
+        builders.add(builderElement);
     }
 
     public List<ProtobufBuilderElement> builders() {
         return Collections.unmodifiableList(builders);
+    }
+
+    public Optional<ExecutableElement> deserializer() {
+        return Optional.ofNullable(deserializer);
     }
 }

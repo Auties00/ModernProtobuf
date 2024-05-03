@@ -2,7 +2,7 @@ package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
@@ -19,7 +19,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";
     private static final String DEFAULT_PARAMETER_NAME = "protoInputObject";
 
-    public ProtobufSerializationMethodGenerator(ProtobufMessageElement element, NestedClassWriter writer) {
+    public ProtobufSerializationMethodGenerator(ProtobufObjectElement element, NestedClassWriter writer) {
         super(element, writer);
     }
 

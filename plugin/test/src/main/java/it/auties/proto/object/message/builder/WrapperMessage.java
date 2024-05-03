@@ -10,8 +10,13 @@ public record WrapperMessage(
         @ProtobufProperty(index = 1, type = STRING)
         String content
 ) implements ProtobufMessage {
-        @ProtobufBuilder(className = "SimpleWrapperMessageBuilder")
-        public static WrapperMessage of(int content) {
-                return new WrapperMessage(String.valueOf(content));
-        }
+    @ProtobufBuilder(className = "ConstructorWrapperMessageBuilder")
+    public WrapperMessage(int content) {
+        this(String.valueOf(content));
+    }
+
+    @ProtobufBuilder(className = "StaticWrapperMessageBuilder")
+    public static WrapperMessage of(int content) {
+        return new WrapperMessage(String.valueOf(content));
+    }
 }

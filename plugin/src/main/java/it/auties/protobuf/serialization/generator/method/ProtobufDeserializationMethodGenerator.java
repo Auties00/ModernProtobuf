@@ -1,7 +1,7 @@
 package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
@@ -15,7 +15,7 @@ import java.util.NoSuchElementException;
 public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenerator {
     private static final String DEFAULT_STREAM_NAME = "inputStream";
 
-    public ProtobufDeserializationMethodGenerator(ProtobufMessageElement element, NestedClassWriter writer) {
+    public ProtobufDeserializationMethodGenerator(ProtobufObjectElement element, NestedClassWriter writer) {
         super(element, writer);
     }
 
@@ -111,7 +111,11 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
                 .forEach(entry -> checkRequiredProperty(writer, entry));
 
         // Return statement
-        writer.println("return new %s(%s);".formatted(message.element(), String.join(", ", argumentsList)));
+        if(message.deserializer().isPresent()) {
+            writer.println("return %s.%s(%s);".formatted(message.element().getQualifiedName(), message.deserializer().get().getSimpleName(), String.join(", ", argumentsList)));
+        }else {
+            writer.println("return new %s(%s);".formatted(message.element().getQualifiedName(), String.join(", ", argumentsList)));
+        }
     }
 
     private void writeMapSerializer(NestedClassWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {

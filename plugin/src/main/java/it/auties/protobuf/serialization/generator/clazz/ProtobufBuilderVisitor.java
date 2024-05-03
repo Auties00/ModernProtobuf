@@ -3,15 +3,13 @@ package it.auties.protobuf.serialization.generator.clazz;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.object.ProtobufBuilderElement;
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
 
 import javax.annotation.processing.Filer;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,7 +21,7 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
         super(filer);
     }
 
-    public void createClass(ProtobufMessageElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufObjectElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
         // Names
         var simpleGeneratedClassName = builderElement != null ? messageElement.getGeneratedClassNameByName(builderElement.name()) : messageElement.getGeneratedClassNameBySuffix("Builder");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
@@ -105,8 +103,13 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 var resultQualifiedName = messageElement.element().getQualifiedName();
                 try(var buildMethodWriter = builderClassWriter.printMethodDeclaration(resultQualifiedName.toString(), "build")) {
                     var invocationArgsJoined = String.join(", ", invocationArgs);
-                    var invocation = builderElement == null ? "new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined) : "%s.%s(%s)".formatted(resultQualifiedName, builderElement.delegate().getSimpleName(), invocationArgsJoined);
-                    buildMethodWriter.printReturn(invocation);
+                    var builderDelegate = messageElement.deserializer();
+                    if (builderDelegate.isEmpty() && (builderElement == null || builderElement.delegate().getKind() == ElementKind.CONSTRUCTOR)) {
+                        buildMethodWriter.printReturn("new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined));
+                    } else {
+                        var methodName = builderElement != null ? builderElement.delegate().getSimpleName() : builderDelegate.get().getSimpleName();
+                        buildMethodWriter.printReturn("%s.%s(%s)".formatted(resultQualifiedName, methodName, invocationArgsJoined));
+                    }
                 }
             }
         }

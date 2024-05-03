@@ -23,7 +23,7 @@ public class ProtobufRepeatedMixin implements ProtobufMixin {
     }
 
     @ProtobufDefaultValue
-    public static <T> Queue<T> newDeque() {
+    public static <T> Deque<T> newDeque() {
         return new LinkedList<>();
     }
 

@@ -2,7 +2,7 @@ package it.auties.protobuf.serialization.generator.clazz;
 
 import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodGenerator;
 import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
-import it.auties.protobuf.serialization.object.ProtobufMessageElement;
+import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
@@ -20,7 +20,7 @@ public class ProtobufSpecVisitor {
         this.processingEnv = processingEnv;
     }
 
-    public void createClass(ProtobufMessageElement result, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufObjectElement result, PackageElement packageName) throws IOException {
         // Names
         var simpleGeneratedClassName = result.getGeneratedClassNameBySuffix("Spec");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
@@ -54,7 +54,7 @@ public class ProtobufSpecVisitor {
     }
 
     // Get the imports to include in the compilation unit
-    private List<String> getSpecImports(ProtobufMessageElement message) {
+    private List<String> getSpecImports(ProtobufObjectElement message) {
         if(message.isEnum()) {
             return List.of(
                     message.element().getQualifiedName().toString(),
