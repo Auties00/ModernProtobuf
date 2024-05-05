@@ -3517,11 +3517,12 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
 Annotations work very well if you can modify the source class, but what if you wanted to use a type that is part of the Standard Java Library or an external library,
 in your Protobuf model? This is possible using Mixins. This library provides built-in mixins for the following standard types:
 1. AtomicReference, AtomicInteger, AtomicLong and AtomicBoolean (**ProtobufAtomicMixin**)
-2. CompletableFuture (**ProtobufFutureMixin**)
-3. Map, HashMap, ConcurrentMap, NavigableMap and SortedMap (**ProtobufMapMixin**)
-4. List, Set, Queue, Deque, ConcurrentHashMap.KeySetView (**ProtobufRepeatedMixin**)
-5. UUID (**ProtobufUUIDMixin**)
-6. URI (**ProtobufURIMixin**)
+2. Optional, OptionalInt, OptionalLong and OptionalDouble (**ProtobufOptionalMixin**)
+3. CompletableFuture (**ProtobufFutureMixin**)
+4. Map, HashMap, ConcurrentMap, NavigableMap and SortedMap (**ProtobufMapMixin**)
+5. List, Set, Queue, Deque, ConcurrentHashMap.KeySetView (**ProtobufRepeatedMixin**)
+6. UUID (**ProtobufUUIDMixin**)
+7. URI (**ProtobufURIMixin**)
 
 These mixins are registered by default, but you can register your own by passing them to `mixins` when annotating a field with `@ProtobufProperty`. 
 A custom mixin can be defined by declaring a class annotated with `@ProtobufMixin`.
