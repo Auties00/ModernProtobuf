@@ -3522,7 +3522,7 @@ in your Protobuf model? This is possible using Mixins. This library provides bui
 4. List, Set, Queue, Deque, ConcurrentHashMap.KeySetView (**ProtobufRepeatedMixin**)
 5. UUID (**ProtobufUUIDMixin**)
 6. URI (**ProtobufURIMixin**)
-7. 
+
 These mixins are registered by default, but you can register your own by passing them to `mixins` when annotating a field with `@ProtobufProperty`. 
 A custom mixin can be defined by declaring a class annotated with `@ProtobufMixin`.
 Inside this class, you can use `@ProtobufSerializer`, `@ProtobufDeserializer` and `@ProtobufDefaultValue` to define how Protobuf should handle these types.
