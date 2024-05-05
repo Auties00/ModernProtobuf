@@ -40,6 +40,31 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
        <configuration>
    <plugin>
    ```
+  
+#### Gradle
+
+- Groovy DSL
+    - Dependency
+    ```groovy
+    implementation 'com.github.auties00:protobuf-base:3.1.0'
+    ```
+
+    - Annotation processor
+    ```groovy
+    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.1.0'
+    ```
+
+- Kotlin DSL
+    - Dependency
+    ```kotlin
+    implementation("com.github.auties00:protobuf-base:3.1.0")
+    ```
+
+    - Annotation processor
+    ```kotlin
+    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.1.0")
+    ```
+  
 ### Schema generation and updating
 
 > Download the CLI tool from the release tab or compile the project yourself using `mvn clean install`
@@ -58,31 +83,6 @@ protoc update <proto> <input_directory> --output [directory]
 This will update all models in `input_directory`.
 If you want your updated models to be mutable, add `--mutable`
 If you don't want to use Optionals, add `--nullable`.
-
-#### Gradle
-
-- Groovy DSL
-   - Dependency
-    ```groovy
-    implementation 'com.github.auties00:protobuf-base:3.1.0'
-    ```
-
-   - Annotation processor
-    ```groovy
-    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.1.0'
-    ```
-
-- Kotlin DSL
-   - Dependency
-    ```groovy
-    implementation("com.github.auties00:protobuf-base:3.1.0")
-    ```
-
-   - Annotation processor
-    ```groovy
-    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.1.0")
-    ```
-
 
 ### Comparison with Google's implementation
 
