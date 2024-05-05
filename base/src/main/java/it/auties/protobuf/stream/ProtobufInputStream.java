@@ -1,3 +1,13 @@
+// Protocol Buffers - Google's data interchange format
+// Copyright 2008 Google Inc.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+// I'm not sure if the LICENSE copyright header is necessary as only two methods in this class are taken from Google's source code
+// But just to be sure I included it
+
 package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
@@ -183,6 +193,8 @@ public class ProtobufInputStream {
         return readInt32Unchecked();
     }
 
+    // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
+    // Fastest implementation I could find
     private int readInt32Unchecked() {
         fspath:
         {
@@ -219,7 +231,9 @@ public class ProtobufInputStream {
 
         return (int) readVarInt64Slow();
     }
-    
+
+    // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
+    // Fastest implementation I could find
     public long readInt64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
@@ -306,7 +320,10 @@ public class ProtobufInputStream {
 
         byte[] buffer = this.buffer;
         this.pos = tempPos + 4;
-        return buffer[tempPos] & 255 | (buffer[tempPos + 1] & 255) << 8 | (buffer[tempPos + 2] & 255) << 16 | (buffer[tempPos + 3] & 255) << 24;
+        return buffer[tempPos] & 255
+                | (buffer[tempPos + 1] & 255) << 8
+                | (buffer[tempPos + 2] & 255) << 16
+                | (buffer[tempPos + 3] & 255) << 24;
     }
     
     public long readFixed64() {
@@ -321,7 +338,14 @@ public class ProtobufInputStream {
 
         byte[] buffer = this.buffer;
         this.pos = tempPos + 8;
-        return (long) buffer[tempPos] & 255L | ((long) buffer[tempPos + 1] & 255L) << 8 | ((long) buffer[tempPos + 2] & 255L) << 16 | ((long) buffer[tempPos + 3] & 255L) << 24 | ((long) buffer[tempPos + 4] & 255L) << 32 | ((long) buffer[tempPos + 5] & 255L) << 40 | ((long) buffer[tempPos + 6] & 255L) << 48 | ((long) buffer[tempPos + 7] & 255L) << 56;
+        return (long) buffer[tempPos] & 255L
+                | ((long) buffer[tempPos + 1] & 255L) << 8
+                | ((long) buffer[tempPos + 2] & 255L) << 16
+                | ((long) buffer[tempPos + 3] & 255L) << 24
+                | ((long) buffer[tempPos + 4] & 255L) << 32
+                | ((long) buffer[tempPos + 5] & 255L) << 40
+                | ((long) buffer[tempPos + 6] & 255L) << 48
+                | ((long) buffer[tempPos + 7] & 255L) << 56;
     }
 
     public byte readByte() {
