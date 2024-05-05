@@ -4,7 +4,7 @@ import it.auties.protobuf.serialization.generator.method.ProtobufDeserialization
 import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
 import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.support.CompilationUnitWriter;
+import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
@@ -27,7 +27,7 @@ public class ProtobufSpecVisitor {
         var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
 
         // Declare a new compilation unit
-        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
+        try (var compilationUnitWriter = new JavaWriter.CompilationUnit(sourceFile.openWriter())) {
             // If a package is available, write it in the compilation unit
             if(packageName != null) {
                 compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
@@ -38,17 +38,17 @@ public class ProtobufSpecVisitor {
             imports.forEach(compilationUnitWriter::printImportDeclaration);
 
             // Separate imports from classes
-            compilationUnitWriter.printClassSeparator();
+            compilationUnitWriter.printSeparator();
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
                 // Write the serializer
-                var serializationVisitor = new ProtobufSerializationMethodGenerator(result, classWriter);
-                serializationVisitor.generate();
+                var serializationVisitor = new ProtobufSerializationMethodGenerator(result);
+                serializationVisitor.generate(classWriter);
 
                 // Write the deserializer
-                var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result, classWriter);
-                deserializationVisitor.generate();
+                var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result);
+                deserializationVisitor.generate(classWriter);
             }
         }
     }

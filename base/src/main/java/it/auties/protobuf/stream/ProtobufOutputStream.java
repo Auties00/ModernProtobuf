@@ -15,7 +15,7 @@ public final class ProtobufOutputStream {
         this.buffer = new ByteArrayOutputStream();
     }
 
-    static int makeTag(int fieldNumber, int wireType) {
+    private static int makeTag(int fieldNumber, int wireType) {
         return (fieldNumber << 3) | wireType;
     }
 

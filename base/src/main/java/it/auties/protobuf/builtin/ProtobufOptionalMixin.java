@@ -3,7 +3,6 @@ package it.auties.protobuf.builtin;
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
-import it.auties.protobuf.model.ProtobufMixin;
 
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -13,7 +12,7 @@ import java.util.OptionalLong;
 import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
 
 @SuppressWarnings({"OptionalAssignedToNull", "OptionalUsedAsFieldOrParameterType", "unused"})
-public class ProtobufOptionalMixin implements ProtobufMixin {
+public class ProtobufOptionalMixin {
     @ProtobufDefaultValue
     public static <T> Optional<T> newOptional() {
         return Optional.empty();

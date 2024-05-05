@@ -6,10 +6,11 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
+import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.model.ProtobufEnum;
 import it.auties.protobuf.parser.tree.ProtobufEnumTree;
 import it.auties.protobuf.parser.tree.ProtobufFieldTree;
 import it.auties.protobuf.schema.util.AstUtils;
@@ -42,8 +43,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
         var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
         allMembers.add(ctEnum);
         ctEnum.setParentNode(parent);
-        addNameAnnotation(ctEnum);
-        addImplementedType(ProtobufEnum.class.getSimpleName(), ctEnum);
+        addEnumName(ctEnum);
         getDeferredImplementations().forEach(entry -> addImplementedType(entry, ctEnum));
         createEnumConstructor(ctEnum);
         createEnumConstants(ctEnum);
@@ -51,6 +51,12 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
         createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
         return ctEnum;
+    }
+
+    private void addEnumName(NodeWithAnnotations<?> node) {
+        var annotation = getOrAddAnnotation(node, ProtobufEnum.class);
+        annotation.setPairs(NodeList.nodeList(new MemberValuePair("name", new StringLiteralExpr(protoStatement.qualifiedCanonicalName().orElseThrow()))));
+        node.addAnnotation(annotation);
     }
 
     private void createEnumConstants(EnumDeclaration ctEnum) {

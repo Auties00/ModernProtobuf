@@ -1,5 +1,8 @@
 package it.auties.protobuf.serialization.support;
 
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufMessage;
+
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
@@ -31,9 +34,15 @@ public class Types {
         return erase(result.asType());
     }
 
+    public boolean isMessage(TypeMirror mirror) {
+        return erase(mirror) instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufMessage.class) != null;
+    }
+
     public boolean isEnum(TypeMirror mirror) {
-        return mirror instanceof DeclaredType declaredType
-                && declaredType.asElement().getKind() == ElementKind.ENUM;
+        return erase(mirror) instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.ENUM
+                && declaredType.asElement().getAnnotation(ProtobufEnum.class) != null;
     }
 
     public boolean isSameType(TypeMirror firstType, Class<?> secondType) {
@@ -41,7 +50,7 @@ public class Types {
     }
 
     public boolean isSameType(TypeMirror firstType, TypeMirror secondType) {
-        return processingEnv.getTypeUtils().isSameType(erase(firstType), secondType);
+        return processingEnv.getTypeUtils().isSameType(erase(firstType), erase(secondType));
     }
 
     public TypeMirror erase(TypeMirror typeMirror) {

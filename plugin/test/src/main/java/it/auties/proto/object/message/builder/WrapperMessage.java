@@ -1,15 +1,16 @@
 package it.auties.proto.object.message.builder;
 
 import it.auties.protobuf.annotation.ProtobufBuilder;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufMessage;
 
 import static it.auties.protobuf.model.ProtobufType.STRING;
 
+@ProtobufMessage
 public record WrapperMessage(
         @ProtobufProperty(index = 1, type = STRING)
         String content
-) implements ProtobufMessage {
+) {
     @ProtobufBuilder(className = "ConstructorWrapperMessageBuilder")
     public WrapperMessage(int content) {
         this(String.valueOf(content));

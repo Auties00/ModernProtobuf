@@ -1,7 +1,6 @@
 package it.auties.protobuf.annotation;
 
 import it.auties.protobuf.builtin.*;
-import it.auties.protobuf.model.ProtobufMixin;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.lang.annotation.ElementType;
@@ -30,10 +29,11 @@ public @interface ProtobufProperty {
 
     Class<?> overrideMapValueType() default Object.class;
 
-    Class<? extends ProtobufMixin>[] mixins() default {
+    Class<?>[] mixins() default {
             ProtobufAtomicMixin.class,
             ProtobufOptionalMixin.class,
             ProtobufUUIDMixin.class,
+            ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
             ProtobufFutureMixin.class

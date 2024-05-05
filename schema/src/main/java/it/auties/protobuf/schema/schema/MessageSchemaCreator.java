@@ -15,8 +15,8 @@ import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
@@ -68,8 +68,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 ctClass.setStatic(true);
             }
 
-            addNameAnnotation(ctClass);
-            addImplementedType(ProtobufMessage.class.getSimpleName(), ctClass);
+            addMessageName(ctClass);
             getDeferredImplementations().forEach(entry -> {
                 addImplementedType(entry, ctClass);
                 ctClass.setFinal(true);
@@ -87,8 +86,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         var ctRecord = new RecordDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
         allMembers.add(ctRecord);
         ctRecord.setParentNode(parent);
-        addNameAnnotation(ctRecord);
-        addImplementedType(ProtobufMessage.class.getSimpleName(), ctRecord);
+        addMessageName(ctRecord);
         getDeferredImplementations().forEach(entry -> addImplementedType(entry, ctRecord));
         addRecordMembers(ctRecord);
         addReservedAnnotation(ctRecord);
@@ -96,6 +94,12 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         methods.forEach(ctRecord::addMember);
         members.forEach(ctRecord::addMember);
         return ctRecord;
+    }
+
+    private void addMessageName(NodeWithAnnotations<?> node) {
+        var annotation = getOrAddAnnotation(node, ProtobufMessage.class);
+        annotation.setPairs(NodeList.nodeList(new MemberValuePair("name", new StringLiteralExpr(protoStatement.qualifiedCanonicalName().orElseThrow()))));
+        node.addAnnotation(annotation);
     }
 
     private void addAllArgsConstructor(ClassOrInterfaceDeclaration ctClass) {

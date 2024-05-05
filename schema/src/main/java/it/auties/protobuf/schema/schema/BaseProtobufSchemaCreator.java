@@ -10,16 +10,15 @@ import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
+import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.annotation.ProtobufMessageName;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.annotation.ProtobufReserved;
-import it.auties.protobuf.model.ProtobufEnum;
-import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.schema.util.LogProvider;
 
+import java.lang.annotation.Annotation;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
@@ -156,14 +155,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
     }
 
     private String readAnnotatedName(TypeDeclaration<?> entry) {
-        var annotation = entry.getAnnotationByClass(ProtobufMessageName.class)
+        var annotation = entry.getAnnotationByClass(ProtobufMessage.class)
+                .or(() -> entry.getAnnotationByClass(ProtobufEnum.class))
                 .orElse(null);
         if(annotation instanceof SingleMemberAnnotationExpr singleMemberAnnotationExpr && singleMemberAnnotationExpr.getMemberValue() instanceof StringLiteralExpr expr) {
             return expr.asString();
         }else if(annotation instanceof NormalAnnotationExpr normalAnnotationExpr) {
             return normalAnnotationExpr.getPairs()
                     .stream()
-                    .filter(valuePair -> valuePair.getNameAsString().equals("value"))
+                    .filter(valuePair -> valuePair.getNameAsString().equals("name"))
                     .findFirst()
                     .filter(arg -> arg.getValue() instanceof StringLiteralExpr)
                     .map(arg -> (StringLiteralExpr) arg.getValue())
@@ -221,7 +221,6 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             compilationUnit.addImport(ProtobufMessage.class.getName());
         }
 
-        compilationUnit.addImport(ProtobufMessageName.class.getName());
         if(protoStatement instanceof ProtobufEnumTree || protoStatement.getStatementRecursive(ProtobufEnumTree.class).isPresent()){
             compilationUnit.addImport(ProtobufEnum.class.getName());
             compilationUnit.addImport(ProtobufEnumIndex.class.getName());
@@ -246,10 +245,6 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             }
         }
 
-        if(hasReservedFields()){
-            compilationUnit.addImport(ProtobufReserved.class.getName());
-        }
-
         if(hasFieldsWithModifier(ProtobufFieldModifier.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
@@ -269,18 +264,6 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
     }
 
     record CompilationUnitResult(CompilationUnit compilationUnit, boolean existing){
-
-    }
-
-    private boolean hasReservedFields() {
-        return hasReservedFields(protoStatement);
-    }
-
-    private boolean hasReservedFields(ProtobufObjectTree<?> statement) {
-        return statement.statements()
-                .stream()
-                .anyMatch(entry -> entry instanceof ProtobufMessageTree messageStatement
-                        && (!messageStatement.reserved().isEmpty() || hasReservedFields(messageStatement)));
 
     }
 
@@ -314,8 +297,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             return;
         }
 
-        var annotation = new NormalAnnotationExpr();
-        annotation.setName(ProtobufReserved.class.getSimpleName());
+        var annotation = getOrAddAnnotation(ctEnum, ProtobufEnum.class);
         var indexes = protobufReservable.reserved()
                 .stream()
                 .filter(entry -> entry instanceof ProtobufObjectTree<?>.ReservedIndexes)
@@ -325,7 +307,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
         if(!indexes.isEmpty()){
-            annotation.addPair("indexes", new ArrayInitializerExpr(indexes));
+            annotation.addPair("reservedIndexes", new ArrayInitializerExpr(indexes));
         }
 
         var names = protobufReservable.reserved()
@@ -337,7 +319,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
                 .map(StringLiteralExpr::new)
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
         if(!indexes.isEmpty()){
-            annotation.addPair("names", new ArrayInitializerExpr(names));
+            annotation.addPair("reservedNames", new ArrayInitializerExpr(names));
         }
 
         var ranges = protobufReservable.reserved()
@@ -348,10 +330,8 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
         if(!indexes.isEmpty()){
-            annotation.addPair("ranges", new ArrayInitializerExpr(ranges));
+            annotation.addPair("reservedRanges", new ArrayInitializerExpr(ranges));
         }
-
-        ctEnum.addAnnotation(annotation);
     }
 
     void addImplementedType(ClassOrInterfaceDeclaration ctInterface, TypeDeclaration<?> target) {
@@ -367,10 +347,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
         nodeWithImplements.addImplementedType(ctInterface);
     }
 
-    void addNameAnnotation(NodeWithAnnotations<?> node) {
+    NormalAnnotationExpr getOrAddAnnotation(NodeWithAnnotations<?> typeDeclaration, Class<? extends Annotation> annotationType) {
+        var candidateAnnotation = typeDeclaration.getAnnotationByClass(annotationType);
+        if(candidateAnnotation.isPresent() && candidateAnnotation.get() instanceof NormalAnnotationExpr annotation) {
+            return annotation;
+        }
+
+        candidateAnnotation.ifPresent(Node::remove);
         var annotation = new NormalAnnotationExpr();
-        annotation.setName(ProtobufMessageName.class.getSimpleName());
-        annotation.setPairs(NodeList.nodeList(new MemberValuePair("value", new StringLiteralExpr(protoStatement.qualifiedCanonicalName().orElseThrow()))));
-        node.addAnnotation(annotation);
+        annotation.setName(annotationType.getSimpleName());
+        return annotation;
     }
 }

@@ -1,9 +1,10 @@
 package it.auties.proto.compatibility.scalar;
 
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufMessage;
 import it.auties.protobuf.model.ProtobufType;
 
+@ProtobufMessage
 public record ModernScalarMessage(
         @ProtobufProperty(index = 1, type = ProtobufType.FIXED32)
         int fixed32,
@@ -31,6 +32,6 @@ public record ModernScalarMessage(
         String string,
         @ProtobufProperty(index = 13, type = ProtobufType.BYTES)
         byte[] bytes
-) implements ProtobufMessage {
+) {
 
 }

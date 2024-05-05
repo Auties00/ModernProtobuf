@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -65,5 +66,16 @@ public abstract sealed class ProtobufIndexedBodyTree<T extends ProtobufTree> ext
     @Override
     public boolean isAttributed() {
         return name != null;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof ProtobufIndexedBodyTree<?> that
+                && Objects.equals(that.qualifiedName(), this.qualifiedName());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(this.qualifiedName());
     }
 }

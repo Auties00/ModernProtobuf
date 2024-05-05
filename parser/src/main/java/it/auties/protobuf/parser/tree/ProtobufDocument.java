@@ -244,4 +244,14 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
         return Optional.ofNullable(lastOption);
     }
 
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof ProtobufDocument that
+                && Objects.equals(that.qualifiedName(), this.qualifiedName());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(this.qualifiedName());
+    }
 }

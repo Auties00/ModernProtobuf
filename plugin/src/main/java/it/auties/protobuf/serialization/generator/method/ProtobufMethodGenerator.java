@@ -1,7 +1,8 @@
 package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.serialization.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.support.CompilationUnitWriter.NestedClassWriter;
+import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
+import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
@@ -12,13 +13,11 @@ import java.util.stream.IntStream;
 
 public abstract class ProtobufMethodGenerator {
     protected final ProtobufObjectElement message;
-    private final NestedClassWriter writer;
-    protected ProtobufMethodGenerator(ProtobufObjectElement message, NestedClassWriter writer) {
+    protected ProtobufMethodGenerator(ProtobufObjectElement message) {
         this.message = message;
-        this.writer = writer;
     }
 
-    public void generate() {
+    public void generate(ClassWriter writer) {
         if (!shouldInstrument()) {
             return;
         }
@@ -39,7 +38,7 @@ public abstract class ProtobufMethodGenerator {
 
     public abstract boolean shouldInstrument();
 
-    protected abstract void doInstrumentation(NestedClassWriter writer);
+    protected abstract void doInstrumentation(MethodWriter writer);
 
     protected abstract List<String> modifiers();
 

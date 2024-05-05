@@ -138,6 +138,10 @@ public sealed interface ProtobufPropertyType {
     // The concreteType should be checked, not the descriptor type
     boolean isPrimitive();
 
+    // Returns whether the type is a message
+    // The concreteType should be checked, not the descriptor type
+    boolean isMessage();
+
     // Returns whether the type is an enum
     // The concreteType should be checked, not the descriptor type
     boolean isEnum();
@@ -160,9 +164,9 @@ public sealed interface ProtobufPropertyType {
                 .toList();
     }
 
-    record NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror implementationType, List<ProtobufConverterElement> converters, String defaultValue, boolean isEnum) implements ProtobufPropertyType {
-        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, String defaultValue, boolean isEnum) {
-            this(protobufType, fieldType, implementationType, new ArrayList<>(), defaultValue, isEnum);
+    record NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror implementationType, List<ProtobufConverterElement> converters, String defaultValue, boolean isMessage, boolean isEnum) implements ProtobufPropertyType {
+        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, String defaultValue, boolean isMessage, boolean isEnum) {
+            this(protobufType, fieldType, implementationType, new ArrayList<>(), defaultValue, isMessage, isEnum);
         }
 
         @Override
@@ -197,6 +201,11 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
+        public boolean isMessage() {
+            return value.isMessage();
+        }
+
+        @Override
         public boolean isEnum() {
             return value.isEnum();
         }
@@ -228,6 +237,11 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public boolean isEnum() {
+            return false;
+        }
+
+        @Override
+        public boolean isMessage() {
             return false;
         }
 
