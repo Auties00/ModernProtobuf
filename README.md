@@ -1,6 +1,6 @@
 # ModernProtobuf
 
-A modern implementation of the Protobuf specification for Java 17 and upwards.
+A modern implementation of the Protobuf specification for Java 21 and upwards.
 Both Protobuf 2 and 3 are supported.
 
 ### What is ModernProtobuf
@@ -3261,7 +3261,7 @@ PerformanceBenchmark.jacksonProtobuf            avgt    5  586.401 ± 2.222  us/
 
 **ModernProtobuf is the fastest**
 
-I'm committed to maintain ModernProtobuf's performance, so, if under any edge cases its performance doesn't live up to expectation, I'm happy to work on it.
+> I'm committed to maintain ModernProtobuf's performance, so, if under any edge cases its performance doesn't live up to expectation, I'm happy to work on it.
 
 ### Schema generation and updating
 
@@ -3521,7 +3521,8 @@ in your Protobuf model? This is possible using Mixins. This library provides bui
 3. Map, HashMap, ConcurrentMap, NavigableMap and SortedMap (**ProtobufMapMixin**)
 4. List, Set, Queue, Deque, ConcurrentHashMap.KeySetView (**ProtobufRepeatedMixin**)
 5. UUID (**ProtobufUUIDMixin**)
-
+6. URI (**ProtobufURIMixin**)
+7. 
 These mixins are registered by default, but you can register your own by passing them to `mixins` when annotating a field with `@ProtobufProperty`. 
 A custom mixin can be defined by declaring a class annotated with `@ProtobufMixin`.
 Inside this class, you can use `@ProtobufSerializer`, `@ProtobufDeserializer` and `@ProtobufDefaultValue` to define how Protobuf should handle these types.
