@@ -32,13 +32,12 @@ public class ReservedFieldTest {
 
     @Test
     public void testIllegal() {
-        var source = ClassLoader.getSystemClassLoader().getResource("reserved_illegal.proto");
-        Objects.requireNonNull(source);
-
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
-            var parser = new ProtobufParser();
-            var document = parser.parseOnly(Path.of(source.toURI()));
-            System.out.println(document);
-        });
+        var parser = new ProtobufParser();
+        var illegalIndexSource = ClassLoader.getSystemClassLoader().getResource("reserved_illegal_index.proto");
+        Objects.requireNonNull(illegalIndexSource);
+        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(illegalIndexSource.toURI())));
+        var illegalNameSource = ClassLoader.getSystemClassLoader().getResource("reserved_illegal_name.proto");
+        Objects.requireNonNull(illegalNameSource);
+        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(illegalNameSource.toURI())));
     }
 }

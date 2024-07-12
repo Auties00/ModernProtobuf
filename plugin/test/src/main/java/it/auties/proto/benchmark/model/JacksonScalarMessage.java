@@ -1,4 +1,4 @@
-package it.auties.proto.benchmark;
+package it.auties.proto.benchmark.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

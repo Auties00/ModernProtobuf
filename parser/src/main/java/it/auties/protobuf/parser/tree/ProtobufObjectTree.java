@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.exception.ProtobufInternalException;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,20 +19,12 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
         return Collections.unmodifiableList(reserved);
     }
 
-    public Optional<Reserved> lastReserved() {
-        return Optional.ofNullable(reserved.peekLast());
-    }
-
     public Optional<Reserved> pollReserved() {
         return Optional.ofNullable(reserved.pollLast());
     }
 
     public List<Extensions> extensions() {
         return Collections.unmodifiableList(extensions);
-    }
-
-    public Optional<Extensions> lastExtension() {
-        return Optional.ofNullable(extensions.peekLast());
     }
 
     public Optional<Extensions> pollExtensions() {
@@ -84,6 +78,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     public sealed interface Reserved {
         boolean isAttributed();
+        void setAttributed(boolean attributed);
     }
 
     public boolean hasReservedIndex(int value) {
@@ -142,6 +137,21 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
         }
 
         @Override
+        public void setAttributed(boolean attributed) {
+            if (!attributed) {
+                return;
+            }
+
+            if(min == null) {
+                throw new ProtobufInternalException("Min");
+            }
+
+            if(max == null) {
+                throw new ProtobufInternalException("Max");
+            }
+        }
+
+        @Override
         public String toString() {
             return "%s to %s".formatted(min, max != null && max == Integer.MAX_VALUE ? "max" : max);
         }
@@ -149,6 +159,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     public final class ReservedIndexes implements Reserved {
         private final LinkedList<Integer> values;
+        private boolean attributed;
         private ReservedIndexes() {
             this.values = new LinkedList<>();
         }
@@ -176,7 +187,11 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
         @Override
         public boolean isAttributed() {
-            return !values.isEmpty();
+            return attributed;
+        }
+
+        public void setAttributed(boolean attributed) {
+            this.attributed = attributed;
         }
 
         @Override
@@ -191,6 +206,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     public final class ReservedNames implements Reserved {
         private final Collection<String> values;
+        private boolean attributed;
         private ReservedNames() {
             this.values = new ArrayList<>();
         }
@@ -210,12 +226,18 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
         @Override
         public boolean isAttributed() {
-            return !values.isEmpty();
+            return attributed;
+        }
+
+        public void setAttributed(boolean attributed) {
+            this.attributed = attributed;
         }
 
         @Override
         public String toString() {
-            return String.join(", ", values);
+            return values.stream()
+                    .map("\"%s\""::formatted)
+                    .collect(Collectors.joining(", "));
         }
 
         public Collection<String> values() {
@@ -225,6 +247,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     public sealed interface Extensions {
         boolean isAttributed();
+        void setAttributed(boolean attributed);
     }
 
     public final class ExtensionsRange implements Extensions {
@@ -263,6 +286,21 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
         }
 
         @Override
+        public void setAttributed(boolean attributed) {
+            if (!attributed) {
+                return;
+            }
+
+            if(min == null) {
+                throw new ProtobufInternalException("Min");
+            }
+
+            if(max == null) {
+                throw new ProtobufInternalException("Max");
+            }
+        }
+
+        @Override
         public String toString() {
             return "%s to %s".formatted(min, max == Integer.MAX_VALUE ? "max" : max);
         }
@@ -270,6 +308,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     public final class ExtensionsIndexes implements Extensions {
         private final LinkedList<Integer> values;
+        private boolean attributed;
         private ExtensionsIndexes() {
             this.values = new LinkedList<>();
         }
@@ -297,7 +336,11 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
         @Override
         public boolean isAttributed() {
-            return !values.isEmpty();
+            return attributed;
+        }
+
+        public void setAttributed(boolean attributed) {
+            this.attributed = attributed;
         }
 
         @Override
@@ -320,18 +363,12 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
         var name = Objects.requireNonNullElse(this.name, "[missing]");
         var builder = new StringBuilder();
         builder.append(toLeveledString("%s %s {\n".formatted(instructionName, name)));
-        if(!reserved.isEmpty()) {
-            builder.append(toLeveledString("    reserved "))
-                    .append(reserved.stream().map(Objects::toString).collect(Collectors.joining(", ")))
-                    .append(";")
-                    .append("\n");
-        }
-        if(!extensions.isEmpty()) {
-            builder.append(toLeveledString("    extensions "))
-                    .append(extensions.stream().map(Objects::toString).collect(Collectors.joining(", ")))
-                    .append(";")
-                    .append("\n");
-        }
+        reserved.stream()
+                .map(entry -> toLeveledString("reserved " + entry + ";\n", 1))
+                .forEach(builder::append);
+        extensions.stream()
+                .map(entry -> toLeveledString("extensions " + entry + ";\n", 1))
+                .forEach(builder::append);
         statements().forEach(statement -> {
             builder.append(statement.toString());
             builder.append("\n");

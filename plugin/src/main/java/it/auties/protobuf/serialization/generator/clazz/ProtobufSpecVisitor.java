@@ -1,7 +1,9 @@
 package it.auties.protobuf.serialization.generator.clazz;
 
+import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodGenerator;
 import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufSizeMethodGenerator;
 import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
@@ -49,6 +51,10 @@ public class ProtobufSpecVisitor {
                 // Write the deserializer
                 var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result);
                 deserializationVisitor.generate(classWriter);
+
+                // Write the size calculator
+                var sizeVisitor = new ProtobufSizeMethodGenerator(result);
+                sizeVisitor.generate(classWriter);
             }
         }
     }
@@ -59,7 +65,8 @@ public class ProtobufSpecVisitor {
             return List.of(
                     message.element().getQualifiedName().toString(),
                     Arrays.class.getName(),
-                    Optional.class.getName()
+                    Optional.class.getName(),
+                    ProtobufOutputStream.class.getName()
             );
         }
 
@@ -67,6 +74,7 @@ public class ProtobufSpecVisitor {
         imports.add(message.element().getQualifiedName().toString());
         imports.add(ProtobufInputStream.class.getName());
         imports.add(ProtobufOutputStream.class.getName());
+        imports.add(ProtobufWireType.class.getName());
         if (message.properties().stream().anyMatch(ProtobufPropertyElement::required)) {
             imports.add(Objects.class.getName());
         }

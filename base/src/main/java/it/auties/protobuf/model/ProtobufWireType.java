@@ -7,4 +7,8 @@ public class ProtobufWireType {
     public final static int WIRE_TYPE_EMBEDDED_MESSAGE = 3;
     public final static int WIRE_TYPE_END_OBJECT = 4;
     public final static int WIRE_TYPE_FIXED32 = 5;
+
+    public static int makeTag(int fieldNumber, int wireType) {
+        return (fieldNumber << 3) | wireType;
+    }
 }

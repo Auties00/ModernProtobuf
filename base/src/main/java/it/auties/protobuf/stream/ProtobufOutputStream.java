@@ -2,25 +2,69 @@ package it.auties.protobuf.stream;
 
 import it.auties.protobuf.model.ProtobufWireType;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 public final class ProtobufOutputStream {
-    private final ByteArrayOutputStream buffer;
-
-    public ProtobufOutputStream() {
-        this.buffer = new ByteArrayOutputStream();
+    public static int getFieldSize(int fieldNumber, int wireType) {
+        return getVarIntSizeUnsigned(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
-    private static int makeTag(int fieldNumber, int wireType) {
-        return (fieldNumber << 3) | wireType;
+    public static int getVarIntSize(long value) {
+        if(value >= 0) {
+            return getVarIntSizeUnsigned(value);
+        }
+
+        var counter = 0;
+        while (true) {
+            counter++;
+            if ((value & ~0x7FL) == 0) {
+                return counter;
+            } else {
+                value >>>= 7;
+            }
+        }
     }
 
-    public void writeTag(int fieldNumber, int wireType) {
-        writeUInt32NoTag(makeTag(fieldNumber, wireType));
+    public static int getVarIntSizeUnsigned(long value) {
+        if (value >= 0 && value <= 127) {
+            return 1;
+        } else if (value >= 128 && value <= 16383) {
+            return 2;
+        } else if (value >= 16384 && value <= 2097151) {
+            return 3;
+        } else if (value >= 2097152 && value <= 268435455) {
+            return 4;
+        } else {
+            return 5;
+        }
+    }
+
+    public static int getStringSize(String value) {
+        if(value == null) {
+            return 0;
+        }
+
+        var length = value.getBytes(StandardCharsets.UTF_8).length;
+        return getVarIntSizeUnsigned(length) + length;
+    }
+
+    public static int getBytesSize(byte[] value) {
+        if(value == null) {
+            return 0;
+        }
+
+        return getVarIntSizeUnsigned(value.length) + value.length;
+    }
+
+    private final byte[] buffer;
+    private int position;
+    public ProtobufOutputStream(int size) {
+        this.buffer = new byte[size];
+    }
+
+    private void writeTag(int fieldNumber, int wireType) {
+        writeUInt32NoTag(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
     public void writeInt32(int fieldNumber, Collection<Integer> values) {
@@ -188,7 +232,7 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeRaw((byte) (value ? 1 : 0));
+        write((byte) (value ? 1 : 0));
     }
 
     public void writeString(int fieldNumber, Collection<String> values) {
@@ -230,12 +274,12 @@ public final class ProtobufOutputStream {
     }
 
     public byte[] toByteArray() {
-        return buffer.toByteArray();
+        return buffer;
     }
 
     private void writeBytesNoTag(byte[] value) {
         writeUInt32NoTag(value.length);
-        writeRawBytes(value);
+        write(value);
     }
 
     private void writeInt32NoTag(int value) {
@@ -249,60 +293,58 @@ public final class ProtobufOutputStream {
     private void writeUInt32NoTag(int value) {
         while (true) {
             if ((value & ~0x7F) == 0) {
-                writeRaw((byte) value);
+                write((byte) value);
                 return;
             } else {
-                writeRaw((byte) ((value & 0x7F) | 0x80));
+                write((byte) ((value & 0x7F) | 0x80));
                 value >>>= 7;
             }
         }
     }
 
     private void writeFixed32NoTag(int value) {
-        writeRaw((byte) (value & 0xFF));
-        writeRaw((byte) ((value >> 8) & 0xFF));
-        writeRaw((byte) ((value >> 16) & 0xFF));
-        writeRaw((byte) ((value >> 24) & 0xFF));
+        write((byte) (value & 0xFF));
+        write((byte) ((value >> 8) & 0xFF));
+        write((byte) ((value >> 16) & 0xFF));
+        write((byte) ((value >> 24) & 0xFF));
     }
 
     private void writeUInt64NoTag(long value) {
         while (true) {
             if ((value & ~0x7FL) == 0) {
-                writeRaw((byte) value);
+                write((byte) value);
                 return;
             } else {
-                writeRaw((byte) (((int) value & 0x7F) | 0x80));
+                write((byte) (((int) value & 0x7F) | 0x80));
                 value >>>= 7;
             }
         }
     }
 
     private void writeFixed64NoTag(long value) {
-        writeRaw((byte) ((int) (value) & 0xFF));
-        writeRaw((byte) ((int) (value >> 8) & 0xFF));
-        writeRaw((byte) ((int) (value >> 16) & 0xFF));
-        writeRaw((byte) ((int) (value >> 24) & 0xFF));
-        writeRaw((byte) ((int) (value >> 32) & 0xFF));
-        writeRaw((byte) ((int) (value >> 40) & 0xFF));
-        writeRaw((byte) ((int) (value >> 48) & 0xFF));
-        writeRaw((byte) ((int) (value >> 56) & 0xFF));
+        write((byte) ((int) (value) & 0xFF));
+        write((byte) ((int) (value >> 8) & 0xFF));
+        write((byte) ((int) (value >> 16) & 0xFF));
+        write((byte) ((int) (value >> 24) & 0xFF));
+        write((byte) ((int) (value >> 32) & 0xFF));
+        write((byte) ((int) (value >> 40) & 0xFF));
+        write((byte) ((int) (value >> 48) & 0xFF));
+        write((byte) ((int) (value >> 56) & 0xFF));
     }
 
     private void writeStringNoTag(String value) {
         var bytes = value.getBytes(StandardCharsets.UTF_8);
         writeUInt32NoTag(bytes.length);
-        writeRawBytes(bytes);
+        write(bytes);
     }
 
-    private void writeRaw(byte value) {
-        buffer.write(value);
+    private void write(byte value) {
+        buffer[position++] = value;
     }
 
-    private void writeRawBytes(byte[] value) {
-        try {
-            buffer.write(value);
-        } catch (IOException exception) {
-            throw new UncheckedIOException("Cannot write bytes to stream", exception);
+    private void write(byte[] values) {
+        for (var value : values) {
+            buffer[position++] = value;
         }
     }
 }

@@ -45,6 +45,7 @@ public final class ProtobufParser {
     private static final String STRING_LITERAL = "\"";
     private static final String STRING_LITERAL_ALIAS_CHAR = "'";
     private static final String MAP_TYPE = "map";
+    private static final String DEFAULT_KEYWORD_OPTION = "default";
 
     static {
         var parser = new ProtobufParser();
@@ -88,7 +89,9 @@ public final class ProtobufParser {
             }
 
             attributeImports(results);
-            results.forEach(statement -> attributeStatement(statement, statement));
+            for (var statement : results) {
+                attributeStatement(statement, statement);
+            }
             results.addAll(getImportedDocuments(results));
             return results;
         }
@@ -169,8 +172,7 @@ public final class ProtobufParser {
 
     private void attributeStatement(ProtobufDocument document, ProtobufTree statement) {
         switch (statement) {
-            case ProtobufDocument documentStatement -> documentStatement.statements()
-                    .forEach(child -> attributeStatement(document, child));
+            case ProtobufDocument documentStatement -> attributeDocument(document, documentStatement);
             case ProtobufMessageTree messageStatement -> messageStatement.statements()
                     .forEach(child -> attributeStatement(document, child));
             case ProtobufOneOfTree oneOfStatement -> oneOfStatement.statements()
@@ -178,6 +180,14 @@ public final class ProtobufParser {
             case ProtobufTypedFieldTree fieldStatement -> attributeTypedStatement(document, fieldStatement, fieldStatement.type().orElse(null));
             default -> {}
         }
+    }
+
+    private void attributeDocument(ProtobufDocument document, ProtobufDocument documentStatement) {
+        for (var child : documentStatement.statements()) {
+            attributeStatement(document, child);
+        }
+
+        attributeOptions(document);
     }
 
     private void attributeTypedStatement(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufTypeReference typeReference) {
@@ -190,6 +200,7 @@ public final class ProtobufParser {
             case ProtobufPrimitiveType ignored -> {}
             case null -> throw new ProtobufInternalException("Unexpected state");
         }
+        attributeOptions(typedFieldTree);
     }
 
     private void attributeType(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufObjectType fieldType) {
@@ -275,6 +286,104 @@ public final class ProtobufParser {
         return Optional.empty();
     }
 
+    private void attributeOptions(ProtobufOptionedTree<?> fieldTree) {
+        for(var option : fieldTree.options()) {
+            if(Objects.equals(option.name(), DEFAULT_KEYWORD_OPTION)) {
+                attributeDefaultValue(fieldTree, option);
+            }
+        }
+    }
+
+    private void attributeDefaultValue(ProtobufOptionedTree<?> fieldTree, ProtobufOptionTree option) {
+        if(!(fieldTree instanceof ProtobufTypedFieldTree typedFieldTree)) {
+            throw new ProtobufTypeException("Default values are only supported by typed fields");
+        }
+
+        switch (typedFieldTree.type().orElseThrow(() -> new ProtobufInternalException("Typed field with no type"))) {
+            case ProtobufPrimitiveType primitiveType -> attributePrimitiveDefaultValue(option, primitiveType);
+            case ProtobufObjectType objectType
+                    when objectType.declaration().orElseThrow(() -> new ProtobufInternalException("Object type is not attributed")) instanceof ProtobufEnumTree enumTree
+                    -> attributeEnumDefaultValue(option, enumTree);
+            default -> throw new ProtobufSyntaxException("Default values are only supported for fields whose type is a primitive or an enum", tokenizer.lineno());
+        }
+    }
+
+    private void attributeEnumDefaultValue(ProtobufOptionTree lastOption, ProtobufEnumTree enumTree) {
+        var enumDefault = enumTree.statements()
+                .stream()
+                .map(ProtobufEnumConstantTree::name)
+                .flatMap(Optional::stream)
+                .filter(constantName -> Objects.equals(constantName, lastOption.value()))
+                .findFirst()
+                .orElseThrow(() -> new ProtobufTypeException("Invalid default value for type enum: " + lastOption.value()));
+        lastOption.setAttributedValue(enumDefault);
+    }
+
+    private void attributePrimitiveDefaultValue(ProtobufOptionTree option, ProtobufPrimitiveType primitiveType) {
+        switch (primitiveType.protobufType()) {
+            case FLOAT -> {
+                try {
+                    var value = Float.parseFloat(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type float");
+                }
+            }
+            case DOUBLE -> {
+                try {
+                    var value = Double.parseDouble(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type double");
+                }
+            }
+            case BOOL -> {
+                try {
+                    var value = Boolean.parseBoolean(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type double");
+                }
+            }
+            case STRING, BYTES -> parseStringLiteral(String.valueOf(option.value())).ifPresentOrElse(option::setAttributedValue, () -> {
+                throw new ProtobufTypeException("Invalid default value for type string");
+            });
+            case INT32, SINT32, FIXED32, SFIXED32 -> {
+                try {
+                    var value = Integer.parseInt(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type int");
+                }
+            }
+            case UINT32 -> {
+                try {
+                    var value = Integer.parseUnsignedInt(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type unsigned int");
+                }
+            }
+
+            case INT64, SINT64, FIXED64, SFIXED64 -> {
+                try {
+                    var value = Long.parseLong(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type long");
+                }
+            }
+            case UINT64 -> {
+                try {
+                    var value = Long.parseUnsignedLong(String.valueOf(option.value()));
+                    option.setAttributedValue(value);
+                }catch (NumberFormatException exception) {
+                    throw new ProtobufTypeException("Invalid default value for type unsigned long");
+                }
+            }
+        }
+    }
+
     private void handleToken(String token) {
         switch (token) {
             case OBJECT_END -> handleObjectEnd();
@@ -310,7 +419,7 @@ public final class ProtobufParser {
                 .orElseThrow();
         var lastOption = fieldTree.lastOption()
                 .orElseThrow();
-        ProtobufSyntaxException.check(lastOption.isAttributed(),
+        ProtobufSyntaxException.check(lastOption.hasValue(),
                 "Unexpected token", tokenizer.lineno());
         jumpOutInstruction();
     }
@@ -327,11 +436,9 @@ public final class ProtobufParser {
     private void handleTokenOnLastInstruction(String token) {
         var instructionsSize = instructions.size();
         switch (instructions.peekLast()) {
-            case UNKNOWN -> throw new ProtobufInternalException("Unexpected state");
-            case null -> handleInstruction(token);
-            case PACKAGE -> handlePackage(token);
-            case SYNTAX -> handleSyntaxState(token);
-            case OPTION -> handleOptionState(token);
+            case PACKAGE -> handleDocumentPackage(token);
+            case SYNTAX -> handleDocumentSyntax(token);
+            case OPTION -> handleDocumentOption(token);
             case MESSAGE, ENUM, ONE_OF -> handleInstructionWithBody(token);
             case RESERVED -> handleReserved(token);
             case EXTENSIONS -> handleExtensions(token);
@@ -340,6 +447,8 @@ public final class ProtobufParser {
             case MAP_TYPE -> handleMapType(token);
             case FIELD_OPTIONS -> handleFieldOption(token);
             case FIELD -> handleField(token);
+            case UNKNOWN -> throw new ProtobufInternalException("Unexpected state");
+            case null -> handleInstruction(token);
         }
 
         if(instructionsSize == instructions.size() && instructions.getLast().shouldMoveInstructionAutomatically()) {
@@ -396,9 +505,11 @@ public final class ProtobufParser {
                 "Illegal import statement", tokenizer.lineno());
         switch (nestedInstructions.peekLast()) {
             case BODY_OR_VALUE -> {
-                ProtobufSyntaxException.check(hasDuplicateImport(token),
+                var importValue = parseStringLiteral(token)
+                        .orElseThrow(() -> new ProtobufSyntaxException("Expected string literal as import value", tokenizer.lineno()));
+                ProtobufSyntaxException.check(hasDuplicateImport(importValue),
                         "Duplicate import statement", tokenizer.lineno());
-                var importStatement = new ProtobufImportTree(token);
+                var importStatement = new ProtobufImportTree(importValue);
                 document.addStatement(importStatement);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(isStatementEnd(token),
@@ -499,9 +610,18 @@ public final class ProtobufParser {
             throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
         }
 
+        var reserved = reservable.reserved()
+                .stream()
+                .filter(entry -> !entry.isAttributed())
+                .findFirst()
+                .orElse(null);
         if(isStatementEnd(token)) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() == NestedInstruction.NESTED_INSTRUCTION_OR_END && !reservable.reserved().isEmpty(),
                     "Unexpected token", tokenizer.lineno());
+            if(reserved != null) {
+                reserved.setAttributed(true);
+            }
+
             return;
         }
 
@@ -511,9 +631,7 @@ public final class ProtobufParser {
             return;
         }
 
-        var reserved = reservable.lastReserved().orElse(null);
-        var didDeclareRange = Objects.equals(token, RANGE_OPERATOR);
-        if(didDeclareRange) {
+        if(Objects.equals(token, RANGE_OPERATOR)) {
             if(!(reserved instanceof ReservedIndexes indexes)) {
                 throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
             }
@@ -549,6 +667,7 @@ public final class ProtobufParser {
                 ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedRange.setMax(index.get()),
                         "Duplicate reserved index", tokenizer.lineno());
+                reserved.setAttributed(true);
             }
             case null -> {
                 var literal = parseStringLiteral(token);
@@ -588,7 +707,11 @@ public final class ProtobufParser {
             return;
         }
 
-        var extensions = extensible.lastExtension().orElse(null);
+        var extensions = extensible.extensions()
+                .stream()
+                .filter(entry -> !entry.isAttributed())
+                .findFirst()
+                .orElse(null);
         var didDeclareRange = Objects.equals(token, RANGE_OPERATOR);
         if(didDeclareRange) {
             if(!(extensions instanceof ExtensionsIndexes indexes)) {
@@ -636,7 +759,7 @@ public final class ProtobufParser {
 
     private Optional<String> parseStringLiteral(String token) {
         return (token.startsWith(STRING_LITERAL) && token.endsWith(STRING_LITERAL)) || (token.startsWith(STRING_LITERAL_ALIAS_CHAR) && token.endsWith(STRING_LITERAL_ALIAS_CHAR))
-                ? Optional.of(token) : Optional.empty();
+                ? Optional.of(token.substring(1, token.length() - 1)) : Optional.empty();
     }
 
     private ProtobufIndexedBodyTree<?> checkFieldParent(String token, ProtobufFieldModifier modifier) {
@@ -831,7 +954,7 @@ public final class ProtobufParser {
         messageTree.addStatement(field);
     }
 
-    private void handleOptionState(String token) {
+    private void handleDocumentOption(String token) {
         switch (nestedInstructions.peekLast()) {
             case DECLARATION -> document.addOption(token);
             case INITIALIZER -> ProtobufSyntaxException.check(isAssignmentOperator(token),
@@ -840,7 +963,7 @@ public final class ProtobufParser {
                 var lastOption = document.lastOption();
                 ProtobufSyntaxException.check(lastOption.isPresent(),
                                 "Unexpected token", tokenizer.lineno());
-                lastOption.get().setValue(token);
+                lastOption.get().setRawValue(token);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(isStatementEnd(token),
                     "Unexpected token", tokenizer.lineno());
@@ -854,6 +977,8 @@ public final class ProtobufParser {
                 var fieldTree = (ProtobufFieldTree) objects.getLast()
                         .lastStatement()
                         .orElseThrow();
+                ProtobufSyntaxException.check(!Objects.equals(token, DEFAULT_KEYWORD_OPTION) || document.version().orElse(ProtobufVersion.defaultVersion()) == PROTOBUF_2,
+                        "Support for the default values was dropped in proto3", tokenizer.lineno());
                 fieldTree.addOption(token);
             }
             case INITIALIZER -> ProtobufSyntaxException.check(isAssignmentOperator(token), "Unexpected token", tokenizer.lineno());
@@ -863,7 +988,7 @@ public final class ProtobufParser {
                         .orElseThrow();
                 var lastOption = fieldTree.lastOption()
                         .orElseThrow();
-                lastOption.setValue(token);
+                lastOption.setRawValue(token);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(token.equals(LIST_SEPARATOR) || isStatementEnd(token),
                     "Unexpected token", tokenizer.lineno());
@@ -871,7 +996,7 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleSyntaxState(String token) {
+    private void handleDocumentSyntax(String token) {
         ProtobufSyntaxException.check(document.statements().isEmpty(),
                 "Unexpected token", tokenizer.lineno());
         switch (nestedInstructions.peekLast()) {
@@ -889,7 +1014,7 @@ public final class ProtobufParser {
         }
     }
 
-    private void handlePackage(String token) {
+    private void handleDocumentPackage(String token) {
         if (nestedInstructions.peekLast() != NestedInstruction.BODY_OR_VALUE) {
             ProtobufSyntaxException.check(isStatementEnd(token),
                     "Unexpected token", tokenizer.lineno());
@@ -916,7 +1041,8 @@ public final class ProtobufParser {
             }
 
             return switch (token) {
-                case StreamTokenizer.TT_WORD, STRING_LITERAL_DELIMITER -> tokenizer.sval;
+                case StreamTokenizer.TT_WORD -> tokenizer.sval;
+                case STRING_LITERAL_DELIMITER -> STRING_LITERAL + tokenizer.sval + STRING_LITERAL;
                 case StreamTokenizer.TT_NUMBER -> String.valueOf((int) tokenizer.nval);
                 default -> String.valueOf((char) token);
             };

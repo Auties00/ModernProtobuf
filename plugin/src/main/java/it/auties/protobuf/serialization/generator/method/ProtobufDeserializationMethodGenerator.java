@@ -69,14 +69,14 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         writer.println("        .findFirst();");
     }
 
-    private void createMessageDeserializer(ClassWriter.MethodWriter classWriter) {
+    private void createMessageDeserializer(ClassWriter.MethodWriter methodWriter) {
         // Check if the input is null
-        try(var ifWriter = classWriter.printIfStatement("input == null")) {
+        try(var ifWriter = methodWriter.printIfStatement("input == null")) {
             ifWriter.printReturn("null");
         }
 
         // Initialize a ProtobufInputStream from the input
-        classWriter.printVariableDeclaration(DEFAULT_STREAM_NAME, "new ProtobufInputStream(input)");
+        methodWriter.printVariableDeclaration(DEFAULT_STREAM_NAME, "new ProtobufInputStream(input)");
 
         // Declare all variables
         // [<implementationType> var<index> = <defaultValue>, ...]
@@ -86,12 +86,12 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
                 case ProtobufPropertyType.MapType mapType -> mapType.descriptorElementType();
                 case ProtobufPropertyType.NormalType normalType -> normalType.implementationType();
             };
-            classWriter.printVariableDeclaration(type.toString(), property.name(), property.type().defaultValue());
+            methodWriter.printVariableDeclaration(type.toString(), property.name(), property.type().defaultValue());
         }
 
         // Write deserializer implementation
         var argumentsList = new ArrayList<String>();
-        try(var whileWriter = classWriter.printWhileStatement(DEFAULT_STREAM_NAME + ".readTag()")) {
+        try(var whileWriter = methodWriter.printWhileStatement(DEFAULT_STREAM_NAME + ".readTag()")) {
             try(var switchWriter = whileWriter.printSwitchStatement(DEFAULT_STREAM_NAME + ".index()")) {
                 for(var property : message.properties()) {
                     switch (property.type()) {
@@ -109,13 +109,13 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         message.properties()
                 .stream()
                 .filter(ProtobufPropertyElement::required)
-                .forEach(entry -> checkRequiredProperty(classWriter, entry));
+                .forEach(entry -> checkRequiredProperty(methodWriter, entry));
 
         // Return statement
         if(message.deserializer().isPresent()) {
-            classWriter.printReturn("%s.%s(%s)".formatted(message.element().getQualifiedName(), message.deserializer().get().getSimpleName(), String.join(", ", argumentsList)));
+            methodWriter.printReturn("%s.%s(%s)".formatted(message.element().getQualifiedName(), message.deserializer().get().getSimpleName(), String.join(", ", argumentsList)));
         }else {
-            classWriter.printReturn("new %s(%s)".formatted(message.element().getQualifiedName(), String.join(", ", argumentsList)));
+            methodWriter.printReturn("new %s(%s)".formatted(message.element().getQualifiedName(), String.join(", ", argumentsList)));
         }
     }
 

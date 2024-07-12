@@ -19,6 +19,12 @@ public sealed abstract class ProtobufNestedTree implements ProtobufTree permits 
     public abstract boolean isAttributed();
 
     String toLeveledString(String input) {
-        return "    ".repeat(nestedLevel == 0 ? 0 : nestedLevel - 1) + input;
+        return toLeveledString(input, 0);
     }
+
+    String toLeveledString(String input, int offset) {
+        var level = nestedLevel + offset;
+        return "    ".repeat(level == 0 ? 0 : level - 1) + input;
+    }
+
 }

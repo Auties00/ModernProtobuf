@@ -2,6 +2,7 @@ package it.auties.protobuf.serialization.support;
 
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.ConditionalStatementWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.ForEachWriter;
+import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.ForWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
 
 import java.io.PrintWriter;
@@ -36,6 +37,10 @@ public abstract class JavaWriter extends PrintWriter {
         println();
     }
 
+    public void printComment(String content) {
+        println("// " + content);
+    }
+
     public static final class CompilationUnit extends JavaWriter {
         public CompilationUnit(Writer out) {
             super(out);
@@ -48,7 +53,6 @@ public abstract class JavaWriter extends PrintWriter {
 
         public void printImportDeclaration(String importName) {
             printf("import %s;%n", importName);
-            printSeparator();
         }
 
         public ClassWriter printClassDeclaration(String className) {
@@ -91,6 +95,11 @@ public abstract class JavaWriter extends PrintWriter {
 
         public void printReturn(String value) {
             printf("return %s;%n", value);
+        }
+
+        public ForWriter printForStatement(String initializer, String condition, String body) {
+            printf("for (%s; %s; %s) { %n", initializer, condition, body);
+            return new ForWriter(this);
         }
 
         public ForEachWriter printForEachStatement(String localVariableName, String accessorCall) {
@@ -168,6 +177,13 @@ public abstract class JavaWriter extends PrintWriter {
 
         public static class ForEachWriter extends BodyWriter implements AutoCloseable {
             public ForEachWriter(JavaWriter out) {
+                super(out);
+                this.level = out.level + 1;
+            }
+        }
+
+        public static class ForWriter extends BodyWriter implements AutoCloseable {
+            public ForWriter(JavaWriter out) {
                 super(out);
                 this.level = out.level + 1;
             }

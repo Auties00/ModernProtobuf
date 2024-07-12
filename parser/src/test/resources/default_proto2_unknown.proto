@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+message Message {
+  optional Enum field2 = 2 [default = FOURTH];
+}
+
+enum Enum {
+  FIRST = 0;
+  SECOND = 1;
+  THIRD = 2;
+}

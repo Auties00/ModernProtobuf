@@ -4,7 +4,8 @@ import java.util.Objects;
 
 public final class ProtobufOptionTree extends ProtobufNestedTree {
     private final String name;
-    private String value;
+    private Object value;
+    private boolean attributed;
 
     public ProtobufOptionTree(String name) {
         this.name = name;
@@ -12,6 +13,10 @@ public final class ProtobufOptionTree extends ProtobufNestedTree {
 
     @Override
     public boolean isAttributed() {
+        return attributed;
+    }
+
+    public boolean hasValue() {
         return value != null;
     }
 
@@ -19,12 +24,19 @@ public final class ProtobufOptionTree extends ProtobufNestedTree {
         return name;
     }
 
-    public String value() {
+    public Object value() {
         return value;
     }
 
-    public ProtobufOptionTree setValue(String value) {
+    public ProtobufOptionTree setRawValue(Object value) {
         this.value = value;
+        this.attributed = false;
+        return this;
+    }
+
+    public ProtobufOptionTree setAttributedValue(Object value) {
+        this.value = value;
+        this.attributed = true;
         return this;
     }
 
@@ -44,7 +56,7 @@ public final class ProtobufOptionTree extends ProtobufNestedTree {
     public String toString() {
         var leading = parent instanceof ProtobufDocument ? "option " : "";
         var name = Objects.requireNonNullElse(this.name, "[missing]");
-        var value = Objects.requireNonNullElse(this.value, "[missing]");
+        var value = this.value instanceof String ? "\"%s\"".formatted(this.value) : Objects.requireNonNullElse(this.value, "[missing]");
         var trailing = parent instanceof ProtobufDocument ? ";" : "";
         return "%s%s = %s%s".formatted(leading, name, value, trailing);
     }

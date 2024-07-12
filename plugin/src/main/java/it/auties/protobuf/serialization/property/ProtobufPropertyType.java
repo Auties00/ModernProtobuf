@@ -171,7 +171,7 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public boolean isPrimitive() {
-            return implementationType.getKind().isPrimitive();
+            return descriptorElementType.getKind().isPrimitive();
         }
 
         @Override
@@ -212,8 +212,8 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public boolean isPrimitive() {
-            return value.isPrimitive();
-        }
+            return false;
+    }
 
         @Override
         public List<ProtobufConverterElement> converters() {

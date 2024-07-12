@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
 
-public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChildTree> {
+public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChildTree> implements ProtobufOptionedTree {
     private final Path location;
     private final LinkedHashMap<String, ProtobufOptionTree> options;
     private ProtobufOptionTree lastOption;
@@ -25,10 +25,12 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
         return Optional.ofNullable(location);
     }
 
+    @Override
     public Collection<ProtobufOptionTree> options() {
         return Collections.unmodifiableCollection(options.values());
     }
 
+    @Override
     public ProtobufDocument addOption(String value) {
         var option = new ProtobufOptionTree(value);
         option.setParent(this);
@@ -240,6 +242,7 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
         return statements().stream().allMatch(ProtobufDocumentChildTree::isAttributed);
     }
 
+    @Override
     public Optional<ProtobufOptionTree> lastOption() {
         return Optional.ofNullable(lastOption);
     }

@@ -1,4 +1,4 @@
-package it.auties.proto.benchmark;
+package it.auties.proto.benchmark.model;
 
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;

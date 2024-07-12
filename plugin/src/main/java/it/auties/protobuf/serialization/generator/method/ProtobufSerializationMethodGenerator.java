@@ -1,7 +1,6 @@
 package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
@@ -9,10 +8,13 @@ import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
-import javax.lang.model.element.*;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerator {
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";
@@ -45,7 +47,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
 
     private void createMessageSerializer(ClassWriter.MethodWriter writer) {
         createRequiredPropertiesNullCheck(writer);
-        writer.printVariableDeclaration(DEFAULT_OUTPUT_STREAM_NAME, "new ProtobufOutputStream()");
+        writer.printVariableDeclaration(DEFAULT_OUTPUT_STREAM_NAME, "new ProtobufOutputStream(%s(%s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, DEFAULT_PARAMETER_NAME));
         for(var property : message.properties()) {
             switch (property.type()) {
                 case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer(writer, property, collectionType);
@@ -106,11 +108,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     }
 
     private String getAccessorCall(ProtobufPropertyElement property) {
-        return switch (property.accessor()) {
-            case ExecutableElement executableElement -> "%s.%s()".formatted(DEFAULT_PARAMETER_NAME, executableElement.getSimpleName());
-            case VariableElement variableElement -> "%s.%s".formatted(DEFAULT_PARAMETER_NAME, variableElement.getSimpleName());
-            default -> throw new IllegalStateException("Unexpected value: " + property.accessor());
-        };
+        return getAccessorCall(DEFAULT_PARAMETER_NAME, property);
     }
 
     private void writeRepeatedPropertySerializer(ClassWriter.MethodWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
@@ -129,7 +127,10 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
             var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
             var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
             try(var forWriter = ifWriter.printForEachStatement(localVariableName, accessorCall + ".entrySet()")) {
-                forWriter.printVariableDeclaration(localStreamName, "new ProtobufOutputStream()");
+                var mapSizeFieldName = localVariableName + "Size";
+                forWriter.printVariableDeclaration(mapSizeFieldName, "0");
+                // TODO: Implement size calculation for embedded map
+                forWriter.printVariableDeclaration(localStreamName, "new ProtobufOutputStream(%s)".formatted(mapSizeFieldName));
                 writeSerializer(forWriter, 1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
                 writeSerializer(forWriter, 2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
                 forWriter.println("%s.writeBytes(%s, %s.toByteArray());".formatted(DEFAULT_OUTPUT_STREAM_NAME, property.index(), localStreamName));
@@ -137,9 +138,9 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         }
     }
 
-    private void writeSerializer(BodyWriter writer, int index, String name, String caller, ProtobufPropertyType type, String streamName) {
+    private void writeSerializer(BodyWriter writer, int index, String name, String value, ProtobufPropertyType type, String streamName) {
         var writeMethod = getSerializerStreamMethods(type);
-        var result = getVariables(name, caller, type);
+        var result = getVariables(name, value, type);
         if(!result.hasConverter()) {
             var toWrite = result.variables().getFirst().value();
             var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecFromObject(type.implementationType()), toWrite);
@@ -174,53 +175,6 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
             nestedWriter.close();
         }
     }
-
-    private ProtobufPropertyVariables getVariables(String name, String caller, ProtobufPropertyType type) {
-        var serializers = type.serializers();
-        var variable = new ProtobufPropertyVariable(type.implementationType(), name, caller, type.isPrimitive());
-        if (serializers.isEmpty()) {
-            return new ProtobufPropertyVariables(false, List.of(variable));
-        }
-
-        var results = new ArrayList<ProtobufPropertyVariable>();
-        results.add(variable);
-        for (var index = 0; index < serializers.size(); index++) {
-            var serializerElement = serializers.get(index);
-            var lastInitializer = index == 0 ? name : name + (index - 1);
-            var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer);
-            var currentVariable = new ProtobufPropertyVariable(
-                    serializerElement.returnType(),
-                    name + index, convertedInitializer,
-                    serializerElement.returnType().getKind().isPrimitive()
-            );
-            results.add(currentVariable);
-        }
-
-        return new ProtobufPropertyVariables(true, results);
-    }
-
-    private record ProtobufPropertyVariables(boolean hasConverter, List<ProtobufPropertyVariable> variables) {
-
-    }
-
-    private record ProtobufPropertyVariable(TypeMirror type, String name, String value, boolean primitive) {
-
-    }
-
-    private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer) {
-        if (serializerElement.delegate().getKind() == ElementKind.CONSTRUCTOR) {
-            var converterWrapperClass = (TypeElement) serializerElement.delegate().getEnclosingElement();
-            return "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), lastInitializer);
-        }
-
-        if (serializerElement.delegate().getModifiers().contains(Modifier.STATIC)) {
-            var converterWrapperClass = (TypeElement) serializerElement.delegate().getEnclosingElement();
-            return "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.delegate().getSimpleName(), lastInitializer);
-        }
-
-        return "%s.%s()".formatted(lastInitializer, serializerElement.delegate().getSimpleName());
-    }
-
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private Method getSerializerStreamMethods(ProtobufPropertyType type) {

@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+message Message {
+  optional bytes field = 1 [default = "abcdef"];
+}
+
+enum Enum {
+  FIRST = 0;
+  SECOND = 1;
+  THIRD = 2;
+}

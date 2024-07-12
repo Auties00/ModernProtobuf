@@ -30,29 +30,39 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.graalvm.buildtools</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-                <version>0.9.27</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                        <configuration>
-                            <buildArgs>
-                                <arg>-march=native</arg>
-                            </buildArgs>
-                            <verbose>true</verbose>
-                            <mainClass>it.auties.protobuf.schema.ProtobufApplication</mainClass>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.9.27</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <configuration>
+                                    <buildArgs>
+                                        <arg>-march=native</arg>
+                                    </buildArgs>
+                                    <verbose>true</verbose>
+                                    <mainClass>it.auties.protobuf.schema.ProtobufApplication</mainClass>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <repositories>
         <repository>
