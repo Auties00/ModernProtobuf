@@ -3565,7 +3565,73 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
     }
    }
    ```
- 
+
+5.  `@ProtobufUnknownFields`
+
+    Let's say your client can receive a protobuf message defined by a schema like this:
+    ```protobuf
+    message Features {
+       optional bool firstTestFeature = 1;
+       optional bool secondTestFeature = 2;
+    }
+    ```
+    The associated ModernProtobuf schema could be defined as follows:
+    ```java
+    @ProtobufMessage
+    record Features(
+        @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
+        bool firstTestFeature,
+        @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
+        bool secondTestFeature
+    ) {}
+    ```
+    Considering that your client might not be up-to date, you want to log fields from the incoming message that your client doesn't support.
+    This can be achieved by using the `@ProtobufUnknownFields` annotation:
+    ```java
+    @ProtobufMessage
+    record Features(
+        @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
+        bool firstTestFeature,
+        @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
+        bool secondTestFeature,
+        @ProtobufUnknownFields
+        Map<Integer, Object> unknownFeatures
+    ) {}
+    ```
+    The field `unknownFeatures` is a Map where the key-value pair represent respectively the index and the value of the unknown field.
+    If you wanted, you could also use an object that isn't a map, here is an example:
+    ```java
+    @ProtobufMessage
+    record Features(
+        @ProtobufProperty(index = 1, type = ProtobufType.BOOL)
+        bool firstTestFeature,
+        @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
+        bool secondTestFeature,
+        @ProtobufUnknownFields
+        UnknownFeatures unknownFeatures
+    ) {}
+    
+    class UnknownFeatures {
+       public final Set<Integer> unknownFeatures;
+       UnknownFeatures() {
+         this.unknownFeatures = new HashSet<>();
+       } 
+    
+       @ProtobufUnknownFields.Setter
+       public void addFeature(int index, Object value) {
+          if(value instanceof Boolean flag && flag) {
+             unknownFeatures.add(index);
+          }
+       }
+    
+       public boolean hasFeature(int index) {
+          return unknownFeatures.contains(index);
+       }
+    }
+    ```
+    As you can see, by using `@ProtobufUnknownFields.Setter` you can make any object work as an unknown fields wrapper.
+    `@ProtobufUnknownFields` also supports mixins if you need them.
+
 ##### Mixins
 
 Annotations work very well if you can modify the source class, but what if you wanted to use a type that is part of the Standard Java Library or an external library,
