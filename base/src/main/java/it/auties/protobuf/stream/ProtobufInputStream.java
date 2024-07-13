@@ -366,6 +366,16 @@ public class ProtobufInputStream {
         return size == 0 ? new byte[0] : this.readBytes(size);
     }
 
+    public Object readUnknown() {
+        return switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> readInt64();
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> readFixed32();
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> readFixed64();
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readBytes();
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
+        };
+    }
+
     public void skipBytes() {
         if(isAtEnd()) {
             return;

@@ -14,6 +14,7 @@ public class ProtobufObjectElement {
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
     private final ExecutableElement deserializer;
+    private ProtobufUnknownFieldsElement unknownFieldsElement;
 
     public ProtobufObjectElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement deserializer) {
         this.typeElement = typeElement;
@@ -84,5 +85,13 @@ public class ProtobufObjectElement {
 
     public Optional<ExecutableElement> deserializer() {
         return Optional.ofNullable(deserializer);
+    }
+
+    public Optional<ProtobufUnknownFieldsElement> unknownFieldsElement() {
+        return Optional.ofNullable(unknownFieldsElement);
+    }
+
+    public void setUnknownFieldsElement(ProtobufUnknownFieldsElement unknownFieldsElement) {
+        this.unknownFieldsElement = unknownFieldsElement;
     }
 }

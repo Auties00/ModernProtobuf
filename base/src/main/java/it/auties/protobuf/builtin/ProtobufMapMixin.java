@@ -1,6 +1,7 @@
 package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
+import it.auties.protobuf.annotation.ProtobufUnknownFields;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,5 +33,10 @@ public class ProtobufMapMixin {
     @ProtobufDefaultValue
     public static <K, V> SortedMap<K, V> newSortedMap() {
         return new TreeMap<>();
+    }
+
+    @ProtobufUnknownFields.Setter
+    public static void addUnknownField(Map<Integer, Object> map, Integer name, Object value) {
+        map.put(name, value);
     }
 }

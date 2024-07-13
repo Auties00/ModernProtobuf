@@ -10,6 +10,7 @@ import it.auties.protobuf.serialization.generator.clazz.ProtobufBuilderVisitor;
 import it.auties.protobuf.serialization.generator.clazz.ProtobufSpecVisitor;
 import it.auties.protobuf.serialization.object.ProtobufEnumMetadata;
 import it.auties.protobuf.serialization.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.object.ProtobufUnknownFieldsElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.Converters;
 import it.auties.protobuf.serialization.support.Messages;
@@ -99,10 +100,17 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         preliminaryChecks.checkEnclosing(
                 roundEnv,
                 ProtobufDefaultValue.class,
-                "Illegal enclosing class: a method or enum constant annotated with @ProtobufDefaultValue should be enclosed by a class annotated with @ProtobufMessage, @ProtobufEnum or @ProtobufMixin",
+                "Illegal enclosing class: a method or enum constant annotated with @ProtobufDefaultValue should be enclosed by a class/record annotated with @ProtobufMessage, @ProtobufEnum or @ProtobufMixin",
                 ProtobufMessage.class,
                 ProtobufEnum.class,
                 ProtobufMixin.class
+        );
+
+        preliminaryChecks.checkEnclosing(
+                roundEnv,
+                ProtobufUnknownFields.class,
+                "Illegal enclosing class: a method or field annotated with @ProtobufUnknownFields should be enclosed by a class/record annotated with @ProtobufMessage",
+                ProtobufMessage.class
         );
 
         var serializers = roundEnv.getElementsAnnotatedWith(ProtobufSerializer.class);
@@ -171,14 +179,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var builderDelegate = getMessageDeserializer(message);
         var messageElement = new ProtobufObjectElement(message, null, builderDelegate.orElse(null));
         processMessage(messageElement, messageElement.element());
+        if (!hasPropertiesConstructor(messageElement)) {
+            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.element());
+            return Optional.empty();
+        }
+
         if(messageElement.properties().isEmpty()) {
             messages.printWarning("No properties found", message);
             return Optional.of(messageElement);
-        }
-
-        if (!hasPropertiesConstructor(messageElement)) {
-            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, as parameters", message);
-            return Optional.empty();
         }
 
         return Optional.of(messageElement);
@@ -201,8 +209,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .ifPresent(superClass -> processMessage(messageElement, superClass));
         for (var entry : typeElement.getEnclosedElements()) {
             switch (entry) {
-                case VariableElement variableElement -> processProperty(messageElement, variableElement);
-                case ExecutableElement executableElement -> processMethod(messageElement, executableElement);
+                case VariableElement variableElement -> handleField(messageElement, variableElement);
+                case ExecutableElement executableElement -> handleMethod(messageElement, executableElement);
                 case null, default -> {}
             }
         }
@@ -221,7 +229,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.ofNullable(superClassElement);
     }
 
-    private void processMethod(ProtobufObjectElement messageElement, ExecutableElement executableElement) {
+    private void handleMethod(ProtobufObjectElement messageElement, ExecutableElement executableElement) {
         var builder = executableElement.getAnnotation(ProtobufBuilder.class);
         if(builder != null) {
             messageElement.addBuilder(builder.className(), executableElement.getParameters(), executableElement);
@@ -236,7 +244,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .map(entry -> (ExecutableElement) entry)
                 .filter(entry -> entry.getKind() == ElementKind.CONSTRUCTOR)
                 .anyMatch(constructor -> {
-                    var constructorParameters = constructor.getParameters();
+                    var constructorParameters = parseMessageConstructorParameters(message, constructor);
                     if(message.properties().size() != constructorParameters.size()) {
                         return false;
                     }
@@ -251,22 +259,154 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                         }
                     }
 
-                    return true;
+                    return message.unknownFieldsElement()
+                            .map(unknownFieldsElement -> types.isSubType(constructor.getParameters().getLast().asType(), unknownFieldsElement.type()))
+                            .orElse(true);
                 });
     }
 
-    private void processProperty(ProtobufObjectElement messageElement, VariableElement variableElement) {
+    private List<? extends VariableElement> parseMessageConstructorParameters(ProtobufObjectElement message, ExecutableElement constructor) {
+        var constructorParameters = constructor.getParameters();
+        if (message.unknownFieldsElement().isEmpty()) {
+            return constructorParameters;
+        }
+
+        if(constructorParameters.isEmpty()) {
+            return constructorParameters;
+        }
+
+        return constructorParameters.subList(0, constructorParameters.size() - 1);
+    }
+
+    private void handleField(ProtobufObjectElement messageElement, VariableElement variableElement) {
         var propertyAnnotation = variableElement.getAnnotation(ProtobufProperty.class);
-        if(propertyAnnotation == null) {
+        if(propertyAnnotation != null) {
+            processMessageProperty(messageElement, variableElement, propertyAnnotation);
             return;
         }
 
+        var unknownFieldsAnnotation = variableElement.getAnnotation(ProtobufUnknownFields.class);
+        if(unknownFieldsAnnotation == null) {
+            return;
+        }
+
+        var unknownFields = processUnknownFieldsField(variableElement, unknownFieldsAnnotation);
+        if(unknownFields.isEmpty()) {
+            return;
+        }
+
+        messageElement.setUnknownFieldsElement(unknownFields.get());
+    }
+
+    private Optional<ProtobufUnknownFieldsElement> processUnknownFieldsField(VariableElement variableElement, ProtobufUnknownFields unknownFieldsAnnotation) {
+        var unknownFieldsType = variableElement.asType();
+        if(!(unknownFieldsType instanceof DeclaredType unknownFieldsDeclaredType)) {
+            messages.printError("Type error: variables annotated with @ProtobufUnknownFields must have an object type", variableElement);
+            return Optional.empty();
+        }
+
+        var mixins = getMixins(unknownFieldsAnnotation);
+        var setter = findUnknownFieldsSetterInType(unknownFieldsDeclaredType);
+        if(setter != null) {
+            return checkUnknownFieldsSetter(variableElement, setter, false)
+                    .map(setterElement -> createUnknownFieldsElement(variableElement, unknownFieldsDeclaredType, setterElement, unknownFieldsType, mixins));
+        }
+
+        var setterFromMixin = findUnknownFieldsSetterInMixins(variableElement, unknownFieldsType, mixins);
+        if(setterFromMixin == null) {
+            messages.printError("Type error: cannot find a @ProtobufUnknownFields.Setter for the provided type", variableElement);
+            return Optional.empty();
+        }
+
+        return checkUnknownFieldsSetter(variableElement, setterFromMixin, true)
+                .map(setterElement -> createUnknownFieldsElement(variableElement, unknownFieldsDeclaredType, setterElement, unknownFieldsType, mixins));
+    }
+
+    private ProtobufUnknownFieldsElement createUnknownFieldsElement(VariableElement variableElement, DeclaredType variableType, ExecutableElement setterElement, TypeMirror unknownFieldsType, List<TypeElement> mixins) {
+        var defaultValue = getDefaultValue(variableElement, unknownFieldsType, mixins)
+                .orElse("new %s()".formatted(variableType)); // For now, could be improved to check if the constructor exists
+        return new ProtobufUnknownFieldsElement(variableType, defaultValue, setterElement);
+    }
+
+    private ExecutableElement findUnknownFieldsSetterInType(DeclaredType unknownFieldsDeclaredType) {
+        return (ExecutableElement) unknownFieldsDeclaredType.asElement()
+                .getEnclosedElements()
+                .stream()
+                .filter(enclosedElement -> enclosedElement.getKind() == ElementKind.METHOD && enclosedElement.getAnnotation(ProtobufUnknownFields.Setter.class) != null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ExecutableElement findUnknownFieldsSetterInMixins(VariableElement element, TypeMirror unknownFieldsType, List<TypeElement> mixins) {
+        return mixins.stream()
+                .map(TypeElement::getEnclosedElements)
+                .flatMap(Collection::stream)
+                 .filter(enclosedElement -> enclosedElement.getKind() == ElementKind.METHOD && enclosedElement.getAnnotation(ProtobufUnknownFields.Setter.class) != null)
+                .map(enclosedElement -> (ExecutableElement) enclosedElement)
+                .filter(enclosedMethod -> !enclosedMethod.getParameters().isEmpty() && types.isSubType(enclosedMethod.getParameters().getFirst().asType(), unknownFieldsType))
+                .reduce((first, second) -> {
+                    messages.printError("Duplicated protobuf unknown fields setter: only one setter for %s is allowed in the mixins".formatted(unknownFieldsType), element);
+                    return first;
+                })
+                .orElse(null);
+    }
+
+    private Optional<ExecutableElement> checkUnknownFieldsSetter(VariableElement variableElement, ExecutableElement setter, boolean fromMixin) {
+        if(!setter.getModifiers().contains(Modifier.PUBLIC)) {
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter must have public visibility", variableElement);
+            return Optional.empty();
+        }
+
+        if(fromMixin != setter.getModifiers().contains(Modifier.STATIC)) {
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %s".formatted(fromMixin ? "in a mixin must be static" : "must not be static"), variableElement);
+            return Optional.empty();
+        }
+
+        if(setter.getParameters().size() != (fromMixin ? 3 : 2)) {
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %smust take only %s parameters".formatted(fromMixin ? "in a mixin" : "", fromMixin ? "three" : "two"), variableElement);
+            return Optional.empty();
+        }
+
+        var firstParameter = setter.getParameters().get(fromMixin ? 1 : 0);
+        var keyType = firstParameter.asType();
+        if(!types.isSubType(keyType, Integer.class) && !types.isSameType(keyType, int.class)) {
+            messages.printError("Type error: expected int type", setter);
+            return Optional.empty();
+        }
+
+        var secondParameter = setter.getParameters().get(fromMixin ? 2 : 1);
+        var valueType = secondParameter.asType();
+        if(!types.isSameType(valueType, Object.class)) {
+            messages.printError("Type error: expected Object type", setter);
+            return Optional.empty();
+        }
+
+        return Optional.of(setter);
+    }
+
+    private List<TypeElement> getMixins(ProtobufUnknownFields property) {
+        try {
+            return Arrays.stream(property.mixins())
+                    .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))
+                    .filter(entry -> entry instanceof DeclaredType)
+                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
+                    .toList();
+        }catch (MirroredTypesException exception) {
+            return exception.getTypeMirrors()
+                    .stream()
+                    .filter(entry -> entry instanceof DeclaredType)
+                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
+                    .toList();
+        }
+    }
+
+    private void processMessageProperty(ProtobufObjectElement messageElement, VariableElement variableElement, ProtobufProperty propertyAnnotation) {
         if(propertyAnnotation.required() && !isValidRequiredProperty(variableElement)) {
             return;
         }
 
         if(propertyAnnotation.packed() && !isValidPackedProperty(variableElement, propertyAnnotation)) {
-           return;
+            return;
         }
 
         var accessor = getAccessor(variableElement, propertyAnnotation)

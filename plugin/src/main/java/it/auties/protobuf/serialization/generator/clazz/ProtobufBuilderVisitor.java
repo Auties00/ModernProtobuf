@@ -112,11 +112,12 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 try(var buildMethodWriter = builderClassWriter.printMethodDeclaration(resultQualifiedName.toString(), "build")) {
                     var invocationArgsJoined = String.join(", ", invocationArgs);
                     var builderDelegate = messageElement.deserializer();
+                    var unknownFieldsValue = messageElement.unknownFieldsElement().isEmpty() ? "" : ", " + messageElement.unknownFieldsElement().get().defaultValue();
                     if (builderDelegate.isEmpty() && (builderElement == null || builderElement.delegate().getKind() == ElementKind.CONSTRUCTOR)) {
-                        buildMethodWriter.printReturn("new %s(%s)".formatted(resultQualifiedName, invocationArgsJoined));
+                        buildMethodWriter.printReturn("new %s(%s%s)".formatted(resultQualifiedName, invocationArgsJoined, unknownFieldsValue));
                     } else {
                         var methodName = builderElement != null ? builderElement.delegate().getSimpleName() : builderDelegate.get().getSimpleName();
-                        buildMethodWriter.printReturn("%s.%s(%s)".formatted(resultQualifiedName, methodName, invocationArgsJoined));
+                        buildMethodWriter.printReturn("%s.%s(%s%s)".formatted(resultQualifiedName, methodName, invocationArgsJoined, unknownFieldsValue));
                     }
                 }
             }

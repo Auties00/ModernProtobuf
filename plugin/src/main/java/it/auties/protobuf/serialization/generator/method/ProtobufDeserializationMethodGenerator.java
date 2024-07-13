@@ -7,13 +7,16 @@ import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
 
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenerator {
-    private static final String DEFAULT_STREAM_NAME = "inputStream";
+    private static final String DEFAULT_STREAM_NAME = "protoInputStream";
+    private static final String DEFAULT_UNKNOWN_FIELDS = "protoUnknownFields";
+    private static final String DEFAULT_INDEX_NAME = "protoFieldIndex";
 
     public ProtobufDeserializationMethodGenerator(ProtobufObjectElement element) {
         super(element);
@@ -89,10 +92,15 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             methodWriter.printVariableDeclaration(type.toString(), property.name(), property.type().defaultValue());
         }
 
+        // Declare the unknown fields value if needed
+        message.unknownFieldsElement()
+                .ifPresent(unknownFieldsElement -> methodWriter.printVariableDeclaration(unknownFieldsElement.type().toString(), DEFAULT_UNKNOWN_FIELDS, unknownFieldsElement.defaultValue()));
+
         // Write deserializer implementation
         var argumentsList = new ArrayList<String>();
         try(var whileWriter = methodWriter.printWhileStatement(DEFAULT_STREAM_NAME + ".readTag()")) {
-            try(var switchWriter = whileWriter.printSwitchStatement(DEFAULT_STREAM_NAME + ".index()")) {
+            whileWriter.printVariableDeclaration(DEFAULT_INDEX_NAME, DEFAULT_STREAM_NAME + ".index()");
+            try(var switchWriter = whileWriter.printSwitchStatement(DEFAULT_INDEX_NAME)) {
                 for(var property : message.properties()) {
                     switch (property.type()) {
                         case ProtobufPropertyType.MapType mapType -> writeMapSerializer(switchWriter, property, mapType);
@@ -101,7 +109,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
                     }
                     argumentsList.add(property.name());
                 }
-                switchWriter.printSwitchBranch("default", "inputStream.skipBytes()");
+                writeDefaultPropertyDeserializer(switchWriter);
             }
         }
 
@@ -112,10 +120,30 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
                 .forEach(entry -> checkRequiredProperty(methodWriter, entry));
 
         // Return statement
+        var unknownFieldsArg = message.unknownFieldsElement().isEmpty() ? "" : ", " + DEFAULT_UNKNOWN_FIELDS;
         if(message.deserializer().isPresent()) {
-            methodWriter.printReturn("%s.%s(%s)".formatted(message.element().getQualifiedName(), message.deserializer().get().getSimpleName(), String.join(", ", argumentsList)));
+            methodWriter.printReturn("%s.%s(%s%s)".formatted(message.element().getQualifiedName(), message.deserializer().get().getSimpleName(), String.join(", ", argumentsList), unknownFieldsArg));
         }else {
-            methodWriter.printReturn("new %s(%s)".formatted(message.element().getQualifiedName(), String.join(", ", argumentsList)));
+            methodWriter.printReturn("new %s(%s%s)".formatted(message.element().getQualifiedName(), String.join(", ", argumentsList), unknownFieldsArg));
+        }
+    }
+
+    private void writeDefaultPropertyDeserializer(SwitchStatementWriter switchWriter) {
+        var unknownFieldsElement = message.unknownFieldsElement()
+                .orElse(null);
+        if(unknownFieldsElement == null) {
+            switchWriter.printSwitchBranch("default", "%s.skipBytes()".formatted(DEFAULT_STREAM_NAME));
+            return;
+        }
+
+        // TODO: Pass correct value instead of "null"
+        var setter = unknownFieldsElement.setter();
+        var value = "%s.readUnknown()".formatted(DEFAULT_STREAM_NAME);
+        if(setter.getModifiers().contains(Modifier.STATIC)) {
+            var setterWrapperClass = (TypeElement) setter.getEnclosingElement();
+            switchWriter.printSwitchBranch("default", "%s.%s(%s, %s, %s)".formatted(setterWrapperClass.getQualifiedName(), setter.getSimpleName(), DEFAULT_UNKNOWN_FIELDS, DEFAULT_INDEX_NAME, value));
+        }else {
+            switchWriter.printSwitchBranch("default", "%s.%s(%s, %s)".formatted(DEFAULT_UNKNOWN_FIELDS, setter.getSimpleName(), DEFAULT_INDEX_NAME, value));
         }
     }
 
