@@ -23,7 +23,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
     }
 
     @Override
-    protected void doInstrumentation(ClassWriter.MethodWriter writer) {
+    protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
         if (message.isEnum()) {
             createEnumDeserializer(writer);
         }else {
@@ -136,7 +136,6 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             return;
         }
 
-        // TODO: Pass correct value instead of "null"
         var setter = unknownFieldsElement.setter();
         var value = "%s.readUnknown()".formatted(DEFAULT_STREAM_NAME);
         if(setter.getModifiers().contains(Modifier.STATIC)) {

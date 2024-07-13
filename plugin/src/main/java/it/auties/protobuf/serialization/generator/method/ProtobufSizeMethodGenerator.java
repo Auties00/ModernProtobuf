@@ -7,6 +7,7 @@ import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.property.ProtobufPropertyType.NormalType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
+import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
 import javax.lang.model.type.TypeMirror;
@@ -23,16 +24,20 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
         super(element);
     }
 
+    static String getMapPropertyMethodName(ProtobufPropertyElement property) {
+        return METHOD_NAME + property.name().substring(0, 1).toUpperCase() + property.name().substring(1);
+    }
+
     @Override
-    protected void doInstrumentation(MethodWriter writer) {
-        try(var ifWriter = writer.printIfStatement("%s == null".formatted(DEFAULT_PARAMETER_NAME))) {
+    protected void doInstrumentation(ClassWriter classWriter, MethodWriter methodWriter) {
+        try(var ifWriter = methodWriter.printIfStatement("%s == null".formatted(DEFAULT_PARAMETER_NAME))) {
             ifWriter.printReturn("0");
         }
 
         if(message.isEnum()) {
-            writeEnumCalculator(writer);
+            writeEnumCalculator(methodWriter);
         }else {
-            writeMessageCalculator(writer);
+            writeMessageCalculator(classWriter, methodWriter);
         }
     }
 
@@ -44,19 +49,19 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
         writer.printReturn("ProtobufOutputStream.getVarIntSize(%s.%s)".formatted(DEFAULT_PARAMETER_NAME, fieldName));
     }
 
-    private void writeMessageCalculator(MethodWriter writer) {
-        writer.printVariableDeclaration(DEFAULT_RESULT_NAME, "0");
+    private void writeMessageCalculator(ClassWriter classWriter, MethodWriter methodWriter) {
+        methodWriter.printVariableDeclaration(DEFAULT_RESULT_NAME, "0");
         for(var property : message.properties()) {
             switch (property.type()) {
-                case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySerializer1(writer, property, collectionType);
-                case ProtobufPropertyType.MapType mapType -> writeMapPropertySerializer(writer, property, mapType);
-                case NormalType normalType -> writeNormalPropertySize(writer, property, normalType);
+                case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedPropertySize(methodWriter, property, collectionType);
+                case ProtobufPropertyType.MapType mapType -> writeMapPropertySize(classWriter, methodWriter, property, mapType);
+                case NormalType normalType -> writeNormalPropertySize(methodWriter, property, normalType);
             }
         }
-        writer.printReturn(DEFAULT_RESULT_NAME);
+        methodWriter.printReturn(DEFAULT_RESULT_NAME);
     }
 
-    private void writeRepeatedPropertySerializer1(MethodWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
+    private void writeRepeatedPropertySize(MethodWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.CollectionType collectionType) {
         var repeatedFieldName = property.name() + "RepeatedField";
         writer.printVariableDeclaration(repeatedFieldName, getAccessorCall(property));
         try(var ifWriter = writer.printIfStatement(repeatedFieldName + " != null")) {
@@ -69,19 +74,34 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
         }
     }
 
-    private void writeMapPropertySerializer(MethodWriter writer, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
+    private void writeMapPropertySize(ClassWriter classWriter, MethodWriter methodWriter, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType) {
         var mapFieldName = property.name() + "MapField";
-        writer.printVariableDeclaration(mapFieldName, getAccessorCall(property));
-        try(var ifWriter = writer.printIfStatement(mapFieldName + " != null")) {
+        methodWriter.printVariableDeclaration(mapFieldName, getAccessorCall(property));
+        var methodName = getMapPropertyMethodName(property);
+        deferredOperations.add(() -> writeMapEntryPropertySizeMethod(classWriter, property, mapType, methodName));
+        try(var ifWriter = methodWriter.printIfStatement(mapFieldName + " != null")) {
             var mapEntryFieldName = property.name() + "MapEntry";
             try(var forEachWriter = ifWriter.printForEachStatement(mapEntryFieldName, mapFieldName + ".entrySet()")) {
-                writeAccessiblePropertySize(forEachWriter, property.index(), mapType.keyType(), mapEntryFieldName + ".getKey()");
-                var mapKeyValue = property.name() + "MapValue";
-                forEachWriter.printVariableDeclaration(mapKeyValue, mapEntryFieldName + ".getValue()");
-                try(var valueIfWriter = forEachWriter.printIfStatement("%s != null".formatted(mapKeyValue))) {
-                    writeAccessiblePropertySize(valueIfWriter, property.index(), mapType.valueType(), mapKeyValue);
-                }
+                writeFieldTagSize(forEachWriter, property.index(), ProtobufType.MAP);
+                var mapEntrySizeFieldName = mapEntryFieldName + "Size";
+                forEachWriter.printVariableDeclaration(mapEntrySizeFieldName, "%s(%s)".formatted(methodName, mapEntryFieldName));
+                forEachWriter.println("%s += ProtobufOutputStream.getVarIntSizeUnsigned(%s);".formatted(DEFAULT_RESULT_NAME, mapEntrySizeFieldName));
+                forEachWriter.println("%s += %s;".formatted(DEFAULT_RESULT_NAME, mapEntrySizeFieldName));
             }
+        }
+    }
+
+    private void writeMapEntryPropertySizeMethod(ClassWriter classWriter, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType, String methodName) {
+        var parameter = "java.util.Map.Entry<%s, %s> %s".formatted(mapType.keyType().implementationType(), mapType.valueType().implementationType(), DEFAULT_PARAMETER_NAME);
+        try (var methodWriter = classWriter.printMethodDeclaration(List.of("private", "static"), "int", methodName, parameter)) {
+            methodWriter.printVariableDeclaration(DEFAULT_RESULT_NAME, "0");
+            writeAccessiblePropertySize(methodWriter, 1, mapType.keyType(), DEFAULT_PARAMETER_NAME + ".getKey()");
+            var mapKeyValue = property.name() + "MapValue";
+            methodWriter.printVariableDeclaration(mapKeyValue, DEFAULT_PARAMETER_NAME + ".getValue()");
+            try(var valueIfWriter = methodWriter.printIfStatement("%s != null".formatted(mapKeyValue))) {
+                writeAccessiblePropertySize(valueIfWriter, 2, mapType.valueType(), mapKeyValue);
+            }
+            methodWriter.printReturn(DEFAULT_RESULT_NAME);
         }
     }
 
@@ -125,14 +145,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
     }
 
     private void writeAccessiblePropertySizeDirect(BodyWriter writer, int index, ProtobufType protobufType, TypeMirror javaType, String accessor) {
-        var wireType = switch (protobufType) {
-            case OBJECT, STRING, BYTES -> ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED;
-            case FLOAT, FIXED32, SFIXED32 -> ProtobufWireType.WIRE_TYPE_FIXED32;
-            case DOUBLE, SFIXED64, FIXED64 -> ProtobufWireType.WIRE_TYPE_FIXED64;
-            case BOOL, INT32, SINT32, UINT32, INT64, UINT64, SINT64 -> ProtobufWireType.WIRE_TYPE_VAR_INT;
-            default -> throw new IllegalStateException("Unexpected value: " + protobufType);
-        };
-        writer.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(DEFAULT_RESULT_NAME, index, wireType));
+        writeFieldTagSize(writer, index, protobufType);
         if(protobufType == ProtobufType.OBJECT) {
             var serializedObjectFieldName = accessor + "SerializedSize";
             writer.printVariableDeclaration(serializedObjectFieldName, "%s.%s(%s)".formatted(getSpecFromObject(javaType), name(), accessor));
@@ -151,6 +164,16 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
             default -> throw new IllegalStateException("Unexpected value: " + protobufType);
         };
         writer.println("%s += %s;".formatted(DEFAULT_RESULT_NAME, protobufSize));
+    }
+
+    private void writeFieldTagSize(BodyWriter writer, int index, ProtobufType protobufType) {
+        var wireType = switch (protobufType) {
+            case OBJECT, STRING, BYTES, MAP -> ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED;
+            case FLOAT, FIXED32, SFIXED32 -> ProtobufWireType.WIRE_TYPE_FIXED32;
+            case DOUBLE, SFIXED64, FIXED64 -> ProtobufWireType.WIRE_TYPE_FIXED64;
+            case BOOL, INT32, SINT32, UINT32, INT64, UINT64, SINT64 -> ProtobufWireType.WIRE_TYPE_VAR_INT;
+        };
+        writer.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(DEFAULT_RESULT_NAME, index, wireType));
     }
 
     @Override

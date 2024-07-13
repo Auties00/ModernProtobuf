@@ -18,8 +18,10 @@ import java.util.stream.IntStream;
 
 public abstract class ProtobufMethodGenerator {
     protected final ProtobufObjectElement message;
+    protected final List<Runnable> deferredOperations;
     protected ProtobufMethodGenerator(ProtobufObjectElement message) {
         this.message = message;
+        this.deferredOperations = new ArrayList<>();
     }
 
     public void generate(ClassWriter writer) {
@@ -37,13 +39,15 @@ public abstract class ProtobufMethodGenerator {
                 .mapToObj(index -> parametersTypes.get(index) + " " + parametersNames.get(index))
                 .toArray(String[]::new);
         try(var methodWriter = writer.printMethodDeclaration(modifiers(), returnType(), name(), parameters)) {
-            doInstrumentation(methodWriter);
+            doInstrumentation(writer, methodWriter);
         }
+
+        deferredOperations.forEach(Runnable::run);
     }
 
     public abstract boolean shouldInstrument();
 
-    protected abstract void doInstrumentation(MethodWriter writer);
+    protected abstract void doInstrumentation(ClassWriter classWriter, MethodWriter writer);
 
     protected abstract List<String> modifiers();
 

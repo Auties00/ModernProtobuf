@@ -25,7 +25,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
     }
 
     @Override
-    protected void doInstrumentation(ClassWriter.MethodWriter writer) {
+    protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
         try(var ifWriter = writer.printIfStatement("%s == null".formatted(DEFAULT_PARAMETER_NAME))) {
             ifWriter.printReturn("null");
         }
@@ -127,10 +127,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
             var localStreamName = "%sOutputStream".formatted(property.name()); // Prevent shadowing
             var localVariableName = "%sEntry".formatted(property.name()); // Prevent shadowing
             try(var forWriter = ifWriter.printForEachStatement(localVariableName, accessorCall + ".entrySet()")) {
-                var mapSizeFieldName = localVariableName + "Size";
-                forWriter.printVariableDeclaration(mapSizeFieldName, "0");
-                // TODO: Implement size calculation for embedded map
-                forWriter.printVariableDeclaration(localStreamName, "new ProtobufOutputStream(%s)".formatted(mapSizeFieldName));
+                forWriter.printVariableDeclaration(localStreamName, "new ProtobufOutputStream(%s(%s))".formatted(ProtobufSizeMethodGenerator.getMapPropertyMethodName(property), localVariableName));
                 writeSerializer(forWriter, 1, property.name(), "%s.getKey()".formatted(localVariableName), mapType.keyType(), localStreamName);
                 writeSerializer(forWriter, 2, property.name(), "%s.getValue()".formatted(localVariableName), mapType.valueType(), localStreamName);
                 forWriter.println("%s.writeBytes(%s, %s.toByteArray());".formatted(DEFAULT_OUTPUT_STREAM_NAME, property.index(), localStreamName));
