@@ -2,14 +2,16 @@ package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType.NormalType;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyType.NormalType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import java.util.LinkedList;
 import java.util.List;
@@ -151,7 +153,9 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
         if(protobufType == ProtobufType.OBJECT) {
             var serializedObjectFieldName = accessor + "SerializedSize";
             writer.printVariableDeclaration(serializedObjectFieldName, "%s.%s(%s)".formatted(getSpecFromObject(javaType), name(), accessor));
-            writer.println("%s += ProtobufOutputStream.getVarIntSize(%s);".formatted(DEFAULT_RESULT_NAME, serializedObjectFieldName));
+            if(!(javaType instanceof DeclaredType declaredType) || declaredType.asElement().getKind() != ElementKind.ENUM) {
+                writer.println("%s += ProtobufOutputStream.getVarIntSize(%s);".formatted(DEFAULT_RESULT_NAME, serializedObjectFieldName));
+            }
             writer.println("%s += %s;".formatted(DEFAULT_RESULT_NAME, serializedObjectFieldName));
             return;
         }

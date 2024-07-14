@@ -1,9 +1,9 @@
 package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.stream.ProtobufOutputStream;
@@ -13,7 +13,10 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.DeclaredType;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerator {
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";

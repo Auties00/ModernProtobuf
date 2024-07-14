@@ -1,10 +1,10 @@
 package it.auties.protobuf.serialization.generator.clazz;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
-import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
-import it.auties.protobuf.serialization.object.ProtobufBuilderElement;
-import it.auties.protobuf.serialization.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.model.object.ProtobufBuilderElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 

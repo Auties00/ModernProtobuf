@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.object;
+package it.auties.protobuf.serialization.model.object;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;

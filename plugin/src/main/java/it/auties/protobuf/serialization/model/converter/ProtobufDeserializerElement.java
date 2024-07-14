@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.converter;
+package it.auties.protobuf.serialization.model.converter;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour;
 

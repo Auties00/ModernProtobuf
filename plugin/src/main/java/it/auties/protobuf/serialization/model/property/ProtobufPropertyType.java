@@ -1,9 +1,9 @@
-package it.auties.protobuf.serialization.property;
+package it.auties.protobuf.serialization.model.property;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.converter.ProtobufConverterElement;
-import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
-import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufConverterElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.*;

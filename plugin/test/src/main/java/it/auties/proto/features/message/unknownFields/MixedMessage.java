@@ -3,7 +3,8 @@ package it.auties.proto.features.message.unknownFields;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufType;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @ProtobufMessage
 public record MixedMessage(

@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.property;
+package it.auties.protobuf.serialization.model.property;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.List;

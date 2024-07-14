@@ -1,6 +1,6 @@
 package it.auties.protobuf.annotation;
 
-import it.auties.protobuf.builtin.*;
+import it.auties.protobuf.builtin.ProtobufMapMixin;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

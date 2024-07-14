@@ -1,11 +1,11 @@
 package it.auties.protobuf.serialization.generator.method;
 
-import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
-import it.auties.protobuf.serialization.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.property.ProtobufPropertyVariables;
-import it.auties.protobuf.serialization.property.ProtobufPropertyVariables.ProtobufPropertyVariable;
+import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables.ProtobufPropertyVariable;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
