@@ -6,9 +6,7 @@ import it.auties.protobuf.serialization.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.converter.ProtobufSerializerElement;
 
 import javax.lang.model.type.TypeMirror;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 // A representation of a protobuf type
 public sealed interface ProtobufPropertyType {
@@ -23,108 +21,23 @@ public sealed interface ProtobufPropertyType {
     List<ProtobufConverterElement> converters();
 
     // The type of the Element that describes this property
-    // Hierarchy of importance for type inference:
-    // 1. Accessor/getter type
-    // 2. Field type
-    // !! Override type is ignored
-    // Here are a couple of examples:
-    // - Type described by a field
-    //    Here the abstract type is int
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32)
-    //         int message; // Public or package private field with no accessor/getter
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //    }
-    // -  Type described by a field with overrideType specified
-    //    Here the abstract type is int (not Integer)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32, overrideType = Integer.class)
-    //         int message; // Public or package private field with no accessor/getter
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //    }
-    // -  Type described by a getter/accessor
-    //    Here the abstract type is Integer (not int)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32)
-    //         private int message; // Type modifier is irrelevant, accessor/getter is considered more important
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
+    // This can be interpreted as the input type as this is used by the deserializer and builder
     //
-    //         public Integer message() { // Public or package private
-    //             return message;
-    //         }
-    //    }
-    // -  Type described by a getter/accessor with overrideType specified
-    //    Here the abstract type is Integer (not Long)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32, overrideType = Long.class)
-    //         private int message; // Type modifier is irrelevant, accessor/getter is considered more important
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
+    // This is also the parameter's type in the constructor of the enclosing ProtobufMessage
+    // This is guaranteed by the ProtobufJavacPlugin#hasPropertiesConstructor check
     //
-    //         public Integer message() { // Public or package private
-    //             return message;
-    //         }
-    //    }
+    // The associated descriptor can either be:
+    // 1. VariableElement(class field/record component)
+    // 2. ExecutableElement (@ProtobufGetter with no VariableElement associated by index)
     TypeMirror descriptorElementType();
 
-    // The actual implementation used for this property
-    // Hierarchy of importance for type inference:
-    // 1. Override type
-    // 2. Accessor/getter type
-    // 3. Field type
-    // Here are a couple of examples:
-    // -  Type described by a field
-    //    Here the implementation type is int
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32)
-    //         int message; // Public or package private field with no accessor/getter
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //    }
-    // -  Type described by a field with overrideType specified
-    //    Here the implementation type is Integer (not int)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32, overrideType = Integer.class)
-    //         int message; // Public or package private field with no accessor/getter
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //    }
-    // -  Type described by a getter/accessor
-    //    Here the implementation type is Integer (not int)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32)
-    //         private int message; // Type modifier is irrelevant, accessor/getter is considered more important
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //
-    //         public Integer message() { // Public or package private
-    //             return message;
-    //         }
-    //    }
-    // -  Type described by a getter/accessor with overrideType specified
-    //    Here the implementation type is Long (not Long)
-    //    class Message implements ProtobufMessage {
-    //         @ProtobufProperty(index = 1, type = UINT32, overrideType = Long.class)
-    //         private int message; // Type modifier is irrelevant, accessor/getter is considered more important
-    //         public Message(int message) {
-    //             this.message = message;
-    //         }
-    //
-    //         public Integer message() { // Public or package private
-    //             return message;
-    //         }
-    //    }
-    TypeMirror implementationType();
+    // The type returned by the accessor for the property
+    // This can be interpreted as the output type as this is used by the serializer
+    // Hierarchy for accessor resolution(from most important to least important):
+    // 1. @ProtobufGetter with the same index
+    // 2. Field (accessible if public, protected or package private)
+    // 3. Getter/Accessor method
+    TypeMirror accessorType();
 
     // The default value of the type
     // For a primitive type, the value is 0 (or false)
@@ -133,18 +46,6 @@ public sealed interface ProtobufPropertyType {
 
     // Adds a nullable converter to the type
     void addNullableConverter(ProtobufConverterElement element);
-
-    // Returns whether the type is a primitive
-    // The concreteType should be checked, not the descriptor type
-    boolean isPrimitive();
-
-    // Returns whether the type is a message
-    // The concreteType should be checked, not the descriptor type
-    boolean isMessage();
-
-    // Returns whether the type is an enum
-    // The concreteType should be checked, not the descriptor type
-    boolean isEnum();
 
     // Default implementation to get the serializers for the converters
     default List<ProtobufSerializerElement> serializers() {
@@ -164,14 +65,38 @@ public sealed interface ProtobufPropertyType {
                 .toList();
     }
 
-    record NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror implementationType, List<ProtobufConverterElement> converters, String defaultValue, boolean isMessage, boolean isEnum) implements ProtobufPropertyType {
-        public NormalType(ProtobufType protobufType, TypeMirror fieldType, TypeMirror implementationType, String defaultValue, boolean isMessage, boolean isEnum) {
-            this(protobufType, fieldType, implementationType, new ArrayList<>(), defaultValue, isMessage, isEnum);
+    default TypeMirror serializedType() {
+        var serializers = serializers();
+        if(serializers.isEmpty()) {
+            return descriptorElementType();
         }
 
-        @Override
-        public boolean isPrimitive() {
-            return descriptorElementType.getKind().isPrimitive();
+        return serializers.getLast().returnType();
+    }
+
+    default TypeMirror deserializedType() {
+        var deserializers = deserializers();
+        if(deserializers.isEmpty()) {
+            return descriptorElementType();
+        }
+
+        return deserializers.getLast().parameterType();
+    }
+
+    final class NormalType implements ProtobufPropertyType {
+        private final ProtobufType protobufType;
+        private final TypeMirror descriptorElementType;
+        private final TypeMirror accessorType;
+        private final List<ProtobufConverterElement> converters;
+        private final String defaultValue;
+        private String deserializedDefaultValue;
+
+        public NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror accessorType, String defaultValue) {
+            this.protobufType = protobufType;
+            this.descriptorElementType = descriptorElementType;
+            this.accessorType = accessorType;
+            this.converters = new ArrayList<>();
+            this.defaultValue = defaultValue;
         }
 
         @Override
@@ -181,17 +106,72 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public void addNullableConverter(ProtobufConverterElement element) {
-            if(element == null) {
+            if (element == null) {
                 return;
             }
 
             converters.add(element);
         }
+
+        @Override
+        public ProtobufType protobufType() {
+            return protobufType;
+        }
+
+        @Override
+        public TypeMirror descriptorElementType() {
+            return descriptorElementType;
+        }
+
+        @Override
+        public TypeMirror accessorType() {
+            return accessorType;
+        }
+
+        @Override
+        public String defaultValue() {
+            return Objects.requireNonNullElse(defaultValue, "The default value was not computed");
+        }
+
+        public Optional<String> deserializedDefaultValue() {
+            return Optional.ofNullable(deserializedDefaultValue);
+        }
+
+        public void setDeserializedDefaultValue(String deserializedDefaultValue) {
+            this.deserializedDefaultValue = deserializedDefaultValue;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) return true;
+            if (obj == null || obj.getClass() != this.getClass()) return false;
+            var that = (NormalType) obj;
+            return Objects.equals(this.protobufType, that.protobufType) &&
+                    Objects.equals(this.descriptorElementType, that.descriptorElementType) &&
+                    Objects.equals(this.accessorType, that.accessorType) &&
+                    Objects.equals(this.converters, that.converters) &&
+                    Objects.equals(this.defaultValue, that.defaultValue);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(protobufType, descriptorElementType, accessorType, converters, defaultValue);
+        }
+
+        @Override
+        public String toString() {
+            return "NormalType[" +
+                    "protobufType=" + protobufType + ", " +
+                    "descriptorElementType=" + descriptorElementType + ", " +
+                    "accessorType=" + accessorType + ", " +
+                    "converters=" + converters + ", " +
+                    "defaultValue=" + defaultValue + ']';
+        }
     }
 
     record CollectionType(TypeMirror descriptorElementType, NormalType value, String defaultValue) implements ProtobufPropertyType {
         @Override
-        public TypeMirror implementationType() {
+        public TypeMirror accessorType() {
             return descriptorElementType;
         }
 
@@ -199,21 +179,6 @@ public sealed interface ProtobufPropertyType {
         public ProtobufType protobufType() {
             return value.protobufType();
         }
-
-        @Override
-        public boolean isMessage() {
-            return value.isMessage();
-        }
-
-        @Override
-        public boolean isEnum() {
-            return value.isEnum();
-        }
-
-        @Override
-        public boolean isPrimitive() {
-            return false;
-    }
 
         @Override
         public List<ProtobufConverterElement> converters() {
@@ -231,31 +196,14 @@ public sealed interface ProtobufPropertyType {
     }
 
     record MapType(TypeMirror descriptorElementType, NormalType keyType, NormalType valueType, String defaultValue) implements ProtobufPropertyType {
-        public boolean isPrimitive() {
-           return false;
-        }
-
         @Override
-        public boolean isEnum() {
-            return false;
-        }
-
-        @Override
-        public boolean isMessage() {
-            return false;
-        }
-
-        @Override
-        public TypeMirror implementationType() {
+        public TypeMirror accessorType() {
             return descriptorElementType;
         }
 
         @Override
         public List<ProtobufConverterElement> converters() {
-            var results = new ArrayList<ProtobufConverterElement>();
-            results.addAll(keyType.converters());
-            results.addAll(valueType.converters());
-            return Collections.unmodifiableList(results);
+            return Collections.emptyList();
         }
 
         @Override

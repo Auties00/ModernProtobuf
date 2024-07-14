@@ -12,7 +12,7 @@ public class SchemaTest {
         var source = ClassLoader.getSystemClassLoader().getResource("whatsapp.proto");
         Objects.requireNonNull(source);
         var proto = Path.of(source.toURI()).toString();
-        var out = Path.of("src/test/java/").toAbsolutePath().toString();
+        var out = Path.of("/home/alessandro/CobaltStreamline/src/main/java/it/auties/whatsapp/model").toAbsolutePath().toString();
 
         Assertions.assertDoesNotThrow(() -> {
             new CommandLine(new BaseCommand()).execute("generate", proto, "--nullable", "--output", out);

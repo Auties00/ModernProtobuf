@@ -4,7 +4,6 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import java.net.URI;
-import java.util.UUID;
 
 import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.ADD;
 
@@ -16,7 +15,7 @@ public class ProtobufURIMixin {
     }
 
     @ProtobufSerializer
-    public static String toValue(UUID value) {
+    public static String toValue(URI value) {
         return value == null ? null : value.toString();
     }
 }

@@ -25,8 +25,8 @@ public class Converters {
 
         var result = entry.getModifiers().contains(Modifier.STATIC)
                 && entry.getParameters().size() == 1
-                && types.isSubType(from, entry.getParameters().getFirst().asType())
-                && types.isSubType(to, entry.getReturnType());
+                && types.isAssignable(from, entry.getParameters().getFirst().asType())
+                && types.isAssignable(to, entry.getReturnType());
         if(!result) {
             return Optional.empty();
         }
@@ -38,7 +38,7 @@ public class Converters {
         var isStatic = entry.getModifiers().contains(Modifier.STATIC);
         return entry.getAnnotation(ProtobufSerializer.class) != null
                 && entry.getParameters().size() == (isStatic ? 1 : 0)
-                && (!isStatic || types.isSubType(to, entry.getParameters().getFirst().asType()))
-                && types.isSubType(from, entry.getReturnType());
+                && (!isStatic || types.isAssignable(to, entry.getParameters().getFirst().asType()))
+                && types.isAssignable(from, entry.getReturnType());
     }
 }

@@ -46,7 +46,7 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                     }
                 }else {
                     for (var property : messageElement.properties()) {
-                        builderClassWriter.printFieldDeclaration(property.type().implementationType().toString(), property.name());
+                        builderClassWriter.printFieldDeclaration(property.type().descriptorElementType().toString(), property.name());
                         invocationArgs.add(property.name());
                     }
                 }
@@ -78,29 +78,31 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                     }
                 }else {
                     for(var property : messageElement.properties()) {
-                        var done = false;
+                        var hasOverride = false;
                         var overloads = getBuilderOverloads(property);
                         if(!overloads.isEmpty()) {
                             var fieldValue = property.name();
                             for(var override : overloads) {
                                 var enclosingElement = (TypeElement) override.delegate().getEnclosingElement();
                                 fieldValue = "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.delegate().getSimpleName(), fieldValue);
-                                done |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+                                hasOverride |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
                             }
 
-                            var builderInputParameter = "%s %s".formatted(overloads.getFirst().parameterType(), property.name());
-                            try(var setterWriter = builderClassWriter.printMethodDeclaration(simpleGeneratedClassName, property.name(), builderInputParameter)) {
-                                setterWriter.printFieldAssignment("this." + property.name(), fieldValue);
-                                setterWriter.printReturn("this");
-                            }
+                            writeBuilderSetter(
+                                    builderClassWriter,
+                                    property.name(),
+                                    fieldValue,
+                                    overloads.getLast().parameterType(),
+                                    simpleGeneratedClassName
+                            );
                         }
 
-                        if(!done) { // If there are no overrides, don't print the default setter
+                        if(!hasOverride) { // If there are no overrides, print the default setter
                             writeBuilderSetter(
                                     builderClassWriter,
                                     property.name(),
                                     property.name(),
-                                    property.type().implementationType(),
+                                    property.type().descriptorElementType(),
                                     simpleGeneratedClassName
                             );
                         }

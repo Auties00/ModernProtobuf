@@ -10,23 +10,15 @@ public final class ProtobufOutputStream {
         return getVarIntSizeUnsigned(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
-    public static int getVarIntSize(long value) {
+    public static int getVarIntSize(int value) {
         if(value >= 0) {
             return getVarIntSizeUnsigned(value);
         }
 
-        var counter = 0;
-        while (true) {
-            counter++;
-            if ((value & ~0x7FL) == 0) {
-                return counter;
-            } else {
-                value >>>= 7;
-            }
-        }
+        return getVarIntSize((long) value);
     }
 
-    public static int getVarIntSizeUnsigned(long value) {
+    public static int getVarIntSizeUnsigned(int value) {
         if (value >= 0 && value <= 127) {
             return 1;
         } else if (value >= 128 && value <= 16383) {
@@ -37,6 +29,18 @@ public final class ProtobufOutputStream {
             return 4;
         } else {
             return 5;
+        }
+    }
+
+    public static int getVarIntSize(long value) {
+        var counter = 0;
+        while (true) {
+            counter++;
+            if ((value & ~0x7FL) == 0) {
+                return counter;
+            } else {
+                value >>>= 7;
+            }
         }
     }
 

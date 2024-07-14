@@ -18,7 +18,7 @@ import java.util.NoSuchElementException;
 public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
     public static final String METHOD_NAME = "sizeOf";
     private static final String DEFAULT_PARAMETER_NAME = "object";
-    private static final String DEFAULT_RESULT_NAME = "size";
+    private static final String DEFAULT_RESULT_NAME = "protoSize";
 
     public ProtobufSizeMethodGenerator(ProtobufObjectElement element) {
         super(element);
@@ -68,7 +68,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
             var repeatedEntryFieldName = property.name() + "Entry";
             try(var forEachWriter = ifWriter.printForEachStatement(repeatedEntryFieldName, repeatedFieldName)) {
                 try(var valueIfWriter = forEachWriter.printIfStatement("%s != null".formatted(repeatedEntryFieldName))) {
-                    writeAccessiblePropertySize(valueIfWriter, property.index(), collectionType.value(), repeatedEntryFieldName);
+                    writeAccessiblePropertySize(valueIfWriter, property.index(), collectionType.value(), repeatedEntryFieldName, repeatedEntryFieldName);
                 }
             }
         }
@@ -92,14 +92,16 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
     }
 
     private void writeMapEntryPropertySizeMethod(ClassWriter classWriter, ProtobufPropertyElement property, ProtobufPropertyType.MapType mapType, String methodName) {
-        var parameter = "java.util.Map.Entry<%s, %s> %s".formatted(mapType.keyType().implementationType(), mapType.valueType().implementationType(), DEFAULT_PARAMETER_NAME);
+        var parameter = "java.util.Map.Entry<%s, %s> %s".formatted(mapType.keyType().accessorType(), mapType.valueType().accessorType(), DEFAULT_PARAMETER_NAME);
         try (var methodWriter = classWriter.printMethodDeclaration(List.of("private", "static"), "int", methodName, parameter)) {
             methodWriter.printVariableDeclaration(DEFAULT_RESULT_NAME, "0");
-            writeAccessiblePropertySize(methodWriter, 1, mapType.keyType(), DEFAULT_PARAMETER_NAME + ".getKey()");
-            var mapKeyValue = property.name() + "MapValue";
-            methodWriter.printVariableDeclaration(mapKeyValue, DEFAULT_PARAMETER_NAME + ".getValue()");
-            try(var valueIfWriter = methodWriter.printIfStatement("%s != null".formatted(mapKeyValue))) {
-                writeAccessiblePropertySize(valueIfWriter, 2, mapType.valueType(), mapKeyValue);
+            var mapKeyFieldName = DEFAULT_PARAMETER_NAME + "MapKey";
+            methodWriter.printVariableDeclaration(mapKeyFieldName, DEFAULT_PARAMETER_NAME + ".getValue()");
+            writeAccessiblePropertySize(methodWriter, 1, mapType.keyType(), mapKeyFieldName, DEFAULT_PARAMETER_NAME + ".getKey()");
+            var mapValueFieldName = property.name() + "MapValue";
+            methodWriter.printVariableDeclaration(mapValueFieldName, DEFAULT_PARAMETER_NAME + ".getValue()");
+            try(var valueIfWriter = methodWriter.printIfStatement("%s != null".formatted(mapValueFieldName))) {
+                writeAccessiblePropertySize(valueIfWriter, 2, mapType.valueType(), mapValueFieldName, mapValueFieldName);
             }
             methodWriter.printReturn(DEFAULT_RESULT_NAME);
         }
@@ -107,23 +109,23 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
 
     private void writeNormalPropertySize(MethodWriter writer, ProtobufPropertyElement property, NormalType normalType) {
         writer.printVariableDeclaration(property.name(), getAccessorCall(property));
-        if(property.required() || property.type().isPrimitive()) {
-            writeAccessiblePropertySize(writer, property.index(), normalType, property.name());
+        if(property.required() || property.type().accessorType().getKind().isPrimitive()) {
+            writeAccessiblePropertySize(writer, property.index(), normalType, property.name(), property.name());
             return;
         }
 
         try(var ifWriter = writer.printIfStatement(property.name()  + " != null")) {
-            writeAccessiblePropertySize(ifWriter, property.index(), normalType, property.name());
+            writeAccessiblePropertySize(ifWriter, property.index(), normalType, property.name(), property.name());
         }
     }
 
-    private void writeAccessiblePropertySize(BodyWriter writer, int index, NormalType type, String variableName) {
+    private void writeAccessiblePropertySize(BodyWriter writer, int index, NormalType type, String variableName, String variableContent) {
         if(type.serializers().isEmpty()) {
-            writeAccessiblePropertySizeDirect(writer, index, type.protobufType(), type.implementationType(), variableName);
+            writeAccessiblePropertySizeDirect(writer, index, type.protobufType(), type.accessorType(), variableContent);
             return;
         }
 
-        var result = getVariables(variableName, variableName, type);
+        var result = getVariables(variableName, variableContent, type);
         var nestedWriters = new LinkedList<BodyWriter>();
         nestedWriters.add(writer);
         for(var i = 1; i < result.variables().size(); i++) {

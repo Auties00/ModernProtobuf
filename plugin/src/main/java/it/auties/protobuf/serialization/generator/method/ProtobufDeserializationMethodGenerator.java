@@ -7,8 +7,10 @@ import it.auties.protobuf.serialization.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
 
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -84,12 +86,10 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         // Declare all variables
         // [<implementationType> var<index> = <defaultValue>, ...]
         for(var property : message.properties()) {
-            var type = switch (property.type()) {
-                case ProtobufPropertyType.CollectionType collectionType -> collectionType.descriptorElementType();
-                case ProtobufPropertyType.MapType mapType -> mapType.descriptorElementType();
-                case ProtobufPropertyType.NormalType normalType -> normalType.implementationType();
-            };
-            methodWriter.printVariableDeclaration(type.toString(), property.name(), property.type().defaultValue());
+            var propertyType = property.type().descriptorElementType().toString();
+            var propertyName = property.name();
+            var propertyDefaultValue = property.type().defaultValue();
+            methodWriter.printVariableDeclaration(propertyType, propertyName, propertyDefaultValue);
         }
 
         // Declare the unknown fields value if needed
@@ -152,14 +152,12 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             var keyName = "%sKey".formatted(property.name());
             var valueName = "%sValue".formatted(property.name());
             switchBranchWriter.printVariableDeclaration(streamName, "new ProtobufInputStream(%s.readBytes())".formatted(DEFAULT_STREAM_NAME));
-            switchBranchWriter.printVariableDeclaration(mapType.keyType().implementationType().toString(), keyName, "null");
-            switchBranchWriter.printVariableDeclaration(mapType.valueType().implementationType().toString(), valueName, "null");
+            switchBranchWriter.printVariableDeclaration(mapType.keyType().accessorType().toString(), keyName, "null");
+            switchBranchWriter.printVariableDeclaration(mapType.valueType().accessorType().toString(), valueName, "null");
             var keyReadMethod = getDeserializerStreamMethod(mapType.keyType(), false);
-            var keyReadValue = getReadValue(streamName, mapType.keyType(), keyReadMethod);
-            var keyReadFunction = getConvertedValue(mapType.keyType(), keyReadValue);
+            var keyReadFunction = getConvertedValue(streamName, mapType.keyType(), keyReadMethod);
             var valueReadMethod = getDeserializerStreamMethod(mapType.valueType(), false);
-            var valueReadValue = getReadValue(streamName, mapType.valueType(), valueReadMethod);
-            var valueReadFunction = getConvertedValue(mapType.valueType(), valueReadValue);
+            var valueReadFunction = getConvertedValue(streamName, mapType.valueType(), valueReadMethod);
             try(var whileWriter = switchBranchWriter.printWhileStatement(streamName + ".readTag()")) {
                 try(var mapSwitchWriter = whileWriter.printSwitchStatement(streamName + ".index()")) {
                     mapSwitchWriter.printSwitchBranch("1", "%s = %s".formatted(keyName, keyReadFunction));
@@ -172,8 +170,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
 
     private void writeDeserializer(SwitchStatementWriter writer, String name, int index, ProtobufPropertyType type, boolean repeated, boolean packed) {
         var readMethod = getDeserializerStreamMethod(type, packed);
-        var readValue = getReadValue(DEFAULT_STREAM_NAME, type, readMethod);
-        var readFunction = getConvertedValue(type, readValue);
+        var readFunction = getConvertedValue(DEFAULT_STREAM_NAME, type, readMethod);
         var readAssignment = getReadAssignment(name, repeated, packed, readFunction);
         writer.printSwitchBranch(String.valueOf(index), readAssignment);
     }
@@ -198,42 +195,34 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         return "%s.%s(%s)".formatted(name, repeatedMethod, readFunction);
     }
 
-    private String getReadValue(String streamName, ProtobufPropertyType type, String readMethod) {
-        var reader = "%s.%s()".formatted(streamName, readMethod);
-        if (type.protobufType() != ProtobufType.OBJECT) {
-            return reader;
+    private String getConvertedValue(String streamName, ProtobufPropertyType implementation, String readMethod) {
+        var result = "%s.%s()".formatted(streamName, readMethod);
+        if(implementation.protobufType() == ProtobufType.OBJECT && implementation instanceof ProtobufPropertyType.NormalType normalType) {
+            var elementType = (DeclaredType) implementation.deserializedType();
+            var elementSpecName = getSpecFromObject(elementType);
+            if(elementType.asElement().getKind() == ElementKind.ENUM) {
+                var defaultValue = normalType.deserializedDefaultValue()
+                        .orElseGet(normalType::defaultValue);
+                result = "%s.decode(%s).orElse(%s)".formatted(elementSpecName, result, defaultValue);
+            } else {
+                result = "%s.decode(%s)".formatted(elementSpecName, result);
+            }
         }
 
-        var specName = getSpecFromObject(type.implementationType());
-        if(type.isEnum()) {
-            return "%s.decode(%s).orElse(%s)".formatted(specName, reader, type.defaultValue());
-        }
-
-        if(type.isMessage()) {
-            return "%s.decode(%s)".formatted(specName, reader);
-        }
-
-        if(!type.deserializers().isEmpty()) {
-            var inferredSpecName = getSpecFromObject(type.deserializers().getFirst().parameterType());
-            return "%s.decode(%s)".formatted(inferredSpecName, reader);
-        }
-
-        return reader;
-    }
-
-    private String getConvertedValue(ProtobufPropertyType implementation, String readValue) {
-        var result = readValue;
-        for(var converter : implementation.deserializers()) {
+        var deserializers = implementation.deserializers();
+        for (var i = deserializers.size() - 1; i >= 0; i--) {
+            var converter = deserializers.get(i);
             var converterWrapperClass = (TypeElement) converter.delegate().getEnclosingElement();
             var converterMethodName = converter.delegate().getSimpleName();
             result = "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), converterMethodName, result);
         }
+
         return result;
     }
 
     // Returns the method to use to deserialize a property from ProtobufInputStream
     private String getDeserializerStreamMethod(ProtobufPropertyType type, boolean packed) {
-        if (type.isEnum()) {
+        if (isEnum(type)) {
             return packed ? "readInt32Packed" : "readInt32";
         }
         
@@ -249,5 +238,11 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             case FIXED64, SFIXED64 -> packed ? "readFixed64Packed" : "readFixed64";
             default -> throw new IllegalStateException("Unexpected value: " + type.protobufType());
         };
+    }
+
+    protected boolean isEnum(ProtobufPropertyType type) {
+        return type instanceof ProtobufPropertyType.NormalType normalType
+                && normalType.serializedType() instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.ENUM;
     }
 }

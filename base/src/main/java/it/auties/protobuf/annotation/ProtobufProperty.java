@@ -15,19 +15,9 @@ public @interface ProtobufProperty {
 
     ProtobufType type();
 
-    Class<?> overrideType() default Object.class;
-
-    Class<?> overrideRepeatedType() default Object.class;
-
-    Class<?> overrideMapType() default Object.class;
-
     ProtobufType mapKeyType() default ProtobufType.MAP;
 
-    Class<?> overrideMapKeyType() default Object.class;
-
     ProtobufType mapValueType() default ProtobufType.MAP;
-
-    Class<?> overrideMapValueType() default Object.class;
 
     Class<?>[] mixins() default {
             ProtobufAtomicMixin.class,

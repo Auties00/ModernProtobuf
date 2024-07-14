@@ -72,6 +72,12 @@ public class PreliminaryChecks {
             return;
         }
 
+        var enclosingType = executableElement.getEnclosingElement().asType();
+        if(enclosingType.getAnnotation(ProtobufMessage.class) != null || enclosingType.getAnnotation(ProtobufEnum.class) != null) {
+            messages.printError("Illegal method: a method annotated with @ProtobufSerializer cannot be inside a ProtobufMessage or ProtobufEnum", executableElement);
+            return;
+        }
+
         if(executableElement.getModifiers().contains(Modifier.PRIVATE)) {
             messages.printError("Weak visibility: a method annotated with @ProtobufSerializer must have at least package-private visibility", executableElement);
             return;
@@ -99,6 +105,13 @@ public class PreliminaryChecks {
             return;
         }
 
+        var enclosingType = executableElement.getEnclosingElement().asType();
+        if(enclosingType.getAnnotation(ProtobufMessage.class) != null || enclosingType.getAnnotation(ProtobufEnum.class) != null) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer cannot be inside a ProtobufMessage or ProtobufEnum", executableElement);
+            return;
+        }
+
+
         if(executableElement.getModifiers().contains(Modifier.PRIVATE)) {
             messages.printError("Weak visibility: a method annotated with @ProtobufDeserializer must have at least package-private visibility", executableElement);
             return;
@@ -109,8 +122,8 @@ public class PreliminaryChecks {
             return;
         }
 
-        if(executableElement.getEnclosingElement().asType().getAnnotation(ProtobufMessage.class) == null && executableElement.getParameters().size() > 1) {
-            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must take exactly zero or one parameter", executableElement);
+        if(executableElement.getParameters().size() != 1) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must take exactly one parameter", executableElement);
         }
     }
     
@@ -133,5 +146,14 @@ public class PreliminaryChecks {
         }
 
         return getEnclosingTypeElement(element.getEnclosingElement());
+    }
+
+    public void checkAnnotation(RoundEnvironment roundEnv, Class<? extends Annotation> protobufMessageClass, String error, ElementKind... elementKind) {
+       var kinds = Set.of(elementKind);
+        for(var element : roundEnv.getElementsAnnotatedWith(protobufMessageClass)) {
+            if(!kinds.contains(element.getKind())) {
+                messages.printError(error, element);
+            }
+        }
     }
 }

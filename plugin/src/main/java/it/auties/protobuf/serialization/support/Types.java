@@ -5,6 +5,8 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
@@ -58,22 +60,22 @@ public class Types {
         return result == null ? typeMirror : result;
     }
 
-    public boolean isSubType(TypeMirror child, Class<?> parent) {
-        return isSubType(child, getType(parent));
+    public boolean isAssignable(TypeMirror rhs, Class<?> lhs) {
+        return isAssignable(rhs, getType(lhs));
     }
 
-    public boolean isSubType(TypeMirror child, TypeMirror parent) {
-        if(child instanceof PrimitiveType primitiveType) {
+    public boolean isAssignable(TypeMirror rhs, TypeMirror lhs) {
+        if(rhs instanceof PrimitiveType primitiveType) {
             var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
-            child = boxed.asType();
+            rhs = boxed.asType();
         }
 
-        if(parent instanceof PrimitiveType primitiveType) {
+        if(lhs instanceof PrimitiveType primitiveType) {
             var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
-            parent = boxed.asType();
+            lhs = boxed.asType();
         }
 
-        return processingEnv.getTypeUtils().isSubtype(erase(child), erase(parent));
+        return processingEnv.getTypeUtils().isAssignable(erase(rhs), erase(lhs));
     }
 
     public TypeMirror newType(Class<?> type, TypeMirror... typeArguments) {
@@ -96,5 +98,22 @@ public class Types {
         }
 
         return Optional.ofNullable(typeElement.getQualifiedName().toString());
+    }
+
+    public Optional<TypeElement> getTypeWithDefaultConstructor(TypeMirror collectionType) {
+        if(erase(collectionType) instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement typeElement
+                && !typeElement.getModifiers().contains(Modifier.ABSTRACT)
+                && hasNoArgsConstructor(typeElement)) {
+            return Optional.of(typeElement);
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean hasNoArgsConstructor(TypeElement typeElement) {
+        return typeElement.getEnclosedElements()
+                .stream()
+                .anyMatch(entry -> entry.getKind() == ElementKind.CONSTRUCTOR && ((ExecutableElement) entry).getParameters().isEmpty());
     }
 }

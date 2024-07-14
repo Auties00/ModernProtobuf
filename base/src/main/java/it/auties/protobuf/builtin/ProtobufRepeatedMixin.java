@@ -8,6 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unused")
 public class ProtobufRepeatedMixin {
     @ProtobufDefaultValue
+    public static <T> Collection<T> newCollection() {
+        return new ArrayList<>();
+    }
+
+    @ProtobufDefaultValue
     public static <T> List<T> newList() {
         return new ArrayList<>();
     }

@@ -9,12 +9,11 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.type.DeclaredType;
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerator {
     private static final String DEFAULT_OUTPUT_STREAM_NAME = "outputStream";
@@ -140,7 +139,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         var result = getVariables(name, value, type);
         if(!result.hasConverter()) {
             var toWrite = result.variables().getFirst().value();
-            var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecFromObject(type.implementationType()), toWrite);
+            var toWriteConverted = type.protobufType() != ProtobufType.OBJECT ? toWrite : "%s.encode(%s)".formatted(getSpecFromObject(type.accessorType()), toWrite);
             writer.println("%s.%s(%s, %s);".formatted(streamName, writeMethod.getName(), index, toWriteConverted));
             return;
         }
@@ -181,7 +180,7 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
                 case STRING ->
                         isRepeatedWithoutConversion(type) ? clazz.getMethod("writeString", int.class, Collection.class) : clazz.getMethod("writeString", int.class, String.class);
                 case OBJECT ->
-                        type.isEnum() ? clazz.getMethod("writeInt32", int.class, Integer.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
+                        isEnum(type) ? clazz.getMethod("writeInt32", int.class, Integer.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BYTES ->
                         isRepeatedWithoutConversion(type) ? clazz.getMethod("writeBytes", int.class, Collection.class) : clazz.getMethod("writeBytes", int.class, byte[].class);
                 case BOOL ->
@@ -209,7 +208,14 @@ public class ProtobufSerializationMethodGenerator extends ProtobufMethodGenerato
         }
     }
 
+    protected boolean isEnum(ProtobufPropertyType type) {
+        return type instanceof ProtobufPropertyType.NormalType normalType
+                && normalType.deserializedType() instanceof DeclaredType declaredType
+                && declaredType.asElement().getKind() == ElementKind.ENUM;
+    }
+
     private boolean isRepeatedWithoutConversion(ProtobufPropertyType type) {
-        return type instanceof ProtobufPropertyType.CollectionType && type.serializers().isEmpty();
+        return type instanceof ProtobufPropertyType.CollectionType
+                && type.serializers().isEmpty();
     }
 }

@@ -98,9 +98,9 @@ public abstract class ProtobufMethodGenerator {
         };
     }
 
-    protected ProtobufPropertyVariables getVariables(String name, String caller, ProtobufPropertyType type) {
+    protected ProtobufPropertyVariables getVariables(String name, String value, ProtobufPropertyType type) {
         var serializers = type.serializers();
-        var variable = new ProtobufPropertyVariable(type.implementationType(), name, caller, type.isPrimitive());
+        var variable = new ProtobufPropertyVariable(type.accessorType(), name, value, type.accessorType().getKind().isPrimitive());
         if (serializers.isEmpty()) {
             return new ProtobufPropertyVariables(false, List.of(variable));
         }

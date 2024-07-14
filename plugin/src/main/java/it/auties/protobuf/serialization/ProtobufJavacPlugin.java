@@ -21,8 +21,8 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
+import java.io.IOException;
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -76,6 +76,21 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
     // Preliminary checks on the annotations' scope
     private void checkAnnotations(RoundEnvironment roundEnv) {
+        preliminaryChecks.checkAnnotation(
+                roundEnv,
+                ProtobufMessage.class,
+                "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
+                ElementKind.CLASS,
+                ElementKind.RECORD
+        );
+
+        preliminaryChecks.checkAnnotation(
+                roundEnv,
+                ProtobufEnum.class,
+                "Illegal annotation: only enums can be annotated with @ProtobufEnum",
+                ElementKind.ENUM
+        );
+
         preliminaryChecks.checkEnclosing(
                 roundEnv,
                 ProtobufProperty.class,
@@ -150,7 +165,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                     buildVisitor.createClass(result.get(), builder, packageName);
                 }
             }
-        }catch (Throwable throwable) {
+        }catch (IOException throwable) {
             messages.printError("An error occurred while processing protobuf: " + Objects.requireNonNullElse(throwable.getMessage(), throwable.getClass().getName()), currentElement);
         }
     }
@@ -179,17 +194,12 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var builderDelegate = getMessageDeserializer(message);
         var messageElement = new ProtobufObjectElement(message, null, builderDelegate.orElse(null));
         processMessage(messageElement, messageElement.element());
-        if (!hasPropertiesConstructor(messageElement)) {
-            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.element());
-            return Optional.empty();
-        }
-
-        if(messageElement.properties().isEmpty()) {
-            messages.printWarning("No properties found", message);
+        if (hasPropertiesConstructor(messageElement)) {
             return Optional.of(messageElement);
         }
 
-        return Optional.of(messageElement);
+        messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.element());
+        return Optional.empty();
     }
 
     private Optional<ExecutableElement> getMessageDeserializer(TypeElement message) {
@@ -222,11 +232,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        var superClassName = superClass.toString();
-        var superClassTypeParametersStartIndex = superClassName.indexOf("<");
-        var rawName = superClassTypeParametersStartIndex <= 0 ? superClassName : superClassName.substring(0, superClassTypeParametersStartIndex);
-        var superClassElement = processingEnv.getElementUtils().getTypeElement(rawName);
-        return Optional.ofNullable(superClassElement);
+        var superClassElement = ((DeclaredType) superClass).asElement();
+        return Optional.of((TypeElement) superClassElement);
     }
 
     private void handleMethod(ProtobufObjectElement messageElement, ExecutableElement executableElement) {
@@ -240,9 +247,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return message.element()
                 .getEnclosedElements()
                 .stream()
-                .filter(entry -> entry instanceof ExecutableElement)
-                .map(entry -> (ExecutableElement) entry)
                 .filter(entry -> entry.getKind() == ElementKind.CONSTRUCTOR)
+                .map(entry -> (ExecutableElement) entry)
                 .anyMatch(constructor -> {
                     var constructorParameters = parseMessageConstructorParameters(message, constructor);
                     if(message.properties().size() != constructorParameters.size()) {
@@ -254,13 +260,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                     while (propertiesIterator.hasNext() && constructorParametersIterator.hasNext()) {
                         var property = propertiesIterator.next();
                         var constructorParameter = constructorParametersIterator.next();
-                        if(!types.isSubType(property.type().descriptorElementType(), constructorParameter.asType())) {
+                        if(!types.isAssignable(property.type().descriptorElementType(), constructorParameter.asType())) {
                             return false;
                         }
                     }
 
                     return message.unknownFieldsElement()
-                            .map(unknownFieldsElement -> types.isSubType(constructor.getParameters().getLast().asType(), unknownFieldsElement.type()))
+                            .map(unknownFieldsElement -> types.isAssignable(unknownFieldsElement.type(), constructor.getParameters().getLast().asType()))
                             .orElse(true);
                 });
     }
@@ -343,7 +349,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .flatMap(Collection::stream)
                  .filter(enclosedElement -> enclosedElement.getKind() == ElementKind.METHOD && enclosedElement.getAnnotation(ProtobufUnknownFields.Setter.class) != null)
                 .map(enclosedElement -> (ExecutableElement) enclosedElement)
-                .filter(enclosedMethod -> !enclosedMethod.getParameters().isEmpty() && types.isSubType(enclosedMethod.getParameters().getFirst().asType(), unknownFieldsType))
+                .filter(enclosedMethod -> !enclosedMethod.getParameters().isEmpty() && types.isAssignable(enclosedMethod.getParameters().getFirst().asType(), unknownFieldsType))
                 .reduce((first, second) -> {
                     messages.printError("Duplicated protobuf unknown fields setter: only one setter for %s is allowed in the mixins".formatted(unknownFieldsType), element);
                     return first;
@@ -369,7 +375,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         var firstParameter = setter.getParameters().get(fromMixin ? 1 : 0);
         var keyType = firstParameter.asType();
-        if(!types.isSubType(keyType, Integer.class) && !types.isSameType(keyType, int.class)) {
+        if(!types.isAssignable(keyType, Integer.class) && !types.isSameType(keyType, int.class)) {
             messages.printError("Type error: expected int type", setter);
             return Optional.empty();
         }
@@ -417,7 +423,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         var accessorType = getAccessorType(accessor);
-        var type = getImplementationType(variableElement, accessorType, propertyAnnotation);
+        var type = getPropertyType(variableElement, accessorType, propertyAnnotation);
         if(type.isEmpty()) {
             return;
         }
@@ -428,6 +434,20 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         messages.printError("Duplicated message property: %s and %s with index %s".formatted(variableElement.getSimpleName(), error.get().name(), propertyAnnotation.index()), variableElement);
+    }
+
+    private TypeMirror getAccessorType(Element accessor) {
+        return switch (accessor) {
+            case VariableElement element -> element.asType();
+            case ExecutableElement element -> element.getReturnType();
+            default -> throw new IllegalStateException("Unexpected value: " + accessor);
+        };
+    }
+
+    private Optional<String> getWrapperDefaultValue(Element element, TypeMirror collectionType, List<TypeElement> mixins) {
+        var type = types.getTypeWithDefaultConstructor(collectionType);
+        return type.map(typeElement -> "new %s()".formatted(typeElement.getQualifiedName()))
+                .or(() -> getDefaultValue(element, collectionType, mixins));
     }
 
     private Optional<String> getDefaultValue(Element caller, TypeMirror type, List<TypeElement> mixins) {
@@ -457,54 +477,35 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
     private Optional<String> getDefaultValueFromAnnotation(Element caller, TypeMirror type, TypeElement provider) {
         if(provider.getKind() == ElementKind.ENUM) {
-            var defaultValueProviderCandidates = new ArrayList<VariableElement>();
-            for(var element : provider.getEnclosedElements()) {
-                if(!(element instanceof VariableElement variableElement) || variableElement.getKind() != ElementKind.ENUM_CONSTANT) {
-                    continue;
-                }
-
-                var annotation = variableElement.getAnnotation(ProtobufDefaultValue.class);
-                if(annotation == null) {
-                    continue;
-                }
-
-                defaultValueProviderCandidates.add(variableElement);
-            }
-
-            var bestMatch = defaultValueProviderCandidates.stream().reduce((first, second) -> {
-                messages.printError("Duplicated protobuf default value: only one default value is allowed in an enum" , caller);
-                return first;
-            });
-            if(bestMatch.isPresent()) {
-                var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();
-                return Optional.of(bestMatchOwner.getQualifiedName() + "." + bestMatch.get().getSimpleName());
-            }
-
-            return Optional.empty();
+            return getEnumDefaultValueFromAnnotation(caller, provider);
         }
-        
+
+        return getObjectDefaultValueFromAnnotation(caller, type, provider);
+    }
+
+    private Optional<String> getObjectDefaultValueFromAnnotation(Element caller, TypeMirror type, TypeElement provider) {
         var defaultValueProviderCandidates = new ArrayList<ExecutableElement>();
         for(var element : provider.getEnclosedElements()) {
             if(!(element instanceof ExecutableElement executableElement)) {
                 continue;
             }
-            
+
             var annotation = executableElement.getAnnotation(ProtobufDefaultValue.class);
             if(annotation == null) {
                 continue;
             }
-            
-            if(types.isSubType(type, executableElement.getReturnType())){
+
+            if(types.isAssignable(executableElement.getReturnType(), type)){
                 defaultValueProviderCandidates.add(executableElement);
             }
         }
-        
+
         var bestMatch = defaultValueProviderCandidates.stream().reduce((first, second) -> {
             if(types.isSameType(first.getReturnType(), second.getReturnType())) {
                 messages.printError("Duplicated protobuf default value: %s provides a default value that was already defined. Remove the conflicting mixins from the property or the enclosing message.".formatted(second) , caller);
             }
 
-            return types.isSubType(first.getReturnType(), second.getReturnType()) ? first : second;
+            return types.isAssignable(first.getReturnType(), second.getReturnType()) ? first : second;
         });
         if(bestMatch.isPresent()) {
             var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();
@@ -514,12 +515,31 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.empty();
     }
 
-    private TypeMirror getAccessorType(Element accessor) {
-        return switch (accessor) {
-            case VariableElement element -> element.asType();
-            case ExecutableElement element -> element.getReturnType();
-            default -> throw new IllegalStateException("Unexpected value: " + accessor);
-        };
+    private Optional<String> getEnumDefaultValueFromAnnotation(Element caller, TypeElement provider) {
+        var defaultValueProviderCandidates = new ArrayList<VariableElement>();
+        for(var element : provider.getEnclosedElements()) {
+            if(!(element instanceof VariableElement variableElement) || variableElement.getKind() != ElementKind.ENUM_CONSTANT) {
+                continue;
+            }
+
+            var annotation = variableElement.getAnnotation(ProtobufDefaultValue.class);
+            if(annotation == null) {
+                continue;
+            }
+
+            defaultValueProviderCandidates.add(variableElement);
+        }
+
+        var bestMatch = defaultValueProviderCandidates.stream().reduce((first, second) -> {
+            messages.printError("Duplicated protobuf default value: only one default value is allowed in an enum" , caller);
+            return first;
+        });
+        if(bestMatch.isPresent()) {
+            var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();
+            return Optional.of(bestMatchOwner.getQualifiedName() + "." + bestMatch.get().getSimpleName());
+        }
+
+        return Optional.empty();
     }
 
     private List<TypeElement> getMixins(ProtobufProperty property) {
@@ -538,124 +558,68 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
     }
 
-    private Optional<ProtobufPropertyType> getImplementationType(Element element, TypeMirror elementType, ProtobufProperty property) {
-        var override = getMirroredOverride(property::overrideType);
-        var repeatedOverride = getMirroredOverride(property::overrideRepeatedType);
+    private Optional<? extends ProtobufPropertyType> getPropertyType(Element element, TypeMirror accessorType, ProtobufProperty property) {
+        var elementType = element.asType();
         var mixins = getMixins(property);
-        if (types.isSubType(elementType, Collection.class) || repeatedOverride.isPresent()) {
-            var collectionTypeParameter = getTypeParameter(elementType, types.getType(Collection.class), 0);
-            if (override.isEmpty() && collectionTypeParameter.isEmpty()) {
-                messages.printError("Type inference error: cannot determine collection's type parameter. Specify the type explicitly in @ProtobufProperty with overrideType", element);
-                return Optional.empty();
-            }
-
-            var collectionType = getMirroredOverride(property::overrideRepeatedType)
-                    .orElse(elementType);
-            var collectionDefaultValue = getCollectionDefaultValue(element, collectionType, mixins);
-            if(collectionDefaultValue == null) {
-                messages.printError("Type inference error: cannot determine collection's type. Specify the type explicitly in @ProtobufProperty with overrideRepeatedType", element);
-                return Optional.empty();
-            }
-
-            var implementationType = override.orElseGet(collectionTypeParameter::get);
-            var collectionTypeParameterDefaultValue = getDefaultValue(element, implementationType, mixins)
-                    .orElse("null");
-            var collectionTypeParameterType = new ProtobufPropertyType.NormalType(
-                    property.type(),
-                    collectionTypeParameter.orElseGet(override::get),
-                    implementationType,
-                    collectionTypeParameterDefaultValue,
-                    types.isMessage(implementationType),
-                    types.isEnum(implementationType)
-            );
-            var type = new ProtobufPropertyType.CollectionType(
-                    elementType,
-                    collectionTypeParameterType,
-                    collectionDefaultValue
-            );
-            attributeConverters(
-                    element,
-                    property.type(),
-                    implementationType,
-                    collectionTypeParameterType,
-                    mixins
-            );
-            return Optional.of(type);
+        if (types.isAssignable(elementType, Collection.class)) {
+            return getConcreteCollectionType(element, property, elementType, mixins);
         }
 
-        var overrideMapType = getMirroredOverride(property::overrideMapType);
-        var overrideMapKeyType = getMirroredOverride(property::overrideMapKeyType);
-        var overrideMapValueType = getMirroredOverride(property::overrideMapValueType);
-        if(types.isSubType(elementType, Map.class) || overrideMapType.isPresent() || property.mapKeyType() != ProtobufType.MAP || overrideMapKeyType.isPresent() || property.mapValueType() != ProtobufType.MAP || overrideMapValueType.isPresent()) {
-            var concreteMapType = getConcreteMapType(
-                    property,
-                    element,
-                    elementType,
-                    mixins
-            );
-            if (concreteMapType.isEmpty()) {
-                return Optional.empty();
-            }
-
-            attributeConverters(
-                    element,
-                    concreteMapType.get().keyType().protobufType(),
-                    concreteMapType.get().keyType().descriptorElementType(),
-                    concreteMapType.get().keyType(), mixins
-            );
-            attributeConverters(
-                    element,
-                    concreteMapType.get().valueType().protobufType(),
-                    concreteMapType.get().valueType().descriptorElementType(),
-                    concreteMapType.get().valueType(),
-                    mixins
-            );
-            return Optional.of(concreteMapType.get());
+        if(types.isAssignable(elementType, Map.class) || property.mapKeyType() != ProtobufType.MAP || property.mapValueType() != ProtobufType.MAP) {
+            return getConcreteMapType(property, element, elementType, mixins);
         }
 
-        var implementationType = override.orElse(elementType);
+        return getNormalType(element, accessorType, property, elementType, mixins);
+    }
+
+    private Optional<ProtobufPropertyType.NormalType> getNormalType(Element element, TypeMirror accessorType, ProtobufProperty property, TypeMirror elementType, List<TypeElement> mixins) {
+        var defaultValue = getDefaultValue(element, elementType, mixins)
+                .orElse("null");
         var implementation = new ProtobufPropertyType.NormalType(
                 property.type(),
                 elementType,
-                implementationType,
-                getDefaultValue(element, implementationType, mixins).orElse("null"),
-                types.isMessage(implementationType),
-                types.isEnum(implementationType)
+                accessorType,
+                defaultValue
         );
-        attributeConverters(element, property.type(), elementType, implementation, mixins);
+        attributeSerializers(element, implementation, mixins);
+        attributeDeserializers(element, implementation, mixins);
+        if(!types.isSameType(implementation.serializedType(), implementation.descriptorElementType())) {
+            var deserializedDefaultValue = getDefaultValue(element, implementation.deserializedType(), mixins)
+                    .orElse("null");
+            implementation.setDeserializedDefaultValue(deserializedDefaultValue);
+        }
+
         return Optional.of(implementation);
     }
 
-    private String getCollectionDefaultValue(Element element, TypeMirror collectionType, List<TypeElement> mixins) {
-        if (types.erase(collectionType) instanceof DeclaredType declaredType
-                && declaredType.asElement() instanceof TypeElement typeElement
-                && !typeElement.getModifiers().contains(Modifier.ABSTRACT)) {
-            return "new %s()".formatted(typeElement.getQualifiedName());
+    private Optional<? extends ProtobufPropertyType> getConcreteCollectionType(Element element, ProtobufProperty property, TypeMirror elementType, List<TypeElement> mixins) {
+        var collectionTypeParameter = getTypeParameter(elementType, types.getType(Collection.class), 0);
+        if (collectionTypeParameter.isEmpty()) {
+            messages.printError("Type inference error: cannot determine collection's type parameter", element);
+            return Optional.empty();
         }
 
-        return getDefaultValue(element, collectionType, mixins).orElse(null);
-    }
-
-    private Optional<TypeMirror> getMirroredOverride(Supplier<Class<?>> supplier) {
-        try {
-            var implementation = supplier.get();
-            var type = processingEnv.getElementUtils().getTypeElement(implementation.getName());
-            if(type == null || types.isSameType(type.asType(), Object.class)) {
-                return Optional.empty();
-            }
-
-            return Optional.of(type.asType());
-        }catch (MirroredTypeException exception) {
-            if (!(exception.getTypeMirror() instanceof DeclaredType declaredType)) {
-                return Optional.empty();
-            }
-
-            if(types.isSameType(declaredType, Object.class)) {
-                return Optional.empty();
-            }
-
-            return Optional.of(declaredType);
+        var collectionDefaultValue = getWrapperDefaultValue(element, elementType, mixins);
+        if(collectionDefaultValue.isEmpty()) {
+            messages.printError("Type inference error: cannot determine collection's default value. Specify the type explicitly in @ProtobufProperty with overrideRepeatedType or provide a mixin for this type", element);
+            return Optional.empty();
         }
+
+        var collectionTypeParameterType = new ProtobufPropertyType.NormalType(
+                property.type(),
+                collectionTypeParameter.get(),
+                collectionTypeParameter.get(),
+                null
+        );
+
+        var type = new ProtobufPropertyType.CollectionType(
+                elementType,
+                collectionTypeParameterType,
+                collectionDefaultValue.get()
+        );
+        attributeSerializers(element, collectionTypeParameterType, mixins);
+        attributeDeserializers(element, collectionTypeParameterType, mixins);
+        return Optional.of(type);
     }
 
     private Optional<? extends Element> getAccessor(VariableElement fieldElement, ProtobufProperty propertyAnnotation) {
@@ -697,107 +661,166 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     // One might ask why we don't check if the type is a map
     // The reason is that there are cases where a user could want to use a collection or any other object and have a mixin in between to convert them
     private Optional<ProtobufPropertyType.MapType> getConcreteMapType(ProtobufProperty property, Element element, TypeMirror elementType, List<TypeElement> mixins) {
-        var error = false; // Fail later
         if(property.mapKeyType() == ProtobufType.MAP) { // By default, the mapKeyType is set to map as maps are not supported as key types
             messages.printError("Missing type error: specify the type of the map's key in @ProtobufProperty with keyType", element);
-            error = true;
+            return Optional.empty();
         }
 
         if(property.mapValueType() == ProtobufType.MAP) { // By default, the mapValueType is set to map as maps are not supported as value types
             messages.printError("Missing type error: specify the type of the map's value in @ProtobufProperty with valueType", element);
-            error = true;
+            return Optional.empty();
         }
 
         if(property.mapKeyType() == ProtobufType.OBJECT) { // Objects can't be used as keys in a map following the proto spec
             messages.printError("Type error: protobuf doesn't support objects as keys in a map", element);
-            error = true;
+            return Optional.empty();
         }
 
-        // Get the overrideMapKeyType as a TypeMirror
-        var keyTypeOverride = getMirroredOverride(property::overrideMapKeyType);
         // Get the key type of the map that represents the property
         // Example: Map<String, Integer> -> String
         var keyTypeParameter = getTypeParameter(elementType, types.getType(Map.class), 0);
-        if (keyTypeOverride.isEmpty() && keyTypeParameter.isEmpty()) {
-            messages.printError("Type inference error: cannot determine map's key type. Specify the type explicitly in @ProtobufProperty with overrideKeyType", element);
-            error = true;
+        if (keyTypeParameter.isEmpty()) {
+            messages.printError("Type inference error: cannot determine map's key type", element);
+            return Optional.empty();
         }
 
-        // Build the protobuf type model for the key
-        var keyDescriptorType = keyTypeParameter.or(() -> keyTypeOverride)
-                .orElseThrow();
-        var keyImplementationType = keyTypeOverride.or(() -> keyTypeParameter)
-                .orElseThrow();
-        var keyDefaultValue = getDefaultValue(element, keyImplementationType, mixins)
-                .orElse("null");
         var keyEntry = new ProtobufPropertyType.NormalType(
                 property.mapKeyType(), // Just the proto type of the key
-                keyDescriptorType, // Follow hierarchy explained in ProtobufPropertyType
-                keyImplementationType, // Follow hierarchy explained in ProtobufPropertyType
-                keyDefaultValue,
-                false,  // Objects can't be keys
-                false // Objects can't be keys, so enums can't as well
+                keyTypeParameter.get(),
+                keyTypeParameter.get(),
+                null
         );
+        attributeSerializers(element, keyEntry, mixins);
+        attributeDeserializers(element, keyEntry, mixins);
 
         // Same thing but for the value type
-        var valueTypeOverride = getMirroredOverride(property::overrideMapValueType);
         var valueTypeParameter = getTypeParameter(elementType, types.getType(Map.class), 1);
-        if (valueTypeOverride.isEmpty() && valueTypeParameter.isEmpty()) {
-            messages.printError("Type inference error: cannot determine map's value type. Specify the type explicitly in @ProtobufProperty with overrideValueType", element);
-            error = true;
+        if (valueTypeParameter.isEmpty()) {
+            messages.printError("Type inference error: cannot determine map's value type", element);
+            return Optional.empty();
         }
 
-        var valueDescriptorType = valueTypeParameter.or(() -> valueTypeOverride)
-                .orElseThrow();
-        var valueImplementationType = valueTypeOverride.or(() -> valueTypeParameter)
-                .orElseThrow();
-        var valueDefaultValue = getDefaultValue(element, valueImplementationType, mixins)
+        var valueDefaultValue = getDefaultValue(element, valueTypeParameter.get(), mixins)
                 .orElse("null");
         var valueEntry = new ProtobufPropertyType.NormalType(
                 property.mapValueType(), // Just the protobuf type
-                valueDescriptorType,  // Follow hierarchy explained in ProtobufPropertyType
-                valueImplementationType,  // Follow hierarchy explained in ProtobufPropertyType
-                valueDefaultValue,
-                types.isMessage(valueImplementationType), // Values can be object so we have to check
-                types.isEnum(valueImplementationType) // Values can be enums so we have to check
+                valueTypeParameter.get(),
+                valueTypeParameter.get(),
+                valueDefaultValue
         );
-
-        // If the type isn't a declared type(ex. a primitive) or if the type is not a map(ex. a collection)
-        // Use the overrideMapType or an HashMap
-        // This is useful for example if the user is using a mixin to convert between a Map and a Collection
-        if(!(elementType instanceof DeclaredType declaredFieldType) || !types.isSubType(declaredFieldType, Map.class)) {
-            if(error) {
-                return Optional.empty();
-            }
-
-            return Optional.of(new ProtobufPropertyType.MapType(
-                    elementType,
-                    keyEntry,
-                    valueEntry,
-                    "new java.util.HashMap()"
-            ));
+        attributeSerializers(element, valueEntry, mixins);
+        attributeDeserializers(element, valueEntry, mixins);
+        if(!types.isSameType(valueEntry.serializedType(), valueEntry.descriptorElementType())) {
+            var deserializedDefaultValue = getDefaultValue(element, valueEntry.deserializedType(), mixins)
+                    .orElse("null");
+            valueEntry.setDeserializedDefaultValue(deserializedDefaultValue);
         }
 
         // If the map type is not abstract, create the type as we would with a normal type
-        var mapType = getMirroredOverride(property::overrideMapType)
-                .orElse(elementType);
-        var mapDefaultValue = getDefaultValue(element, mapType, mixins)
-                .orElseThrow();
+        var mapDefaultValue = getWrapperDefaultValue(element, elementType, mixins);
         if(mapDefaultValue.isEmpty()) {
-            messages.printError("Type inference error: cannot determine concrete map type. Use a concrete type for the property's field(for example HashMap instead of Map) or specify the type explicitly in @ProtobufProperty with overrideMapType", element);
+            messages.printError("Type inference error: cannot determine map default value", element);
             return Optional.empty();
         }
 
         return Optional.of(new ProtobufPropertyType.MapType(
-                mapType,  // Follow hierarchy explained in ProtobufPropertyType
+                elementType,
                 keyEntry,
                 valueEntry,
-                mapDefaultValue
+                mapDefaultValue.get()
         ));
     }
 
+    private void attributeSerializers(Element invoker, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+        attributeSerializers(invoker, implementation.accessorType(), implementation, mixins);
+    }
+
     // Add the necessary converters for the provided types using as sources the target type's class and the provided mixins
-    private void attributeConverters(Element invoker, ProtobufType from, TypeMirror to, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+    private void attributeSerializers(Element invoker, TypeMirror from, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+        // If to is a primitive no conversions are necessary
+        // We don't support arrays so no check is necessary
+        if(!(from instanceof DeclaredType toDeclaredType)) {
+            return;
+        }
+
+        // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
+        var to = implementation.protobufType();
+        var toType = types.getType(to.wrappedType());
+        if (types.isAssignable(from, toType)
+                && (to != ProtobufType.OBJECT || types.isMessage(toDeclaredType) || types.isEnum(toDeclaredType))) {
+            return;
+        }
+
+        // Look for valid serializers and deserializers in the toType and mixins
+        var serializers = new ArrayList<ProtobufSerializerElement>();
+        var candidates = new ArrayList<>(mixins);
+        candidates.add((TypeElement) toDeclaredType.asElement());
+        for(var candidate : candidates) {
+            for(var entry : candidate.getEnclosedElements()) {
+                if (!(entry instanceof ExecutableElement element)) {
+                    continue;
+                }
+
+                if (!converters.isSerializer(element, from, toType)) {
+                    continue;
+                }
+
+                if (!isParametrized(element)) {
+                    var serializer = new ProtobufSerializerElement(element, element.getReturnType());
+                    serializers.add(serializer);
+                    continue;
+                }
+
+                var serializerInputType = element.getParameters()
+                        .getFirst()
+                        .asType();
+                var inferredType = getTypeParameter(from, serializerInputType, 0);
+                if(inferredType.isEmpty()) {
+                    messages.printError("Type inference error: cannot determine serializer's type parameter", element); // There is no solution here, if the type cannot be inferred
+                    continue;
+                }
+
+                var serializer = new ProtobufSerializerElement(element, inferredType.get());
+                serializers.add(serializer);
+            }
+        }
+
+        // Add the best serializer or error out
+        if (serializers.isEmpty()) {
+            messages.printError("Missing converter: cannot find a serializer for %s".formatted(from), invoker);
+        } else {
+            var bestSerializer = serializers.stream()
+                    .reduce((first, second) -> {
+                        var firstType = first.delegate().getReturnType();
+                        var secondType = second.delegate().getReturnType();
+                        if(types.isSameType(firstType, secondType)) {
+                            messages.printError("Duplicated protobuf serializer for %s".formatted(firstType) , second.delegate());
+                        }
+
+                        return types.isAssignable(firstType, secondType) ? first : second;
+                    })
+                    .orElseThrow();
+            implementation.addNullableConverter(bestSerializer);
+
+            // Prevent repeated attribution of the serializer/deserializer type if it's not a protobuf message/enum
+            var recursiveNonProtoAttribution = !types.isMessage(bestSerializer.returnType()) && !types.isEnum(bestSerializer.returnType());
+            if(recursiveNonProtoAttribution) {
+                attributeSerializers(
+                        invoker,
+                        bestSerializer.returnType(),
+                        implementation,
+                        mixins
+                );
+            }
+        }
+    }
+
+    // Add the necessary converters for the provided types using as sources the target type's class and the provided mixins
+    private void attributeDeserializers(Element invoker, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+        attributeDeserializers(invoker, implementation.descriptorElementType(), implementation, mixins);
+    }
+
+    private void attributeDeserializers(Element invoker, TypeMirror to, ProtobufPropertyType implementation, List<TypeElement> mixins) {
         // If to is a primitive no conversions are necessary
         // We don't support arrays so no check is necessary
         if(!(to instanceof DeclaredType toDeclaredType)) {
@@ -805,14 +828,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
+        var from = implementation.protobufType();
         var fromType = types.getType(from.wrappedType());
-        if (types.isSubType(to, fromType)
+        if (types.isAssignable(to, fromType)
                 && (from != ProtobufType.OBJECT || types.isMessage(toDeclaredType) || types.isEnum(toDeclaredType))) {
             return;
         }
 
         // Look for valid serializers and deserializers in the toType and mixins
-        var serializers = new ArrayList<ProtobufSerializerElement>();
         var deserializers = new ArrayList<ProtobufDeserializerElement>();
         var candidates = new ArrayList<>(mixins);
         candidates.add((TypeElement) toDeclaredType.asElement());
@@ -822,29 +845,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                     continue;
                 }
 
-                if (converters.isSerializer(element, to, fromType)) {
-                    if (from != ProtobufType.OBJECT || !isParametrized(element)) {
-                        var serializer = new ProtobufSerializerElement(element, element.getReturnType());
-                        serializers.add(serializer);
-                        continue;
-                    }
-
-                    var serializerInputType = element.getParameters()
-                            .getFirst()
-                            .asType();
-                    var inferredType = getTypeParameter(to, serializerInputType, 0);
-                    if(inferredType.isEmpty()) {
-                        messages.printError("Type inference error: cannot determine serializer's type parameter", element); // There is no solution here, if the type cannot be inferred
-                        continue;
-                    }
-
-                    var serializer = new ProtobufSerializerElement(element, inferredType.get());
-                    serializers.add(serializer);
-                    continue;
-                }
-
                 converters.getDeserializerBuilderBehaviour(element, to, fromType).ifPresent(builderBehaviour -> {
-                    if (from != ProtobufType.OBJECT || !isParametrized(element)) {
+                    if (!isParametrized(element)) {
                         var deserializer = new ProtobufDeserializerElement(element, fromType, builderBehaviour);
                         deserializers.add(deserializer);
                         return;
@@ -862,31 +864,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             }
         }
 
-        // Prevent repeated attribution of the serializer/deserializer type if it's not a protobuf message/enum
-        var recursiveNonProtoAttribution = false;
-
-        // Add the best serializer or error out
-        if (serializers.isEmpty()) {
-            messages.printError("Missing converter: cannot find a serializer for %s".formatted(to), invoker);
-        } else {
-            var bestSerializer = serializers.stream()
-                    .reduce((first, second) -> {
-                        var firstType = first.delegate().getReturnType();
-                        var secondType = second.delegate().getReturnType();
-                        if(types.isSameType(firstType, secondType)) {
-                            messages.printError("Duplicated protobuf serializer for %s".formatted(firstType) , second.delegate());
-                        }
-
-                        return types.isSubType(firstType, secondType) ? first : second;
-                    })
-                    .orElseThrow();
-            implementation.addNullableConverter(bestSerializer);
-            recursiveNonProtoAttribution = !types.isMessage(bestSerializer.returnType()) && !types.isEnum(bestSerializer.returnType());
-            if(recursiveNonProtoAttribution) {
-                attributeConverters(invoker, from, bestSerializer.returnType(), implementation, mixins);
-            }
-        }
-
         // Add the best deserializer or error out
         if (deserializers.isEmpty()) {
             messages.printError("Missing converter: cannot find a deserializer for %s".formatted(fromType), invoker);
@@ -899,12 +876,17 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                             messages.printError("Duplicated protobuf deserializer for %s".formatted(firstType) , second.delegate());
                         }
 
-                        return types.isSubType(firstType, secondType) ? first : second;
+                        return types.isAssignable(firstType, secondType) ? first : second;
                     })
                     .orElseThrow();
             implementation.addNullableConverter(bestDeserializer);
-            if(!recursiveNonProtoAttribution && !types.isMessage(bestDeserializer.parameterType()) && !types.isEnum(bestDeserializer.parameterType())) {
-                attributeConverters(invoker, from, bestDeserializer.parameterType(), implementation, mixins);
+            if(!types.isMessage(bestDeserializer.parameterType()) && !types.isEnum(bestDeserializer.parameterType())) {
+                attributeDeserializers(
+                        invoker,
+                        bestDeserializer.parameterType(),
+                        implementation,
+                        mixins
+                );
             }
         }
     }
@@ -1001,7 +983,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private boolean isValidPackedProperty(VariableElement variableElement, ProtobufProperty propertyAnnotation) {
-        if(!propertyAnnotation.packed() || types.isSubType(variableElement.asType(), Collection.class)) {
+        if(!propertyAnnotation.packed() || types.isAssignable(variableElement.asType(), Collection.class)) {
             return true;
         }
 
