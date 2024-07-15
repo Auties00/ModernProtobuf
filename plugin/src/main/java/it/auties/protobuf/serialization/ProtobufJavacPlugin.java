@@ -432,7 +432,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 messages.printError("Duplicated protobuf default value: %s provides a default value that was already defined. Remove the conflicting mixins from the property or the enclosing message.".formatted(second) , caller);
             }
 
-            return types.isAssignable(first.getReturnType(), second.getReturnType()) ? first : second;
+            return types.isAssignable(first.getReturnType(), second.getReturnType()) ? second : first;
         });
         if(bestMatch.isPresent()) {
             var bestMatchOwner = (TypeElement) bestMatch.get().getEnclosingElement();

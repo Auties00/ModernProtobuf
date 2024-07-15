@@ -278,10 +278,6 @@ public final class ProtobufOutputStream {
     }
 
     public byte[] toByteArray() {
-        if(buffer.length != position) {
-            throw new IllegalStateException("Computed wrong size: " + (buffer.length - position));
-        }
-
         return buffer;
     }
 
