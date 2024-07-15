@@ -1,12 +1,14 @@
 package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
+import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufUnknownFields;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@ProtobufMixin
 public class ProtobufMapMixin {
     @ProtobufDefaultValue
     public static <K, V> Map<K, V> newMap() {

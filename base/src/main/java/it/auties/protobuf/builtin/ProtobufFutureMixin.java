@@ -2,6 +2,7 @@ package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
+import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import java.util.concurrent.CompletableFuture;
@@ -9,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
 
 @SuppressWarnings("unused")
+@ProtobufMixin
 public class ProtobufFutureMixin {
     @ProtobufDefaultValue
     public static <T> CompletableFuture<T> newCompletableFuture() {

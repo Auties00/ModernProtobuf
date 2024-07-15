@@ -98,8 +98,8 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
         try (var methodWriter = classWriter.printMethodDeclaration(List.of("private", "static"), "int", methodName, parameter)) {
             methodWriter.printVariableDeclaration(DEFAULT_RESULT_NAME, "0");
             var mapKeyFieldName = DEFAULT_PARAMETER_NAME + "MapKey";
-            methodWriter.printVariableDeclaration(mapKeyFieldName, DEFAULT_PARAMETER_NAME + ".getValue()");
-            writeAccessiblePropertySize(methodWriter, 1, mapType.keyType(), mapKeyFieldName, DEFAULT_PARAMETER_NAME + ".getKey()");
+            methodWriter.printVariableDeclaration(mapKeyFieldName, DEFAULT_PARAMETER_NAME + ".getKey()");
+            writeAccessiblePropertySize(methodWriter, 1, mapType.keyType(), mapKeyFieldName, mapKeyFieldName);
             var mapValueFieldName = property.name() + "MapValue";
             methodWriter.printVariableDeclaration(mapValueFieldName, DEFAULT_PARAMETER_NAME + ".getValue()");
             try(var valueIfWriter = methodWriter.printIfStatement("%s != null".formatted(mapValueFieldName))) {

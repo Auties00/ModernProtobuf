@@ -1,6 +1,7 @@
 package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
+import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import java.net.URI;
@@ -8,6 +9,7 @@ import java.net.URI;
 import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.ADD;
 
 @SuppressWarnings("unused")
+@ProtobufMixin
 public class ProtobufURIMixin {
     @ProtobufDeserializer(builderBehaviour = ADD)
     public static URI ofNullable(String value) {

@@ -2,18 +2,20 @@ package it.auties.protobuf.serialization.support;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufUnknownFields;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public class Types {
     private final ProcessingEnvironment processingEnv;
@@ -115,5 +117,29 @@ public class Types {
         return typeElement.getEnclosedElements()
                 .stream()
                 .anyMatch(entry -> entry.getKind() == ElementKind.CONSTRUCTOR && ((ExecutableElement) entry).getParameters().isEmpty());
+    }
+
+    public List<TypeElement> getMixins(ProtobufProperty property) {
+        return getMixins(property::mixins);
+    }
+
+    public List<TypeElement> getMixins(ProtobufUnknownFields property) {
+        return getMixins(property::mixins);
+    }
+
+    private List<TypeElement> getMixins(Supplier<Class<?>[]> supplier) {
+        try {
+            return Arrays.stream(supplier.get())
+                    .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))
+                    .filter(entry -> entry instanceof DeclaredType)
+                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
+                    .toList();
+        }catch (MirroredTypesException exception) {
+            return exception.getTypeMirrors()
+                    .stream()
+                    .filter(entry -> entry instanceof DeclaredType)
+                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
+                    .toList();
+        }
     }
 }

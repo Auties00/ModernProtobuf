@@ -2,6 +2,7 @@ package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
+import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
 
 @SuppressWarnings("unused")
+@ProtobufMixin
 public class ProtobufAtomicMixin {
     @ProtobufDefaultValue
     public static AtomicInteger newAtomicInt() {

@@ -42,7 +42,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private Converters converters;
     private PreliminaryChecks preliminaryChecks;
 
-    // Called when the annotation processor gets initialized
+    // Called when the annotation processor is initialized
     @Override
     public synchronized void init(ProcessingEnvironment wrapperProcessingEnv) {
         var unwrappedProcessingEnv = unwrapProcessingEnv(wrapperProcessingEnv);
@@ -51,7 +51,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         this.types = new Types(processingEnv);
         this.messages = new Messages(processingEnv);
         this.converters = new Converters(types);
-        this.preliminaryChecks = new PreliminaryChecks(messages);
+        this.preliminaryChecks = new PreliminaryChecks(types, messages);
     }
 
     // Unwrap the processing environment
@@ -69,78 +69,16 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     // Called when the annotation processor starts processing data
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        checkAnnotations(roundEnv);
+        // Make sure that annotations are not being used in the wrong scope
+        preliminaryChecks.runChecks(roundEnv);
+
+        // Do the actual processing of the annotations
         processObjects(roundEnv);
+
         return true;
     }
 
-    // Preliminary checks on the annotations' scope
-    private void checkAnnotations(RoundEnvironment roundEnv) {
-        preliminaryChecks.checkAnnotation(
-                roundEnv,
-                ProtobufMessage.class,
-                "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
-                ElementKind.CLASS,
-                ElementKind.RECORD
-        );
-
-        preliminaryChecks.checkAnnotation(
-                roundEnv,
-                ProtobufEnum.class,
-                "Illegal annotation: only enums can be annotated with @ProtobufEnum",
-                ElementKind.ENUM
-        );
-
-        preliminaryChecks.checkEnclosing(
-                roundEnv,
-                ProtobufProperty.class,
-                "Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage",
-                ProtobufMessage.class
-        );
-
-        preliminaryChecks.checkEnclosing(
-                roundEnv,
-                ProtobufGetter.class,
-                "Illegal enclosing class: a method annotated with @ProtobufGetter should be enclosed by a class or record annotated with @ProtobufMessage",
-                ProtobufMessage.class
-        );
-
-        preliminaryChecks.checkEnclosing(
-                roundEnv,
-                ProtobufEnumIndex.class,
-                "Illegal enclosing class: a field or parameter annotated with @ProtobufEnumIndex should be enclosed by an enum annotated with @ProtobufEnum",
-                ProtobufEnum.class
-        );
-
-        preliminaryChecks.checkEnclosing(
-                roundEnv,
-                ProtobufDefaultValue.class,
-                "Illegal enclosing class: a method or enum constant annotated with @ProtobufDefaultValue should be enclosed by a class/record annotated with @ProtobufMessage, @ProtobufEnum or @ProtobufMixin",
-                ProtobufMessage.class,
-                ProtobufEnum.class,
-                ProtobufMixin.class
-        );
-
-        preliminaryChecks.checkEnclosing(
-                roundEnv,
-                ProtobufUnknownFields.class,
-                "Illegal enclosing class: a method or field annotated with @ProtobufUnknownFields should be enclosed by a class/record annotated with @ProtobufMessage",
-                ProtobufMessage.class
-        );
-
-        var serializers = roundEnv.getElementsAnnotatedWith(ProtobufSerializer.class);
-        preliminaryChecks.checkSerializers(serializers);
-
-        var deserializers = roundEnv.getElementsAnnotatedWith(ProtobufDeserializer.class);
-        preliminaryChecks.checkDeserializers(deserializers);
-
-        var builders = roundEnv.getElementsAnnotatedWith(ProtobufBuilder.class);
-        preliminaryChecks.checkBuilders(builders);
-
-        var defaultValues = roundEnv.getElementsAnnotatedWith(ProtobufDefaultValue.class);
-        preliminaryChecks.checkDefaultValues(defaultValues);
-    }
-
+    // This is where the actual processing happens
     private void processObjects(RoundEnvironment roundEnv) {
         TypeElement currentElement = null;
         try {
@@ -296,6 +234,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
+        if(messageElement.unknownFieldsElement().isPresent()) {
+            messages.printError("Duplicated protobuf unknown fields: a message should provide only one method field annotated with @ProtobufUnknownFields", variableElement);
+            return;
+        }
+
         var unknownFields = processUnknownFieldsField(variableElement, unknownFieldsAnnotation);
         if(unknownFields.isEmpty()) {
             return;
@@ -311,7 +254,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        var mixins = getMixins(unknownFieldsAnnotation);
+        var mixins = types.getMixins(unknownFieldsAnnotation);
         var setter = findUnknownFieldsSetterInType(unknownFieldsDeclaredType);
         if(setter != null) {
             return checkUnknownFieldsSetter(variableElement, setter, false)
@@ -388,22 +331,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         return Optional.of(setter);
-    }
-
-    private List<TypeElement> getMixins(ProtobufUnknownFields property) {
-        try {
-            return Arrays.stream(property.mixins())
-                    .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
-                    .toList();
-        }catch (MirroredTypesException exception) {
-            return exception.getTypeMirrors()
-                    .stream()
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
-                    .toList();
-        }
     }
 
     private void processMessageProperty(ProtobufObjectElement messageElement, VariableElement variableElement, ProtobufProperty propertyAnnotation) {
@@ -542,25 +469,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.empty();
     }
 
-    private List<TypeElement> getMixins(ProtobufProperty property) {
-        try {
-            return Arrays.stream(property.mixins())
-                    .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
-                    .toList();
-        }catch (MirroredTypesException exception) {
-            return exception.getTypeMirrors()
-                    .stream()
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
-                    .toList();
-        }
-    }
-
     private Optional<? extends ProtobufPropertyType> getPropertyType(Element element, TypeMirror accessorType, ProtobufProperty property) {
         var elementType = element.asType();
-        var mixins = getMixins(property);
+        var mixins = types.getMixins(property);
         if (types.isAssignable(elementType, Collection.class)) {
             return getConcreteCollectionType(element, property, elementType, mixins);
         }

@@ -1,11 +1,13 @@
 package it.auties.protobuf.builtin;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
+import it.auties.protobuf.annotation.ProtobufMixin;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
+@ProtobufMixin
 public class ProtobufRepeatedMixin {
     @ProtobufDefaultValue
     public static <T> Collection<T> newCollection() {

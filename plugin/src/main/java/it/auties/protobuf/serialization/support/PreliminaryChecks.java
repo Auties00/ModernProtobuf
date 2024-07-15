@@ -1,28 +1,70 @@
 package it.auties.protobuf.serialization.support;
 
-import it.auties.protobuf.annotation.ProtobufEnum;
-import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.annotation.*;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
 public class PreliminaryChecks {
+    private final Types types;
     private final Messages messages;
-    public PreliminaryChecks(Messages messages) {
+    public PreliminaryChecks(Types types, Messages messages) {
+        this.types = types;
         this.messages = messages;
     }
 
-    public void checkDefaultValues(Set<? extends Element> elements) {
-        for(var element : elements) {
-            checkDefaultValue(element);
+    public void runChecks(RoundEnvironment roundEnv) {
+        checkMessages(roundEnv);
+        checkMessageProperties(roundEnv);
+        checkEnums(roundEnv);
+        checkEnumProperties(roundEnv);
+        checkAnyGetters(roundEnv);
+        checkUnknownFields(roundEnv);
+        checkSerializers(roundEnv);
+        checkDeserializers(roundEnv);
+        checkBuilders(roundEnv);
+        checkDefaultValues(roundEnv);
+    }
+
+    private void checkUnknownFields(RoundEnvironment roundEnv) {
+        var properties = roundEnv.getElementsAnnotatedWith(ProtobufUnknownFields.class);
+        for (var property : properties) {
+            checkUnknownField(property);
+        }
+    }
+
+    private void checkUnknownField(Element property) {
+        var enclosingElement = getEnclosingTypeElement(property);
+        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null) {
+            messages.printError("Illegal enclosing class: a method or field annotated with @ProtobufUnknownFields should be enclosed by a class/record annotated with @ProtobufMessage", property);
+            return;
+        }
+
+        var annotation = property.getAnnotation(ProtobufUnknownFields.class);
+        var mixins = types.getMixins(annotation);
+        checkMixins(property, mixins);
+    }
+
+    private void checkDefaultValues(RoundEnvironment roundEnv) {
+        var defaultValues = roundEnv.getElementsAnnotatedWith(ProtobufDefaultValue.class);
+        for(var defaultValue : defaultValues) {
+            checkDefaultValue(defaultValue);
         }
     }
 
     private void checkDefaultValue(Element entry) {
+        var enclosingElement = getEnclosingTypeElement(entry);
+        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null && enclosingElement.getAnnotation(ProtobufEnum.class) == null && enclosingElement.getAnnotation(ProtobufMixin.class) == null) {
+            messages.printError("Illegal enclosing class: a method or enum constant annotated with @ProtobufDefaultValue should be enclosed by a class/record annotated with @ProtobufMessage, @ProtobufEnum or @ProtobufMixin", entry);
+            return;
+        }
+
         if(entry.getKind() != ElementKind.METHOD && (entry.getKind() != ElementKind.ENUM_CONSTANT || getEnclosingTypeElement(entry).getAnnotation(ProtobufEnum.class) == null)) {
             messages.printError("Invalid delegate: only methods, and enum constants in a ProtobufEnum, can be annotated with @ProtobufDefaultValue", entry);
             return;
@@ -38,9 +80,76 @@ public class PreliminaryChecks {
         }
     }
 
-    public void checkBuilders(Set<? extends Element> elements) {
-        for(var element : elements) {
-            checkBuilder(element);
+    private void checkEnumProperties(RoundEnvironment roundEnv) {
+        checkEnclosing(
+                roundEnv,
+                ProtobufEnumIndex.class,
+                "Illegal enclosing class: a field or parameter annotated with @ProtobufEnumIndex should be enclosed by an enum annotated with @ProtobufEnum",
+                ProtobufEnum.class
+        );
+    }
+
+    private void checkAnyGetters(RoundEnvironment roundEnv) {
+        checkEnclosing(
+                roundEnv,
+                ProtobufGetter.class,
+                "Illegal enclosing class: a method annotated with @ProtobufGetter should be enclosed by a class or record annotated with @ProtobufMessage",
+                ProtobufMessage.class
+        );
+    }
+
+    private void checkMessageProperties(RoundEnvironment roundEnv) {
+        var properties = roundEnv.getElementsAnnotatedWith(ProtobufProperty.class);
+        for (var property : properties) {
+            processMessageProperty(property);
+        }
+    }
+
+    private void processMessageProperty(Element property) {
+        var enclosingElement = getEnclosingTypeElement(property);
+        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null) {
+            messages.printError("Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage", property);
+            return;
+        }
+
+        var annotation = property.getAnnotation(ProtobufProperty.class);
+        var mixins = types.getMixins(annotation);
+        checkMixins(property, mixins);
+    }
+
+    private void checkMixins(Element property, List<TypeElement> mixins) {
+        for(var mixin : mixins) {
+            if (mixin.asType() instanceof DeclaredType declaredType && declaredType.asElement().getAnnotation(ProtobufMixin.class) != null) {
+                continue;
+            }
+
+            messages.printError("Illegal argument: %s is not a valid mixin".formatted(mixin.getSimpleName()), property);
+        }
+    }
+
+    private void checkEnums(RoundEnvironment roundEnv) {
+        checkAnnotation(
+                roundEnv,
+                ProtobufEnum.class,
+                "Illegal annotation: only enums can be annotated with @ProtobufEnum",
+                ElementKind.ENUM
+        );
+    }
+
+    private void checkMessages(RoundEnvironment roundEnv) {
+        checkAnnotation(
+                roundEnv,
+                ProtobufMessage.class,
+                "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
+                ElementKind.CLASS,
+                ElementKind.RECORD
+        );
+    }
+
+    private void checkBuilders(RoundEnvironment roundEnv) {
+        var builders = roundEnv.getElementsAnnotatedWith(ProtobufBuilder.class);
+        for(var builder : builders) {
+            checkBuilder(builder);
         }
     }
 
@@ -60,15 +169,21 @@ public class PreliminaryChecks {
         }
     }
 
-    public void checkSerializers(Set<? extends Element> elements) {
-        for(var element : elements) {
-            checkSerializer(element);
+    private void checkSerializers(RoundEnvironment roundEnv) {
+        var serializers = roundEnv.getElementsAnnotatedWith(ProtobufSerializer.class);
+        for(var serializer : serializers) {
+            checkSerializer(serializer);
         }
     }
 
     private void checkSerializer(Element element) {
         if(!(element instanceof ExecutableElement executableElement)) {
             messages.printError("Invalid delegate: only methods can be annotated with @ProtobufSerializer", element);
+            return;
+        }
+
+        if(executableElement.getKind() == ElementKind.CONSTRUCTOR) {
+            messages.printError("Invalid delegate: constructors cannot be annotated with @ProtobufSerializer", element);
             return;
         }
 
@@ -83,19 +198,23 @@ public class PreliminaryChecks {
             return;
         }
 
-        if(executableElement.getKind() == ElementKind.CONSTRUCTOR || executableElement.getModifiers().contains(Modifier.STATIC)) {
-            messages.printError("Illegal method: a method annotated with @ProtobufSerializer must be a non-static method", executableElement);
+        var inMixin = enclosingType.getAnnotation(ProtobufMixin.class) != null;
+        if(executableElement.getModifiers().contains(Modifier.STATIC) != inMixin) {
+            var message = inMixin ? "Illegal method: a method annotated with @ProtobufSerializer in a mixin must be static" : "Illegal method: a method annotated with @ProtobufSerializer must not be static";
+            messages.printError(message, executableElement);
             return;
         }
 
-        if(!executableElement.getParameters().isEmpty()) {
-            messages.printError("Illegal method: a method annotated with @ProtobufSerializer mustn't take any parameters", executableElement);
+        if(executableElement.getParameters().size() != (inMixin ? 1 : 0)) {
+            var message = inMixin ? "Illegal method: a method annotated with @ProtobufSerializer in a mixin must take exactly one parameter" : "Illegal method: a method annotated with @ProtobufSerializer must take no parameters";
+            messages.printError(message, executableElement);
         }
     }
 
-    public void checkDeserializers(Set<? extends Element> elements) {
-        for(var element : elements) {
-            checkDeserializer(element);
+    private void checkDeserializers(RoundEnvironment roundEnv) {
+        var deserializers = roundEnv.getElementsAnnotatedWith(ProtobufDeserializer.class);
+        for(var deserializer : deserializers) {
+            checkDeserializer(deserializer);
         }
     }
     
@@ -111,32 +230,24 @@ public class PreliminaryChecks {
             return;
         }
 
-
         if(executableElement.getModifiers().contains(Modifier.PRIVATE)) {
             messages.printError("Weak visibility: a method annotated with @ProtobufDeserializer must have at least package-private visibility", executableElement);
             return;
         }
 
-        if(executableElement.getKind() != ElementKind.CONSTRUCTOR && !executableElement.getModifiers().contains(Modifier.STATIC)) {
-            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must be static or a constructor", executableElement);
+        if(!executableElement.getModifiers().contains(Modifier.STATIC)) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must be static", executableElement);
+            return;
+        }
+
+        if(executableElement.getKind() == ElementKind.CONSTRUCTOR && enclosingType.getAnnotation(ProtobufMixin.class) != null) {
+            messages.printError( "Illegal method: a method annotated with @ProtobufDeserializer in a mixin cannot be a constructor", executableElement);
             return;
         }
 
         if(executableElement.getParameters().size() != 1) {
             messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must take exactly one parameter", executableElement);
         }
-    }
-    
-    @SafeVarargs
-    public final void checkEnclosing(RoundEnvironment roundEnv, Class<? extends Annotation> annotation, String error, Class<? extends Annotation>... requiredAnnotations) {
-        roundEnv.getElementsAnnotatedWith(annotation)
-                .stream()
-                .filter(property -> {
-                    var enclosingTypeElement = getEnclosingTypeElement(property);
-                    return Arrays.stream(requiredAnnotations)
-                            .noneMatch(type -> enclosingTypeElement.getAnnotation(type) != null);
-                })
-                .forEach(property -> messages.printError(error, property));
     }
     
     private TypeElement getEnclosingTypeElement(Element element) {
@@ -148,12 +259,25 @@ public class PreliminaryChecks {
         return getEnclosingTypeElement(element.getEnclosingElement());
     }
 
-    public void checkAnnotation(RoundEnvironment roundEnv, Class<? extends Annotation> protobufMessageClass, String error, ElementKind... elementKind) {
-       var kinds = Set.of(elementKind);
+    @SafeVarargs
+    private void checkEnclosing(RoundEnvironment roundEnv, Class<? extends Annotation> annotation, String error, Class<? extends Annotation>... requiredAnnotations) {
+        roundEnv.getElementsAnnotatedWith(annotation)
+                .stream()
+                .filter(property -> {
+                    var enclosingTypeElement = getEnclosingTypeElement(property);
+                    return Arrays.stream(requiredAnnotations)
+                            .noneMatch(type -> enclosingTypeElement.getAnnotation(type) != null);
+                })
+                .forEach(property -> messages.printError(error, property));
+    }
+
+    private void checkAnnotation(RoundEnvironment roundEnv, Class<? extends Annotation> protobufMessageClass, String error, ElementKind... elementKind) {
+        var kinds = Set.of(elementKind);
         for(var element : roundEnv.getElementsAnnotatedWith(protobufMessageClass)) {
             if(!kinds.contains(element.getKind())) {
                 messages.printError(error, element);
             }
         }
     }
+
 }
