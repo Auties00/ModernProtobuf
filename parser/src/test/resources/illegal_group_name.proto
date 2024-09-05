@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+message Group {
+  oneof OneOf {
+    group value = 1 [deprecated = true] {
+
+    }
+  }
+}

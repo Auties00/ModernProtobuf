@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+message Group {
+  oneof OneOf {
+    group Value = 1
+  }
+}

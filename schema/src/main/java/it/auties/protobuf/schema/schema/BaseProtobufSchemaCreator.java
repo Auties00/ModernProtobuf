@@ -15,7 +15,11 @@ import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.*;
+import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -245,11 +249,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             }
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldModifier.REQUIRED)){
+        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldModifier.REPEATED)){
+        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.REPEATED)){
             compilationUnit.addImport(List.class.getName());
         }
 
@@ -259,7 +263,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
     private boolean hasFields(ProtobufObjectTree statement) {
         return statement instanceof ProtobufMessageTree messageTree && messageTree.statements()
                 .stream()
-                .anyMatch(entry -> entry instanceof ProtobufModifiableFieldTree
+                .anyMatch(entry -> entry instanceof ProtobufGroupableFieldTree
                         || (entry instanceof ProtobufMessageTree nestedMessageTree && hasFields(nestedMessageTree)));
     }
 
@@ -267,15 +271,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
 
     }
 
-    private boolean hasFieldsWithModifier(ProtobufFieldModifier modifier) {
+    private boolean hasFieldsWithModifier(ProtobufFieldTree.Modifier modifier) {
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufObjectTree<?> statement, ProtobufFieldModifier modifier) {
+    private boolean hasFieldsWithModifier(ProtobufObjectTree<?> statement, ProtobufFieldTree.Modifier modifier) {
         return statement.statements()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithModifier(messageStatement, modifier))
-                        || (entry instanceof ProtobufModifiableFieldTree fieldStatement && fieldStatement.modifier().orElse(null) == modifier));
+                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.modifier().orElse(null) == modifier));
 
     }
 
@@ -288,7 +292,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
         return statement.statements()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithType(messageStatement, types))
-                        || (entry instanceof ProtobufTypedFieldTree fieldStatement && fieldStatement.type().isPresent() && typesSet.contains(fieldStatement.type().get().protobufType())));
+                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.type().isPresent() && typesSet.contains(fieldStatement.type().get().protobufType())));
 
     }
 

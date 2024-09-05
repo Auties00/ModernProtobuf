@@ -1,6 +1,11 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.tree.body.document;
 
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.parser.tree.ProtobufNamedTree;
+import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
+import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -15,6 +20,7 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     private ProtobufVersion version;
 
     public ProtobufDocument(Path location) {
+        super(null);
         this.location = location;
         this.version = null;
         this.imports = new LinkedHashMap<>();
@@ -33,7 +39,7 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     @Override
     public ProtobufDocument addOption(String value) {
         var option = new ProtobufOptionTree(value);
-        option.setParent(this);
+        option.setParent(this, 1);
         options.put(value, option);
         this.lastOption = option;
         return this;

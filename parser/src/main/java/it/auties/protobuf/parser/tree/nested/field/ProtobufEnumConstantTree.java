@@ -1,4 +1,6 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.tree.nested.field;
+
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 
 import java.util.Objects;
 import java.util.stream.Collectors;

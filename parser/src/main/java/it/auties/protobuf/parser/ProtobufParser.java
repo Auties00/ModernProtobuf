@@ -1,15 +1,27 @@
 package it.auties.protobuf.parser;
 
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufInternalException;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.exception.ProtobufTypeException;
-import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.tree.ProtobufObjectTree.*;
-import it.auties.protobuf.parser.type.ProtobufMapType;
-import it.auties.protobuf.parser.type.ProtobufObjectType;
-import it.auties.protobuf.parser.type.ProtobufPrimitiveType;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.tree.ProtobufTree;
+import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;
+import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree.*;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufEnumConstantTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufGroupTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
+import it.auties.protobuf.parser.type.*;
 
 import java.io.IOException;
 import java.io.StreamTokenizer;
@@ -62,7 +74,7 @@ public final class ProtobufParser {
         }
     }
 
-    private final Deque<ProtobufIndexedBodyTree<?>> objects;
+    private final Deque<ProtobufBodyTree<?>> objects;
     private final Deque<Instruction> instructions;
     private final Deque<NestedInstruction> nestedInstructions;
     private final ReentrantLock parserLock;
@@ -129,9 +141,20 @@ public final class ProtobufParser {
             this.document = new ProtobufDocument(location);
             document.setName(location == null ? "" : location.getFileName().toString());
             this.tokenizer = new StreamTokenizer(new StringReader(input));
+            tokenizer.resetSyntax();
+            tokenizer.wordChars('a', 'z');
+            tokenizer.wordChars('A', 'Z');
+            tokenizer.wordChars(128 + 32, 255);
             tokenizer.wordChars('_', '_');
             tokenizer.wordChars('"', '"');
             tokenizer.wordChars('\'', '\'');
+            tokenizer.wordChars('.', '.');
+            tokenizer.wordChars('-', '-');
+            for (int i = '0'; i <= '9'; i++) {
+                tokenizer.wordChars(i, i);
+            }
+            tokenizer.whitespaceChars(0, ' ');
+            tokenizer.commentChar('/');
             tokenizer.quoteChar(STRING_LITERAL_DELIMITER);
             String token;
             while ((token = nextToken()) != null) {
@@ -139,7 +162,9 @@ public final class ProtobufParser {
             }
 
             return document;
-        }finally {
+        } catch (ProtobufSyntaxException syntaxException) {
+            throw ProtobufSyntaxException.withPath(syntaxException.getMessage(), location);
+        } finally {
             document = null;
             objects.clear();
             instructions.clear();
@@ -175,9 +200,9 @@ public final class ProtobufParser {
             case ProtobufDocument documentStatement -> attributeDocument(document, documentStatement);
             case ProtobufMessageTree messageStatement -> messageStatement.statements()
                     .forEach(child -> attributeStatement(document, child));
-            case ProtobufOneOfTree oneOfStatement -> oneOfStatement.statements()
+            case ProtobufOneofTree oneOfStatement -> oneOfStatement.statements()
                     .forEach(child -> attributeStatement(document, child));
-            case ProtobufTypedFieldTree fieldStatement -> attributeTypedStatement(document, fieldStatement, fieldStatement.type().orElse(null));
+            case ProtobufGroupableFieldTree fieldStatement -> attributeTypedStatement(document, fieldStatement, fieldStatement.type().orElse(null));
             default -> {}
         }
     }
@@ -190,20 +215,19 @@ public final class ProtobufParser {
         attributeOptions(document);
     }
 
-    private void attributeTypedStatement(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufTypeReference typeReference) {
+    private void attributeTypedStatement(ProtobufDocument document, ProtobufGroupableFieldTree typedFieldTree, ProtobufTypeReference typeReference) {
         switch (typeReference) {
             case ProtobufMapType mapType -> {
                 attributeTypedStatement(document, typedFieldTree, mapType.keyType().orElseThrow());
                 attributeTypedStatement(document, typedFieldTree, mapType.valueType().orElseThrow());
             }
             case ProtobufObjectType messageType -> attributeType(document, typedFieldTree, messageType);
-            case ProtobufPrimitiveType ignored -> {}
-            case null -> throw new ProtobufInternalException("Unexpected state");
+            case null, default -> {}
         }
         attributeOptions(typedFieldTree);
     }
 
-    private void attributeType(ProtobufDocument document, ProtobufTypedFieldTree typedFieldTree, ProtobufObjectType fieldType) {
+    private void attributeType(ProtobufDocument document, ProtobufGroupableFieldTree typedFieldTree, ProtobufObjectType fieldType) {
         if (fieldType.isAttributed()) {
             return;
         }
@@ -241,7 +265,7 @@ public final class ProtobufParser {
         fieldType.attribute(type);
     }
 
-    private Optional<ProtobufObjectTree<?>> getLocalType(ProtobufTypedFieldTree typedFieldTree, String accessed) {
+    private Optional<ProtobufObjectTree<?>> getLocalType(ProtobufGroupableFieldTree typedFieldTree, String accessed) {
         var parent = typedFieldTree.parent().orElse(null);
         ProtobufObjectTree<?> innerType = null;
         while (parent != null && innerType == null){
@@ -295,7 +319,7 @@ public final class ProtobufParser {
     }
 
     private void attributeDefaultValue(ProtobufOptionedTree<?> fieldTree, ProtobufOptionTree option) {
-        if(!(fieldTree instanceof ProtobufTypedFieldTree typedFieldTree)) {
+        if(!(fieldTree instanceof ProtobufGroupableFieldTree typedFieldTree)) {
             throw new ProtobufTypeException("Default values are only supported by typed fields");
         }
 
@@ -384,20 +408,9 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleToken(String token) {
-        switch (token) {
-            case OBJECT_END -> handleObjectEnd();
-            case TYPE_PARAMETERS_START -> handleTypeParametersStart();
-            case TYPE_PARAMETERS_END -> handleTypeParametersEnd();
-            case ARRAY_START -> handleOptionsStart();
-            case ARRAY_END -> handleOptionsEnd();
-            default -> handleTokenOnLastInstruction(token);
-        }
-    }
-
     private void handleOptionsStart() {
         ProtobufSyntaxException.check(hasFieldScope(),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + ARRAY_START, tokenizer.lineno());
         jumpIntoInstruction(Instruction.FIELD_OPTIONS);
     }
 
@@ -413,14 +426,14 @@ public final class ProtobufParser {
 
     private void handleOptionsEnd() {
         ProtobufSyntaxException.check(instructions.peekLast() == Instruction.FIELD_OPTIONS,
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + ARRAY_END, tokenizer.lineno());
         var fieldTree = (ProtobufFieldTree) objects.getLast()
                 .lastStatement()
                 .orElseThrow();
         var lastOption = fieldTree.lastOption()
                 .orElseThrow();
         ProtobufSyntaxException.check(lastOption.hasValue(),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + ARRAY_END, tokenizer.lineno());
         jumpOutInstruction();
     }
 
@@ -433,7 +446,7 @@ public final class ProtobufParser {
                 .isPresent();
     }
 
-    private void handleTokenOnLastInstruction(String token) {
+    private void handleToken(String token) {
         var instructionsSize = instructions.size();
         switch (instructions.peekLast()) {
             case PACKAGE -> handleDocumentPackage(token);
@@ -447,6 +460,7 @@ public final class ProtobufParser {
             case MAP_TYPE -> handleMapType(token);
             case FIELD_OPTIONS -> handleFieldOption(token);
             case FIELD -> handleField(token);
+            case GROUP_BODY -> handleNestedInstructionForBody(token, true);
             case UNKNOWN -> throw new ProtobufInternalException("Unexpected state");
             case null -> handleInstruction(token);
         }
@@ -465,17 +479,25 @@ public final class ProtobufParser {
     }
 
     private void handleMapType(String token) {
-        var fieldTree = (ProtobufTypedFieldTree) objects.getLast()
+        switch (token) {
+            case TYPE_PARAMETERS_START -> handleTypeParametersStart();
+            case TYPE_PARAMETERS_END -> handleTypeParametersEnd();
+            default -> handleMapTypeInstruction(token);
+        }
+    }
+
+    private void handleMapTypeInstruction(String token) {
+        var fieldTree = (ProtobufGroupableFieldTree) objects.getLast()
                 .lastStatement()
                 .orElseThrow();
-        var fieldType = (ProtobufTypeReference) fieldTree.type()
+        var fieldType = fieldTree.type()
                 .orElseThrow();
         var objectType = (ProtobufMapType) fieldType;
         switch (nestedInstructions.peekLast()) {
             case BODY_OR_VALUE -> {
                 if(isStatementEnd(token)) {
                     ProtobufSyntaxException.check(objectType.isAttributed(),
-                            "Unexpected token", tokenizer.lineno());
+                            "Unexpected token " + token, tokenizer.lineno());
                     return;
                 }
 
@@ -490,10 +512,10 @@ public final class ProtobufParser {
                     return;
                 }
 
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(!objectType.isAttributed() && Objects.equals(token, LIST_SEPARATOR),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
@@ -513,14 +535,14 @@ public final class ProtobufParser {
                 document.addStatement(importStatement);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(isStatementEnd(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
     private void handleTypeParametersEnd() {
         ProtobufSyntaxException.check(instructions.peekLast() == Instruction.MAP_TYPE && nestedInstructions.peekLast() == NestedInstruction.NESTED_INSTRUCTION_OR_END,
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + TYPE_PARAMETERS_END, tokenizer.lineno());
         jumpOutInstruction();
     }
 
@@ -533,9 +555,9 @@ public final class ProtobufParser {
     private boolean isValidTypeParameterScope() {
         return Optional.ofNullable(objects.peekLast())
                 .flatMap(ProtobufBodyTree::lastStatement)
-                .filter(entry -> entry instanceof ProtobufTypedFieldTree)
-                .map(entry -> (ProtobufTypedFieldTree) entry)
-                .flatMap(ProtobufTypedFieldTree::type)
+                .filter(entry -> entry instanceof ProtobufGroupableFieldTree)
+                .map(entry -> (ProtobufGroupableFieldTree) entry)
+                .flatMap(ProtobufGroupableFieldTree::type)
                 .filter(entry -> entry instanceof ProtobufMapType)
                 .isPresent();
     }
@@ -544,14 +566,35 @@ public final class ProtobufParser {
         var object = objects.pollLast();
         ProtobufSyntaxException.check(hasAnyStatements(object),
                 "Illegal enum or oneof without any constants", tokenizer.lineno());
-        ProtobufSyntaxException.check(isValidReservable(object),
-                "Illegal use of reserved field", tokenizer.lineno());
+        ProtobufSyntaxException.check(isValidIndex(object),
+                "Illegal field index used", tokenizer.lineno());
         ProtobufSyntaxException.check(isValidEnumConstant(object),
                 "Proto3 enums require the first constant to have index 0", tokenizer.lineno());
+        if(object instanceof ProtobufGroupTree groupTree) {
+            attributeSyntheticGroup(groupTree);
+            jumpOutInstruction();
+        }
+
         jumpOutInstruction();
     }
 
-    private boolean isValidEnumConstant(ProtobufIndexedBodyTree<?> indexedBodyTree) {
+    private void attributeSyntheticGroup(ProtobufGroupTree groupTree) {
+        var groupOwner = objects.peekLast();
+        if(groupOwner == null) {
+            throw new ProtobufInternalException("Missing group owner at line " + tokenizer.lineno());
+        }
+
+        var groupType = groupOwner.lastStatement()
+                .filter(entry -> entry instanceof ProtobufGroupableFieldTree)
+                .map(entry -> (ProtobufGroupableFieldTree) entry)
+                .flatMap(ProtobufGroupableFieldTree::type)
+                .filter(type -> type instanceof ProtobufGroupType)
+                .map(type -> (ProtobufGroupType) type)
+                .orElseThrow(() -> new ProtobufInternalException("Missing group type at line " + tokenizer.lineno()));
+        groupType.attribute(groupTree);
+    }
+
+    private boolean isValidEnumConstant(ProtobufBodyTree<?> indexedBodyTree) {
         return !(indexedBodyTree instanceof ProtobufEnumTree enumTree) || document.version().orElse(ProtobufVersion.defaultVersion()) != PROTOBUF_3 || enumTree.firstStatement()
                 .filter(constant -> constant.index().isPresent() && constant.index().getAsInt() == 0)
                 .isPresent();
@@ -563,39 +606,63 @@ public final class ProtobufParser {
                 .noneMatch(entry -> entry instanceof ProtobufImportTree importStatement && Objects.equals(importStatement.location(), token));
     }
 
-    private boolean isValidReservable(ProtobufIndexedBodyTree<?> indexedBodyTree) {
-        return !(indexedBodyTree instanceof ProtobufObjectTree<?> reservable) || reservable.reserved().isEmpty() || indexedBodyTree.statements()
+    private boolean isValidIndex(ProtobufBodyTree<?> indexedBodyTree) {
+        if (!(indexedBodyTree instanceof ProtobufObjectTree<?> reservable)) {
+            return true;
+        }
+
+        if (reservable.reserved().isEmpty() && reservable.extensions().isEmpty()){
+            return true;
+        }
+
+        return indexedBodyTree.statements()
                 .stream()
-                .map(entry -> entry instanceof ProtobufOneOfTree oneOfTree ? oneOfTree.statements() : List.of(entry))
+                .map(entry -> entry instanceof ProtobufOneofTree oneOfTree ? oneOfTree.statements() : List.of(entry))
                 .flatMap(Collection::stream)
-                .filter(entry -> entry instanceof ProtobufIndexedTree)
-                .map(entry -> (ProtobufIndexedTree) entry)
+                .filter(entry -> entry instanceof ProtobufFieldTree)
+                .map(entry -> (ProtobufFieldTree) entry)
                 .noneMatch(entry -> hasForbiddenField(reservable, entry));
     }
 
-    private boolean hasForbiddenField(ProtobufObjectTree<?> reservable, ProtobufIndexedTree entry) {
+    private boolean hasForbiddenField(ProtobufObjectTree<?> reservable, ProtobufFieldTree entry) {
         var index = entry.index().orElseThrow();
-        var name = entry instanceof ProtobufFieldTree fieldTree ? fieldTree.name().orElseThrow() : null;
-        return reservable.hasReservedIndex(index) || reservable.hasReservedName(name);
+        var name = entry.name().orElseThrow();
+        return reservable.hasReservedIndex(index) || reservable.hasReservedName(name) || reservable.hasExtensionsIndex(index);
     }
 
-    private boolean hasAnyStatements(ProtobufIndexedBodyTree<?> object) {
-        return (object instanceof ProtobufEnumTree enumStatement && !enumStatement.statements().isEmpty())
-                || (object instanceof ProtobufOneOfTree oneOfStatement && !oneOfStatement.statements().isEmpty())
-                || object instanceof ProtobufMessageTree;
+    private boolean hasAnyStatements(ProtobufBodyTree<?> object) {
+        if(object instanceof ProtobufEnumTree enumStatement) {
+            return !enumStatement.statements().isEmpty();
+        }
+
+        if(object instanceof ProtobufOneofTree oneOfStatement) {
+            return !oneOfStatement.statements().isEmpty();
+        }
+
+        return true;
     }
 
     private void handleInstructionWithBody(String token) {
+        if (token.equals(OBJECT_END)) {
+            handleObjectEnd();
+            return;
+        }
+
         switch (nestedInstructions.peekLast()) {
             case DECLARATION -> handleNestedBodyDeclaration(instructions.getLast(), token);
             case INITIALIZER -> ProtobufSyntaxException.check(isObjectStart(token),
                     "Expected message initializer after message declaration", tokenizer.lineno());
-            case BODY_OR_VALUE -> handleNestedInstructionForBody(token);
+            case BODY_OR_VALUE -> handleNestedInstructionForBody(token, false);
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
-    private void handleNestedInstructionForBody(String token) {
+    private void handleNestedInstructionForBody(String token, boolean allowObjectEnd) {
+        if (allowObjectEnd && token.equals(OBJECT_END)) {
+            handleObjectEnd();
+            return;
+        }
+
         var nestedInstruction = Instruction.of(token, true);
         var actualNestedInstruction = nestedInstruction == Instruction.UNKNOWN ? Instruction.FIELD : nestedInstruction;
         if (actualNestedInstruction == Instruction.FIELD) {
@@ -607,7 +674,7 @@ public final class ProtobufParser {
     private void handleReserved(String token) {
         var scope = objects.peekLast();
         if(!(scope instanceof ProtobufObjectTree<?> reservable)) {
-            throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
+            throw new ProtobufSyntaxException("Invalid scope for reserved", tokenizer.lineno());
         }
 
         var reserved = reservable.reserved()
@@ -617,7 +684,7 @@ public final class ProtobufParser {
                 .orElse(null);
         if(isStatementEnd(token)) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() == NestedInstruction.NESTED_INSTRUCTION_OR_END && !reservable.reserved().isEmpty(),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             if(reserved != null) {
                 reserved.setAttributed(true);
             }
@@ -626,19 +693,19 @@ public final class ProtobufParser {
         }
 
         ProtobufSyntaxException.check(nestedInstructions.peekLast() == NestedInstruction.BODY_OR_VALUE || token.equals(LIST_SEPARATOR) || token.equals(RANGE_OPERATOR),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
         if(nestedInstructions.peekLast() != NestedInstruction.BODY_OR_VALUE && token.equals(LIST_SEPARATOR)) {
             return;
         }
 
         if(Objects.equals(token, RANGE_OPERATOR)) {
             if(!(reserved instanceof ReservedIndexes indexes)) {
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
 
             var lastValue = indexes.pollLastValue();
             if(lastValue == null || lastValue == Integer.MAX_VALUE) {
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
 
             if(indexes.isEmpty()) {
@@ -652,19 +719,19 @@ public final class ProtobufParser {
         switch (reserved) {
             case ReservedIndexes reservedIndexes -> {
                 var index = parseIndex(token, false, false);
-                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
+                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedIndexes.addValue(index.get()),
                         "Duplicate reserved index", tokenizer.lineno());
             }
             case ReservedNames reservedNames -> {
                 var literal = parseStringLiteral(token);
-                ProtobufSyntaxException.check(literal.isPresent(), "Unexpected token", tokenizer.lineno());
+                ProtobufSyntaxException.check(literal.isPresent(), "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedNames.addValue(literal.get()),
                         "Duplicate reserved name", tokenizer.lineno());
             }
             case ReservedRange reservedRange -> {
                 var index = parseIndex(token, false, true);
-                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
+                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(reservedRange.setMax(index.get()),
                         "Duplicate reserved index", tokenizer.lineno());
                 reserved.setAttributed(true);
@@ -684,7 +751,7 @@ public final class ProtobufParser {
                     return;
                 }
 
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
         }
     }
@@ -692,17 +759,17 @@ public final class ProtobufParser {
     private void handleExtensions(String token) {
         var scope = objects.peekLast();
         if(!(scope instanceof ProtobufObjectTree<?> extensible)) {
-            throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
+            throw new ProtobufSyntaxException("Invalid scope for extensions", tokenizer.lineno());
         }
 
         if(isStatementEnd(token)) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() == NestedInstruction.NESTED_INSTRUCTION_OR_END && !extensible.extensions().isEmpty(),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             return;
         }
 
         ProtobufSyntaxException.check(nestedInstructions.peekLast() == NestedInstruction.BODY_OR_VALUE || token.equals(LIST_SEPARATOR) || token.equals(RANGE_OPERATOR),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
         if(nestedInstructions.peekLast() != NestedInstruction.BODY_OR_VALUE && token.equals(LIST_SEPARATOR)) {
             return;
         }
@@ -715,32 +782,32 @@ public final class ProtobufParser {
         var didDeclareRange = Objects.equals(token, RANGE_OPERATOR);
         if(didDeclareRange) {
             if(!(extensions instanceof ExtensionsIndexes indexes)) {
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
 
             var lastValue = indexes.pollLastValue();
             if(lastValue == null || lastValue == Integer.MAX_VALUE) {
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
 
             if(indexes.isEmpty()) {
                 extensible.pollExtensions();
             }
 
-            extensible.addReservedRange(lastValue);
+            extensible.addExtensionsRange(lastValue);
             return;
         }
 
         switch (extensions) {
             case ExtensionsIndexes extensionsIndexes -> {
                 var index = parseIndex(token, false, false);
-                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
+                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(extensionsIndexes.addValue(index.get()),
                         "Duplicate extensions index", tokenizer.lineno());
             }
             case ExtensionsRange extensionsRange -> {
                 var index = parseIndex(token, false, true);
-                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token", tokenizer.lineno());
+                ProtobufSyntaxException.check(index.isPresent(), "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(extensionsRange.setMax(index.get()),
                         "Duplicate extensions index", tokenizer.lineno());
             }
@@ -752,7 +819,7 @@ public final class ProtobufParser {
                     return;
                 }
 
-                throw new ProtobufSyntaxException("Unexpected token", tokenizer.lineno());
+                throw new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno());
             }
         }
     }
@@ -762,13 +829,13 @@ public final class ProtobufParser {
                 ? Optional.of(token.substring(1, token.length() - 1)) : Optional.empty();
     }
 
-    private ProtobufIndexedBodyTree<?> checkFieldParent(String token, ProtobufFieldModifier modifier) {
+    private ProtobufBodyTree<?> checkFieldParent(String token, ProtobufFieldTree.Modifier modifier) {
         var scope = objects.peekLast();
-        if (modifier != ProtobufFieldModifier.NOTHING) {
-            ProtobufSyntaxException.check(document.version().orElse(ProtobufVersion.defaultVersion()) == PROTOBUF_2 || modifier != ProtobufFieldModifier.REQUIRED,
+        if (!(modifier instanceof ProtobufFieldTree.Modifier.MaybeNothing maybeNothing)) {
+            ProtobufSyntaxException.check(document.version().orElse(ProtobufVersion.defaultVersion()) == PROTOBUF_2 || modifier.type() != ProtobufFieldTree.Modifier.Type.REQUIRED,
                     "Support for the required label was dropped in proto3", tokenizer.lineno());
-            ProtobufSyntaxException.check(scope instanceof ProtobufMessageTree,
-                    "Expected message scope for field declaration", tokenizer.lineno());
+            ProtobufSyntaxException.check(scope instanceof ProtobufMessageTree || scope instanceof ProtobufGroupTree,
+                    "Expected message or group scope for field declaration", tokenizer.lineno());
             return scope;
         }
 
@@ -776,33 +843,45 @@ public final class ProtobufParser {
             return scope;
         }
 
-        if (scope instanceof ProtobufEnumTree || scope instanceof ProtobufOneOfTree || token.equals(MAP_TYPE)) {
+        if (scope instanceof ProtobufEnumTree || scope instanceof ProtobufOneofTree || token.equals(MAP_TYPE)) {
             return scope;
         }
 
-        throw new ProtobufSyntaxException("Expected enum or one of scope for field declaration without label",
+        throw new ProtobufSyntaxException("Expected a valid field modifier in proto2 message scope for token " + maybeNothing.token(),
                 tokenizer.lineno());
     }
 
     private void handleField(String token) {
+        switch (token) {
+            case TYPE_PARAMETERS_START -> handleTypeParametersStart();
+            case TYPE_PARAMETERS_END -> handleTypeParametersEnd();
+            case ARRAY_START -> handleOptionsStart();
+            case ARRAY_END -> handleOptionsEnd();
+            default -> handleFieldInstruction(token);
+        }
+    }
+
+    private void handleFieldInstruction(String token) {
         var parent = objects.getLast();
         var lastField = parent.lastStatement().orElseThrow();
         switch (lastField) {
-            case ProtobufModifiableFieldTree fieldTree -> handleModifiableField(token, fieldTree, parent);
+            case ProtobufGroupableFieldTree fieldTree -> handleModifiableField(token, fieldTree, parent);
             case ProtobufEnumConstantTree constant -> handleEnumConstant(token, constant, parent);
             default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
-    private void handleModifiableField(String token, ProtobufModifiableFieldTree fieldTree, ProtobufIndexedBodyTree<?> parent) {
+    private void handleModifiableField(String token, ProtobufGroupableFieldTree fieldTree, ProtobufBodyTree<?> parent) {
         switch (parent) {
             case ProtobufMessageTree ignored -> handleMessageField(token, fieldTree, parent);
-            case ProtobufOneOfTree ignored -> handleOneOfField(token, fieldTree, parent);
+            case ProtobufGroupTree ignored ->  handleMessageField(token, fieldTree, parent);
+            case ProtobufOneofTree ignored -> handleOneOfField(token, fieldTree, parent);
             default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
-    private void handleOneOfField(String token, ProtobufModifiableFieldTree fieldTree, ProtobufIndexedBodyTree<?> parent) {
+    @SuppressWarnings("deprecation")
+    private void handleOneOfField(String token, ProtobufGroupableFieldTree fieldTree, ProtobufBodyTree<?> parent) {
         if(fieldTree.type().isEmpty()) {
             fieldTree.setType(ProtobufTypeReference.of(token));
             return;
@@ -811,6 +890,8 @@ public final class ProtobufParser {
         if(fieldTree.name().isEmpty()) {
             ProtobufSyntaxException.check(isLegalIdentifier(token), "Illegal field name: %s",
                     tokenizer.lineno(), token);
+            ProtobufSyntaxException.check(!parent.hasName(token),
+                    "Duplicated name %s", tokenizer.lineno(), token);
             fieldTree.setName(token);
             jumpIntoNestedInstruction(NestedInstruction.INITIALIZER);
             return;
@@ -818,33 +899,58 @@ public final class ProtobufParser {
 
         if(fieldTree.index().isEmpty()) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() != NestedInstruction.INITIALIZER || isAssignmentOperator(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             if(nestedInstructions.peekLast() == NestedInstruction.INITIALIZER) {
                 jumpIntoNestedInstruction(NestedInstruction.BODY_OR_VALUE);
                 return;
             }
 
             var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufSyntaxException("Unexpected token", tokenizer.lineno()));
+                    .orElseThrow(() -> new ProtobufSyntaxException("Invalid index " + token, tokenizer.lineno()));
             ProtobufSyntaxException.check(!parent.hasIndex(index),
                     "Duplicated index %s", tokenizer.lineno(), index);
             fieldTree.setIndex(index);
             return;
         }
 
+        var type = fieldTree.type();
+        if(type.isPresent() && type.get().protobufType() == ProtobufType.GROUP) {
+            handleGroupStart(token, fieldTree);
+            return;
+        }
+
         ProtobufSyntaxException.check(isStatementEnd(token),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
     }
 
-    private void handleMessageField(String token, ProtobufModifiableFieldTree fieldTree, ProtobufIndexedBodyTree<?> parent) {
+    private void handleGroupStart(String token, ProtobufGroupableFieldTree fieldTree) {
+        ProtobufSyntaxException.check(document.version().orElse(ProtobufVersion.defaultVersion()) == PROTOBUF_2,
+                "Groups are not supported in proto3", tokenizer.lineno());
+        ProtobufSyntaxException.check(isObjectStart(token),
+                "Unexpected token " + token, tokenizer.lineno());
+        var syntheticName = fieldTree.name()
+                        .orElseThrow(() -> new ProtobufInternalException("Missing field name for group"));
+        ProtobufSyntaxException.check(!syntheticName.isEmpty() && Character.isUpperCase(syntheticName.charAt(0)),
+                "Group name " + syntheticName + " should start with a capital letter", tokenizer.lineno());
+        var groupTree = new ProtobufGroupTree(syntheticName);
+        var fieldParent = fieldTree.parent()
+                .orElseThrow(() -> new ProtobufInternalException("Missing field parent at line " + tokenizer.lineno()));
+        groupTree.setParent(fieldParent, 2);
+        objects.add(groupTree);
+        jumpIntoInstruction(Instruction.GROUP_BODY);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void handleMessageField(String token, ProtobufGroupableFieldTree fieldTree, ProtobufBodyTree<?> parent) {
         if(fieldTree.modifier().isEmpty()) {
-            fieldTree.setModifier(ProtobufFieldModifier.of(token));
+            var modifier = ProtobufFieldTree.Modifier.of(token);
+            fieldTree.setModifier(modifier);
             return;
         }
 
         if(fieldTree.type().isEmpty()) {
-            ProtobufSyntaxException.check(!token.equals(MAP_TYPE) || fieldTree.modifier().get() == ProtobufFieldModifier.NOTHING,
-                    "Unexpected token", tokenizer.lineno());
+            ProtobufSyntaxException.check(!token.equals(MAP_TYPE) || fieldTree.modifier().get().type() == ProtobufFieldTree.Modifier.Type.NOTHING,
+                    "Unexpected token " + token, tokenizer.lineno());
             fieldTree.setType(ProtobufTypeReference.of(token));
             return;
         }
@@ -852,6 +958,8 @@ public final class ProtobufParser {
         if(fieldTree.name().isEmpty()) {
             ProtobufSyntaxException.check(isLegalIdentifier(token), "Illegal field name: %s",
                     tokenizer.lineno(), token);
+            ProtobufSyntaxException.check(!parent.hasName(token),
+                    "Duplicated name %s", tokenizer.lineno(), token);
             fieldTree.setName(token);
             jumpIntoNestedInstruction(NestedInstruction.INITIALIZER);
             return;
@@ -859,28 +967,36 @@ public final class ProtobufParser {
 
         if(fieldTree.index().isEmpty()) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() != NestedInstruction.INITIALIZER || isAssignmentOperator(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             if(nestedInstructions.peekLast() == NestedInstruction.INITIALIZER) {
                 jumpIntoNestedInstruction(NestedInstruction.BODY_OR_VALUE);
                 return;
             }
 
             var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufSyntaxException("Unexpected token", tokenizer.lineno()));
+                    .orElseThrow(() -> new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno()));
             ProtobufSyntaxException.check(!parent.hasIndex(index),
                     "Duplicated index %s", tokenizer.lineno(), index);
             fieldTree.setIndex(index);
             return;
         }
 
+        var type = fieldTree.type();
+        if(type.isPresent() && type.get().protobufType() == ProtobufType.GROUP) {
+            handleGroupStart(token, fieldTree);
+            return;
+        }
+
         ProtobufSyntaxException.check(isStatementEnd(token),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
     }
 
-    private void handleEnumConstant(String token, ProtobufEnumConstantTree constant, ProtobufIndexedBodyTree<?> parent) {
+    private void handleEnumConstant(String token, ProtobufEnumConstantTree constant, ProtobufBodyTree<?> parent) {
         if(constant.name().isEmpty()) {
             ProtobufSyntaxException.check(isLegalIdentifier(token), "Illegal field name: %s",
                     tokenizer.lineno(), token);
+            ProtobufSyntaxException.check(!parent.hasName(token),
+                    "Duplicated name %s", tokenizer.lineno(), token);
             constant.setName(token);
             jumpIntoNestedInstruction(NestedInstruction.INITIALIZER);
             return;
@@ -888,14 +1004,14 @@ public final class ProtobufParser {
 
         if(constant.index().isEmpty()) {
             ProtobufSyntaxException.check(nestedInstructions.peekLast() != NestedInstruction.DECLARATION || isAssignmentOperator(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             if(nestedInstructions.peekLast() == NestedInstruction.DECLARATION) {
                 jumpIntoNestedInstruction(NestedInstruction.BODY_OR_VALUE);
                 return;
             }
 
             var index = parseIndex(token, true, false)
-                    .orElseThrow(() -> new ProtobufSyntaxException("Unexpected token", tokenizer.lineno()));
+                    .orElseThrow(() -> new ProtobufSyntaxException("Unexpected token " + token, tokenizer.lineno()));
             ProtobufSyntaxException.check(!parent.hasIndex(index),
                     "Duplicated index %s", tokenizer.lineno(), index);
             constant.setIndex(index);
@@ -903,26 +1019,27 @@ public final class ProtobufParser {
         }
 
         ProtobufSyntaxException.check(isStatementEnd(token),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
     }
 
     private void handleFieldDeclaration(String token) {
-        var modifier = ProtobufFieldModifier.of(token);
+        var modifier = ProtobufFieldTree.Modifier.of(token);
         var parent = checkFieldParent(token, modifier);
         switch (parent) {
             case ProtobufMessageTree messageTree -> handleMessageFieldDeclaration(token, messageTree, modifier);
+            case ProtobufGroupTree groupTree -> handleGroupFieldDeclaration(token, groupTree, modifier);
             case ProtobufEnumTree enumTree -> handleEnumConstantDeclaration(token, enumTree);
-            case ProtobufOneOfTree oneOfTree -> handleOneOfFieldDeclaration(token, oneOfTree, modifier);
+            case ProtobufOneofTree oneOfTree -> handleOneOfFieldDeclaration(token, oneOfTree, modifier);
             default -> throw new ProtobufInternalException("Unexpected context");
         }
     }
 
-    private void handleOneOfFieldDeclaration(String token, ProtobufOneOfTree oneOfTree, ProtobufFieldModifier modifier) {
-        var field = new ProtobufModifiableFieldTree();
-        ProtobufSyntaxException.check(modifier == ProtobufFieldModifier.NOTHING || modifier == ProtobufFieldModifier.OPTIONAL,
-                "Unexpected token", tokenizer.lineno());
+    private void handleOneOfFieldDeclaration(String token, ProtobufOneofTree oneOfTree, ProtobufFieldTree.Modifier modifier) {
+        var field = new ProtobufGroupableFieldTree();
+        ProtobufSyntaxException.check(modifier.type() == ProtobufFieldTree.Modifier.Type.NOTHING || modifier.type() == ProtobufFieldTree.Modifier.Type.OPTIONAL,
+                "Unexpected token " + token, tokenizer.lineno());
         field.setModifier(modifier);
-        if(modifier == ProtobufFieldModifier.NOTHING) {
+        if(modifier.type() == ProtobufFieldTree.Modifier.Type.NOTHING) {
             field.setType(ProtobufTypeReference.of(token));
         }
 
@@ -935,8 +1052,8 @@ public final class ProtobufParser {
         enumTree.addStatement(field);
     }
 
-    private void handleMessageFieldDeclaration(String token, ProtobufMessageTree messageTree, ProtobufFieldModifier modifier) {
-        var field = new ProtobufModifiableFieldTree();
+    private void handleMessageFieldDeclaration(String token, ProtobufMessageTree messageTree, ProtobufFieldTree.Modifier modifier) {
+        var field = new ProtobufGroupableFieldTree();
         switch (document.version().orElse(ProtobufVersion.defaultVersion())){
             case PROTOBUF_2 -> {
                 field.setModifier(modifier);
@@ -946,12 +1063,21 @@ public final class ProtobufParser {
             }
             case PROTOBUF_3 -> {
                 field.setModifier(modifier);
-                if(modifier == ProtobufFieldModifier.NOTHING) {
+                if(modifier.type() == ProtobufFieldTree.Modifier.Type.NOTHING) {
                     field.setType(ProtobufTypeReference.of(token));
                 }
             }
         }
         messageTree.addStatement(field);
+    }
+
+    private void handleGroupFieldDeclaration(String token, ProtobufGroupTree groupTree, ProtobufFieldTree.Modifier modifier) {
+        var field = new ProtobufGroupableFieldTree();
+        field.setModifier(modifier);
+        if(token.equals(MAP_TYPE)) {
+            field.setType(ProtobufTypeReference.of(token));
+        }
+        groupTree.addStatement(field);
     }
 
     private void handleDocumentOption(String token) {
@@ -962,16 +1088,24 @@ public final class ProtobufParser {
             case BODY_OR_VALUE -> {
                 var lastOption = document.lastOption();
                 ProtobufSyntaxException.check(lastOption.isPresent(),
-                                "Unexpected token", tokenizer.lineno());
+                                "Unexpected token " + token, tokenizer.lineno());
                 lastOption.get().setRawValue(token);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(isStatementEnd(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
     private void handleFieldOption(String token) {
+        switch (token) {
+            case ARRAY_START -> handleOptionsStart();
+            case ARRAY_END -> handleOptionsEnd();
+            default -> handleFieldOptionInstruction(token);
+        }
+    }
+
+    private void handleFieldOptionInstruction(String token) {
         switch (nestedInstructions.peekLast()) {
             case DECLARATION -> {
                 var fieldTree = (ProtobufFieldTree) objects.getLast()
@@ -981,7 +1115,7 @@ public final class ProtobufParser {
                         "Support for the default values was dropped in proto3", tokenizer.lineno());
                 fieldTree.addOption(token);
             }
-            case INITIALIZER -> ProtobufSyntaxException.check(isAssignmentOperator(token), "Unexpected token", tokenizer.lineno());
+            case INITIALIZER -> ProtobufSyntaxException.check(isAssignmentOperator(token), "Unexpected token " + token, tokenizer.lineno());
             case BODY_OR_VALUE -> {
                 var fieldTree = (ProtobufFieldTree) objects.getLast()
                         .lastStatement()
@@ -991,24 +1125,24 @@ public final class ProtobufParser {
                 lastOption.setRawValue(token);
             }
             case NESTED_INSTRUCTION_OR_END -> ProtobufSyntaxException.check(token.equals(LIST_SEPARATOR) || isStatementEnd(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
     }
 
     private void handleDocumentSyntax(String token) {
         ProtobufSyntaxException.check(document.statements().isEmpty(),
-                "Unexpected token", tokenizer.lineno());
+                "Unexpected token " + token, tokenizer.lineno());
         switch (nestedInstructions.peekLast()) {
             case INITIALIZER -> ProtobufSyntaxException.check(isAssignmentOperator(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             case BODY_OR_VALUE -> document.setVersion(ProtobufVersion.of(token)
                     .orElseThrow(() -> new ProtobufSyntaxException("Illegal syntax declaration: %s is not a valid version".formatted(token), tokenizer.lineno())));
             case NESTED_INSTRUCTION_OR_END -> {
                 ProtobufSyntaxException.check(document.version().isPresent(),
-                        "Unexpected token", tokenizer.lineno());
+                        "Unexpected token " + token, tokenizer.lineno());
                 ProtobufSyntaxException.check(isStatementEnd(token),
-                        "Unexpected token", tokenizer.lineno());
+                        "Unexpected token " + token, tokenizer.lineno());
             }
             case null, default -> throw new ProtobufInternalException("Unexpected state");
         }
@@ -1017,7 +1151,7 @@ public final class ProtobufParser {
     private void handleDocumentPackage(String token) {
         if (nestedInstructions.peekLast() != NestedInstruction.BODY_OR_VALUE) {
             ProtobufSyntaxException.check(isStatementEnd(token),
-                    "Unexpected token", tokenizer.lineno());
+                    "Unexpected token " + token, tokenizer.lineno());
             return;
         }
 
@@ -1029,7 +1163,7 @@ public final class ProtobufParser {
     private void handleInstruction(String token) {
         var instruction = Instruction.of(token, false);
         ProtobufSyntaxException.check(instruction != Instruction.UNKNOWN,
-                "Unexpected token", tokenizer.lineno(), token);
+                "Unexpected token " + token, tokenizer.lineno(), token);
         jumpIntoInstruction(instruction);
     }
 
@@ -1055,20 +1189,21 @@ public final class ProtobufParser {
         var object = switch (instruction) {
             case MESSAGE -> new ProtobufMessageTree(name);
             case ENUM -> new ProtobufEnumTree(name);
-            case ONE_OF -> new ProtobufOneOfTree(name);
+            case ONE_OF -> new ProtobufOneofTree(name);
             default -> throw new ProtobufSyntaxException("Illegal state", tokenizer.lineno());
         };
         var scope = objects.peekLast();
-        if(scope == null){
-            if(!(object instanceof ProtobufDocumentChildTree childTree)) {
-                throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
-            }
+        switch (scope) {
+            case ProtobufMessageTree message -> message.addStatement(object);
+            case ProtobufGroupTree groupTree -> groupTree.addStatement(object);
+            case null -> {
+                if (!(object instanceof ProtobufDocumentChildTree childTree)) {
+                    throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
+                }
 
-            document.addStatement(childTree);
-        }else if(scope instanceof ProtobufMessageTree message){
-            message.addStatement(object);
-        }else {
-            throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
+                document.addStatement(childTree);
+            }
+            default -> throw new ProtobufSyntaxException("Invalid scope", tokenizer.lineno());
         }
 
         objects.add(object);
@@ -1131,7 +1266,8 @@ public final class ProtobufParser {
         EXTENSIONS("extensions", true, List.of(NestedInstruction.BODY_OR_VALUE, NestedInstruction.NESTED_INSTRUCTION_OR_END), true, true),
         MAP_TYPE(null, false, List.of(NestedInstruction.BODY_OR_VALUE, NestedInstruction.NESTED_INSTRUCTION_OR_END), true, true),
         FIELD(null, false, NestedInstruction.VALUES, false, false),
-        FIELD_OPTIONS(null, false, NestedInstruction.VALUES, true, true);
+        FIELD_OPTIONS(null, false, NestedInstruction.VALUES, true, true),
+        GROUP_BODY(null, true, List.of(NestedInstruction.BODY_OR_VALUE), true, false);
 
         private final String name;
         private final boolean nestable;

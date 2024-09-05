@@ -7,6 +7,8 @@ import java.util.Optional;
 public enum ProtobufType {
     UNKNOWN(null, null, false),
     OBJECT(Object.class, Object.class, false),
+    @Deprecated
+    GROUP(Object.class, Object.class, false),
     MAP(Map.class, Map.class, false),
     FLOAT(float.class, Float.class, true),
     DOUBLE(double.class, Double.class, true),
@@ -38,7 +40,7 @@ public enum ProtobufType {
 
     public static Optional<ProtobufType> of(String name) {
         return Arrays.stream(values())
-                .filter(entry -> entry.name().equalsIgnoreCase(name))
+                .filter(entry -> entry.name().toLowerCase().equals(name))
                 .findFirst();
     }
 

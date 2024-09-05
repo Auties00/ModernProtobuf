@@ -1,11 +1,15 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.tree.body.oneof;
+
+import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufGroupableChildTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
 
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class ProtobufOneOfTree extends ProtobufIndexedBodyTree<ProtobufModifiableFieldTree> implements ProtobufMessageChildTree {
-    public ProtobufOneOfTree(String name) {
+public final class ProtobufOneofTree extends ProtobufBodyTree<ProtobufGroupableFieldTree> implements ProtobufGroupableChildTree {
+    public ProtobufOneofTree(String name) {
         super(name);
     }
 
@@ -21,7 +25,7 @@ public final class ProtobufOneOfTree extends ProtobufIndexedBodyTree<ProtobufMod
 
     @Override
     public boolean isAttributed() {
-        return statements().stream().allMatch(ProtobufModifiableFieldTree::isAttributed);
+        return statements().stream().allMatch(ProtobufGroupableFieldTree::isAttributed);
     }
 
     @Override

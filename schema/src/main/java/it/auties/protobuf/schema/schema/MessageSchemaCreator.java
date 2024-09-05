@@ -18,7 +18,12 @@ import com.github.javaparser.ast.type.Type;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.*;
+import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;
 import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import it.auties.protobuf.schema.util.AstUtils;
@@ -28,8 +33,8 @@ import java.util.*;
 
 import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
 import static com.github.javaparser.StaticJavaParser.parseType;
-import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REPEATED;
-import static it.auties.protobuf.parser.tree.ProtobufFieldModifier.REQUIRED;
+import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.REPEATED;
+import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.REQUIRED;
 
 final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessageTree> {
     private final List<FieldDeclaration> fields;
@@ -173,7 +178,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         blockStmt.addStatement(new ReturnStmt(new ThisExpr()));
     }
 
-    private void createGetter(ClassOrInterfaceDeclaration ctClass, ProtobufTypedFieldTree statement, MessageType type) {
+    private void createGetter(ClassOrInterfaceDeclaration ctClass, ProtobufGroupableFieldTree statement, MessageType type) {
         if (getMethod(ctClass, AstUtils.toJavaName(statement.name().orElseThrow())).isPresent()) {
             return;
         }
@@ -185,7 +190,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         var blockStmt = new BlockStmt();
         getter.setBody(blockStmt);
         var fieldExpression = new NameExpr(AstUtils.toJavaName(statement.name().orElseThrow()));
-        var modifier = statement instanceof ProtobufModifiableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
+        var modifier = statement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
         if(modifier == REQUIRED || modifier == REPEATED || nullable) {
             blockStmt.addStatement(new ReturnStmt(fieldExpression));
         } else {
@@ -245,19 +250,19 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
     private void addClassMembers(ClassOrInterfaceDeclaration ctClass) {
         for(var statement : protoStatement.statements()){
-            if(statement instanceof ProtobufTypedFieldTree fieldStatement){
+            if(statement instanceof ProtobufGroupableFieldTree fieldStatement){
                 addClassField(fieldStatement, ctClass, false);
             }else if(statement instanceof ProtobufMessageTree messageStatement){
                 addNestedMessage(ctClass, messageStatement);
             }else if(statement instanceof ProtobufEnumTree enumStatement){
                 addNestedEnum(ctClass, enumStatement);
-            }else if (statement instanceof ProtobufOneOfTree oneOfStatement){
+            }else if (statement instanceof ProtobufOneofTree oneOfStatement){
                 addOneOfStatement(ctClass, oneOfStatement);
             }
         }
     }
 
-    private MessageType addClassField(ProtobufTypedFieldTree fieldStatement, ClassOrInterfaceDeclaration ctClass, boolean wrapType) {
+    private MessageType addClassField(ProtobufGroupableFieldTree fieldStatement, ClassOrInterfaceDeclaration ctClass, boolean wrapType) {
         var parameterType = getMessageType(ctClass, fieldStatement, wrapType);
         var existing = getClassField(fieldStatement, ctClass);
         if(existing.isPresent()){
@@ -279,7 +284,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         annotation.setName(ProtobufProperty.class.getSimpleName());
         annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index().orElseThrow())));
         annotation.addPair("type", new NameExpr(fieldStatement.type().orElseThrow().protobufType().name()));
-        var modifier = fieldStatement instanceof ProtobufModifiableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
+        var modifier = fieldStatement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
         if(modifier == REQUIRED) {
             annotation.addPair("required", new BooleanLiteralExpr(true));
         }
@@ -299,19 +304,19 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
     private void addRecordMembers(RecordDeclaration ctRecord) {
         for(var statement : protoStatement.statements()){
-            if(statement instanceof ProtobufModifiableFieldTree fieldStatement){
+            if(statement instanceof ProtobufGroupableFieldTree fieldStatement){
                 addRecordParameter(fieldStatement, ctRecord, false);
             }else if(statement instanceof ProtobufMessageTree messageStatement){
                 addNestedMessage(ctRecord, messageStatement);
             }else if(statement instanceof ProtobufEnumTree enumStatement){
                 addNestedEnum(ctRecord, enumStatement);
-            }else if (statement instanceof ProtobufOneOfTree oneOfStatement){
+            }else if (statement instanceof ProtobufOneofTree oneOfStatement){
                 addOneOfStatement(ctRecord, oneOfStatement);
             }
         }
     }
 
-    private MessageType addRecordParameter(ProtobufModifiableFieldTree fieldStatement, RecordDeclaration ctRecord, boolean wrapType) {
+    private MessageType addRecordParameter(ProtobufGroupableFieldTree fieldStatement, RecordDeclaration ctRecord, boolean wrapType) {
         var parameterType = getMessageType(ctRecord, fieldStatement, wrapType);
         var existing = getRecordParameter(fieldStatement, ctRecord);
         if(existing.isPresent()){
@@ -364,8 +369,8 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 .anyMatch(index -> index.asNumber().intValue() == fieldStatement.index().orElseThrow());
     }
 
-    private MessageType getMessageType(TypeDeclaration<?> scope, ProtobufTypedFieldTree fieldStatement, boolean wrapType) {
-        var modifier = fieldStatement instanceof ProtobufModifiableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
+    private MessageType getMessageType(TypeDeclaration<?> scope, ProtobufGroupableFieldTree fieldStatement, boolean wrapType) {
+        var modifier = fieldStatement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
         var qualifiedType = getMessageFieldType(fieldStatement.type().orElseThrow(), modifier == REQUIRED, modifier == REPEATED);
         var typeParameter = modifier == REPEATED ? qualifiedType : null;
         var javaType = typeParameter == null ? qualifiedType : MessageFieldType.listType(typeParameter);
@@ -513,7 +518,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         allMembers.add(member);
     }
 
-    private void addOneOfStatement(TypeDeclaration<?> typeDeclaration, ProtobufOneOfTree oneOfStatement) {
+    private void addOneOfStatement(TypeDeclaration<?> typeDeclaration, ProtobufOneofTree oneOfStatement) {
         var ctInterface = createOneOfInterface(typeDeclaration, oneOfStatement);
         var ctMethod = createOneOfMethod(typeDeclaration, oneOfStatement, ctInterface);
         var ctMethodBody = new BlockStmt();
@@ -569,7 +574,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         ctInterface.setPermittedTypes(permittedTypes);
     }
 
-    private MethodDeclaration createOneOfMethod(TypeDeclaration<?> typeDeclaration, ProtobufOneOfTree oneOfStatement, ClassOrInterfaceDeclaration ctInterface) {
+    private MethodDeclaration createOneOfMethod(TypeDeclaration<?> typeDeclaration, ProtobufOneofTree oneOfStatement, ClassOrInterfaceDeclaration ctInterface) {
         var existing = getMethod(typeDeclaration, AstUtils.toJavaName(oneOfStatement.name().orElseThrow()));
         if(existing.isPresent()) {
             return existing.get();
@@ -583,7 +588,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         return ctMethod;
     }
 
-    private ClassOrInterfaceDeclaration createOneOfInterface(TypeDeclaration<?> scope, ProtobufOneOfTree oneOfStatement) {
+    private ClassOrInterfaceDeclaration createOneOfInterface(TypeDeclaration<?> scope, ProtobufOneofTree oneOfStatement) {
         var result = getTypeMember(scope, oneOfStatement.className().orElseThrow());
         if (result.isPresent()) {
             return (ClassOrInterfaceDeclaration) result.get();

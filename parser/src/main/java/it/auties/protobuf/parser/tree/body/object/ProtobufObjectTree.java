@@ -1,15 +1,16 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.tree.body.object;
 
 import it.auties.protobuf.parser.exception.ProtobufInternalException;
+import it.auties.protobuf.parser.tree.ProtobufTree;
+import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufIndexedBodyTree<T> permits ProtobufEnumTree, ProtobufMessageTree {
+public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufBodyTree<T> permits ProtobufEnumTree, ProtobufGroupTree, ProtobufMessageTree {
     private final LinkedList<Reserved> reserved;
     private final LinkedList<Extensions> extensions;
-
-    ProtobufObjectTree(String name) {
+    protected ProtobufObjectTree(String name) {
         super(name);
         this.reserved = new LinkedList<>();
         this.extensions = new LinkedList<>();
@@ -355,25 +356,33 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufI
 
     @Override
     public String toString() {
+        var builder = new StringBuilder();
+        builder.append(header());
+        reserved.stream()
+                .map(entry -> toLeveledString("reserved " + entry + ";\n", this instanceof ProtobufGroupTree ? 0 : 1))
+                .forEach(builder::append);
+        extensions.stream()
+                .map(entry -> toLeveledString("extensions " + entry + ";\n", this instanceof ProtobufGroupTree ? 0 : 1))
+                .forEach(builder::append);
+        statements().forEach(statement -> {
+            builder.append(statement.toString());
+            builder.append("\n");
+        });
+        builder.append(toLeveledString("}", this instanceof ProtobufGroupTree ? -1 : 0));
+        return builder.toString();
+    }
+
+    private String header() {
+        if(this instanceof ProtobufGroupTree) {
+            return "{\n";
+        }
+
         var instructionName = switch (this) {
             case ProtobufMessageTree ignored -> "message";
             case ProtobufEnumTree ignored -> "enum";
             default -> throw new IllegalStateException("Unexpected value: " + this);
         };
         var name = Objects.requireNonNullElse(this.name, "[missing]");
-        var builder = new StringBuilder();
-        builder.append(toLeveledString("%s %s {\n".formatted(instructionName, name)));
-        reserved.stream()
-                .map(entry -> toLeveledString("reserved " + entry + ";\n", 1))
-                .forEach(builder::append);
-        extensions.stream()
-                .map(entry -> toLeveledString("extensions " + entry + ";\n", 1))
-                .forEach(builder::append);
-        statements().forEach(statement -> {
-            builder.append(statement.toString());
-            builder.append("\n");
-        });
-        builder.append(toLeveledString("}"));
-        return builder.toString();
+        return toLeveledString("%s %s {\n".formatted(instructionName, name));
     }
 }

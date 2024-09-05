@@ -11,8 +11,8 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.parser.tree.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;

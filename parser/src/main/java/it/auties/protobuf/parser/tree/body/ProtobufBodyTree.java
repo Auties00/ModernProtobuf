@@ -1,12 +1,22 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.tree.body;
+
+import it.auties.protobuf.parser.tree.ProtobufNamedTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufGroupTree;
+import it.auties.protobuf.parser.tree.nested.ProtobufNestedTree;
+import it.auties.protobuf.parser.tree.ProtobufTree;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
+import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 
 import java.util.*;
 import java.util.function.Consumer;
 
-public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree permits ProtobufDocument, ProtobufIndexedBodyTree {
-    String name;
-    final LinkedList<T> statements;
-    ProtobufBodyTree(){
+public sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree permits ProtobufDocument, ProtobufObjectTree, ProtobufOneofTree {
+    protected String name;
+    protected final LinkedList<T> statements;
+    protected ProtobufBodyTree(String name){
+        this.name = name;
         this.statements = new LinkedList<>();
     }
 
@@ -19,11 +29,26 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
         return this;
     }
 
-    public abstract Optional<String> qualifiedName();
+    public Optional<String> qualifiedName() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedName())
+                .map(parentName -> name == null ? parentName : parentName + (parent instanceof ProtobufObjectTree<?> ? "$" : ".") + name)
+                .or(this::name);
+    }
 
-    public abstract Optional<String> qualifiedCanonicalName();
+    public Optional<String> qualifiedCanonicalName() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedCanonicalName())
+                .map(parentName -> name == null ? parentName : parentName + "." + name)
+                .or(this::name);
+    }
 
-    public abstract Optional<String> qualifiedPath();
+    public Optional<String> qualifiedPath() {
+        return parent()
+                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageNamePath() : parent.qualifiedPath())
+                .map(parentName -> name == null ? parentName : parentName + "/" + name)
+                .or(this::name);
+    }
 
     public Collection<T> statements() {
         return Collections.unmodifiableCollection(statements);
@@ -39,7 +64,7 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
 
     public ProtobufBodyTree addStatement(T statement){
         if(statement instanceof ProtobufNestedTree nestedTree) {
-            nestedTree.setParent(this);
+            nestedTree.setParent(this, this instanceof ProtobufGroupTree ? 0 : 1);
         }
 
         statements.add(statement);
@@ -106,5 +131,36 @@ public abstract sealed class ProtobufBodyTree<T extends ProtobufTree> extends Pr
                 }
             })
             .toList();
+    }
+
+    public List<Integer> indexes() {
+        return statements().stream()
+                .filter(entry -> entry instanceof ProtobufFieldTree)
+                .map(entry -> (ProtobufFieldTree) entry)
+                .map(ProtobufFieldTree::index)
+                .flatMapToInt(OptionalInt::stream)
+                .boxed()
+                .toList();
+    }
+
+    public boolean hasIndex(int index) {
+        return statements()
+                .stream()
+                .filter(entry -> entry instanceof ProtobufFieldTree)
+                .map(entry -> (ProtobufFieldTree) entry)
+                .anyMatch(entry -> entry.index().isPresent() && entry.index().getAsInt() == index);
+    }
+
+    public boolean hasName(String name) {
+        return statements()
+                .stream()
+                .filter(entry -> entry instanceof ProtobufNamedTree)
+                .map(entry -> (ProtobufNamedTree) entry)
+                .anyMatch(entry -> entry.name().isPresent() && entry.name().get().equals(name));
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return name != null;
     }
 }
