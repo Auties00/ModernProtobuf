@@ -137,7 +137,7 @@ public abstract class JavaWriter extends PrintWriter {
         }
 
         public MethodWriter printMethodDeclaration(List<String> modifiers, String returnType, String methodName, String... parameters) {
-            printf("%s %s %s(%s) {%n", String.join(" ", modifiers), returnType, methodName, String.join(" ", parameters));
+            printf("%s %s %s(%s) {%n", String.join(" ", modifiers), returnType, methodName, String.join(", ", parameters));
             return new MethodWriter(this);
         }
 
