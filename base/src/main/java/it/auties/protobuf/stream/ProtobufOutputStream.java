@@ -302,7 +302,7 @@ public final class ProtobufOutputStream {
 
     public byte[] toByteArray() {
         if(position != buffer.length) {
-            throw new ProtobufSerializationException();
+            throw ProtobufSerializationException.sizeMismatch();
         }
 
         return buffer;
