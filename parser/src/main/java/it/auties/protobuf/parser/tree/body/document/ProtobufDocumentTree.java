@@ -3,7 +3,7 @@ package it.auties.protobuf.parser.tree.body.document;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.tree.ProtobufNamedTree;
 import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
-import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
+import it.auties.protobuf.parser.tree.nested.imports.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 
 import java.nio.file.Path;

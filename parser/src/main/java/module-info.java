@@ -12,5 +12,5 @@ module it.auties.protobuf.parser {
     exports it.auties.protobuf.parser.tree.body.oneof;
     exports it.auties.protobuf.parser.tree.body.object;
     exports it.auties.protobuf.parser.tree.nested;
-    exports it.auties.protobuf.parser.tree.nested.impors;
+    exports it.auties.protobuf.parser.tree.nested.imports;
 }

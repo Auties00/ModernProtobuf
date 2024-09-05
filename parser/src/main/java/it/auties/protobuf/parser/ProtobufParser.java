@@ -7,7 +7,7 @@ import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;
 import it.auties.protobuf.parser.tree.body.object.*;
-import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
+import it.auties.protobuf.parser.tree.nested.imports.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree.*;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufEnumConstantTree;
 import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;

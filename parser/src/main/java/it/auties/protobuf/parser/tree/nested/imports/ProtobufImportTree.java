@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser.tree.nested.impors;
+package it.auties.protobuf.parser.tree.nested.imports;
 
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;

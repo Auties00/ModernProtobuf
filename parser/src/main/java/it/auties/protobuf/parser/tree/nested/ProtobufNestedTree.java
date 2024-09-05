@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.tree.nested;
 
 import it.auties.protobuf.parser.tree.ProtobufTree;
 import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
-import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
+import it.auties.protobuf.parser.tree.nested.imports.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 
