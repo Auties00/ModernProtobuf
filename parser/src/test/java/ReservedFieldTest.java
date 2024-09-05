@@ -1,5 +1,5 @@
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.ProtobufParserException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +23,7 @@ public class ReservedFieldTest {
         var source = ClassLoader.getSystemClassLoader().getResource("reserved_duplicate.proto");
         Objects.requireNonNull(source);
 
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> {
+        Assertions.assertThrows(ProtobufParserException.class, () -> {
             var parser = new ProtobufParser();
             var document = parser.parseOnly(Path.of(source.toURI()));
             System.out.println(document);
@@ -35,9 +35,9 @@ public class ReservedFieldTest {
         var parser = new ProtobufParser();
         var illegalIndexSource = ClassLoader.getSystemClassLoader().getResource("reserved_illegal_index.proto");
         Objects.requireNonNull(illegalIndexSource);
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(illegalIndexSource.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalIndexSource.toURI())));
         var illegalNameSource = ClassLoader.getSystemClassLoader().getResource("reserved_illegal_name.proto");
         Objects.requireNonNull(illegalNameSource);
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(illegalNameSource.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNameSource.toURI())));
     }
 }

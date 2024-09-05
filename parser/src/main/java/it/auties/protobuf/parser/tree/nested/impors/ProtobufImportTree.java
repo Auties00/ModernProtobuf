@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.tree.nested.impors;
 
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;
 import it.auties.protobuf.parser.tree.nested.ProtobufNestedTree;
 
@@ -9,9 +9,10 @@ import java.util.Optional;
 
 public final class ProtobufImportTree extends ProtobufNestedTree implements ProtobufDocumentChildTree {
     private final String location;
-    private ProtobufDocument document;
+    private ProtobufDocumentTree document;
 
-    public ProtobufImportTree(String location) {
+    public ProtobufImportTree(int line, String location) {
+        super(line);
         this.location = Objects.requireNonNull(location);
     }
 
@@ -19,11 +20,11 @@ public final class ProtobufImportTree extends ProtobufNestedTree implements Prot
         return location;
     }
 
-    public Optional<ProtobufDocument> document() {
+    public Optional<ProtobufDocumentTree> document() {
         return Optional.ofNullable(document);
     }
 
-    public ProtobufImportTree setDocument(ProtobufDocument document) {
+    public ProtobufImportTree setDocument(ProtobufDocumentTree document) {
         this.document = document;
         return this;
     }
@@ -31,7 +32,7 @@ public final class ProtobufImportTree extends ProtobufNestedTree implements Prot
     @Override
     public String toString() {
         var path = Optional.ofNullable(document)
-                .flatMap(ProtobufDocument::qualifiedPath)
+                .flatMap(ProtobufDocumentTree::qualifiedPath)
                 .map(entry -> "\"" + entry + "\"")
                 .orElse(location);
         return "import " + path + ";";

@@ -1,5 +1,5 @@
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.ProtobufParserException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +23,7 @@ public class GroupTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_group_name.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 
     @Test
@@ -31,7 +31,7 @@ public class GroupTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_group_declaration_no_body.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 
     @Test
@@ -39,6 +39,6 @@ public class GroupTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_group_declaration_no_terminator.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> System.out.println(parser.parseOnly(Path.of(proto2Source.toURI()))));
+        Assertions.assertThrows(ProtobufParserException.class, () -> System.out.println(parser.parseOnly(Path.of(proto2Source.toURI()))));
     }
 }

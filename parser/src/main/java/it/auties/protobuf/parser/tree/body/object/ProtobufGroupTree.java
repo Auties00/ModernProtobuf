@@ -2,9 +2,9 @@ package it.auties.protobuf.parser.tree.body.object;
 
 import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofChildTree;
 
-public final class ProtobufGroupTree extends ProtobufObjectTree<ProtobufGroupableChildTree> implements ProtobufGroupableChildTree, ProtobufOneofChildTree {
-    public ProtobufGroupTree(String name) {
-        super(name);
+public final class ProtobufGroupTree extends ProtobufObjectTree<ProtobufGroupTree, ProtobufGroupableChildTree> implements ProtobufGroupableChildTree, ProtobufOneofChildTree {
+    public ProtobufGroupTree(int line, String name) {
+        super(line, name);
     }
 
     @Override

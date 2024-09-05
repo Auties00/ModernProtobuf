@@ -1,17 +1,22 @@
 package it.auties.protobuf.parser.tree.nested.option;
 
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.nested.ProtobufNestedTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public final class ProtobufOptionTree extends ProtobufNestedTree {
     private final String name;
+    private final ProtobufGroupableFieldTree definition;
     private Object value;
     private boolean attributed;
 
-    public ProtobufOptionTree(String name) {
+    public ProtobufOptionTree(int line, String name, ProtobufGroupableFieldTree definition) {
+        super(line);
         this.name = name;
+        this.definition = definition;
     }
 
     @Override
@@ -25,6 +30,10 @@ public final class ProtobufOptionTree extends ProtobufNestedTree {
 
     public String name() {
         return name;
+    }
+
+    public Optional<ProtobufGroupableFieldTree> definition() {
+        return Optional.ofNullable(definition);
     }
 
     public Object value() {
@@ -57,10 +66,11 @@ public final class ProtobufOptionTree extends ProtobufNestedTree {
 
     @Override
     public String toString() {
-        var leading = parent instanceof ProtobufDocument ? "option " : "";
+        var leading = parent == null ? "" : "option ";
         var name = Objects.requireNonNullElse(this.name, "[missing]");
         var value = this.value instanceof String ? "\"%s\"".formatted(this.value) : Objects.requireNonNullElse(this.value, "[missing]");
-        var trailing = parent instanceof ProtobufDocument ? ";" : "";
-        return "%s%s = %s%s".formatted(leading, name, value, trailing);
+        var trailing = parent instanceof ProtobufDocumentTree ? ";" : "";
+        var result = "%s%s = %s%s".formatted(leading, name, value, trailing);
+        return parent == null ? result : toLeveledString(result);
     }
 }

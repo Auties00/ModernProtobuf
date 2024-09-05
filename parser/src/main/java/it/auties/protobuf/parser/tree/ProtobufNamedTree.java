@@ -6,5 +6,8 @@ import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 import java.util.Optional;
 
 public sealed interface ProtobufNamedTree extends ProtobufTree permits ProtobufBodyTree, ProtobufFieldTree {
+    @Override
+    int line();
+
     Optional<String> name();
 }

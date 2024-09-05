@@ -1,0 +1,3 @@
+enum Message {
+  VALUE = 1 [deprecated = true];
+}

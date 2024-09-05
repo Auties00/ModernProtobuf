@@ -1,0 +1,3 @@
+message Message {
+  option message_set_wire_format = 1;
+}

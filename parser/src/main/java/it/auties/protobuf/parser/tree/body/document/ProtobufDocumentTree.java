@@ -5,51 +5,32 @@ import it.auties.protobuf.parser.tree.ProtobufNamedTree;
 import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
 import it.auties.protobuf.parser.tree.nested.impors.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
-import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
 
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
 
-public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChildTree> implements ProtobufOptionedTree {
+public final class ProtobufDocumentTree extends ProtobufBodyTree<ProtobufDocumentTree, ProtobufDocumentChildTree> {
     private final Path location;
-    private final LinkedHashMap<String, ProtobufOptionTree> options;
-    private ProtobufOptionTree lastOption;
     private final LinkedHashMap<String, ProtobufImportTree> imports;
     private String packageName;
     private ProtobufVersion version;
-
-    public ProtobufDocument(Path location) {
-        super(null);
+    public ProtobufDocumentTree(Path location) {
+        super(0,null);
         this.location = location;
         this.version = null;
         this.imports = new LinkedHashMap<>();
-        this.options = new LinkedHashMap<>();
     }
 
     public Optional<Path> location() {
         return Optional.ofNullable(location);
     }
 
-    @Override
-    public Collection<ProtobufOptionTree> options() {
-        return Collections.unmodifiableCollection(options.values());
-    }
-
-    @Override
-    public ProtobufDocument addOption(String value) {
-        var option = new ProtobufOptionTree(value);
-        option.setParent(this, 1);
-        options.put(value, option);
-        this.lastOption = option;
-        return this;
-    }
-
     public Optional<ProtobufVersion> version() {
         return Optional.ofNullable(version);
     }
 
-    public ProtobufDocument setVersion(ProtobufVersion version) {
+    public ProtobufDocumentTree setVersion(ProtobufVersion version) {
         this.version = Objects.requireNonNull(version);
         return this;
     }
@@ -63,7 +44,7 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
                 .map(packageName -> packageName.replaceAll("\\.", "/"));
     }
 
-    public ProtobufDocument setPackageName(String packageName) {
+    public ProtobufDocumentTree setPackageName(String packageName) {
         this.packageName = packageName;
         return this;
     }
@@ -249,13 +230,8 @@ public final class ProtobufDocument extends ProtobufBodyTree<ProtobufDocumentChi
     }
 
     @Override
-    public Optional<ProtobufOptionTree> lastOption() {
-        return Optional.ofNullable(lastOption);
-    }
-
-    @Override
     public boolean equals(Object other) {
-        return other instanceof ProtobufDocument that
+        return other instanceof ProtobufDocumentTree that
                 && Objects.equals(that.qualifiedName(), this.qualifiedName());
     }
 

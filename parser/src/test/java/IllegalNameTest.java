@@ -1,5 +1,5 @@
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.ProtobufParserException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,7 @@ public class IllegalNameTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_name_symbol.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 
     @Test
@@ -20,7 +20,7 @@ public class IllegalNameTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_name_symbol_variant.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 
     @Test
@@ -28,7 +28,7 @@ public class IllegalNameTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_name_number.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufSyntaxException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 
     @Test

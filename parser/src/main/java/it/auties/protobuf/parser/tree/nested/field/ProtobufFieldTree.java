@@ -7,12 +7,14 @@ import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
 
 import java.util.*;
 
-public abstract sealed class ProtobufFieldTree extends ProtobufNestedTree implements ProtobufNamedTree, ProtobufOptionedTree permits ProtobufEnumConstantTree, ProtobufGroupableFieldTree {
+public abstract sealed class ProtobufFieldTree extends ProtobufNestedTree implements ProtobufNamedTree, ProtobufOptionedTree
+        permits ProtobufEnumConstantTree, ProtobufGroupableFieldTree {
     protected String name;
     protected Integer index;
     protected final LinkedHashMap<String, ProtobufOptionTree> options;
     private ProtobufOptionTree lastOption;
-    protected ProtobufFieldTree() {
+    protected ProtobufFieldTree(int line) {
+        super(line);
         this.options = new LinkedHashMap<>();
     }
 
@@ -21,13 +23,18 @@ public abstract sealed class ProtobufFieldTree extends ProtobufNestedTree implem
     }
 
     @Override
+    public Optional<ProtobufOptionTree> getOption(String name) {
+        return Optional.ofNullable(options.get(name));
+    }
+
+    @Override
     public Collection<ProtobufOptionTree> options() {
         return Collections.unmodifiableCollection(options.values());
     }
 
     @Override
-    public ProtobufFieldTree addOption(String name) {
-        var option = new ProtobufOptionTree(name);
+    public ProtobufFieldTree addOption(int line, String name, ProtobufGroupableFieldTree definition) {
+        var option = new ProtobufOptionTree(line, name, definition);
         options.put(name, option);
         this.lastOption = option;
         return this;

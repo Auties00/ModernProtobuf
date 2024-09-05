@@ -1,0 +1,5 @@
+enum Message {
+  option allow_alias = 123;
+
+  VALUE = 1;
+}

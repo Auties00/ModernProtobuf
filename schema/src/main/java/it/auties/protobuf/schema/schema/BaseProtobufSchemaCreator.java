@@ -29,7 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
+abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, ?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
     private static final String SRC_MAIN_JAVA = "src.main.java.";
     private static final String SRC_TEST_JAVA = "src.test.java.";
 
@@ -249,11 +249,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
             }
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.REQUIRED)){
+        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.REPEATED)){
+        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type.REPEATED)){
             compilationUnit.addImport(List.class.getName());
         }
 
@@ -271,15 +271,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
 
     }
 
-    private boolean hasFieldsWithModifier(ProtobufFieldTree.Modifier modifier) {
+    private boolean hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type modifier) {
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufObjectTree<?> statement, ProtobufFieldTree.Modifier modifier) {
+    private boolean hasFieldsWithModifier(ProtobufObjectTree<?, ?> statement, ProtobufFieldTree.Modifier.Type modifier) {
         return statement.statements()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithModifier(messageStatement, modifier))
-                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.modifier().orElse(null) == modifier));
+                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.modifier().map(ProtobufFieldTree.Modifier::type).orElse(null) == modifier));
 
     }
 
@@ -287,7 +287,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
         return hasFieldsWithType(protoStatement, types);
     }
 
-    private boolean hasFieldsWithType(ProtobufObjectTree<?> statement, ProtobufType... types) {
+    private boolean hasFieldsWithType(ProtobufObjectTree<?, ?> statement, ProtobufType... types) {
         var typesSet = Set.of(types);
         return statement.statements()
                 .stream()
@@ -297,15 +297,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
     }
 
     void addReservedAnnotation(TypeDeclaration<?> ctEnum) {
-        if(!(protoStatement instanceof ProtobufObjectTree<?> protobufReservable) || protobufReservable.reserved().isEmpty()){
+        if(!(protoStatement instanceof ProtobufObjectTree<?, ?> protobufReservable) || protobufReservable.reserved().isEmpty()){
             return;
         }
 
         var annotation = getOrAddAnnotation(ctEnum, ProtobufEnum.class);
         var indexes = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufObjectTree<?>.ReservedIndexes)
-                .map(entry -> (ProtobufObjectTree<?>.ReservedIndexes) entry)
+                .filter(entry -> entry instanceof ProtobufObjectTree<?, ?>.ReservedIndexes)
+                .map(entry -> (ProtobufObjectTree<?, ?>.ReservedIndexes) entry)
                 .map(ProtobufObjectTree.ReservedIndexes::values)
                 .flatMap(Collection::stream)
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
@@ -316,8 +316,8 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?>>
 
         var names = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufObjectTree<?>.ReservedNames)
-                .map(entry -> (ProtobufObjectTree<?>.ReservedNames) entry)
+                .filter(entry -> entry instanceof ProtobufObjectTree<?, ?>.ReservedNames)
+                .map(entry -> (ProtobufObjectTree<?, ?>.ReservedNames) entry)
                 .map(ProtobufObjectTree.ReservedNames::values)
                 .flatMap(Collection::stream)
                 .map(StringLiteralExpr::new)

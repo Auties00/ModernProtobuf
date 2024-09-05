@@ -1,0 +1,6 @@
+message Message {
+  option message_set_wire_format = true;
+  option no_standard_descriptor_accessor = true;
+  option deprecated = true;
+  option map_entry = true;
+}

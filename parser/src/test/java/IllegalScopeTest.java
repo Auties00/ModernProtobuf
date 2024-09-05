@@ -1,5 +1,5 @@
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.exception.ProtobufTypeException;
+import it.auties.protobuf.parser.ProtobufParserException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -12,6 +12,6 @@ public class IllegalScopeTest {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("illegal_scope.proto");
         Objects.requireNonNull(proto2Source);
         var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufTypeException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
     }
 }

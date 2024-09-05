@@ -9,10 +9,19 @@ import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 import java.util.Optional;
 
 public sealed abstract class ProtobufNestedTree implements ProtobufTree permits ProtobufBodyTree, ProtobufImportTree, ProtobufFieldTree, ProtobufOptionTree {
-    protected ProtobufBodyTree<?> parent;
+    private final int line;
+    protected ProtobufBodyTree<?, ?> parent;
     protected int nestedLevel;
+    protected ProtobufNestedTree(int line) {
+        this.line = line;
+    }
 
-    public Optional<ProtobufBodyTree<?>> parent() {
+    @Override
+    public int line() {
+        return line;
+    }
+
+    public Optional<ProtobufBodyTree<?, ?>> parent() {
         return Optional.ofNullable(parent);
     }
 

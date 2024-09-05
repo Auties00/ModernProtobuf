@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufObjectTree<?> declaration;
+    private ProtobufObjectTree<?, ?> declaration;
 
     public static ProtobufObjectType unattributed(String typeName){
         return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
@@ -39,7 +39,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return name();
     }
 
-    public Optional<ProtobufObjectTree<?>> declaration() {
+    public Optional<ProtobufObjectTree<?, ?>> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -48,7 +48,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufObjectTree<?> statement) {
+    public void attribute(ProtobufObjectTree<?, ?> statement) {
         this.declaration = statement;
     }
 }

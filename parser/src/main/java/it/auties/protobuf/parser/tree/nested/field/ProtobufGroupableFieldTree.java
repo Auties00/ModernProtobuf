@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 public final class ProtobufGroupableFieldTree extends ProtobufFieldTree implements ProtobufGroupableChildTree, ProtobufOneofChildTree {
     private Modifier modifier;
     private ProtobufTypeReference type;
+    public ProtobufGroupableFieldTree(int line) {
+        super(line);
+    }
 
     public Optional<Modifier> modifier() {
         return Optional.ofNullable(modifier);

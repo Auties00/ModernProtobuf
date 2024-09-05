@@ -1,0 +1,7 @@
+enum Message {
+  option allow_alias = true;
+  option deprecated = true;
+
+  VALUE = 1;
+  ANOTHER = 1;
+}

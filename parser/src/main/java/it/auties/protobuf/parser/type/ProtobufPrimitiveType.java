@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.exception.ProtobufInternalException;
+import it.auties.protobuf.parser.ProtobufParserException;
 
 import java.util.Objects;
 
@@ -14,7 +14,7 @@ public final class ProtobufPrimitiveType implements ProtobufTypeReference {
 
     private ProtobufPrimitiveType(ProtobufType protobufType) {
         if (protobufType == ProtobufType.OBJECT || protobufType == ProtobufType.MAP) {
-            throw new ProtobufInternalException("A primitive type cannot wrap an object or a map");
+            throw new ProtobufParserException("A primitive type cannot wrap an object or a map");
         }
 
         this.protobufType = protobufType;

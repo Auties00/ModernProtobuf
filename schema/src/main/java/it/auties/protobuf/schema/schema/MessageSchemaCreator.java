@@ -33,8 +33,8 @@ import java.util.*;
 
 import static com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType;
 import static com.github.javaparser.StaticJavaParser.parseType;
-import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.REPEATED;
-import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.REQUIRED;
+import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.Type.REPEATED;
+import static it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree.Modifier.Type.REQUIRED;
 
 final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessageTree> {
     private final List<FieldDeclaration> fields;
@@ -190,8 +190,8 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         var blockStmt = new BlockStmt();
         getter.setBody(blockStmt);
         var fieldExpression = new NameExpr(AstUtils.toJavaName(statement.name().orElseThrow()));
-        var modifier = statement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
-        if(modifier == REQUIRED || modifier == REPEATED || nullable) {
+        var modifier = statement.modifier().orElse(null);
+        if((modifier != null && (modifier.type() == REQUIRED || modifier.type() == ProtobufFieldTree.Modifier.Type.REPEATED)) || nullable) {
             blockStmt.addStatement(new ReturnStmt(fieldExpression));
         } else {
             var fieldAccess = new FieldAccessExpr(new ThisExpr(), AstUtils.toJavaName(statement.name().orElseThrow()));
@@ -284,8 +284,8 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         annotation.setName(ProtobufProperty.class.getSimpleName());
         annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index().orElseThrow())));
         annotation.addPair("type", new NameExpr(fieldStatement.type().orElseThrow().protobufType().name()));
-        var modifier = fieldStatement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
-        if(modifier == REQUIRED) {
+        var modifier = fieldStatement.modifier().orElse(null);
+        if(modifier != null && modifier.type() == REQUIRED) {
             annotation.addPair("required", new BooleanLiteralExpr(true));
         }
         field.addAnnotation(annotation);
@@ -330,7 +330,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         annotation.setName(ProtobufProperty.class.getSimpleName());
         annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index().orElseThrow())));
         annotation.addPair("type", new NameExpr(fieldStatement.type().orElseThrow().protobufType().name()));
-        if(fieldStatement.modifier().orElseThrow() == REQUIRED) {
+        if(fieldStatement.modifier().orElseThrow().type() == REQUIRED) {
             annotation.addPair("required", new BooleanLiteralExpr(true));
             var compactConstructor = getOrCreateCompactConstructor(ctRecord);
             var objectsExpression = new NameExpr(Objects.class.getSimpleName());
@@ -371,15 +371,16 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
     private MessageType getMessageType(TypeDeclaration<?> scope, ProtobufGroupableFieldTree fieldStatement, boolean wrapType) {
         var modifier = fieldStatement instanceof ProtobufGroupableFieldTree fieldTree ? fieldTree.modifier().orElse(null) : null;
-        var qualifiedType = getMessageFieldType(fieldStatement.type().orElseThrow(), modifier == REQUIRED, modifier == REPEATED);
-        var typeParameter = modifier == REPEATED ? qualifiedType : null;
+        var repeated = modifier != null && modifier.type() == REPEATED;
+        var qualifiedType = getMessageFieldType(fieldStatement.type().orElseThrow(), modifier != null && modifier.type() == REQUIRED, repeated);
+        var typeParameter = repeated ? qualifiedType : null;
         var javaType = typeParameter == null ? qualifiedType : MessageFieldType.listType(typeParameter);
         if (!wrapType) {
             return new MessageType(javaType, null, null);
         }
 
         var fieldStatementType = fieldStatement.type().orElseThrow();
-        if (modifier == REPEATED || fieldStatementType.protobufType() != ProtobufType.OBJECT) {
+        if (repeated || fieldStatementType.protobufType() != ProtobufType.OBJECT) {
             var fieldName = AstUtils.toJavaName(fieldStatement.name().orElseThrow());
             var wrapperQualifiedName = fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
             var wrapperRecord = createWrapperRecord(scope, wrapperQualifiedName, parseType(AstUtils.toCanonicalJavaName(javaType.fieldType())));

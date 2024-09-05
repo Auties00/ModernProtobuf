@@ -1,17 +1,19 @@
 package it.auties.protobuf.parser.tree.body.object;
 
-import it.auties.protobuf.parser.exception.ProtobufInternalException;
+import it.auties.protobuf.parser.ProtobufParserException;
 import it.auties.protobuf.parser.tree.ProtobufTree;
 import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufBodyTree<T> permits ProtobufEnumTree, ProtobufGroupTree, ProtobufMessageTree {
+public sealed class ProtobufObjectTree<T extends ProtobufObjectTree<T, C>, C extends ProtobufTree> extends ProtobufBodyTree<T, C>
+        permits ProtobufEnumTree, ProtobufGroupTree, ProtobufMessageTree {
     private final LinkedList<Reserved> reserved;
     private final LinkedList<Extensions> extensions;
-    protected ProtobufObjectTree(String name) {
-        super(name);
+    protected ProtobufObjectTree(int line, String name) {
+        super(line, name);
         this.reserved = new LinkedList<>();
         this.extensions = new LinkedList<>();
     }
@@ -92,7 +94,7 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufB
 
     public boolean hasReservedName(String value) {
         return value != null && reserved.stream()
-                .anyMatch(entry -> entry instanceof ProtobufObjectTree<?>.ReservedNames reservedNames && reservedNames.hasValue(value));
+                .anyMatch(entry -> entry instanceof ProtobufObjectTree<?, ?>.ReservedNames reservedNames && reservedNames.hasValue(value));
     }
 
     public boolean hasExtensionsIndex(int value) {
@@ -144,11 +146,11 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufB
             }
 
             if(min == null) {
-                throw new ProtobufInternalException("Min");
+                throw new ProtobufParserException("Min");
             }
 
             if(max == null) {
-                throw new ProtobufInternalException("Max");
+                throw new ProtobufParserException("Max");
             }
         }
 
@@ -293,11 +295,11 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufB
             }
 
             if(min == null) {
-                throw new ProtobufInternalException("Min");
+                throw new ProtobufParserException("Min");
             }
 
             if(max == null) {
-                throw new ProtobufInternalException("Max");
+                throw new ProtobufParserException("Max");
             }
         }
 
@@ -358,6 +360,13 @@ public sealed class ProtobufObjectTree<T extends ProtobufTree> extends ProtobufB
     public String toString() {
         var builder = new StringBuilder();
         builder.append(header());
+        options.values()
+                .stream()
+                .map(ProtobufOptionTree::toString)
+                .forEach(option -> {
+                    builder.append(option);
+                    builder.append("\n");
+                });
         reserved.stream()
                 .map(entry -> toLeveledString("reserved " + entry + ";\n", this instanceof ProtobufGroupTree ? 0 : 1))
                 .forEach(builder::append);

@@ -7,7 +7,7 @@ import com.github.javaparser.printer.configuration.DefaultConfigurationOption;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration.ConfigOption;
 import com.github.javaparser.printer.configuration.imports.IntelliJImportOrderingStrategy;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
 import it.auties.protobuf.parser.tree.ProtobufTree;
@@ -22,7 +22,7 @@ import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
+public record ProtobufSchemaCreator(ProtobufDocumentTree document, File directory) {
     public void generate(List<CompilationUnit> classPool, boolean mutable, boolean nullable) {
         var results = document.statements()
                 .stream()

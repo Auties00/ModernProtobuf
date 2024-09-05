@@ -2,7 +2,7 @@ package it.auties.protobuf.schema.command;
 
 import com.github.javaparser.ast.CompilationUnit;
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.schema.schema.ProtobufSchemaCreator;
 import it.auties.protobuf.schema.util.AstUtils;
 import it.auties.protobuf.schema.util.LogProvider;
@@ -81,7 +81,7 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
         return false;
     }
 
-    private ProtobufDocument generateAST() throws IOException {
+    private ProtobufDocumentTree generateAST() throws IOException {
         log.log(Level.INFO, "Generating AST for protobuf file...");
         var parser = new ProtobufParser();
         var document = parser.parseOnly(protobuf.toPath());
@@ -89,7 +89,7 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
         return document;
     }
 
-    private void generateSchema(List<CompilationUnit> classPool, ProtobufDocument ast) {
+    private void generateSchema(List<CompilationUnit> classPool, ProtobufDocumentTree ast) {
         log.log(Level.INFO, "Generating java classes from AST...");
         var generator = new ProtobufSchemaCreator(ast, output);
         generator.generate(classPool, mutable, nullable);

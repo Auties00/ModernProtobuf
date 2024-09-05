@@ -1,0 +1,5 @@
+message Message {
+  optional string entry = 1 [
+    abc = STRING_PIECE
+  ];
+}

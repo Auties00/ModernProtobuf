@@ -4,20 +4,53 @@ import it.auties.protobuf.parser.tree.ProtobufNamedTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufGroupTree;
 import it.auties.protobuf.parser.tree.nested.ProtobufNestedTree;
 import it.auties.protobuf.parser.tree.ProtobufTree;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocument;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
 import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
+import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
 
 import java.util.*;
 import java.util.function.Consumer;
 
-public sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree permits ProtobufDocument, ProtobufObjectTree, ProtobufOneofTree {
+public sealed class ProtobufBodyTree<T extends ProtobufBodyTree<T, C>, C extends ProtobufTree> extends ProtobufNestedTree implements ProtobufNamedTree, ProtobufOptionedTree<T>
+        permits ProtobufDocumentTree, ProtobufObjectTree, ProtobufOneofTree {
     protected String name;
-    protected final LinkedList<T> statements;
-    protected ProtobufBodyTree(String name){
+    protected final LinkedList<C> statements;
+    protected final LinkedHashMap<String, ProtobufOptionTree> options;
+    private ProtobufOptionTree lastOption;
+    protected ProtobufBodyTree(int line, String name) {
+        super(line);
         this.name = name;
         this.statements = new LinkedList<>();
+        this.options = new LinkedHashMap<>();
+    }
+
+    @Override
+    public Optional<ProtobufOptionTree> getOption(String name) {
+        return Optional.ofNullable(options.get(name));
+    }
+
+    @Override
+    public Collection<ProtobufOptionTree> options() {
+        return Collections.unmodifiableCollection(options.values());
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public T addOption(int line, String value, ProtobufGroupableFieldTree definition) {
+        var option = new ProtobufOptionTree(line, value, definition);
+        option.setParent(this, 1);
+        options.put(value, option);
+        this.lastOption = option;
+        return (T) this;
+    }
+
+    @Override
+    public Optional<ProtobufOptionTree> lastOption() {
+        return Optional.ofNullable(lastOption);
     }
 
     public Optional<String> name() {
@@ -31,38 +64,38 @@ public sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNes
 
     public Optional<String> qualifiedName() {
         return parent()
-                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedName())
-                .map(parentName -> name == null ? parentName : parentName + (parent instanceof ProtobufObjectTree<?> ? "$" : ".") + name)
+                .flatMap(parent -> parent instanceof ProtobufDocumentTree document ? document.packageName() : parent.qualifiedName())
+                .map(parentName -> name == null ? parentName : parentName + (parent instanceof ProtobufObjectTree<?, ?> ? "$" : ".") + name)
                 .or(this::name);
     }
 
     public Optional<String> qualifiedCanonicalName() {
         return parent()
-                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageName() : parent.qualifiedCanonicalName())
+                .flatMap(parent -> parent instanceof ProtobufDocumentTree document ? document.packageName() : parent.qualifiedCanonicalName())
                 .map(parentName -> name == null ? parentName : parentName + "." + name)
                 .or(this::name);
     }
 
     public Optional<String> qualifiedPath() {
         return parent()
-                .flatMap(parent -> parent instanceof ProtobufDocument document ? document.packageNamePath() : parent.qualifiedPath())
+                .flatMap(parent -> parent instanceof ProtobufDocumentTree document ? document.packageNamePath() : parent.qualifiedPath())
                 .map(parentName -> name == null ? parentName : parentName + "/" + name)
                 .or(this::name);
     }
 
-    public Collection<T> statements() {
+    public Collection<C> statements() {
         return Collections.unmodifiableCollection(statements);
     }
 
-    public Optional<T> firstStatement() {
+    public Optional<C> firstStatement() {
         return Optional.ofNullable(statements.peekFirst());
     }
 
-    public Optional<T> lastStatement() {
+    public Optional<C> lastStatement() {
         return Optional.ofNullable(statements.peekLast());
     }
 
-    public ProtobufBodyTree addStatement(T statement){
+    public ProtobufBodyTree addStatement(C statement){
         if(statement instanceof ProtobufNestedTree nestedTree) {
             nestedTree.setParent(this, this instanceof ProtobufGroupTree ? 0 : 1);
         }
@@ -94,7 +127,7 @@ public sealed class ProtobufBodyTree<T extends ProtobufTree> extends ProtobufNes
         var child = getStatement(name, clazz);
         return child.isPresent() ? child : statements().stream()
                 .filter(entry -> ProtobufBodyTree.class.isAssignableFrom(entry.getClass()))
-                .map(entry -> (ProtobufBodyTree<?>) entry)
+                .map(entry -> (ProtobufBodyTree<?, ?>) entry)
                 .flatMap(entry -> entry.getStatement(name, clazz).stream())
                 .findFirst();
     }
