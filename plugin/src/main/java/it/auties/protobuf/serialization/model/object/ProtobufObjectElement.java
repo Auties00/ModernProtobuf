@@ -65,12 +65,8 @@ public class ProtobufObjectElement {
     }
 
     public Optional<ProtobufPropertyElement> addProperty(Element element, Element accessor, ProtobufPropertyType type, ProtobufProperty property) {
-        if(property.ignored()) {
-            return Optional.empty();
-        }
-
         var fieldName = element.getSimpleName().toString();
-        var result = new ProtobufPropertyElement(fieldName, accessor, type, property);
+        var result = new ProtobufPropertyElement(fieldName, accessor, type, property, element instanceof ExecutableElement);
         return Optional.ofNullable(properties.put(property.index(), result));
     }
 

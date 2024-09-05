@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public enum ProtobufType {
+    UNKNOWN(null, null, false),
     OBJECT(Object.class, Object.class, false),
     MAP(Map.class, Map.class, false),
     FLOAT(float.class, Float.class, true),
@@ -42,14 +43,26 @@ public enum ProtobufType {
     }
 
     public Class<?> primitiveType() {
+        if(this == UNKNOWN) {
+            throw new UnsupportedOperationException();
+        }
+
         return this.primitiveType;
     }
 
     public Class<?> wrappedType() {
+        if(this == UNKNOWN) {
+            throw new UnsupportedOperationException();
+        }
+
         return this.wrappedType;
     }
 
     public boolean isPackable() {
+        if(this == UNKNOWN) {
+            throw new UnsupportedOperationException();
+        }
+
         return this.packable;
     }
 }

@@ -46,6 +46,10 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                     }
                 }else {
                     for (var property : messageElement.properties()) {
+                        if(property.synthetic()) {
+                            continue;
+                        }
+
                         builderClassWriter.printFieldDeclaration(property.type().descriptorElementType().toString(), property.name());
                         invocationArgs.add(property.name());
                     }
@@ -59,6 +63,10 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                     if (builderElement == null) {
                         // Assign each field in the builder to its default value
                         for (var property : messageElement.properties()) {
+                            if(property.synthetic()) {
+                                continue;
+                            }
+
                             builderConstructorWriter.printFieldAssignment(property.name(), property.type().defaultValue());
                         }
                     }
@@ -78,6 +86,10 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                     }
                 }else {
                     for(var property : messageElement.properties()) {
+                        if(property.synthetic()) {
+                            continue;
+                        }
+
                         var hasOverride = false;
                         var overloads = getBuilderOverloads(property);
                         if(!overloads.isEmpty()) {

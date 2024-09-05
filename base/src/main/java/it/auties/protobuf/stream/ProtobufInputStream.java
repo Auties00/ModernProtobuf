@@ -14,21 +14,22 @@ import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class ProtobufInputStream {
+    private static final byte[] EMPTY_BUFFER = new byte[0];
+
     private final byte[] buffer;
     private final int limit;
     private int wireType;
     private int index;
     private int pos;
+    private Integer groupIndex;
 
-    public ProtobufInputStream(byte[] buffer) {
+    public ProtobufInputStream(byte[] buffer, int offset, int length) {
         this.buffer = buffer;
-        this.limit = buffer.length;
-        this.pos = 0;
+        this.limit = length;
+        this.pos = offset;
     }
 
     public boolean readTag() {
@@ -39,7 +40,33 @@ public class ProtobufInputStream {
 
         var rawTag = readInt32Unchecked();
         this.wireType = rawTag & 7;
+        if(wireType > ProtobufWireType.WIRE_TYPE_FIXED32) {
+            throw ProtobufDeserializationException.invalidWireType(wireType);
+        }
+
         this.index = rawTag >>> 3;
+        if(index == 0) {
+            throw ProtobufDeserializationException.invalidFieldIndex(index);
+        }
+
+        if(rawTag == ProtobufWireType.WIRE_TYPE_START_OBJECT) {
+            if(groupIndex != null) {
+                throw ProtobufDeserializationException.invalidStartObject();
+            }
+
+            this.groupIndex = index;
+        }else if(rawTag == ProtobufWireType.WIRE_TYPE_END_OBJECT) {
+            if(groupIndex == null) {
+                throw ProtobufDeserializationException.invalidEndObject();
+            }
+
+            if(index != groupIndex) {
+                throw ProtobufDeserializationException.invalidEndObject(index, groupIndex);
+            }
+
+            this.groupIndex = null;
+        }
+
         return true;
     }
 
@@ -47,7 +74,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Float>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isAtEnd()){
                     results.add(input.readFloat());
@@ -65,7 +92,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Double>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isAtEnd()){
                     results.add(input.readDouble());
@@ -83,7 +110,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readInt32());
@@ -101,7 +128,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readInt64());
@@ -119,7 +146,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isAtEnd()){
                     results.add(input.readFixed32());
@@ -137,7 +164,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isAtEnd()){
                     results.add(input.readFixed64());
@@ -155,7 +182,7 @@ public class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Boolean>();
-                var input = new ProtobufInputStream(readBytes());
+                var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isAtEnd()){
                     results.add(input.readBool());
@@ -358,34 +385,51 @@ public class ProtobufInputStream {
         }
 
         var size = this.readInt32Unchecked();
-        if (size > 0 && size <= this.limit - this.pos) {
-            this.pos += size;
-            return Arrays.copyOfRange(buffer, pos - size, pos);
+        if(size < 0) {
+            throw ProtobufDeserializationException.negativeLength(size);
+        }else {
+            return readBytes(size);
         }
-
-        return size == 0 ? new byte[0] : this.readBytes(size);
     }
 
     public Object readUnknown() {
+        return readUnknown(true);
+    }
+
+    public Object readUnknown(boolean allocate) {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> readInt64();
             case ProtobufWireType.WIRE_TYPE_FIXED32 -> readFixed32();
             case ProtobufWireType.WIRE_TYPE_FIXED64 -> readFixed64();
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readBytes();
+            case ProtobufWireType.WIRE_TYPE_START_OBJECT -> readGroup(allocate);
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
-    public void skipBytes() {
-        if(isAtEnd()) {
-            return;
+    private HashMap<Integer, Object> readGroup(boolean allocate) {
+        var group = allocate ? new HashMap<Integer, Object>() : null;
+        while (!isAtEnd()) {
+            var value = readUnknown();
+            if(group != null) {
+                group.put(index, value);
+            }
         }
+        assertGroupClosed();
+        return group;
+    }
 
-        var size = this.readInt32Unchecked();
-        this.pos += size;
+    private void assertGroupClosed() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_END_OBJECT) {
+            throw ProtobufDeserializationException.malformedGroup();
+        }
     }
 
     private byte[] readBytes(int length) {
+        if(length == 0) {
+            return EMPTY_BUFFER;
+        }
+
         var tempPos = pos;
         pos += length;
         return Arrays.copyOfRange(buffer, tempPos, pos);
@@ -397,5 +441,20 @@ public class ProtobufInputStream {
 
     public int index() {
         return index;
+    }
+
+    public ProtobufInputStream lengthDelimitedStream() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
+            throw ProtobufDeserializationException.invalidWireType(wireType);
+        }
+
+        var size = this.readInt32Unchecked();
+        if(size < 0) {
+            throw ProtobufDeserializationException.negativeLength(size);
+        }else {
+            var tempPos = pos;
+            pos += size;
+            return new ProtobufInputStream(buffer, tempPos, pos);
+        }
     }
 }

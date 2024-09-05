@@ -1,5 +1,6 @@
 package it.auties.protobuf.stream;
 
+import it.auties.protobuf.exception.ProtobufSerializationException;
 import it.auties.protobuf.model.ProtobufWireType;
 
 import java.nio.charset.StandardCharsets;
@@ -7,50 +8,59 @@ import java.util.Collection;
 
 public final class ProtobufOutputStream {
     public static int getFieldSize(int fieldNumber, int wireType) {
-        return getVarIntSizeUnsigned(ProtobufWireType.makeTag(fieldNumber, wireType));
+        return getVarIntSize(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
-    public static int getVarIntSize(int value) {
-        if(value >= 0) {
-            return getVarIntSizeUnsigned(value);
-        }
-
-        return getVarIntSize((long) value);
-    }
-
-    public static int getVarIntSizeUnsigned(int value) {
-        if (value >= 0 && value <= 127) {
-            return 1;
-        } else if (value >= 128 && value <= 16383) {
-            return 2;
-        } else if (value >= 16384 && value <= 2097151) {
-            return 3;
-        } else if (value >= 2097152 && value <= 268435455) {
-            return 4;
-        } else {
-            return 5;
-        }
-    }
-
+    // Long values go from [-2^63, 2^63)
+    // A negative var-int always take up 10 bits
+    // A positive var int takes up log_2(value) / 7 + 1
+    // Constants where folded here to save time
     public static int getVarIntSize(long value) {
-        var counter = 0;
-        while (true) {
-            counter++;
-            if ((value & ~0x7FL) == 0) {
-                return counter;
-            } else {
-                value >>>= 7;
-            }
+        if(value < 0) {
+            return 10;
+        }else if (value < 128) {
+            return 1;
+        } else if (value < 16384) {
+            return 2;
+        } else if (value < 2097152) {
+            return 3;
+        } else if (value < 268435456) {
+            return 4;
+        } else if(value < 34359738368L) {
+            return 5;
+        }else if(value < 4398046511104L) {
+            return 6;
+        }else if(value < 562949953421312L) {
+            return 7;
+        }else if(value < 72057594037927936L) {
+            return 8;
+        }else {
+            return 9;
         }
     }
 
+    // Adapted from https://stackoverflow.com/a/8512877
+    // Tested other alternatives including Guava's, seems the fastest considering all possibilities
     public static int getStringSize(String value) {
         if(value == null) {
             return 0;
         }
 
-        var length = value.getBytes(StandardCharsets.UTF_8).length;
-        return getVarIntSizeUnsigned(length) + length;
+        var count = 0;
+        for (int i = 0, len = value.length(); i < len; i++) {
+            var ch = value.charAt(i);
+            if (ch <= 0x7F) {
+                count++;
+            } else if (ch <= 0x7FF) {
+                count += 2;
+            } else if (Character.isHighSurrogate(ch)) {
+                count += 4;
+                ++i;
+            } else {
+                count += 3;
+            }
+        }
+        return getVarIntSize(count) + count;
     }
 
     public static int getBytesSize(byte[] value) {
@@ -58,7 +68,7 @@ public final class ProtobufOutputStream {
             return 0;
         }
 
-        return getVarIntSizeUnsigned(value.length) + value.length;
+        return getVarIntSize(value.length) + value.length;
     }
 
     private final byte[] buffer;
@@ -68,7 +78,7 @@ public final class ProtobufOutputStream {
     }
 
     private void writeTag(int fieldNumber, int wireType) {
-        writeUInt32NoTag(ProtobufWireType.makeTag(fieldNumber, wireType));
+        writeVarIntNoTag(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
     public void writeInt32(int fieldNumber, Collection<Integer> values) {
@@ -87,7 +97,7 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeInt32NoTag(value);
+        writeVarIntNoTag(value);
     }
     
     public void writeUInt32(int fieldNumber, Collection<Integer> values) {
@@ -106,7 +116,7 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeUInt32NoTag(value);
+        writeVarIntNoTag(value);
     }
 
     public void writeFloat(int fieldNumber, Collection<Float> values) {
@@ -143,7 +153,10 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED32);
-        writeFixed32NoTag(value);
+        write((byte) (value & 0xFF));
+        write((byte) ((value >> 8) & 0xFF));
+        write((byte) ((value >> 16) & 0xFF));
+        write((byte) ((value >> 24) & 0xFF));
     }
 
     public void writeInt64(int fieldNumber, Collection<Long> values) {
@@ -180,7 +193,7 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeUInt64NoTag(value);
+        writeVarIntNoTag(value);
     }
 
     public void writeDouble(int fieldNumber, Collection<Double> values) {
@@ -217,7 +230,14 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED64);
-        writeFixed64NoTag(value);
+        write((byte) ((int) ((long) value) & 0xFF));
+        write((byte) ((int) (value >> 8) & 0xFF));
+        write((byte) ((int) (value >> 16) & 0xFF));
+        write((byte) ((int) (value >> 24) & 0xFF));
+        write((byte) ((int) (value >> 32) & 0xFF));
+        write((byte) ((int) (value >> 40) & 0xFF));
+        write((byte) ((int) (value >> 48) & 0xFF));
+        write((byte) ((int) (value >> 56) & 0xFF));
     }
 
     public void writeBool(int fieldNumber, Collection<Boolean> values) {
@@ -255,7 +275,9 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-        writeStringNoTag(value);
+        var bytes = value.getBytes(StandardCharsets.UTF_8);
+        writeVarIntNoTag(bytes.length);
+        write(bytes);
     }
 
     public void writeBytes(int fieldNumber, Collection<byte[]> values) {
@@ -274,46 +296,19 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-        writeBytesNoTag(value);
-    }
-
-    public byte[] toByteArray() {
-        return buffer;
-    }
-
-    private void writeBytesNoTag(byte[] value) {
-        writeUInt32NoTag(value.length);
+        writeVarIntNoTag(value.length);
         write(value);
     }
 
-    private void writeInt32NoTag(int value) {
-        if (value >= 0) {
-            writeUInt32NoTag(value);
-        } else {
-            writeUInt64NoTag(value);
+    public byte[] toByteArray() {
+        if(position != buffer.length) {
+            throw new ProtobufSerializationException();
         }
+
+        return buffer;
     }
 
-    private void writeUInt32NoTag(int value) {
-        while (true) {
-            if ((value & ~0x7F) == 0) {
-                write((byte) value);
-                return;
-            } else {
-                write((byte) ((value & 0x7F) | 0x80));
-                value >>>= 7;
-            }
-        }
-    }
-
-    private void writeFixed32NoTag(int value) {
-        write((byte) (value & 0xFF));
-        write((byte) ((value >> 8) & 0xFF));
-        write((byte) ((value >> 16) & 0xFF));
-        write((byte) ((value >> 24) & 0xFF));
-    }
-
-    private void writeUInt64NoTag(long value) {
+    private void writeVarIntNoTag(long value) {
         while (true) {
             if ((value & ~0x7FL) == 0) {
                 write((byte) value);
@@ -323,23 +318,6 @@ public final class ProtobufOutputStream {
                 value >>>= 7;
             }
         }
-    }
-
-    private void writeFixed64NoTag(long value) {
-        write((byte) ((int) (value) & 0xFF));
-        write((byte) ((int) (value >> 8) & 0xFF));
-        write((byte) ((int) (value >> 16) & 0xFF));
-        write((byte) ((int) (value >> 24) & 0xFF));
-        write((byte) ((int) (value >> 32) & 0xFF));
-        write((byte) ((int) (value >> 40) & 0xFF));
-        write((byte) ((int) (value >> 48) & 0xFF));
-        write((byte) ((int) (value >> 56) & 0xFF));
-    }
-
-    private void writeStringNoTag(String value) {
-        var bytes = value.getBytes(StandardCharsets.UTF_8);
-        writeUInt32NoTag(bytes.length);
-        write(bytes);
     }
 
     private void write(byte value) {

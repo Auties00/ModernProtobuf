@@ -3429,7 +3429,7 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
 3. `@ProtobufGetter`
 
     Fields annotated with `@ProtobufProperty` are accessed by the enclosing message's spec-class using:
-    1. Direct access, if the field is package-private or public
+    1. Direct access, if the field is package-private, protected or public
     2. An accessor or getter, if one exists with the same name as the field
     
     If you want to specify a getter that doesn't follow these conventions, you can do so using this annotation:
@@ -3450,6 +3450,31 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
    }
     ```
    
+    Getters can also be used to specify standalone properties that don't need to be stored in the message:
+   ```java
+   @ProtobufMessage
+   public final class BoxMessage {
+       @ProtobufProperty(index = 1, type = ProtobufType.STRING)
+       private final String value;
+   
+       public BoxMessage(String value) {
+           this.value = value;
+       }
+   
+       @ProtobufGetter(index = 1)
+       public String unbox() {
+           return value;
+       }
+   
+       @ProtobufGetter(index = 2, type = ProtobufType.STRING)
+       public String type() {
+          return "Box"; 
+       }    
+   }
+    ```
+   The protobuf type needs to be specified for standalone getters, mixins and packed properties are also supported.
+   Also make sure to not include the property in the protobuf constructor as standalone getters should only represent properties that don't need to be stored in the object.
+
 4. `@ProtobufSerializer` and `@ProtobufDeserializer`
 
    Let's say a server sends a Protobuf message whose schema is defined as follows:

@@ -15,9 +15,9 @@ public @interface ProtobufProperty {
 
     ProtobufType type();
 
-    ProtobufType mapKeyType() default ProtobufType.MAP;
+    ProtobufType mapKeyType() default ProtobufType.UNKNOWN;
 
-    ProtobufType mapValueType() default ProtobufType.MAP;
+    ProtobufType mapValueType() default ProtobufType.UNKNOWN;
 
     Class<?>[] mixins() default {
             ProtobufAtomicMixin.class,

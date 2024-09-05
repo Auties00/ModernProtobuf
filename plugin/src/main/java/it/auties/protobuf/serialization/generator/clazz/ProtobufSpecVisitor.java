@@ -2,6 +2,7 @@ package it.auties.protobuf.serialization.generator.clazz;
 
 import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodOverloadGenerator;
 import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
 import it.auties.protobuf.serialization.generator.method.ProtobufSizeMethodGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
@@ -49,8 +50,13 @@ public class ProtobufSpecVisitor {
                 serializationVisitor.generate(classWriter);
 
                 // Write the deserializer
+                var deserializationOverloadVisitor = new ProtobufDeserializationMethodOverloadGenerator(result);
+                deserializationOverloadVisitor.generate(classWriter);
+
+                // Write the deserializer
                 var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result);
                 deserializationVisitor.generate(classWriter);
+
 
                 // Write the size calculator
                 var sizeVisitor = new ProtobufSizeMethodGenerator(result);

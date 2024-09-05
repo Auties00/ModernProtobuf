@@ -56,12 +56,12 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
 
     @Override
     protected List<String> parametersTypes() {
-        return message.isEnum() ? List.of("int") : List.of("byte[]");
+        return message.isEnum() ? List.of("int") : List.of("ProtobufInputStream");
     }
 
     @Override
     protected List<String> parametersNames() {
-        return message.isEnum() ? List.of("index") : List.of("input");
+        return message.isEnum() ? List.of("index") : List.of(DEFAULT_STREAM_NAME);
     }
 
     private void createEnumDeserializer(ClassWriter.MethodWriter writer) {
@@ -75,17 +75,13 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
     }
 
     private void createMessageDeserializer(ClassWriter.MethodWriter methodWriter) {
-        // Check if the input is null
-        try(var ifWriter = methodWriter.printIfStatement("input == null")) {
-            ifWriter.printReturn("null");
-        }
-
-        // Initialize a ProtobufInputStream from the input
-        methodWriter.printVariableDeclaration(DEFAULT_STREAM_NAME, "new ProtobufInputStream(input)");
-
         // Declare all variables
         // [<implementationType> var<index> = <defaultValue>, ...]
         for(var property : message.properties()) {
+            if(property.synthetic()) {
+                continue;
+            }
+
             var propertyType = property.type().descriptorElementType().toString();
             var propertyName = property.name();
             var propertyDefaultValue = property.type().defaultValue();
@@ -102,6 +98,10 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             whileWriter.printVariableDeclaration(DEFAULT_INDEX_NAME, DEFAULT_STREAM_NAME + ".index()");
             try(var switchWriter = whileWriter.printSwitchStatement(DEFAULT_INDEX_NAME)) {
                 for(var property : message.properties()) {
+                    if(property.synthetic()) {
+                        continue;
+                    }
+
                     switch (property.type()) {
                         case ProtobufPropertyType.MapType mapType -> writeMapSerializer(switchWriter, property, mapType);
                         case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(switchWriter, property.name(), property.index(), collectionType.value(), true, property.packed());
@@ -132,7 +132,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         var unknownFieldsElement = message.unknownFieldsElement()
                 .orElse(null);
         if(unknownFieldsElement == null) {
-            switchWriter.printSwitchBranch("default", "%s.skipBytes()".formatted(DEFAULT_STREAM_NAME));
+            switchWriter.printSwitchBranch("default", "%s.readUnknown(false)".formatted(DEFAULT_STREAM_NAME));
             return;
         }
 
@@ -151,7 +151,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
             var streamName = "%sInputStream".formatted(property.name());
             var keyName = "%sKey".formatted(property.name());
             var valueName = "%sValue".formatted(property.name());
-            switchBranchWriter.printVariableDeclaration(streamName, "new ProtobufInputStream(%s.readBytes())".formatted(DEFAULT_STREAM_NAME));
+            switchBranchWriter.printVariableDeclaration(streamName, "%s.lengthDelimitedStream()".formatted(DEFAULT_STREAM_NAME));
             switchBranchWriter.printVariableDeclaration(mapType.keyType().accessorType().toString(), keyName, "null");
             switchBranchWriter.printVariableDeclaration(mapType.valueType().accessorType().toString(), valueName, "null");
             var keyReadMethod = getDeserializerStreamMethod(mapType.keyType(), false);
@@ -196,7 +196,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
     }
 
     private String getConvertedValue(String streamName, ProtobufPropertyType implementation, String readMethod) {
-        var result = "%s.%s()".formatted(streamName, readMethod);
+        var result = readMethod.isEmpty() ? streamName : "%s.%s()".formatted(streamName, readMethod);
         if(implementation.protobufType() == ProtobufType.OBJECT && implementation instanceof ProtobufPropertyType.NormalType normalType) {
             var elementType = (DeclaredType) implementation.deserializedType();
             var elementSpecName = getSpecFromObject(elementType);
@@ -205,7 +205,7 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
                         .orElseGet(normalType::defaultValue);
                 result = "%s.decode(%s).orElse(%s)".formatted(elementSpecName, result, defaultValue);
             } else {
-                result = "%s.decode(%s)".formatted(elementSpecName, result);
+                result = "%s.decode(%s.lengthDelimitedStream())".formatted(elementSpecName, result);
             }
         }
 
@@ -228,7 +228,8 @@ public class ProtobufDeserializationMethodGenerator extends ProtobufMethodGenera
         
         return switch (type.protobufType()) {
             case STRING -> "readString";
-            case OBJECT, BYTES -> "readBytes";
+            case OBJECT -> "";
+            case BYTES -> "readBytes";
             case BOOL -> packed ? "readBoolPacked" : "readBool";
             case INT32, SINT32, UINT32 -> packed ? "readInt32Packed" : "readInt32";
             case FLOAT -> packed ? "readFloatPacked" : "readFloat";

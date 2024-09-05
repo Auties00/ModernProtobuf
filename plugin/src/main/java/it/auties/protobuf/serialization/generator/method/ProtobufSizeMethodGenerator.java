@@ -87,7 +87,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
                 writeFieldTagSize(forEachWriter, property.index(), ProtobufType.MAP);
                 var mapEntrySizeFieldName = mapEntryFieldName + "Size";
                 forEachWriter.printVariableDeclaration(mapEntrySizeFieldName, "%s(%s)".formatted(methodName, mapEntryFieldName));
-                forEachWriter.println("%s += ProtobufOutputStream.getVarIntSizeUnsigned(%s);".formatted(DEFAULT_RESULT_NAME, mapEntrySizeFieldName));
+                forEachWriter.println("%s += ProtobufOutputStream.getVarIntSize(%s);".formatted(DEFAULT_RESULT_NAME, mapEntrySizeFieldName));
                 forEachWriter.println("%s += %s;".formatted(DEFAULT_RESULT_NAME, mapEntrySizeFieldName));
             }
         }
@@ -164,7 +164,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
             case BOOL -> "1";
             case STRING -> "ProtobufOutputStream.getStringSize(%s)".formatted(accessor);
             case BYTES -> "ProtobufOutputStream.getBytesSize(%s)".formatted(accessor);
-            case INT32, SINT32, UINT32, INT64, SINT64, UINT64 -> "ProtobufOutputStream.getVarIntSize(%s)".formatted(accessor);
+            case INT32, SINT32, INT64, SINT64, UINT32, UINT64 -> "ProtobufOutputStream.getVarIntSize(%s)".formatted(accessor);
             case FIXED32, SFIXED32, FLOAT -> "4";
             case FIXED64, SFIXED64, DOUBLE -> "8";
             default -> throw new IllegalStateException("Unexpected value: " + protobufType);
@@ -178,6 +178,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
             case FLOAT, FIXED32, SFIXED32 -> ProtobufWireType.WIRE_TYPE_FIXED32;
             case DOUBLE, SFIXED64, FIXED64 -> ProtobufWireType.WIRE_TYPE_FIXED64;
             case BOOL, INT32, SINT32, UINT32, INT64, UINT64, SINT64 -> ProtobufWireType.WIRE_TYPE_VAR_INT;
+            case UNKNOWN -> throw new IllegalArgumentException("Unexpected UNKNOWN field type");
         };
         writer.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(DEFAULT_RESULT_NAME, index, wireType));
     }

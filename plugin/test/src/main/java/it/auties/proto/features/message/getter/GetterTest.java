@@ -11,4 +11,12 @@ public class GetterTest {
         var decoded = BoxMessageSpec.decode(encoded);
         Assertions.assertEquals(decoded.unbox(), boxMessage.unbox());
     }
+
+    @Test
+    public void testMismatch() {
+        var boxMessage = new StandaloneGetterMessage("Hello World!");
+        var encoded = StandaloneGetterMessageSpec.encode(boxMessage);
+        var decoded = StandaloneGetterMessageSpec.decode(encoded);
+        Assertions.assertEquals(decoded.tag(), boxMessage.tag());
+    }
 }

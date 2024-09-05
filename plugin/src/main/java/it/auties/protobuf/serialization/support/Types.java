@@ -1,9 +1,6 @@
 package it.auties.protobuf.serialization.support;
 
-import it.auties.protobuf.annotation.ProtobufEnum;
-import it.auties.protobuf.annotation.ProtobufMessage;
-import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.annotation.ProtobufUnknownFields;
+import it.auties.protobuf.annotation.*;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ElementKind;
@@ -80,28 +77,6 @@ public class Types {
         return processingEnv.getTypeUtils().isAssignable(erase(rhs), erase(lhs));
     }
 
-    public TypeMirror newType(Class<?> type, TypeMirror... typeArguments) {
-        var astType = getType(type);
-        if(!(astType instanceof DeclaredType declaredType)) {
-            return astType;
-        }
-
-        var element = (TypeElement) declaredType.asElement();
-        return processingEnv.getTypeUtils().getDeclaredType(element, typeArguments);
-    }
-
-    public Optional<String> getName(TypeMirror type) {
-        if(!(type instanceof DeclaredType declaredType)) {
-            return Optional.empty();
-        }
-
-        if(!(declaredType.asElement() instanceof TypeElement typeElement)) {
-            return Optional.empty();
-        }
-
-        return Optional.ofNullable(typeElement.getQualifiedName().toString());
-    }
-
     public Optional<TypeElement> getTypeWithDefaultConstructor(TypeMirror collectionType) {
         if(erase(collectionType) instanceof DeclaredType declaredType
                 && declaredType.asElement() instanceof TypeElement typeElement
@@ -124,6 +99,10 @@ public class Types {
     }
 
     public List<TypeElement> getMixins(ProtobufUnknownFields property) {
+        return getMixins(property::mixins);
+    }
+
+    public List<TypeElement> getMixins(ProtobufGetter property) {
         return getMixins(property::mixins);
     }
 
