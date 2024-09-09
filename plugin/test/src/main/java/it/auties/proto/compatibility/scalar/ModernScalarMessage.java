@@ -4,6 +4,8 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.nio.ByteBuffer;
+
 @ProtobufMessage
 public record ModernScalarMessage(
         @ProtobufProperty(index = 1, type = ProtobufType.FIXED32)
@@ -31,7 +33,10 @@ public record ModernScalarMessage(
         @ProtobufProperty(index = 12, type = ProtobufType.STRING)
         String string,
         @ProtobufProperty(index = 13, type = ProtobufType.BYTES)
-        byte[] bytes
+        ByteBuffer bytes
 ) {
-
+        @Override
+        public ByteBuffer bytes() {
+                return bytes;
+        }
 }

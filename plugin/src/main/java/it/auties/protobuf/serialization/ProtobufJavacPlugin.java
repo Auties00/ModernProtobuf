@@ -45,7 +45,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class
+            ProtobufFutureMixin.class,
+            ProtobufStringMixin.class,
+            ProtobufBytesMixin.class
     };
 
     private Trees trees;
@@ -801,26 +803,24 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
     // Add the necessary converters for the provided types using as sources the target type's class and the provided mixins
     private void attributeSerializers(Element invoker, TypeMirror from, ProtobufPropertyType implementation, List<TypeElement> mixins) {
-        // If to is a primitive no conversions are necessary
-        // We don't support arrays so no check is necessary
-        if(!(from instanceof DeclaredType toDeclaredType)) {
-            return;
-        }
-
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var to = implementation.protobufType();
         var toType = types.getType(to.wrappedType());
-        if (types.isAssignable(from, toType)
-                && (to != ProtobufType.OBJECT || types.isMessage(toDeclaredType) || types.isEnum(toDeclaredType))) {
+        var toTypeAlias = to.wrappedTypeSerializationAlias();
+        if ((types.isAssignable(from, toType) || (toTypeAlias.isPresent() && types.isAssignable(from, toTypeAlias.get())))
+                && (to != ProtobufType.OBJECT || types.isMessage(from) || types.isEnum(from))) {
             return;
         }
 
         // Look for valid serializers and deserializers in the toType and mixins
         var serializers = new ArrayList<ProtobufSerializerElement>();
         var candidates = new ArrayList<>(mixins);
-        candidates.add((TypeElement) toDeclaredType.asElement());
-        for(var candidate : candidates) {
-            for(var entry : candidate.getEnclosedElements()) {
+        if(from instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
+            candidates.add(typeElement);
+        }
+
+        for (var candidate : candidates) {
+            for (var entry : candidate.getEnclosedElements()) {
                 if (!(entry instanceof ExecutableElement element)) {
                     continue;
                 }
@@ -839,7 +839,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                         .getFirst()
                         .asType();
                 var inferredType = getTypeParameter(from, serializerInputType, 0);
-                if(inferredType.isEmpty()) {
+                if (inferredType.isEmpty()) {
                     messages.printError("Type inference error: cannot determine serializer's type parameter", element); // There is no solution here, if the type cannot be inferred
                     continue;
                 }
@@ -851,14 +851,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         // Add the best serializer or error out
         if (serializers.isEmpty()) {
-            messages.printError("Missing converter: cannot find a serializer for %s".formatted(from), invoker);
+            messages.printError("Missing converter: cannot find a serializer from %s to %s".formatted(from, toType), invoker);
         } else {
             var bestSerializer = serializers.stream()
                     .reduce((first, second) -> {
                         var firstType = first.delegate().getReturnType();
                         var secondType = second.delegate().getReturnType();
-                        if(types.isSameType(firstType, secondType)) {
-                            messages.printError("Duplicated protobuf serializer for %s".formatted(firstType) , second.delegate());
+                        if (types.isSameType(firstType, secondType)) {
+                            messages.printError("Duplicated protobuf serializer for %s".formatted(firstType), second.delegate());
                         }
 
                         return types.isAssignable(firstType, secondType) ? first : second;
@@ -868,7 +868,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
             // Prevent repeated attribution of the serializer/deserializer type if it's not a protobuf message/enum
             var recursiveNonProtoAttribution = !types.isMessage(bestSerializer.returnType()) && !types.isEnum(bestSerializer.returnType());
-            if(recursiveNonProtoAttribution) {
+            if (recursiveNonProtoAttribution) {
                 attributeSerializers(
                         invoker,
                         bestSerializer.returnType(),
@@ -887,22 +887,20 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private void attributeDeserializers(Element invoker, TypeMirror to, ProtobufPropertyType implementation, List<TypeElement> mixins) {
         // If to is a primitive no conversions are necessary
         // We don't support arrays so no check is necessary
-        if(!(to instanceof DeclaredType toDeclaredType)) {
-            return;
-        }
-
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var from = implementation.protobufType();
         var fromType = types.getType(from.wrappedType());
         if (types.isAssignable(to, fromType)
-                && (from != ProtobufType.OBJECT || types.isMessage(toDeclaredType) || types.isEnum(toDeclaredType))) {
+                && (from != ProtobufType.OBJECT || types.isMessage(to) || types.isEnum(to))) {
             return;
         }
 
         // Look for valid serializers and deserializers in the toType and mixins
         var deserializers = new ArrayList<ProtobufDeserializerElement>();
         var candidates = new ArrayList<>(mixins);
-        candidates.add((TypeElement) toDeclaredType.asElement());
+        if(to instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
+            candidates.add(typeElement);
+        }
         for(var candidate : candidates) {
             for(var entry : candidate.getEnclosedElements()) {
                 if (!(entry instanceof ExecutableElement element)) {
@@ -930,7 +928,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         // Add the best deserializer or error out
         if (deserializers.isEmpty()) {
-            messages.printError("Missing converter: cannot find a deserializer for %s".formatted(fromType), invoker);
+            messages.printError("Missing converter: cannot find a deserializer from %s to %s".formatted(fromType, to), invoker);
         } else {
             var bestDeserializer = deserializers.stream()
                     .reduce((first, second) -> {
@@ -979,7 +977,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        if (types.isSameType(mirror, targetType)) {
+        if (types.isSameType(mirror, targetType) && index < declaredType.getTypeArguments().size()) {
             var collectionTypeArgument = declaredType.getTypeArguments().get(index);
             return getConcreteTypeParameter(collectionTypeArgument, declaredType, index);
         }

@@ -178,7 +178,7 @@ public class ProtobufSizeMethodGenerator extends ProtobufMethodGenerator {
             case FLOAT, FIXED32, SFIXED32 -> ProtobufWireType.WIRE_TYPE_FIXED32;
             case DOUBLE, SFIXED64, FIXED64 -> ProtobufWireType.WIRE_TYPE_FIXED64;
             case BOOL, INT32, SINT32, UINT32, INT64, UINT64, SINT64 -> ProtobufWireType.WIRE_TYPE_VAR_INT;
-            case UNKNOWN -> throw new IllegalArgumentException("Unexpected UNKNOWN field type");
+            default -> throw new IllegalArgumentException("Unexpected UNKNOWN field type");
         };
         writer.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(DEFAULT_RESULT_NAME, index, wireType));
     }

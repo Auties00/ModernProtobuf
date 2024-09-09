@@ -1,10 +1,7 @@
 package it.auties.protobuf.serialization.generator.clazz;
 
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationMethodOverloadGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufSerializationMethodGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufSizeMethodGenerator;
+import it.auties.protobuf.serialization.generator.method.*;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
@@ -46,17 +43,16 @@ public class ProtobufSpecVisitor {
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
                 // Write the serializer
+                var serializationOverloadVisitor = new ProtobufSerializationMethodOverloadGenerator(result);
+                serializationOverloadVisitor.generate(classWriter);
                 var serializationVisitor = new ProtobufSerializationMethodGenerator(result);
                 serializationVisitor.generate(classWriter);
 
                 // Write the deserializer
                 var deserializationOverloadVisitor = new ProtobufDeserializationMethodOverloadGenerator(result);
                 deserializationOverloadVisitor.generate(classWriter);
-
-                // Write the deserializer
                 var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result);
                 deserializationVisitor.generate(classWriter);
-
 
                 // Write the size calculator
                 var sizeVisitor = new ProtobufSizeMethodGenerator(result);

@@ -35,10 +35,24 @@ public class Converters {
     }
 
     public boolean isSerializer(ExecutableElement entry, TypeMirror to, TypeMirror from) {
+        // All serializers must be annotated with @ProtobufSerializer
+        if(entry.getAnnotation(ProtobufSerializer.class) == null) {
+            return false;
+        }
+
+        // Static serializers take a parameter, that is the object that they need to serialize
+        // Class serializers take no parameters
         var isStatic = entry.getModifiers().contains(Modifier.STATIC);
-        return entry.getAnnotation(ProtobufSerializer.class) != null
-                && entry.getParameters().size() == (isStatic ? 1 : 0)
-                && (!isStatic || types.isAssignable(to, entry.getParameters().getFirst().asType()))
-                && types.isAssignable(from, entry.getReturnType());
+        if(entry.getParameters().size() != (isStatic ? 1 : 0)) {
+            return false;
+        }
+
+        // Check if the serializer is either not static or if it accepts the to type as a parameter
+        if(isStatic && !types.isAssignable(to, entry.getParameters().getFirst().asType())) {
+            return false;
+        }
+
+        // Check if the return type is accepted
+        return types.isAssignable(from, entry.getReturnType());
     }
 }

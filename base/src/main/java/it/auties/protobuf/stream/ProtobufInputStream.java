@@ -11,62 +11,55 @@
 package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufWireType;
 
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.InvalidMarkException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class ProtobufInputStream {
-    private static final byte[] EMPTY_BUFFER = new byte[0];
+    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
-    private final byte[] buffer;
-    private final int limit;
+    private final Input input;
     private int wireType;
     private int index;
-    private int pos;
-    private Integer groupIndex;
-
     public ProtobufInputStream(byte[] buffer, int offset, int length) {
-        this.buffer = buffer;
-        this.limit = length;
-        this.pos = offset;
+        this.input = Input.wrap(buffer, offset, length);
+    }
+    
+    public ProtobufInputStream(Path channel) throws IOException {
+        this(Files.newInputStream(channel), Files.size(channel));
+    }
+
+    public ProtobufInputStream(InputStream inputStream, long size){
+        this.input = Input.wrap(inputStream, size);
+    }
+
+    private ProtobufInputStream(Input input) {
+        this.input = input;
     }
 
     public boolean readTag() {
-        if(isAtEnd()) {
+        if(isFinished()) {
             this.wireType = 0;
             return false;
         }
 
         var rawTag = readInt32Unchecked();
         this.wireType = rawTag & 7;
-        if(wireType > ProtobufWireType.WIRE_TYPE_FIXED32) {
-            throw ProtobufDeserializationException.invalidWireType(wireType);
-        }
-
         this.index = rawTag >>> 3;
         if(index == 0) {
             throw ProtobufDeserializationException.invalidFieldIndex(index);
         }
-
-        if(rawTag == ProtobufWireType.WIRE_TYPE_START_OBJECT) {
-            if(groupIndex != null) {
-                throw ProtobufDeserializationException.invalidStartObject();
-            }
-
-            this.groupIndex = index;
-        }else if(rawTag == ProtobufWireType.WIRE_TYPE_END_OBJECT) {
-            if(groupIndex == null) {
-                throw ProtobufDeserializationException.invalidEndObject();
-            }
-
-            if(index != groupIndex) {
-                throw ProtobufDeserializationException.invalidEndObject(index, groupIndex);
-            }
-
-            this.groupIndex = null;
-        }
-
         return true;
     }
 
@@ -76,7 +69,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Float>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readFloat());
                 }
 
@@ -94,7 +87,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Double>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readDouble());
                 }
 
@@ -112,7 +105,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Integer>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readInt32());
                 }
 
@@ -130,7 +123,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Long>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readInt64());
                 }
 
@@ -148,7 +141,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Integer>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readFixed32());
                 }
 
@@ -166,7 +159,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Long>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readFixed64());
                 }
 
@@ -184,7 +177,7 @@ public class ProtobufInputStream {
                 var results = new ArrayList<Boolean>();
                 var input = lengthDelimitedStream();
                 this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
-                while (!input.isAtEnd()){
+                while (!input.isFinished()){
                     results.add(input.readBool());
                 }
 
@@ -208,8 +201,17 @@ public class ProtobufInputStream {
         return readInt64() == 1;
     }
 
-    public String readString() {
-        return new String(readBytes(), StandardCharsets.UTF_8);
+    public ProtobufString readString() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
+            throw ProtobufDeserializationException.invalidWireType(wireType);
+        }
+
+        var size = this.readInt32Unchecked();
+        if(size < 0) {
+            throw ProtobufDeserializationException.negativeLength(size);
+        }else {
+            return input.readString(size);
+        }
     }
 
     public int readInt32() {
@@ -222,74 +224,68 @@ public class ProtobufInputStream {
 
     // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
     // Fastest implementation I could find
+    // Adapted to work with Channels
     private int readInt32Unchecked() {
+        input.mark();
         fspath:
         {
-            int tempPos = pos;
-            byte[] buffer = this.buffer;
             int x;
-            if ((x = buffer[tempPos++]) >= 0) {
-                pos = tempPos;
+            if ((x = input.readByte()) >= 0) {
                 return x;
-            } else if (limit - tempPos < 9) {
-                break fspath;
-            } else if ((x ^= (buffer[tempPos++] << 7)) < 0) {
+            } else if ((x ^= (input.readByte() << 7)) < 0) {
                 x ^= (~0 << 7);
-            } else if ((x ^= (buffer[tempPos++] << 14)) >= 0) {
+            } else if ((x ^= (input.readByte() << 14)) >= 0) {
                 x ^= (~0 << 7) ^ (~0 << 14);
-            } else if ((x ^= (buffer[tempPos++] << 21)) < 0) {
+            } else if ((x ^= (input.readByte() << 21)) < 0) {
                 x ^= (~0 << 7) ^ (~0 << 14) ^ (~0 << 21);
             } else {
-                int y = buffer[tempPos++];
+                int y = input.readByte();
                 x ^= y << 28;
                 x ^= (~0 << 7) ^ (~0 << 14) ^ (~0 << 21) ^ (~0 << 28);
                 if (y < 0
-                        && buffer[tempPos++] < 0
-                        && buffer[tempPos++] < 0
-                        && buffer[tempPos++] < 0
-                        && buffer[tempPos++] < 0
-                        && buffer[tempPos++] < 0) {
+                        && input.readByte() < 0
+                        && input.readByte() < 0
+                        && input.readByte() < 0
+                        && input.readByte() < 0
+                        && input.readByte() < 0) {
                     break fspath;
                 }
             }
-            pos = tempPos;
             return x;
         }
 
+        input.rewind();
         return (int) readVarInt64Slow();
     }
 
     // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
     // Fastest implementation I could find
+    // Adapted to work with Channels
     public long readInt64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
-        
+
+        input.mark();
         fspath:
         {
-            int tempPos = pos;
-            byte[] buffer = this.buffer;
             long x;
             int y;
-            if ((y = buffer[tempPos++]) >= 0) {
-                pos = tempPos;
+            if ((y = input.readByte()) >= 0) {
                 return y;
-            } else if (limit - tempPos < 9) {
-                break fspath;
-            } else if ((y ^= (buffer[tempPos++] << 7)) < 0) {
+            } else if ((y ^= (input.readByte() << 7)) < 0) {
                 x = y ^ (~0 << 7);
-            } else if ((y ^= (buffer[tempPos++] << 14)) >= 0) {
+            } else if ((y ^= (input.readByte() << 14)) >= 0) {
                 x = y ^ ((~0 << 7) ^ (~0 << 14));
-            } else if ((y ^= (buffer[tempPos++] << 21)) < 0) {
+            } else if ((y ^= (input.readByte() << 21)) < 0) {
                 x = y ^ ((~0 << 7) ^ (~0 << 14) ^ (~0 << 21));
-            } else if ((x = y ^ ((long) buffer[tempPos++] << 28)) >= 0L) {
+            } else if ((x = y ^ ((long) input.readByte() << 28)) >= 0L) {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28);
-            } else if ((x ^= ((long) buffer[tempPos++] << 35)) < 0L) {
+            } else if ((x ^= ((long) input.readByte() << 35)) < 0L) {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35);
-            } else if ((x ^= ((long) buffer[tempPos++] << 42)) >= 0L) {
+            } else if ((x ^= ((long) input.readByte() << 42)) >= 0L) {
                 x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35) ^ (~0L << 42);
-            } else if ((x ^= ((long) buffer[tempPos++] << 49)) < 0L) {
+            } else if ((x ^= ((long) input.readByte() << 49)) < 0L) {
                 x ^=
                         (~0L << 7)
                                 ^ (~0L << 14)
@@ -299,7 +295,7 @@ public class ProtobufInputStream {
                                 ^ (~0L << 42)
                                 ^ (~0L << 49);
             } else {
-                x ^= ((long) buffer[tempPos++] << 56);
+                x ^= ((long) input.readByte() << 56);
                 x ^=
                         (~0L << 7)
                                 ^ (~0L << 14)
@@ -310,22 +306,22 @@ public class ProtobufInputStream {
                                 ^ (~0L << 49)
                                 ^ (~0L << 56);
                 if (x < 0L) {
-                    if (buffer[tempPos++] < 0L) {
+                    if (input.readByte() < 0L) {
                         break fspath;
                     }
                 }
             }
-            pos = tempPos;
             return x;
         }
 
+        input.rewind();
         return readVarInt64Slow();
     }
 
     private long readVarInt64Slow() {
         var result = 0L;
         for (int shift = 0; shift < 64; shift += 7) {
-            byte b = readByte();
+            byte b = input.readByte();
             result |= (long) (b & 0x7F) << shift;
             if ((b & 0x80) == 0) {
                 return result;
@@ -340,17 +336,10 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
-        var tempPos = this.pos;
-        if (this.limit - tempPos < 4) {
-            throw ProtobufDeserializationException.truncatedMessage();
-        }
-
-        byte[] buffer = this.buffer;
-        this.pos = tempPos + 4;
-        return buffer[tempPos] & 255
-                | (buffer[tempPos + 1] & 255) << 8
-                | (buffer[tempPos + 2] & 255) << 16
-                | (buffer[tempPos + 3] & 255) << 24;
+        return input.readByte() & 255
+                | (input.readByte() & 255) << 8
+                | (input.readByte() & 255) << 16
+                | (input.readByte() & 255) << 24;
     }
     
     public long readFixed64() {
@@ -358,28 +347,17 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
         
-        int tempPos = this.pos;
-        if (this.limit - tempPos < 8) {
-            throw ProtobufDeserializationException.truncatedMessage();
-        }
-
-        byte[] buffer = this.buffer;
-        this.pos = tempPos + 8;
-        return (long) buffer[tempPos] & 255L
-                | ((long) buffer[tempPos + 1] & 255L) << 8
-                | ((long) buffer[tempPos + 2] & 255L) << 16
-                | ((long) buffer[tempPos + 3] & 255L) << 24
-                | ((long) buffer[tempPos + 4] & 255L) << 32
-                | ((long) buffer[tempPos + 5] & 255L) << 40
-                | ((long) buffer[tempPos + 6] & 255L) << 48
-                | ((long) buffer[tempPos + 7] & 255L) << 56;
+        return (long) input.readByte() & 255L
+                | ((long) input.readByte() & 255L) << 8
+                | ((long) input.readByte() & 255L) << 16
+                | ((long) input.readByte() & 255L) << 24
+                | ((long) input.readByte() & 255L) << 32
+                | ((long) input.readByte() & 255L) << 40
+                | ((long) input.readByte() & 255L) << 48
+                | ((long) input.readByte() & 255L) << 56;
     }
 
-    public byte readByte() {
-        return buffer[pos++];
-    }
-
-    public byte[] readBytes() {
+    public ByteBuffer readBytes() {
         if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
@@ -387,8 +365,10 @@ public class ProtobufInputStream {
         var size = this.readInt32Unchecked();
         if(size < 0) {
             throw ProtobufDeserializationException.negativeLength(size);
+        }else if(size == 0) {
+            return EMPTY_BUFFER;
         }else {
-            return readBytes(size);
+            return input.readBytes(size);
         }
     }
 
@@ -409,38 +389,32 @@ public class ProtobufInputStream {
 
     private HashMap<Integer, Object> readGroup(boolean allocate) {
         var group = allocate ? new HashMap<Integer, Object>() : null;
-        while (!isAtEnd()) {
+        var groupIndex = index;
+        while (!isFinished()) {
             var value = readUnknown();
             if(group != null) {
                 group.put(index, value);
             }
         }
-        assertGroupClosed();
+        assertGroupClosed(groupIndex);
         return group;
     }
 
-    private void assertGroupClosed() {
+    private void assertGroupClosed(int groupIndex) {
         if(wireType != ProtobufWireType.WIRE_TYPE_END_OBJECT) {
             throw ProtobufDeserializationException.malformedGroup();
         }
-    }
-
-    private byte[] readBytes(int length) {
-        if(length == 0) {
-            return EMPTY_BUFFER;
+        if(index != groupIndex) {
+            throw ProtobufDeserializationException.invalidEndObject(index, groupIndex);
         }
-
-        var tempPos = pos;
-        pos += length;
-        return Arrays.copyOfRange(buffer, tempPos, pos);
     }
-
-    public boolean isAtEnd() {
-        return pos >= limit;
-    }
-
+    
     public int index() {
         return index;
+    }
+
+    public boolean isFinished() {
+        return input.isFinished();
     }
 
     public ProtobufInputStream lengthDelimitedStream() {
@@ -452,9 +426,196 @@ public class ProtobufInputStream {
         if(size < 0) {
             throw ProtobufDeserializationException.negativeLength(size);
         }else {
-            var tempPos = pos;
-            pos += size;
-            return new ProtobufInputStream(buffer, tempPos, pos);
+            return new ProtobufInputStream(input.subInput(size));
+        }
+    }
+
+    private static abstract sealed class Input {
+        long marker;
+        private Input() {
+            this.marker = -1;
+        }
+
+        public abstract byte readByte();
+        public abstract ByteBuffer readBytes(int size);
+        public abstract ProtobufString readString(int size);
+        public abstract void mark();
+        public abstract void rewind();
+        public abstract boolean isFinished();
+        public abstract Input subInput(int size);
+
+        private static Input wrap(InputStream channel, long size) {
+            return new Stream(channel, size);
+        }
+
+        private static Input wrap(byte[] buffer, int offset, int size) {
+            return new Buffer(buffer, offset, size);
+        }
+        
+        private static final class Stream extends Input{
+            private final InputStream inputStream;
+            private long remaining;
+
+            // A buffer is needed to rewind if decoding a varint fails
+            // So the max size this can use is 10 bytes
+            private byte[] buffer;
+            private int bufferPosition;
+            private int bufferLength;
+
+            private Stream(InputStream inputStream, long size) {
+                this.inputStream = inputStream;
+                this.remaining = size;
+            }
+
+            @Override
+            public byte readByte() {
+                try {
+                    if(marker == -1 && bufferLength != 0) {
+                        bufferLength--;
+                        remaining--;
+                        return buffer[bufferPosition++];
+                    }
+
+                    if(remaining-- <= 0) {
+                        throw new EOFException();
+                    }
+
+                    return (byte) inputStream.read();
+                }catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            }
+
+            @Override
+            public ByteBuffer readBytes(int size) {
+                try {
+                    if((this.remaining = remaining - size) < 0) {
+                        throw new EOFException();
+                    }
+
+                    var bytes = new byte[size];
+                    var offset = 0;
+                    if(bufferLength != 0) {
+                        System.arraycopy(buffer, 0, bytes, 0, bufferLength);
+                        offset = bufferLength;
+                        bufferLength = Math.max(bufferLength - size, 0);
+                    }
+
+                    inputStream.readNBytes(bytes, offset, size - offset);
+                    return ByteBuffer.wrap(bytes);
+                }catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            }
+
+            @Override
+            public ProtobufString readString(int size) {
+                try {
+                    if((this.remaining = remaining - size) < 0) {
+                        throw new EOFException();
+                    }
+
+                    var bytes = new byte[size];
+                    var offset = 0;
+                    if(bufferLength != 0) {
+                        System.arraycopy(buffer, 0, bytes, 0, bufferLength);
+                        offset = bufferLength;
+                        bufferLength = Math.max(bufferLength - size, 0);
+                    }
+
+                    inputStream.readNBytes(bytes, offset, size - offset);
+                    return ProtobufString.lazy(bytes, 0, size);
+                }catch (IOException exception) {
+                    throw new UncheckedIOException(exception);
+                }
+            }
+
+            @Override
+            public void mark() {
+                if(this.buffer != null) {
+                    this.buffer = new byte[10];
+                }
+
+                this.bufferLength = 0;
+                this.marker = remaining;
+            }
+
+            @Override
+            public void rewind() {
+                this.marker = -1;
+                this.bufferPosition = 0;
+                this.remaining += bufferLength;
+            }
+
+            @Override
+            public boolean isFinished() {
+                return remaining <= 0;
+            }
+
+            @Override
+            public Input subInput(int size) {
+                var result = new Stream(inputStream, size);
+                remaining -= size;
+                return result;
+            }
+        }
+
+        private static final class Buffer extends Input{
+            private final byte[] buffer;
+            private final int offset;
+            private final int length;
+            private int position;
+            private int marker;
+            private Buffer(byte[] buffer, int offset, int length) {
+                this.buffer = buffer;
+                this.offset = offset;
+                this.length = length;
+            }
+
+            @Override
+            public byte readByte() {
+               return buffer[offset + position++];
+            }
+
+            @Override
+            public ByteBuffer readBytes(int size) {
+                var result = ByteBuffer.wrap(buffer, offset + position, size);
+                position += size;
+                return result;
+            }
+
+            @Override
+            public ProtobufString readString(int size) {
+                var result = ProtobufString.lazy(buffer, offset + position, size);
+                position += size;
+                return result;
+            }
+
+            @Override
+            public void mark() {
+                this.marker = position;
+            }
+
+            @Override
+            public void rewind() {
+                if(marker == -1) {
+                    throw new InvalidMarkException();
+                }
+
+                this.position = marker;
+            }
+
+            @Override
+            public boolean isFinished() {
+                return position >= length;
+            }
+
+            @Override
+            public Input subInput(int size) {
+                var result = new Buffer(buffer, offset + position, size);
+                position += size;
+                return result;
+            }
         }
     }
 }

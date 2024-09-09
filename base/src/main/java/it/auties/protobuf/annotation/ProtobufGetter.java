@@ -22,7 +22,9 @@ public @interface ProtobufGetter {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class
+            ProtobufFutureMixin.class,
+            ProtobufStringMixin.class,
+            ProtobufBytesMixin.class
     };
 
     boolean packed() default false;

@@ -2,15 +2,18 @@ package it.auties.proto.features.message.conversion;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
+import it.auties.protobuf.model.ProtobufString;
 
-record Wrapper(String value) {
+// ProtobufString -> String -> Wrapper
+// Wrapper -> String -> ProtobufString
+record Wrapper(ProtobufString value) {
     @ProtobufDeserializer
-    public static Wrapper of(String object) {
+    public static Wrapper of(ProtobufString object) {
         return new Wrapper(object);
     }
 
     @ProtobufSerializer
-    public String toValue() {
+    public ProtobufString toValue() {
         return value;
     }
 }

@@ -1,8 +1,13 @@
 package it.auties.protobuf.stream;
 
 import it.auties.protobuf.exception.ProtobufSerializationException;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufWireType;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
@@ -39,6 +44,11 @@ public final class ProtobufOutputStream {
         }
     }
 
+    public static int getStringSize(ProtobufString value) {
+        var count = value.encodedLength();
+        return getVarIntSize(count) + count;
+    }
+
     // Adapted from https://stackoverflow.com/a/8512877
     // Tested other alternatives including Guava's, seems the fastest considering all possibilities
     public static int getStringSize(String value) {
@@ -71,10 +81,21 @@ public final class ProtobufOutputStream {
         return getVarIntSize(value.length) + value.length;
     }
 
-    private final byte[] buffer;
-    private int position;
+    public static int getBytesSize(ByteBuffer value) {
+        if(value == null) {
+            return 0;
+        }
+
+        return getVarIntSize(value.remaining()) + value.remaining();
+    }
+
+    private final Output output;
     public ProtobufOutputStream(int size) {
-        this.buffer = new byte[size];
+        this.output = Output.allocate(size);
+    }
+
+    public ProtobufOutputStream(OutputStream outputStream) {
+        this.output = Output.wrap(outputStream);
     }
 
     private void writeTag(int fieldNumber, int wireType) {
@@ -153,10 +174,10 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED32);
-        write((byte) (value & 0xFF));
-        write((byte) ((value >> 8) & 0xFF));
-        write((byte) ((value >> 16) & 0xFF));
-        write((byte) ((value >> 24) & 0xFF));
+        output.write((byte) (value & 0xFF));
+        output.write((byte) ((value >> 8) & 0xFF));
+        output.write((byte) ((value >> 16) & 0xFF));
+        output.write((byte) ((value >> 24) & 0xFF));
     }
 
     public void writeInt64(int fieldNumber, Collection<Long> values) {
@@ -230,14 +251,14 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED64);
-        write((byte) ((int) ((long) value) & 0xFF));
-        write((byte) ((int) (value >> 8) & 0xFF));
-        write((byte) ((int) (value >> 16) & 0xFF));
-        write((byte) ((int) (value >> 24) & 0xFF));
-        write((byte) ((int) (value >> 32) & 0xFF));
-        write((byte) ((int) (value >> 40) & 0xFF));
-        write((byte) ((int) (value >> 48) & 0xFF));
-        write((byte) ((int) (value >> 56) & 0xFF));
+        output.write((byte) ((int) ((long) value) & 0xFF));
+        output.write((byte) ((int) (value >> 8) & 0xFF));
+        output.write((byte) ((int) (value >> 16) & 0xFF));
+        output.write((byte) ((int) (value >> 24) & 0xFF));
+        output.write((byte) ((int) (value >> 32) & 0xFF));
+        output.write((byte) ((int) (value >> 40) & 0xFF));
+        output.write((byte) ((int) (value >> 48) & 0xFF));
+        output.write((byte) ((int) (value >> 56) & 0xFF));
     }
 
     public void writeBool(int fieldNumber, Collection<Boolean> values) {
@@ -256,17 +277,29 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        write((byte) (value ? 1 : 0));
+        output.write((byte) (value ? 1 : 0));
     }
 
-    public void writeString(int fieldNumber, Collection<String> values) {
+    public void writeString(int fieldNumber, Collection<?> values) {
         if(values == null){
             return;
         }
 
         for (var value : values) {
-            writeString(fieldNumber, value);
+            switch (value) {
+                case String string -> writeString(fieldNumber, string);
+                case ProtobufString protobufString -> writeString(fieldNumber, protobufString);
+                default -> throw new IllegalStateException("Unexpected value: " + value);
+            }
         }
+    }
+
+    public void writeString(int fieldNumber, ProtobufString value) {
+        if(value == null){
+            return;
+        }
+
+        value.write(fieldNumber, this);
     }
 
     public void writeString(int fieldNumber, String value) {
@@ -277,17 +310,32 @@ public final class ProtobufOutputStream {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         var bytes = value.getBytes(StandardCharsets.UTF_8);
         writeVarIntNoTag(bytes.length);
-        write(bytes);
+        output.write(bytes);
     }
 
-    public void writeBytes(int fieldNumber, Collection<byte[]> values) {
+    public void writeBytes(int fieldNumber, Collection<?> values) {
         if(values == null){
             return;
         }
 
         for (var value : values) {
-            writeBytes(fieldNumber, value);
+            switch (value) {
+                case byte[] bytes -> writeBytes(fieldNumber, bytes);
+                case ByteBuffer byteBuffer -> writeBytes(fieldNumber, byteBuffer);
+                default -> throw new IllegalStateException("Unexpected value: " + value);
+            }
         }
+    }
+
+    public void writeBytes(int fieldNumber, ByteBuffer value) {
+        if(value == null){
+            return;
+        }
+
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        var size = value.remaining();
+        writeVarIntNoTag(size);
+        output.write(value);
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {
@@ -297,36 +345,150 @@ public final class ProtobufOutputStream {
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeVarIntNoTag(value.length);
-        write(value);
+        output.write(value);
+    }
+
+    public void writeBytes(int fieldNumber, byte[] value, int offset, int size) {
+        if(value == null){
+            return;
+        }
+
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
+        output.write(value, offset, size);
+    }
+
+    public void writeObject(int fieldNumber, int size) {
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
     }
 
     public byte[] toByteArray() {
-        if(position != buffer.length) {
-            throw ProtobufSerializationException.sizeMismatch();
-        }
-
-        return buffer;
+        return output.toByteArray();
     }
 
     private void writeVarIntNoTag(long value) {
         while (true) {
             if ((value & ~0x7FL) == 0) {
-                write((byte) value);
+                output.write((byte) value);
                 return;
             } else {
-                write((byte) (((int) value & 0x7F) | 0x80));
+                output.write((byte) (((int) value & 0x7F) | 0x80));
                 value >>>= 7;
             }
         }
     }
 
-    private void write(byte value) {
-        buffer[position++] = value;
-    }
+    private static abstract sealed class Output {
+        public abstract void write(byte entry);
+        public abstract void write(byte[] entry);
+        public abstract void write(byte[] entry, int offset, int length);
+        public abstract void write(ByteBuffer entry);
+        public abstract byte[] toByteArray();
 
-    private void write(byte[] values) {
-        for (var value : values) {
-            buffer[position++] = value;
+        private static Output wrap(OutputStream outputStream) {
+            return new Stream(outputStream);
+        }
+
+        private static Output allocate(int size) {
+            return new Buffer(size);
+        }
+
+        private static final class Stream extends Output {
+            private final OutputStream outputStream;
+            private Stream(OutputStream outputStream) {
+                this.outputStream = outputStream;
+            }
+
+            @Override
+            public void write(byte entry) {
+                try {
+                    outputStream.write(entry);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+            @Override
+            public void write(byte[] entry) {
+                try {
+                    outputStream.write(entry);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+            @Override
+            public void write(byte[] entry, int offset, int length) {
+                try {
+                    outputStream.write(entry, offset, length);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+            @Override
+            public void write(ByteBuffer entry) {
+                try {
+                    var size = entry.remaining();
+                    var bufferPosition = entry.position();
+                    for(var i = 0; i < size; i++) {
+                        outputStream.write(entry.get(bufferPosition + i));
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+            @Override
+            public byte[] toByteArray() {
+                throw new UnsupportedOperationException();
+            }
+        }
+
+        private static final class Buffer extends Output {
+            private final byte[] buffer;
+            private int position;
+            private Buffer(int size) {
+                this.buffer = new byte[size];
+            }
+
+            @Override
+            public void write(byte entry) {
+                buffer[position++] = entry;
+            }
+
+            @Override
+            public void write(byte[] entry) {
+                for (byte b : entry) {
+                    buffer[position++] = b;
+                }
+            }
+
+            @Override
+            public void write(byte[] entry, int offset, int length) {
+                for(var i = 0; i < length; i++) {
+                    buffer[position++] = entry[offset + i];
+                }
+            }
+
+            @Override
+            public void write(ByteBuffer entry) {
+                var size = entry.remaining();
+                var bufferPosition = entry.position();
+                for(var i = 0; i < size; i++) {
+                    buffer[position++] = entry.get(bufferPosition + i);
+                }
+            }
+
+            @Override
+            public byte[] toByteArray() {
+                if(position != buffer.length) {
+                    throw ProtobufSerializationException.sizeMismatch();
+                }
+
+                return buffer;
+            }
         }
     }
 }

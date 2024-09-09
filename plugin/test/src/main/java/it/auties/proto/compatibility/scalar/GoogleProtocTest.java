@@ -4,6 +4,8 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+
 public class GoogleProtocTest {
     @Test
         public void encodeScalarTypes() {
@@ -31,7 +33,7 @@ public class GoogleProtocTest {
         Assertions.assertEquals(modernScalarMessage._double(), modernDecoded._double());
         Assertions.assertEquals(modernScalarMessage.bool(), modernDecoded.bool());
         Assertions.assertEquals(modernScalarMessage.string(), modernDecoded.string());
-        Assertions.assertArrayEquals(modernScalarMessage.bytes(), modernDecoded.bytes());
+        equals(modernScalarMessage.bytes(), modernDecoded.bytes());
     }
 
     private void equals(ModernScalarMessage modernDecoded, GoogleScalarMessage oldDecoded) {
@@ -47,6 +49,19 @@ public class GoogleProtocTest {
         Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
         Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
         Assertions.assertEquals(modernDecoded.string(), oldDecoded.getString());
-        Assertions.assertArrayEquals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
+        equals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
+    }
+
+    private void equals(ByteBuffer buffer, byte[] array) {
+        equals(buffer, ByteBuffer.wrap(array));
+    }
+
+    private void equals(ByteBuffer buffer, ByteBuffer other) {
+        Assertions.assertEquals(buffer.remaining(), other.remaining());
+        var bufferPosition = buffer.position();
+        var otherPosition = other.position();
+        for(var i = 0; i < other.remaining(); i++) {
+            Assertions.assertEquals(buffer.get(bufferPosition + i), other.get(otherPosition + i));
+        }
     }
 }

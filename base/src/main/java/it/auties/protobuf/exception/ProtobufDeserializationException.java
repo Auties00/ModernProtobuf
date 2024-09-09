@@ -9,7 +9,7 @@ public class ProtobufDeserializationException extends ProtobufException {
     }
 
     public static ProtobufDeserializationException truncatedMessage() {
-        return new ProtobufDeserializationException("A message ended unexpectedly in the middle of a field");
+        return new ProtobufDeserializationException("A message ended unexpectedly");
     }
 
     public static ProtobufDeserializationException malformedVarInt() {
@@ -18,14 +18,6 @@ public class ProtobufDeserializationException extends ProtobufException {
 
     public static ProtobufDeserializationException invalidWireType(int wireType) {
         return new ProtobufDeserializationException("A message contained an invalid wire type: %s".formatted(wireType));
-    }
-
-    public static ProtobufDeserializationException invalidStartObject() {
-        return new ProtobufDeserializationException("A message started a new group without closing the previous one");
-    }
-
-    public static ProtobufDeserializationException invalidEndObject() {
-        return new ProtobufDeserializationException("A message closed a group without opening one");
     }
 
     public static ProtobufDeserializationException invalidEndObject(int actualFieldIndex, int expectedFieldIndex) {
