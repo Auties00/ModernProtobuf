@@ -26,9 +26,7 @@ public @interface ProtobufProperty {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class,
-            ProtobufStringMixin.class,
-            ProtobufBytesMixin.class
+            ProtobufFutureMixin.class
     };
 
     boolean required() default false;

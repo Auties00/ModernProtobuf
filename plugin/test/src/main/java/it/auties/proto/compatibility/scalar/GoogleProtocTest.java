@@ -48,7 +48,7 @@ public class GoogleProtocTest {
         Assertions.assertEquals(modernDecoded._float(), oldDecoded.getFloat());
         Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
         Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
-        Assertions.assertEquals(modernDecoded.string(), oldDecoded.getString());
+        Assertions.assertTrue( modernDecoded.string().contentEquals(oldDecoded.getString()));
         equals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
     }
 

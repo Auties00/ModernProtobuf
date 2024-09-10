@@ -11,7 +11,6 @@
 // I thought some more about it and decided that having ProtobufString <-> String interoperability using a mixin would be good enough,
 // but this solution is not perfect because a developer might use the String type in their model without realizing that this "disables" lazy string decoding
 // This can be partially solved by making the compiler print a supportable warning telling the dev to consider the performance hit, but still this adds friction to the development process
-// This is where the story ends in terms of what's done, but if you like over engineered solutions you might as well continue reading
 //
 // While thinking about possible solutions, I remembered when, around five years ago, I used Java agents to instrument Minecraft's server code using bytecode manipulation to alter the physics of the game
 // I then figured that I could theoretically craft a class that is theoretically eligible to extend java.lang.String(i.e. all the methods from the super class are inherited and there are no conflicts)
@@ -28,18 +27,45 @@
 // Sometimes we loose to the language designers, I'm sure that moments like this lead Google engineers to develop more than once new programming languages in house
 // One day I'll probably do the same, just not right now because I feel like I still don't know enough about type systems and I'd hate to be clowned on like Go developers when they were asked about their interesting type system choices
 //
-// Will anyone ever read this? I don't know, but I hope that, if someone does, I can convey the sheer complexity of the platforms we build upon and how deep the rabbit hole for anything truly is
+// I also considered ByteBuddy, but it obviously can't magically make the JVM accept a class that extends a final class, we still need an agent
+//
+// FINAL DESIGN DECISION
+// Implement all String methods in a sealed classes that specializes already deserialized string and string that can be deserialized if needed
+// Don't provide default mixin as ProtobufString offers all the String features
+// Hash might not be the same for a wrap
 
 package it.auties.protobuf.model;
 
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
+import java.io.UnsupportedEncodingException;
+import java.lang.invoke.MethodHandles;
+import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-@SuppressWarnings({"EqualsWhichDoesntCheckParameterClass"})
-public sealed abstract class ProtobufString {
+/**
+ * A model that represents an underlying String value
+ * The underlying value can either be decoded, as described by {@link Value}, or encoded, as described by {@link Bytes}
+ * The hash code implementation is based on the encoded byte[] representation so that it matches encoded and decoded values
+ * This means that the hashCode produced by a ProtobufString and String will NOT match
+ * All methods from String are also available in ProtobufString, if you need to pass it to a method that takes a String use {@link ProtobufString#toString()}, or modify the method to accept a {@link CharSequence}
+ */
+@SuppressWarnings({
+        "EqualsWhichDoesntCheckParameterClass", // Equality is implemented differently
+        "unused",  // All methods are needed, consider design explanation in the class header
+        "ReplaceNullCheck", // Don't want to use Objects.requireNonNullElseGet as old style if check is faster
+        "NullableProblems" // Don't want to provide annotations for null properties
+})
+public sealed abstract class ProtobufString implements CharSequence {
     public static ProtobufString wrap(String string) {
         return new Value(string);
     }
@@ -48,29 +74,188 @@ public sealed abstract class ProtobufString {
         return new Bytes(bytes, offset, length);
     }
 
-    public abstract void write(int field, ProtobufOutputStream outputStream);
+    public static ProtobufString lazy(ByteBuffer buffer) {
+        return new Buffer(buffer);
+    }
 
     @Override
+    public abstract boolean equals(Object anObject);
+
+    public abstract void write(int field, ProtobufOutputStream outputStream);
+
     public abstract String toString();
+
+    public abstract int hashCode();
 
     public abstract int encodedLength();
 
+    public abstract int length();
+
+    public abstract char charAt(int index);
+
+    public abstract CharSequence subSequence(int start, int end);
+
+    public abstract boolean contentEquals(CharSequence cs);
+
+    public abstract boolean equalsIgnoreCase(String anotherString);
+
+    public abstract boolean regionMatches(int toffset, String other, int ooffset, int len);
+
+    public abstract boolean regionMatches(boolean ignoreCase, int toffset, String other, int ooffset, int len);
+
+    public abstract boolean startsWith(String prefix, int toffset);
+
+    public abstract boolean startsWith(String prefix);
+
+    public abstract boolean endsWith(String suffix);
+
+    public abstract int indexOf(int ch);
+
+    public abstract int indexOf(int ch, int fromIndex);
+
+    public abstract int lastIndexOf(int ch);
+
+    public abstract int lastIndexOf(int ch, int fromIndex);
+
+    public abstract int indexOf(String str);
+
+    public abstract int indexOf(String str, int fromIndex);
+
+    public abstract int lastIndexOf(String str);
+
+    public abstract int lastIndexOf(String str, int fromIndex);
+
+    public abstract String substring(int beginIndex);
+
+    public abstract String substring(int beginIndex, int endIndex);
+
+    public abstract String concat(String str);
+
+    public abstract String replace(char oldChar, char newChar);
+
+    public abstract boolean matches(String regex);
+
+    public abstract boolean contains(CharSequence s);
+
+    public abstract String replaceFirst(String regex, String replacement);
+
+    public abstract String replaceAll(String regex, String replacement);
+
+    public abstract String[] split(String regex, int limit);
+
+    public abstract String[] split(String regex);
+
+    public abstract String toLowerCase();
+
+    public abstract String toLowerCase(Locale locale);
+
+    public abstract String toUpperCase();
+
+    public abstract String toUpperCase(Locale locale);
+
+    public abstract String trim();
+
+    public abstract char[] toCharArray();
+
+    public abstract byte[] getBytes();
+
+    public abstract byte[] getBytes(String charsetName) throws UnsupportedEncodingException;
+
+    public abstract byte[] getBytes(Charset charset);
+
+    public abstract void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin);
+
+    public abstract boolean isEmpty();
+
+    public abstract int codePointAt(int index);
+
+    public abstract int codePointBefore(int index);
+
+    public abstract int codePointCount(int beginIndex, int endIndex);
+
+    public abstract int offsetByCodePoints(int index, int codePointOffset);
+
+    public abstract void getBytes(int srcBegin, int srcEnd, byte[] dst, int dstBegin);
+
+    public abstract boolean contentEquals(StringBuffer sb);
+
+    public abstract int indexOf(int ch, int beginIndex, int endIndex);
+
+    public abstract int indexOf(String str, int beginIndex, int endIndex);
+
+    public abstract String replace(CharSequence target, CharSequence replacement);
+
+    public abstract String[] splitWithDelimiters(String regex, int limit);
+
+    public abstract String strip();
+
+    public abstract String stripLeading();
+
+    public abstract String stripTrailing();
+
+    public abstract boolean isBlank();
+
+    public abstract Stream<String> lines();
+
+    public abstract String indent(int n);
+
+    public abstract String stripIndent();
+
+    public abstract String translateEscapes();
+
+    public abstract <R> R transform(Function<? super String, ? extends R> f);
+
+    public abstract IntStream chars();
+
+    public abstract IntStream codePoints();
+
+    public abstract String formatted(Object... args);
+
+    public abstract String intern();
+
+    public abstract String repeat(int count);
+
+    public abstract Optional<String> describeConstable();
+
+    public abstract String resolveConstantDesc(MethodHandles.Lookup lookup);
+
+    private static void assertUtf8(String charset) {
+        if (charset == null || !charset.equals("UTF-8")) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    static boolean equals(ByteBuffer buffer, byte[] array, int arrayOffset, int arrayLength) {
+        if(buffer.remaining() != arrayLength) {
+            return false;
+        }
+
+        var bufferPosition = buffer.position();
+        for(var i = 0; i < arrayLength; i++) {
+            if(buffer.get(bufferPosition + i) != array[arrayOffset + i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static final class Bytes extends ProtobufString {
-        private final byte[] buffer;
+        private final byte[] bytes;
         private final int offset;
         private final int length;
         private String decoded;
-        private Bytes(byte[] buffer, int offset, int length) {
-            this.buffer = buffer;
+        private Bytes(byte[] bytes, int offset, int length) {
+            this.bytes = bytes;
             this.offset = offset;
             this.length = length;
         }
 
-
+        @Override
         public boolean equals(Object anObject) {
             return switch (anObject) {
-                case String string -> Objects.equals(toString(), string);
-                case Bytes lazyString -> Arrays.mismatch(buffer, lazyString.buffer) == -1;
+                case Buffer lazyString -> equals(lazyString.buffer, bytes, offset, length);
+                case Bytes lazyString -> Arrays.mismatch(bytes, offset, offset + length, lazyString.bytes, lazyString.offset, lazyString.offset + lazyString.length) == -1;
                 case Value wrappedString -> Objects.equals(toString(), wrappedString.value);
                 case null, default -> false;
             };
@@ -83,7 +268,11 @@ public sealed abstract class ProtobufString {
             }
 
             synchronized (this) {
-                return Objects.requireNonNullElseGet(decoded, () -> this.decoded = new String(buffer, offset, length, StandardCharsets.UTF_8));
+                if(decoded != null) {
+                    return decoded;
+                }
+
+                return this.decoded = new String(bytes, offset, length, StandardCharsets.UTF_8);
             }
         }
 
@@ -92,31 +281,748 @@ public sealed abstract class ProtobufString {
             var end = offset + length;
             var result = 1;
             for (var i = offset; i < end; i++) {
-                result = 31 * result + buffer[i];
+                result = 31 * result + bytes[i];
             }
             return result;
         }
 
         @Override
         public void write(int field, ProtobufOutputStream outputStream) {
-            outputStream.writeBytes(field, buffer, offset, length);
+            outputStream.writeBytes(field, bytes, offset, length);
         }
 
         @Override
         public int encodedLength() {
             return length;
         }
+
+        @Override
+        public int length() {
+            return toString().length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return toString().charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return toString().subSequence(start, end);
+        }
+
+        @Override
+        public boolean contentEquals(CharSequence cs) {
+            return toString().contentEquals(cs);
+        }
+
+        @Override
+        public boolean equalsIgnoreCase(String anotherString) {
+            return toString().equalsIgnoreCase(anotherString);
+        }
+
+        @Override
+        public boolean regionMatches(int toffset, String other, int ooffset, int len) {
+            return toString().regionMatches(toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean regionMatches(boolean ignoreCase, int toffset, String other, int ooffset, int len) {
+            return toString().regionMatches(ignoreCase, toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean startsWith(String prefix, int toffset) {
+            return toString().startsWith(prefix, toffset);
+        }
+
+        @Override
+        public boolean startsWith(String prefix) {
+            return toString().startsWith(prefix);
+        }
+
+        @Override
+        public boolean endsWith(String suffix) {
+            return toString().endsWith(suffix);
+        }
+
+        @Override
+        public int indexOf(int ch) {
+            return toString().indexOf(ch);
+        }
+
+        @Override
+        public int indexOf(int ch, int fromIndex) {
+            return toString().indexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(int ch) {
+            return toString().lastIndexOf(ch);
+        }
+
+        @Override
+        public int lastIndexOf(int ch, int fromIndex) {
+            return toString().lastIndexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int indexOf(String str) {
+            return toString().indexOf(str);
+        }
+
+        @Override
+        public int indexOf(String str, int fromIndex) {
+            return toString().indexOf(str, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(String str) {
+            return toString().lastIndexOf(str);
+        }
+
+        @Override
+        public int lastIndexOf(String str, int fromIndex) {
+            return toString().lastIndexOf(str, fromIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex) {
+            return toString().substring(beginIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex, int endIndex) {
+            return toString().substring(beginIndex, endIndex);
+        }
+
+        @Override
+        public String concat(String str) {
+            return toString().concat(str);
+        }
+
+        @Override
+        public String replace(char oldChar, char newChar) {
+            return toString().replace(oldChar, newChar);
+        }
+
+        @Override
+        public boolean matches(String regex) {
+            return toString().matches(regex);
+        }
+
+        @Override
+        public boolean contains(CharSequence s) {
+            return toString().contains(s);
+        }
+
+        @Override
+        public String replaceFirst(String regex, String replacement) {
+            return toString().replaceFirst(regex, replacement);
+        }
+
+        @Override
+        public String replaceAll(String regex, String replacement) {
+            return toString().replaceAll(regex, replacement);
+        }
+
+        @Override
+        public String[] split(String regex, int limit) {
+            return toString().split(regex, limit);
+        }
+
+        @Override
+        public String[] split(String regex) {
+            return toString().split(regex);
+        }
+
+        @Override
+        public String toLowerCase() {
+            return toString().toLowerCase();
+        }
+
+        @Override
+        public String toLowerCase(Locale locale) {
+            return toString().toLowerCase(locale);
+        }
+
+        @Override
+        public String toUpperCase() {
+            return toString().toUpperCase();
+        }
+
+        @Override
+        public String toUpperCase(Locale locale) {
+            return toString().toUpperCase(locale);
+        }
+
+        @Override
+        public String trim() {
+            return toString().trim();
+        }
+
+        @Override
+        public char[] toCharArray() {
+            return toString().toCharArray();
+        }
+
+        @Override
+        public byte[] getBytes() {
+            return bytes;
+        }
+
+        @Override
+        public byte[] getBytes(String charsetName) {
+            assertUtf8(charsetName);
+            return bytes;
+        }
+
+        @Override
+        public byte[] getBytes(Charset charset) {
+            assertUtf8(charset.name());
+            return bytes;
+        }
+
+        @Override
+        public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {
+            toString().getChars(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return toString().isEmpty();
+        }
+
+        @Override
+        public int codePointAt(int index) {
+            return toString().codePointAt(index);
+        }
+
+        @Override
+        public int codePointBefore(int index) {
+            return toString().codePointBefore(index);
+        }
+
+        @Override
+        public int codePointCount(int beginIndex, int endIndex) {
+            return toString().codePointCount(beginIndex, endIndex);
+        }
+
+        @Override
+        public int offsetByCodePoints(int index, int codePointOffset) {
+            return toString().offsetByCodePoints(index, codePointOffset);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public void getBytes(int srcBegin, int srcEnd, byte[] dst, int dstBegin) {
+            toString().getBytes(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean contentEquals(StringBuffer sb) {
+            return toString().contentEquals(sb);
+        }
+
+        @Override
+        public int indexOf(int ch, int beginIndex, int endIndex) {
+            return toString().indexOf(ch, beginIndex, endIndex);
+        }
+
+        @Override
+        public int indexOf(String str, int beginIndex, int endIndex) {
+            return toString().indexOf(str, beginIndex, endIndex);
+        }
+
+        @Override
+        public String replace(CharSequence target, CharSequence replacement) {
+            return toString().replace(target, replacement);
+        }
+
+        @Override
+        public String[] splitWithDelimiters(String regex, int limit) {
+            return toString().splitWithDelimiters(regex, limit);
+        }
+
+        @Override
+        public String strip() {
+            return toString().strip();
+        }
+
+        @Override
+        public String stripLeading() {
+            return toString().stripLeading();
+        }
+
+        @Override
+        public String stripTrailing() {
+            return toString().stripTrailing();
+        }
+
+        @Override
+        public boolean isBlank() {
+            return toString().isBlank();
+        }
+
+        @Override
+        public Stream<String> lines() {
+            return toString().lines();
+        }
+
+        @Override
+        public String indent(int n) {
+            return toString().indent(n);
+        }
+
+        @Override
+        public String stripIndent() {
+            return toString().stripIndent();
+        }
+
+        @Override
+        public String translateEscapes() {
+            return toString().translateEscapes();
+        }
+
+        @Override
+        public <R> R transform(Function<? super String, ? extends R> f) {
+            return toString().transform(f);
+        }
+
+        @Override
+        public IntStream chars() {
+            return toString().chars();
+        }
+
+        @Override
+        public IntStream codePoints() {
+            return toString().codePoints();
+        }
+
+        @Override
+        public String formatted(Object... args) {
+            return toString().formatted(args);
+        }
+
+        @Override
+        public String intern() {
+            return toString().intern();
+        }
+
+        @Override
+        public String repeat(int count) {
+            return toString().repeat(count);
+        }
+
+        @Override
+        public Optional<String> describeConstable() {
+            return toString().describeConstable();
+        }
+
+        @Override
+        public String resolveConstantDesc(MethodHandles.Lookup lookup) {
+            return toString().resolveConstantDesc(lookup);
+        }
+    }
+
+    private static final class Buffer extends ProtobufString {
+        private final ByteBuffer buffer;
+        private String decoded;
+        private Buffer(ByteBuffer buffer) {
+            if(!buffer.isReadOnly()) {
+                throw new IllegalArgumentException("Only read only buffers are allowed");
+            }
+
+            this.buffer = buffer;
+        }
+
+        @Override
+        public boolean equals(Object anObject) {
+            return switch (anObject) {
+                case Bytes lazyString -> equals(buffer, lazyString.bytes, lazyString.offset, lazyString.length);
+                case Buffer lazyString -> buffer.mismatch(lazyString.buffer) == -1;
+                case Value wrappedString -> Objects.equals(toString(), wrappedString.value);
+                case null, default -> false;
+            };
+        }
+
+        @Override
+        public String toString() {
+            if(decoded != null) {
+                return decoded;
+            }
+
+            synchronized (this) {
+                if(decoded != null) {
+                    return decoded;
+                }
+
+                return this.decoded = StandardCharsets.UTF_8.decode(buffer).toString();
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            var start = buffer.position();
+            var result = 1;
+            for (var i = 0; i < buffer.remaining(); i++) {
+                result = 31 * result + buffer.get(start + i);
+            }
+            return result;
+        }
+
+        @Override
+        public void write(int field, ProtobufOutputStream outputStream) {
+            outputStream.writeBytes(field, buffer);
+        }
+
+        @Override
+        public int encodedLength() {
+            return buffer.remaining();
+        }
+
+        @Override
+        public int length() {
+            return toString().length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return toString().charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return toString().subSequence(start, end);
+        }
+
+        @Override
+        public boolean contentEquals(CharSequence cs) {
+            return toString().contentEquals(cs);
+        }
+
+        @Override
+        public boolean equalsIgnoreCase(String anotherString) {
+            return toString().equalsIgnoreCase(anotherString);
+        }
+
+        @Override
+        public boolean regionMatches(int toffset, String other, int ooffset, int len) {
+            return toString().regionMatches(toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean regionMatches(boolean ignoreCase, int toffset, String other, int ooffset, int len) {
+            return toString().regionMatches(ignoreCase, toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean startsWith(String prefix, int toffset) {
+            return toString().startsWith(prefix, toffset);
+        }
+
+        @Override
+        public boolean startsWith(String prefix) {
+            return toString().startsWith(prefix);
+        }
+
+        @Override
+        public boolean endsWith(String suffix) {
+            return toString().endsWith(suffix);
+        }
+
+        @Override
+        public int indexOf(int ch) {
+            return toString().indexOf(ch);
+        }
+
+        @Override
+        public int indexOf(int ch, int fromIndex) {
+            return toString().indexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(int ch) {
+            return toString().lastIndexOf(ch);
+        }
+
+        @Override
+        public int lastIndexOf(int ch, int fromIndex) {
+            return toString().lastIndexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int indexOf(String str) {
+            return toString().indexOf(str);
+        }
+
+        @Override
+        public int indexOf(String str, int fromIndex) {
+            return toString().indexOf(str, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(String str) {
+            return toString().lastIndexOf(str);
+        }
+
+        @Override
+        public int lastIndexOf(String str, int fromIndex) {
+            return toString().lastIndexOf(str, fromIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex) {
+            return toString().substring(beginIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex, int endIndex) {
+            return toString().substring(beginIndex, endIndex);
+        }
+
+        @Override
+        public String concat(String str) {
+            return toString().concat(str);
+        }
+
+        @Override
+        public String replace(char oldChar, char newChar) {
+            return toString().replace(oldChar, newChar);
+        }
+
+        @Override
+        public boolean matches(String regex) {
+            return toString().matches(regex);
+        }
+
+        @Override
+        public boolean contains(CharSequence s) {
+            return toString().contains(s);
+        }
+
+        @Override
+        public String replaceFirst(String regex, String replacement) {
+            return toString().replaceFirst(regex, replacement);
+        }
+
+        @Override
+        public String replaceAll(String regex, String replacement) {
+            return toString().replaceAll(regex, replacement);
+        }
+
+        @Override
+        public String[] split(String regex, int limit) {
+            return toString().split(regex, limit);
+        }
+
+        @Override
+        public String[] split(String regex) {
+            return toString().split(regex);
+        }
+
+        @Override
+        public String toLowerCase() {
+            return toString().toLowerCase();
+        }
+
+        @Override
+        public String toLowerCase(Locale locale) {
+            return toString().toLowerCase(locale);
+        }
+
+        @Override
+        public String toUpperCase() {
+            return toString().toUpperCase();
+        }
+
+        @Override
+        public String toUpperCase(Locale locale) {
+            return toString().toUpperCase(locale);
+        }
+
+        @Override
+        public String trim() {
+            return toString().trim();
+        }
+
+        @Override
+        public char[] toCharArray() {
+            return toString().toCharArray();
+        }
+
+        @Override
+        public byte[] getBytes() {
+            var result = new byte[buffer.remaining()];
+            buffer.get(result);
+            return result;
+        }
+
+        @Override
+        public byte[] getBytes(String charsetName) {
+            assertUtf8(charsetName);
+            return getBytes();
+        }
+
+        @Override
+        public byte[] getBytes(Charset charset) {
+            assertUtf8(charset.name());
+            return getBytes();
+        }
+
+        @Override
+        public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {
+            toString().getChars(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return toString().isEmpty();
+        }
+
+        @Override
+        public int codePointAt(int index) {
+            return toString().codePointAt(index);
+        }
+
+        @Override
+        public int codePointBefore(int index) {
+            return toString().codePointBefore(index);
+        }
+
+        @Override
+        public int codePointCount(int beginIndex, int endIndex) {
+            return toString().codePointCount(beginIndex, endIndex);
+        }
+
+        @Override
+        public int offsetByCodePoints(int index, int codePointOffset) {
+            return toString().offsetByCodePoints(index, codePointOffset);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public void getBytes(int srcBegin, int srcEnd, byte[] dst, int dstBegin) {
+            toString().getBytes(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean contentEquals(StringBuffer sb) {
+            return toString().contentEquals(sb);
+        }
+
+        @Override
+        public int indexOf(int ch, int beginIndex, int endIndex) {
+            return toString().indexOf(ch, beginIndex, endIndex);
+        }
+
+        @Override
+        public int indexOf(String str, int beginIndex, int endIndex) {
+            return toString().indexOf(str, beginIndex, endIndex);
+        }
+
+        @Override
+        public String replace(CharSequence target, CharSequence replacement) {
+            return toString().replace(target, replacement);
+        }
+
+        @Override
+        public String[] splitWithDelimiters(String regex, int limit) {
+            return toString().splitWithDelimiters(regex, limit);
+        }
+
+        @Override
+        public String strip() {
+            return toString().strip();
+        }
+
+        @Override
+        public String stripLeading() {
+            return toString().stripLeading();
+        }
+
+        @Override
+        public String stripTrailing() {
+            return toString().stripTrailing();
+        }
+
+        @Override
+        public boolean isBlank() {
+            return toString().isBlank();
+        }
+
+        @Override
+        public Stream<String> lines() {
+            return toString().lines();
+        }
+
+        @Override
+        public String indent(int n) {
+            return toString().indent(n);
+        }
+
+        @Override
+        public String stripIndent() {
+            return toString().stripIndent();
+        }
+
+        @Override
+        public String translateEscapes() {
+            return toString().translateEscapes();
+        }
+
+        @Override
+        public <R> R transform(Function<? super String, ? extends R> f) {
+            return toString().transform(f);
+        }
+
+        @Override
+        public IntStream chars() {
+            return toString().chars();
+        }
+
+        @Override
+        public IntStream codePoints() {
+            return toString().codePoints();
+        }
+
+        @Override
+        public String formatted(Object... args) {
+            return toString().formatted(args);
+        }
+
+        @Override
+        public String intern() {
+            return toString().intern();
+        }
+
+        @Override
+        public String repeat(int count) {
+            return toString().repeat(count);
+        }
+
+        @Override
+        public Optional<String> describeConstable() {
+            return toString().describeConstable();
+        }
+
+        @Override
+        public String resolveConstantDesc(MethodHandles.Lookup lookup) {
+            return toString().resolveConstantDesc(lookup);
+        }
     }
 
     private static final class Value extends ProtobufString {
         private final String value;
-        public Value(String value) {
+        private WeakReference<byte[]> bytes;
+        private Value(String value) {
             this.value = value;
         }
 
+        @Override
         public boolean equals(Object anObject) {
             return switch (anObject) {
-                case String string -> Objects.equals(value, string);
+                case Buffer lazyString -> Objects.equals(value, lazyString.toString());
                 case Bytes lazyString -> Objects.equals(value, lazyString.toString());
                 case Value wrappedString -> Objects.equals(value, wrappedString.value);
                 case null, default -> false;
@@ -125,7 +1031,7 @@ public sealed abstract class ProtobufString {
 
         @Override
         public void write(int field, ProtobufOutputStream outputStream) {
-            outputStream.writeBytes(field, value.getBytes(StandardCharsets.UTF_8));
+            outputStream.writeBytes(field, getBytes());
         }
 
         @Override
@@ -135,7 +1041,7 @@ public sealed abstract class ProtobufString {
 
         @Override
         public int hashCode() {
-            return value.hashCode();
+            return Arrays.hashCode(getBytes());
         }
 
         @Override
@@ -155,6 +1061,352 @@ public sealed abstract class ProtobufString {
                 }
             }
             return count;
+        }
+
+        @Override
+        public int length() {
+            return value.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            return value.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return value.subSequence(start, end);
+        }
+
+        @Override
+        public boolean contentEquals(CharSequence cs) {
+            return value.contentEquals(cs);
+        }
+
+        @Override
+        public boolean equalsIgnoreCase(String anotherString) {
+            return value.equalsIgnoreCase(anotherString);
+        }
+
+        @Override
+        public boolean regionMatches(int toffset, String other, int ooffset, int len) {
+            return value.regionMatches(toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean regionMatches(boolean ignoreCase, int toffset, String other, int ooffset, int len) {
+            return value.regionMatches(ignoreCase, toffset, other, ooffset, len);
+        }
+
+        @Override
+        public boolean startsWith(String prefix, int toffset) {
+            return value.startsWith(prefix, toffset);
+        }
+
+        @Override
+        public boolean startsWith(String prefix) {
+            return value.startsWith(prefix);
+        }
+
+        @Override
+        public boolean endsWith(String suffix) {
+            return value.endsWith(suffix);
+        }
+
+        @Override
+        public int indexOf(int ch) {
+            return value.indexOf(ch);
+        }
+
+        @Override
+        public int indexOf(int ch, int fromIndex) {
+            return value.indexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(int ch) {
+            return value.lastIndexOf(ch);
+        }
+
+        @Override
+        public int lastIndexOf(int ch, int fromIndex) {
+            return value.lastIndexOf(ch, fromIndex);
+        }
+
+        @Override
+        public int indexOf(String str) {
+            return value.indexOf(str);
+        }
+
+        @Override
+        public int indexOf(String str, int fromIndex) {
+            return value.indexOf(str, fromIndex);
+        }
+
+        @Override
+        public int lastIndexOf(String str) {
+            return value.lastIndexOf(str);
+        }
+
+        @Override
+        public int lastIndexOf(String str, int fromIndex) {
+            return value.lastIndexOf(str, fromIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex) {
+            return value.substring(beginIndex);
+        }
+
+        @Override
+        public String substring(int beginIndex, int endIndex) {
+            return value.substring(beginIndex, endIndex);
+        }
+
+        @Override
+        public String concat(String str) {
+            return value.concat(str);
+        }
+
+        @Override
+        public String replace(char oldChar, char newChar) {
+            return value.replace(oldChar, newChar);
+        }
+
+        @Override
+        public boolean matches(String regex) {
+            return value.matches(regex);
+        }
+
+        @Override
+        public boolean contains(CharSequence s) {
+            return value.contains(s);
+        }
+
+        @Override
+        public String replaceFirst(String regex, String replacement) {
+            return value.replaceFirst(regex, replacement);
+        }
+
+        @Override
+        public String replaceAll(String regex, String replacement) {
+            return value.replaceAll(regex, replacement);
+        }
+
+        @Override
+        public String[] split(String regex, int limit) {
+            return value.split(regex, limit);
+        }
+
+        @Override
+        public String[] split(String regex) {
+            return value.split(regex);
+        }
+
+        @Override
+        public String toLowerCase() {
+            return value.toLowerCase();
+        }
+
+        @Override
+        public String toLowerCase(Locale locale) {
+            return value.toLowerCase(locale);
+        }
+
+        @Override
+        public String toUpperCase() {
+            return value.toUpperCase();
+        }
+
+        @Override
+        public String toUpperCase(Locale locale) {
+            return value.toUpperCase(locale);
+        }
+
+        @Override
+        public String trim() {
+            return value.trim();
+        }
+
+        @Override
+        public char[] toCharArray() {
+            return value.toCharArray();
+        }
+
+        @Override
+        public byte[] getBytes() {
+            if(bytes != null) {
+                var result = bytes.get();
+                if(result != null) {
+                    return result;
+                }
+            }
+
+            synchronized (this) {
+                if(bytes != null) {
+                    var result = bytes.get();
+                    if(result != null) {
+                        return result;
+                    }
+                }
+
+                var result = value.getBytes(StandardCharsets.UTF_8);
+                this.bytes = new WeakReference<>(result);
+                return result;
+            }
+        }
+
+        @Override
+        public byte[] getBytes(String charsetName) {
+            assertUtf8(charsetName);
+            return getBytes();
+        }
+
+        @Override
+        public byte[] getBytes(Charset charset) {
+            assertUtf8(charset.name());
+            return getBytes();
+        }
+
+        @Override
+        public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {
+            value.getChars(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return value.isEmpty();
+        }
+
+        @Override
+        public int codePointAt(int index) {
+            return value.codePointAt(index);
+        }
+
+        @Override
+        public int codePointBefore(int index) {
+            return value.codePointBefore(index);
+        }
+
+        @Override
+        public int codePointCount(int beginIndex, int endIndex) {
+            return value.codePointCount(beginIndex, endIndex);
+        }
+
+        @Override
+        public int offsetByCodePoints(int index, int codePointOffset) {
+            return value.offsetByCodePoints(index, codePointOffset);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public void getBytes(int srcBegin, int srcEnd, byte[] dst, int dstBegin) {
+            value.getBytes(srcBegin, srcEnd, dst, dstBegin);
+        }
+
+        @Override
+        public boolean contentEquals(StringBuffer sb) {
+            return value.contentEquals(sb);
+        }
+
+        @Override
+        public int indexOf(int ch, int beginIndex, int endIndex) {
+            return value.indexOf(ch, beginIndex, endIndex);
+        }
+
+        @Override
+        public int indexOf(String str, int beginIndex, int endIndex) {
+            return value.indexOf(str, beginIndex, endIndex);
+        }
+
+        @Override
+        public String replace(CharSequence target, CharSequence replacement) {
+            return value.replace(target, replacement);
+        }
+
+        @Override
+        public String[] splitWithDelimiters(String regex, int limit) {
+            return value.splitWithDelimiters(regex, limit);
+        }
+
+        @Override
+        public String strip() {
+            return value.strip();
+        }
+
+        @Override
+        public String stripLeading() {
+            return value.stripLeading();
+        }
+
+        @Override
+        public String stripTrailing() {
+            return value.stripTrailing();
+        }
+
+        @Override
+        public boolean isBlank() {
+            return value.isBlank();
+        }
+
+        @Override
+        public Stream<String> lines() {
+            return value.lines();
+        }
+
+        @Override
+        public String indent(int n) {
+            return value.indent(n);
+        }
+
+        @Override
+        public String stripIndent() {
+            return value.stripIndent();
+        }
+
+        @Override
+        public String translateEscapes() {
+            return value.translateEscapes();
+        }
+
+        @Override
+        public <R> R transform(Function<? super String, ? extends R> f) {
+            return value.transform(f);
+        }
+
+        @Override
+        public IntStream chars() {
+            return value.chars();
+        }
+
+        @Override
+        public IntStream codePoints() {
+            return value.codePoints();
+        }
+
+        @Override
+        public String formatted(Object... args) {
+            return value.formatted(args);
+        }
+
+        @Override
+        public String intern() {
+            return value.intern();
+        }
+
+        @Override
+        public String repeat(int count) {
+            return value.repeat(count);
+        }
+
+        @Override
+        public Optional<String> describeConstable() {
+            return value.describeConstable();
+        }
+
+        @Override
+        public String resolveConstantDesc(MethodHandles.Lookup lookup) {
+            return value.resolveConstantDesc(lookup);
         }
     }
 }

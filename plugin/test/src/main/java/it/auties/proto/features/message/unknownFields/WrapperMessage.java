@@ -3,6 +3,7 @@ package it.auties.proto.features.message.unknownFields;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.annotation.ProtobufUnknownFields;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.util.HashMap;
@@ -12,7 +13,7 @@ import java.util.Optional;
 @ProtobufMessage
 public record WrapperMessage(
         @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-        String value,
+        ProtobufString value,
         @ProtobufUnknownFields
         UnknownFields unknownFields
 ) {

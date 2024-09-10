@@ -2,6 +2,7 @@ package it.auties.proto.features.message.mixin.atomic;
 
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufString;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -14,7 +15,7 @@ import static it.auties.protobuf.model.ProtobufType.*;
 @ProtobufMessage
 public record AtomicMessage(
         @ProtobufProperty(index = 1, type = STRING)
-        AtomicReference<String> atomicString,
+        AtomicReference<ProtobufString> atomicString,
         @ProtobufProperty(index = 2, type = UINT32)
         AtomicInteger atomicInteger,
         @ProtobufProperty(index = 3, type = UINT64)

@@ -1,16 +1,17 @@
 package it.auties.proto.benchmark.simple;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import it.auties.proto.benchmark.model.LiteScalar;
 import it.auties.proto.benchmark.model.ModernScalarMessage;
 import it.auties.proto.benchmark.model.ModernScalarMessageSpec;
 import it.auties.proto.benchmark.model.Scalar;
 import org.openjdk.jmh.annotations.*;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
@@ -32,11 +33,9 @@ public class SimplePerformanceBenchmark {
             var liteGoogleMessages = new ArrayList<LiteScalar.ScalarMessage>(CAPACITY);
             var modernMessages = new ArrayList<ModernScalarMessage>(CAPACITY);
             for(var i = 0; i < CAPACITY; i++) {
-                var data = new byte[ThreadLocalRandom.current().nextInt(1, 8192)];
-                ThreadLocalRandom.current().nextBytes(data);
                 var googleMessage = Scalar.ScalarMessage.newBuilder()
-                        .setBytes(ByteString.copyFrom(data))
-                        .setString(new String(data))
+                        .setString("Hello, this is an automated test")
+                        .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
                         .setFixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
                         .setSfixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
                         .setInt32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
@@ -61,12 +60,58 @@ public class SimplePerformanceBenchmark {
             throw new RuntimeException("Cannot initialize benchmark", throwable);
         }
     }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void modernProtobufSerialization() {
+        for(var input : MODERN_MESSAGES) {
+            ModernScalarMessageSpec.encode(input);
+        }
+    }
+
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public void modernProtobufDeserialization() {
         for(var input : INPUTS) {
             ModernScalarMessageSpec.decode(input);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleProtobufSerialization() {
+        for(var input : GOOGLE_MESSAGES) {
+            input.toByteArray();
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleProtobufDeserialization() throws InvalidProtocolBufferException {
+        for(var input : INPUTS) {
+            Scalar.ScalarMessage.parseFrom(input);
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleLiteProtobufSerialization() {
+        for(var input : LITE_GOOGLE_MESSAGES) {
+            input.toByteArray();
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public void googleLiteProtobufDeserialization() throws InvalidProtocolBufferException {
+        for(var input : INPUTS) {
+            LiteScalar.ScalarMessage.parseFrom(input);
         }
     }
 }

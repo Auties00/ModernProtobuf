@@ -3,6 +3,7 @@ package it.auties.proto.features.message.getter;
 import it.auties.protobuf.annotation.ProtobufGetter;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
@@ -10,19 +11,19 @@ import java.util.Objects;
 @ProtobufMessage
 public final class StandaloneGetterMessage {
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    private final String value;
+    private final ProtobufString value;
 
-    public StandaloneGetterMessage(String value) {
+    public StandaloneGetterMessage(ProtobufString value) {
         this.value = value;
     }
 
     @ProtobufGetter(index = 1)
-    public String unbox() {
+    public ProtobufString unbox() {
         return value;
     }
 
     @ProtobufGetter(index = 2, type = ProtobufType.STRING)
-    public String tag() {
+    public ProtobufString tag() {
         return value;
     }
 

@@ -45,9 +45,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class,
-            ProtobufStringMixin.class,
-            ProtobufBytesMixin.class
+            ProtobufFutureMixin.class
     };
 
     private Trees trees;

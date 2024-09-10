@@ -2,6 +2,7 @@ package it.auties.proto.compatibility.scalar;
 
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.nio.ByteBuffer;
@@ -31,7 +32,7 @@ public record ModernScalarMessage(
         @ProtobufProperty(index = 11, type = ProtobufType.BOOL)
         boolean bool,
         @ProtobufProperty(index = 12, type = ProtobufType.STRING)
-        String string,
+        ProtobufString string,
         @ProtobufProperty(index = 13, type = ProtobufType.BYTES)
         ByteBuffer bytes
 ) {

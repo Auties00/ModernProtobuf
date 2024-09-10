@@ -4,6 +4,7 @@ import it.auties.protobuf.annotation.ProtobufDefaultValue;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
@@ -13,8 +14,8 @@ public final class OptionalMessage {
     private static final OptionalMessage EMPTY = new OptionalMessage(null);
 
     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    private final String value;
-    private OptionalMessage(String value) {
+    private final ProtobufString value;
+    private OptionalMessage(ProtobufString value) {
         this.value = value;
     }
 
@@ -24,11 +25,11 @@ public final class OptionalMessage {
     }
 
     @ProtobufDeserializer
-    public static OptionalMessage ofNullable(String value) {
+    public static OptionalMessage ofNullable(ProtobufString value) {
         return value == null ? EMPTY : new OptionalMessage(value);
     }
 
-    public String value() {
+    public ProtobufString value() {
         return value;
     }
 

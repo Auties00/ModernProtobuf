@@ -14,7 +14,6 @@ import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufWireType;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -35,7 +34,11 @@ public class ProtobufInputStream {
     public ProtobufInputStream(byte[] buffer, int offset, int length) {
         this.input = Input.wrap(buffer, offset, length);
     }
-    
+
+    public ProtobufInputStream(ByteBuffer buffer) {
+        this.input = Input.wrap(buffer);
+    }
+
     public ProtobufInputStream(Path channel) throws IOException {
         this(Files.newInputStream(channel), Files.size(channel));
     }
@@ -50,7 +53,6 @@ public class ProtobufInputStream {
 
     public boolean readTag() {
         if(isFinished()) {
-            this.wireType = 0;
             return false;
         }
 
@@ -449,7 +451,11 @@ public class ProtobufInputStream {
         }
 
         private static Input wrap(byte[] buffer, int offset, int size) {
-            return new Buffer(buffer, offset, size);
+            return new Bytes(buffer, offset, size);
+        }
+
+        private static Input wrap(ByteBuffer buffer) {
+            return new Buffer(buffer, buffer.remaining());
         }
         
         private static final class Stream extends Input{
@@ -470,17 +476,18 @@ public class ProtobufInputStream {
             @Override
             public byte readByte() {
                 try {
-                    if(marker == -1 && bufferLength != 0) {
+                    if(bufferLength != 0) {
                         bufferLength--;
                         remaining--;
                         return buffer[bufferPosition++];
                     }
 
-                    if(remaining-- <= 0) {
-                        throw new EOFException();
+                    var result = (byte) inputStream.read();
+                    if(marker != -1) {
+                        buffer[bufferPosition++] = result;
                     }
 
-                    return (byte) inputStream.read();
+                    return result;
                 }catch (IOException exception) {
                     throw new UncheckedIOException(exception);
                 }
@@ -489,10 +496,6 @@ public class ProtobufInputStream {
             @Override
             public ByteBuffer readBytes(int size) {
                 try {
-                    if((this.remaining = remaining - size) < 0) {
-                        throw new EOFException();
-                    }
-
                     var bytes = new byte[size];
                     var offset = 0;
                     if(bufferLength != 0) {
@@ -511,10 +514,6 @@ public class ProtobufInputStream {
             @Override
             public ProtobufString readString(int size) {
                 try {
-                    if((this.remaining = remaining - size) < 0) {
-                        throw new EOFException();
-                    }
-
                     var bytes = new byte[size];
                     var offset = 0;
                     if(bufferLength != 0) {
@@ -532,19 +531,20 @@ public class ProtobufInputStream {
 
             @Override
             public void mark() {
-                if(this.buffer != null) {
+                if(this.buffer == null) {
                     this.buffer = new byte[10];
                 }
 
-                this.bufferLength = 0;
                 this.marker = remaining;
             }
 
             @Override
             public void rewind() {
+                var delta = (int) Math.max(marker - remaining, 0);
+                this.bufferLength += delta; // Safe, see comments on bufferLength
                 this.marker = -1;
                 this.bufferPosition = 0;
-                this.remaining += bufferLength;
+                this.remaining += delta;
             }
 
             @Override
@@ -560,13 +560,13 @@ public class ProtobufInputStream {
             }
         }
 
-        private static final class Buffer extends Input{
+        private static final class Bytes extends Input{
             private final byte[] buffer;
             private final int offset;
             private final int length;
             private int position;
             private int marker;
-            private Buffer(byte[] buffer, int offset, int length) {
+            private Bytes(byte[] buffer, int offset, int length) {
                 this.buffer = buffer;
                 this.offset = offset;
                 this.length = length;
@@ -612,8 +612,65 @@ public class ProtobufInputStream {
 
             @Override
             public Input subInput(int size) {
-                var result = new Buffer(buffer, offset + position, size);
+                var result = new Bytes(buffer, offset + position, size);
                 position += size;
+                return result;
+            }
+        }
+
+        private static final class Buffer extends Input{
+            private final ByteBuffer buffer;
+            private int length;
+            private Buffer(ByteBuffer buffer, int length) {
+                this.buffer = buffer;
+                this.length = length;
+            }
+
+            @Override
+            public byte readByte() {
+                var result = buffer.get();
+                length--;
+                return result;
+            }
+
+            @Override
+            public ByteBuffer readBytes(int size) {
+                var position = buffer.position();
+                var result = buffer.slice(position, position + size);
+                buffer.position(position + size);
+                length -= size;
+                return result;
+            }
+
+            @Override
+            public ProtobufString readString(int size) {
+                var position = buffer.position();
+                var result = buffer.slice(position, position + size);
+                buffer.position(position + size);
+                length -= size;
+                return ProtobufString.lazy(result.asReadOnlyBuffer());
+            }
+
+            @Override
+            public void mark() {
+               buffer.mark();
+            }
+
+            @Override
+            public void rewind() {
+                buffer.reset();
+            }
+
+            @Override
+            public boolean isFinished() {
+                return length <= 0;
+            }
+
+            @Override
+            public Input subInput(int size) {
+                var result = new Buffer(buffer, size);
+                buffer.position(buffer.position() + size);
+                length -= size;
                 return result;
             }
         }

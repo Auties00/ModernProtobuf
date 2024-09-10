@@ -1,6 +1,7 @@
 package it.auties.proto.features.message.unknownFields;
 
 
+import it.auties.protobuf.model.ProtobufString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -8,7 +9,7 @@ public class UnknownFieldsTest {
     @Test
     public void testSimple() {
         var extendedMessage = new ExtendedMessageBuilder()
-                .value("Hello World!")
+                .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
         var baseMessage = SimpleMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));
@@ -19,7 +20,7 @@ public class UnknownFieldsTest {
     @Test
     public void testWrapper() {
         var extendedMessage = new ExtendedMessageBuilder()
-                .value("Hello World!")
+                .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
         var baseMessage = WrapperMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));
@@ -32,7 +33,7 @@ public class UnknownFieldsTest {
     @Test
     public void testMixed() {
         var extendedMessage = new ExtendedMessageBuilder()
-                .value("Hello World!")
+                .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
         var baseMessage = MixedMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));

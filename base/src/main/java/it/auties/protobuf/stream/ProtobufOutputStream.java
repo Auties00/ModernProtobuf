@@ -391,7 +391,7 @@ public final class ProtobufOutputStream {
         }
 
         private static Output allocate(int size) {
-            return new Buffer(size);
+            return new Bytes(size);
         }
 
         private static final class Stream extends Output {
@@ -446,10 +446,10 @@ public final class ProtobufOutputStream {
             }
         }
 
-        private static final class Buffer extends Output {
+        private static final class Bytes extends Output {
             private final byte[] buffer;
             private int position;
-            private Buffer(int size) {
+            private Bytes(int size) {
                 this.buffer = new byte[size];
             }
 

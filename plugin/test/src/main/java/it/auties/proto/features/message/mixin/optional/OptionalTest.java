@@ -1,5 +1,6 @@
 package it.auties.proto.features.message.mixin.optional;
 
+import it.auties.protobuf.model.ProtobufString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -7,7 +8,7 @@ public class OptionalTest {
     @Test
     public void testBuilder() {
         var resultBuilder = new OptionalMessageBuilder()
-                .optionalString("abc")
+                .optionalString(ProtobufString.wrap("abc"))
                 .optionalInt(123)
                 .optionalDouble(456D)
                 .optionalLong(null);
