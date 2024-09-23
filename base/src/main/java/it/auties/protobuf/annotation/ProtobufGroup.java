@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ProtobufEnum {
+public @interface ProtobufGroup {
     String name() default "";
     String[] reservedNames() default {};
     int[] reservedIndexes() default {};

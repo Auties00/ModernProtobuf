@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.tree.nested.imports;
 
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.nested.ProtobufNestedTree;
 
 import java.util.Objects;

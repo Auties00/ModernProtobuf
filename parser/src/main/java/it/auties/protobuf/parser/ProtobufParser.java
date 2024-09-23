@@ -4,15 +4,15 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.tree.ProtobufTree;
 import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentChildTree;
+import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.body.object.*;
-import it.auties.protobuf.parser.tree.nested.imports.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree.*;
-import it.auties.protobuf.parser.tree.nested.field.ProtobufEnumConstantTree;
 import it.auties.protobuf.parser.tree.body.oneof.ProtobufOneofTree;
+import it.auties.protobuf.parser.tree.nested.field.ProtobufEnumConstantTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.nested.imports.ProtobufImportTree;
 import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionTree;
 import it.auties.protobuf.parser.tree.nested.option.ProtobufOptionedTree;
 import it.auties.protobuf.parser.type.*;
@@ -28,7 +28,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static it.auties.protobuf.model.ProtobufVersion.*;
+import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_2;
+import static it.auties.protobuf.model.ProtobufVersion.PROTOBUF_3;
 
 public final class ProtobufParser {
     private static final Set<ProtobufDocumentTree> BUILT_INS;

@@ -24,6 +24,10 @@ public class ProtobufDeserializationException extends ProtobufException {
         return new ProtobufDeserializationException("A message closed a group with index %s, but the previously opened group had index %s".formatted(actualFieldIndex, expectedFieldIndex));
     }
 
+    public static ProtobufDeserializationException invalidStartObject(int fieldIndex) {
+        return new ProtobufDeserializationException("A message expected a group to open at index " + fieldIndex);
+    }
+
     public static ProtobufDeserializationException malformedGroup() {
         return new ProtobufDeserializationException("A message opened a group but didn't close it");
     }
@@ -34,5 +38,9 @@ public class ProtobufDeserializationException extends ProtobufException {
 
     public static ProtobufDeserializationException invalidFieldIndex(int index) {
         return new ProtobufDeserializationException("A message specified an invalid field index: " + index);
+    }
+
+    public static ProtobufDeserializationException reservedIndex(int index) {
+        return new ProtobufDeserializationException(index + " is marked as reserved");
     }
 }

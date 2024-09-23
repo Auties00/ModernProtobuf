@@ -6,7 +6,8 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import java.util.List;
 
 public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethodGenerator {
-    private static final String DEFAULT_PARAMETER_NAME = "protoInputObject";
+    private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
+    private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
 
     public ProtobufSerializationMethodOverloadGenerator(ProtobufObjectElement element) {
         super(element);
@@ -15,13 +16,19 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
     @Override
     protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
         // Check if the input is null
-        try(var ifWriter = writer.printIfStatement("%s == null".formatted(DEFAULT_PARAMETER_NAME))) {
+        try(var ifWriter = writer.printIfStatement("%s == null".formatted(INPUT_OBJECT_PARAMETER))) {
             ifWriter.printReturn("null");
         }
 
         // Return the result
-        writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, DEFAULT_PARAMETER_NAME));
-        writer.println("encode(%s, stream);".formatted(DEFAULT_PARAMETER_NAME));
+        if(message.isGroup()) {
+            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s, %s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
+            writer.println("encode(%s, %s, stream);".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
+        }else {
+            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, INPUT_OBJECT_PARAMETER));
+            writer.println("encode(%s, stream);".formatted(INPUT_OBJECT_PARAMETER));
+        }
+
         writer.printReturn("stream.toByteArray()");
     }
 
@@ -47,11 +54,20 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
 
     @Override
     protected List<String> parametersTypes() {
-        return List.of(message.element().getSimpleName().toString());
+        var objectType = message.element().getSimpleName().toString();
+        if(message.isGroup()) {
+            return List.of("int", objectType);
+        }else {
+            return List.of(objectType);
+        }
     }
 
     @Override
     protected List<String> parametersNames() {
-        return List.of(DEFAULT_PARAMETER_NAME);
+        if(message.isGroup()) {
+            return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
+        }else {
+            return List.of(INPUT_OBJECT_PARAMETER);
+        }
     }
 }

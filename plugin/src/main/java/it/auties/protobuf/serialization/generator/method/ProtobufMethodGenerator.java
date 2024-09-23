@@ -2,7 +2,6 @@ package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables.ProtobufPropertyVariable;
@@ -42,7 +41,13 @@ public abstract class ProtobufMethodGenerator {
             doInstrumentation(writer, methodWriter);
         }
 
-        deferredOperations.forEach(Runnable::run);
+        while (!deferredOperations.isEmpty()) {
+            var round = new ArrayList<>(deferredOperations);
+            deferredOperations.clear();
+            for(var runnable : round) {
+                runnable.run();
+            }
+        }
     }
 
     public abstract boolean shouldInstrument();
@@ -90,15 +95,15 @@ public abstract class ProtobufMethodGenerator {
         return result.toString();
     }
 
-    protected String getAccessorCall(String object, ProtobufPropertyElement property) {
-        return switch (property.accessor()) {
+    protected String getAccessorCall(String object, Element accessor) {
+        return switch (accessor) {
             case ExecutableElement executableElement -> "%s.%s()".formatted(object, executableElement.getSimpleName());
             case VariableElement variableElement -> "%s.%s".formatted(object, variableElement.getSimpleName());
-            default -> throw new IllegalStateException("Unexpected value: " + property.accessor());
+            default -> throw new IllegalStateException("Unexpected value: " + accessor);
         };
     }
 
-    protected ProtobufPropertyVariables getVariables(String name, String value, ProtobufPropertyType type) {
+    protected ProtobufPropertyVariables getPropertyVariables(String name, String value, ProtobufPropertyType type) {
         var serializers = type.serializers();
         var variable = new ProtobufPropertyVariable(type.accessorType(), name, value, type.accessorType().getKind().isPrimitive());
         if (serializers.isEmpty()) {
@@ -120,6 +125,23 @@ public abstract class ProtobufMethodGenerator {
         }
 
         return new ProtobufPropertyVariables(true, results);
+    }
+
+    protected String getQualifiedName(TypeMirror type) {
+        if(!(type instanceof DeclaredType declaredType)) {
+            return type.toString();
+        }
+
+        if((!(declaredType.asElement() instanceof TypeElement typeElement))) {
+            return declaredType.toString();
+        }
+
+        return typeElement.getQualifiedName().toString();
+    }
+
+    protected String getSimpleName(TypeMirror type) {
+        var parts = getQualifiedName(type).split("\\.");
+        return parts[parts.length - 1].replaceAll("\\$", ".");
     }
 
     private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer) {

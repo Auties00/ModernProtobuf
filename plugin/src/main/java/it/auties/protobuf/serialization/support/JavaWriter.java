@@ -66,12 +66,14 @@ public abstract class JavaWriter extends PrintWriter {
             super(out);
         }
 
-        public void printVariableDeclaration(String fieldName, String fieldValue) {
+        public String printVariableDeclaration(String fieldName, String fieldValue) {
             printVariableDeclaration(null, fieldName, fieldValue);
+            return fieldName;
         }
 
-        public void printVariableDeclaration(String fieldType, String fieldName, String fieldValue) {
+        public String printVariableDeclaration(String fieldType, String fieldName, String fieldValue) {
             printf("%s %s = %s;%n", fieldType == null ? "var" : fieldType, fieldName, fieldValue);
+            return fieldName;
         }
 
         public void printFieldAssignment(String name, String value) {
@@ -95,6 +97,10 @@ public abstract class JavaWriter extends PrintWriter {
 
         public void printReturn(String value) {
             printf("return %s;%n", value);
+        }
+
+        public void printReturn() {
+            println("return;");
         }
 
         public ForWriter printForStatement(String initializer, String condition, String body) {
@@ -138,6 +144,11 @@ public abstract class JavaWriter extends PrintWriter {
 
         public MethodWriter printMethodDeclaration(List<String> modifiers, String returnType, String methodName, String... parameters) {
             printf("%s %s %s(%s) {%n", String.join(" ", modifiers), returnType, methodName, String.join(", ", parameters));
+            return new MethodWriter(this);
+        }
+
+        public MethodWriter printStaticBlock() {
+            printf("static {%n");
             return new MethodWriter(this);
         }
 

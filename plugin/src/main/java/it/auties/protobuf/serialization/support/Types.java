@@ -21,7 +21,7 @@ public class Types {
     }
 
     // Convert a Java type into an AST type mirror
-    public TypeMirror getType(Class<?> type) {
+    public TypeMirror getType(Class<?> type, Class<?>... params) {
         if(type.isPrimitive()) {
             var kind = TypeKind.valueOf(type.getName().toUpperCase(Locale.ROOT));
             return processingEnv.getTypeUtils().getPrimitiveType(kind);
@@ -32,7 +32,19 @@ public class Types {
         }
 
         var result = processingEnv.getElementUtils().getTypeElement(type.getName());
-        return erase(result.asType());
+        if(params.length == 0) {
+            return erase(result.asType());
+        }else {
+            var typeArgs = Arrays.stream(params)
+                    .map(this::getType)
+                    .toArray(TypeMirror[]::new);
+            return processingEnv.getTypeUtils().getDeclaredType(result, typeArgs);
+        }
+    }
+
+    public boolean isGroup(TypeMirror mirror) {
+        return erase(mirror) instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufGroup.class) != null;
     }
 
     public boolean isMessage(TypeMirror mirror) {
@@ -95,18 +107,26 @@ public class Types {
     }
 
     public List<TypeElement> getMixins(ProtobufProperty property) {
-        return getMixins(property::mixins);
+        return getMirroredTypes(property::mixins);
     }
 
     public List<TypeElement> getMixins(ProtobufUnknownFields property) {
-        return getMixins(property::mixins);
+        return getMirroredTypes(property::mixins);
     }
 
     public List<TypeElement> getMixins(ProtobufGetter property) {
-        return getMixins(property::mixins);
+        return getMirroredTypes(property::mixins);
     }
 
-    private List<TypeElement> getMixins(Supplier<Class<?>[]> supplier) {
+    public TypeElement getMirroredType(Supplier<Class<?>> supplier) {
+        try {
+            return processingEnv.getElementUtils().getTypeElement(supplier.get().getName());
+        }catch (MirroredTypeException exception) {
+            return (TypeElement) ((DeclaredType) exception.getTypeMirror()).asElement();
+        }
+    }
+
+    public List<TypeElement> getMirroredTypes(Supplier<Class<?>[]> supplier) {
         try {
             return Arrays.stream(supplier.get())
                     .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))

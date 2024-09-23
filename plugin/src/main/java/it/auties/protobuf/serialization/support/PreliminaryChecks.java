@@ -1,6 +1,7 @@
 package it.auties.protobuf.serialization.support;
 
 import it.auties.protobuf.annotation.*;
+import it.auties.protobuf.model.ProtobufType;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
@@ -21,6 +22,7 @@ public class PreliminaryChecks {
 
     public void runChecks(RoundEnvironment roundEnv) {
         checkMessages(roundEnv);
+        checkGroups(roundEnv);
         checkMessageProperties(roundEnv);
         checkEnums(roundEnv);
         checkEnumProperties(roundEnv);
@@ -30,6 +32,42 @@ public class PreliminaryChecks {
         checkDeserializers(roundEnv);
         checkBuilders(roundEnv);
         checkDefaultValues(roundEnv);
+        checkReservedRanges(roundEnv);
+    }
+
+    private void checkReservedRanges(RoundEnvironment roundEnv) {
+        for(var element : roundEnv.getElementsAnnotatedWith(ProtobufMessage.class)) {
+            var message = element.getAnnotation(ProtobufMessage.class);
+            for(var range : message.reservedRanges()) {
+                checkRange(element, range);
+            }
+        }
+        for(var element : roundEnv.getElementsAnnotatedWith(ProtobufEnum.class)) {
+            var enumeration = element.getAnnotation(ProtobufEnum.class);
+            for(var range : enumeration.reservedRanges()) {
+                checkRange(element, range);
+            }
+        }
+        for(var element : roundEnv.getElementsAnnotatedWith(ProtobufGroup.class)) {
+            var group = element.getAnnotation(ProtobufGroup.class);
+            for(var range : group.reservedRanges()) {
+                checkRange(element, range);
+            }
+        }
+    }
+
+    private void checkRange(Element element, ProtobufReservedRange range) {
+        if(range.min() < 0) {
+            messages.printError("Illegal annotation: min must be positive", element);
+        }
+
+        if(range.max() < 0) {
+            messages.printError("Illegal annotation: max must be positive", element);
+        }
+
+        if(range.min() > range.max()) {
+            messages.printError("Illegal annotation: max must be equal or bigger than min", element);
+        }
     }
 
     private void checkUnknownFields(RoundEnvironment roundEnv) {
@@ -107,12 +145,17 @@ public class PreliminaryChecks {
 
     private void processMessageProperty(Element property) {
         var enclosingElement = getEnclosingTypeElement(property);
-        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null) {
-            messages.printError("Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage", property);
+        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null && enclosingElement.getAnnotation(ProtobufGroup.class) == null) {
+            messages.printError("Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage or @ProtobufGroup", property);
             return;
         }
 
         var annotation = property.getAnnotation(ProtobufProperty.class);
+        if(annotation.type() == ProtobufType.UNKNOWN) {
+            messages.printError("Illegal protobuf type: a field annotated with @ProtobufProperty cannot have an UNKNOWN type", property);
+            return;
+        }
+
         var mixins = types.getMixins(annotation);
         checkMixins(property, mixins);
     }
@@ -140,6 +183,16 @@ public class PreliminaryChecks {
         checkAnnotation(
                 roundEnv,
                 ProtobufMessage.class,
+                "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
+                ElementKind.CLASS,
+                ElementKind.RECORD
+        );
+    }
+
+    private void checkGroups(RoundEnvironment roundEnv) {
+        checkAnnotation(
+                roundEnv,
+                ProtobufGroup.class,
                 "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
                 ElementKind.CLASS,
                 ElementKind.RECORD

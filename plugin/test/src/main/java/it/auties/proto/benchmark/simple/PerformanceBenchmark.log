@@ -1,8 +1,8 @@
-/home/alessandro/.jdks/openjdk-21/bin/java -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -classpath /home/alessandro/IdeaProjects/ModernProtobuf/plugin/test/target/classes:/home/alessandro/IdeaProjects/ModernProtobuf/base/target/classes:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-java/3.24.2/protobuf-java-3.24.2.jar:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-javalite/3.24.2/protobuf-javalite-3.24.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-core/1.35/jmh-core-1.35.jar:/home/alessandro/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/home/alessandro/.m2/repository/org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.35/jmh-generator-annprocess-1.35.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-protobuf/2.14.0/jackson-dataformat-protobuf-2.14.0.jar:/home/alessandro/.m2/repository/com/squareup/protoparser/4.0.3/protoparser-4.0.3.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.14.0/jackson-databind-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.14.0/jackson-annotations-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.14.0/jackson-core-2.14.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter/5.9.0/junit-jupiter-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.0/junit-jupiter-api-5.9.0.jar:/home/alessandro/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-commons/1.9.0/junit-platform-commons-1.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.9.0/junit-jupiter-params-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.0/junit-jupiter-engine-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-engine/1.9.0/junit-platform-engine-1.9.0.jar:/home/alessandro/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar org.openjdk.jmh.Main it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.*
+/home/alessandro/.jdks/openjdk-21/bin/java -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -classpath /home/alessandro/IdeaProjects/ModernProtobuf/plugin/test/target/classes:/home/alessandro/IdeaProjects/ModernProtobuf/base/target/classes:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-java/3.24.2/protobuf-java-3.24.2.jar:/home/alessandro/.m2/repository/com/google/protobuf/protobuf-javalite/3.24.2/protobuf-javalite-3.24.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-core/1.35/jmh-core-1.35.jar:/home/alessandro/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/home/alessandro/.m2/repository/org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar:/home/alessandro/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.35/jmh-generator-annprocess-1.35.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-protobuf/2.14.0/jackson-dataformat-protobuf-2.14.0.jar:/home/alessandro/.m2/repository/com/squareup/protoparser/4.0.3/protoparser-4.0.3.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.14.0/jackson-databind-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.14.0/jackson-annotations-2.14.0.jar:/home/alessandro/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.14.0/jackson-core-2.14.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter/5.9.0/junit-jupiter-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.9.0/junit-jupiter-api-5.9.0.jar:/home/alessandro/.m2/repository/org/opentest4j/opentest4j/1.2.0/opentest4j-1.2.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-commons/1.9.0/junit-platform-commons-1.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.9.0/junit-jupiter-params-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.9.0/junit-jupiter-engine-5.9.0.jar:/home/alessandro/.m2/repository/org/junit/platform/junit-platform-engine/1.9.0/junit-platform-engine-1.9.0.jar:/home/alessandro/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar org.openjdk.jmh.Main it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.*
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -13,26 +13,26 @@
 
 # Run progress: 0.00% complete, ETA 00:08:00
 # Fork: 1 of 1
-# Warmup Iteration   1: 184.942 us/op
-# Warmup Iteration   2: 182.796 us/op
-# Warmup Iteration   3: 182.311 us/op
-Iteration   1: 181.678 us/op
-Iteration   2: 181.548 us/op
-Iteration   3: 182.070 us/op
-Iteration   4: 182.769 us/op
-Iteration   5: 182.222 us/op
+# Warmup Iteration   1: 187.388 us/op
+# Warmup Iteration   2: 179.027 us/op
+# Warmup Iteration   3: 179.152 us/op
+Iteration   1: 178.189 us/op
+Iteration   2: 177.981 us/op
+Iteration   3: 178.150 us/op
+Iteration   4: 178.070 us/op
+Iteration   5: 177.835 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleLiteProtobufDeserialization":
-  182.057 ±(99.9%) 1.864 us/op [Average]
-  (min, avg, max) = (181.548, 182.057, 182.769), stdev = 0.484
-  CI (99.9%): [180.193, 183.921] (assumes normal distribution)
+  178.045 ±(99.9%) 0.546 us/op [Average]
+  (min, avg, max) = (177.835, 178.045, 178.189), stdev = 0.142
+  CI (99.9%): [177.499, 178.592] (assumes normal distribution)
 
 
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -43,26 +43,26 @@ Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleLitePr
 
 # Run progress: 16.67% complete, ETA 00:06:43
 # Fork: 1 of 1
-# Warmup Iteration   1: 166.033 us/op
-# Warmup Iteration   2: 163.928 us/op
-# Warmup Iteration   3: 163.500 us/op
-Iteration   1: 164.207 us/op
-Iteration   2: 164.265 us/op
-Iteration   3: 164.341 us/op
-Iteration   4: 164.006 us/op
-Iteration   5: 164.111 us/op
+# Warmup Iteration   1: 158.446 us/op
+# Warmup Iteration   2: 156.655 us/op
+# Warmup Iteration   3: 156.283 us/op
+Iteration   1: 156.080 us/op
+Iteration   2: 156.074 us/op
+Iteration   3: 156.186 us/op
+Iteration   4: 156.276 us/op
+Iteration   5: 156.171 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleLiteProtobufSerialization":
-  164.186 ±(99.9%) 0.504 us/op [Average]
-  (min, avg, max) = (164.006, 164.186, 164.341), stdev = 0.131
-  CI (99.9%): [163.682, 164.690] (assumes normal distribution)
+  156.157 ±(99.9%) 0.322 us/op [Average]
+  (min, avg, max) = (156.074, 156.157, 156.276), stdev = 0.084
+  CI (99.9%): [155.836, 156.479] (assumes normal distribution)
 
 
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -73,26 +73,26 @@ Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleLitePr
 
 # Run progress: 33.33% complete, ETA 00:05:22
 # Fork: 1 of 1
-# Warmup Iteration   1: 117.735 us/op
-# Warmup Iteration   2: 116.786 us/op
-# Warmup Iteration   3: 117.391 us/op
-Iteration   1: 117.336 us/op
-Iteration   2: 117.186 us/op
-Iteration   3: 117.418 us/op
-Iteration   4: 117.358 us/op
-Iteration   5: 117.083 us/op
+# Warmup Iteration   1: 122.392 us/op
+# Warmup Iteration   2: 121.493 us/op
+# Warmup Iteration   3: 122.054 us/op
+Iteration   1: 121.963 us/op
+Iteration   2: 121.946 us/op
+Iteration   3: 121.953 us/op
+Iteration   4: 121.801 us/op
+Iteration   5: 122.392 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleProtobufDeserialization":
-  117.276 ±(99.9%) 0.530 us/op [Average]
-  (min, avg, max) = (117.083, 117.276, 117.418), stdev = 0.138
-  CI (99.9%): [116.746, 117.806] (assumes normal distribution)
+  122.011 ±(99.9%) 0.859 us/op [Average]
+  (min, avg, max) = (121.801, 122.011, 122.392), stdev = 0.223
+  CI (99.9%): [121.152, 122.870] (assumes normal distribution)
 
 
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -103,26 +103,26 @@ Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleProtob
 
 # Run progress: 50.00% complete, ETA 00:04:01
 # Fork: 1 of 1
-# Warmup Iteration   1: 80.118 us/op
-# Warmup Iteration   2: 79.334 us/op
-# Warmup Iteration   3: 78.838 us/op
-Iteration   1: 78.943 us/op
-Iteration   2: 78.775 us/op
-Iteration   3: 78.663 us/op
-Iteration   4: 78.688 us/op
-Iteration   5: 78.695 us/op
+# Warmup Iteration   1: 75.568 us/op
+# Warmup Iteration   2: 75.884 us/op
+# Warmup Iteration   3: 75.788 us/op
+Iteration   1: 75.769 us/op
+Iteration   2: 75.838 us/op
+Iteration   3: 75.836 us/op
+Iteration   4: 75.770 us/op
+Iteration   5: 75.847 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleProtobufSerialization":
-  78.753 ±(99.9%) 0.440 us/op [Average]
-  (min, avg, max) = (78.663, 78.753, 78.943), stdev = 0.114
-  CI (99.9%): [78.312, 79.193] (assumes normal distribution)
+  75.812 ±(99.9%) 0.150 us/op [Average]
+  (min, avg, max) = (75.769, 75.812, 75.847), stdev = 0.039
+  CI (99.9%): [75.662, 75.962] (assumes normal distribution)
 
 
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -133,26 +133,26 @@ Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.googleProtob
 
 # Run progress: 66.67% complete, ETA 00:02:41
 # Fork: 1 of 1
-# Warmup Iteration   1: 68.941 us/op
-# Warmup Iteration   2: 67.984 us/op
-# Warmup Iteration   3: 68.315 us/op
-Iteration   1: 68.310 us/op
-Iteration   2: 68.313 us/op
-Iteration   3: 68.210 us/op
-Iteration   4: 68.432 us/op
-Iteration   5: 68.268 us/op
+# Warmup Iteration   1: 71.339 us/op
+# Warmup Iteration   2: 70.572 us/op
+# Warmup Iteration   3: 71.542 us/op
+Iteration   1: 71.460 us/op
+Iteration   2: 71.013 us/op
+Iteration   3: 71.073 us/op
+Iteration   4: 71.039 us/op
+Iteration   5: 71.044 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.modernProtobufDeserialization":
-  68.307 ±(99.9%) 0.314 us/op [Average]
-  (min, avg, max) = (68.210, 68.307, 68.432), stdev = 0.082
-  CI (99.9%): [67.993, 68.620] (assumes normal distribution)
+  71.126 ±(99.9%) 0.725 us/op [Average]
+  (min, avg, max) = (71.013, 71.126, 71.460), stdev = 0.188
+  CI (99.9%): [70.401, 71.850] (assumes normal distribution)
 
 
 # JMH version: 1.35
 # VM version: JDK 21, OpenJDK 64-Bit Server VM, 21+35-2513
 # VM invoker: /home/alessandro/.jdks/openjdk-21/bin/java
-# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=42573:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
+# VM options: -javaagent:/snap/intellij-idea-community/530/lib/idea_rt.jar=45681:/snap/intellij-idea-community/530/bin -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8
 # Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
 # Warmup: 3 iterations, 10 s each
 # Measurement: 5 iterations, 10 s each
@@ -163,20 +163,20 @@ Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.modernProtob
 
 # Run progress: 83.33% complete, ETA 00:01:20
 # Fork: 1 of 1
-# Warmup Iteration   1: 98.088 us/op
-# Warmup Iteration   2: 97.900 us/op
-# Warmup Iteration   3: 97.298 us/op
-Iteration   1: 97.478 us/op
-Iteration   2: 97.419 us/op
-Iteration   3: 97.421 us/op
-Iteration   4: 97.340 us/op
-Iteration   5: 97.289 us/op
+# Warmup Iteration   1: 106.989 us/op
+# Warmup Iteration   2: 105.680 us/op
+# Warmup Iteration   3: 106.650 us/op
+Iteration   1: 105.606 us/op
+Iteration   2: 105.466 us/op
+Iteration   3: 105.176 us/op
+Iteration   4: 105.331 us/op
+Iteration   5: 105.109 us/op
 
 
 Result "it.auties.proto.benchmark.simple.SimplePerformanceBenchmark.modernProtobufSerialization":
-  97.389 ±(99.9%) 0.286 us/op [Average]
-  (min, avg, max) = (97.289, 97.389, 97.478), stdev = 0.074
-  CI (99.9%): [97.103, 97.676] (assumes normal distribution)
+  105.338 ±(99.9%) 0.786 us/op [Average]
+  (min, avg, max) = (105.109, 105.338, 105.606), stdev = 0.204
+  CI (99.9%): [104.551, 106.124] (assumes normal distribution)
 
 
 # Run complete. Total time: 00:08:03
@@ -194,11 +194,11 @@ different JVMs are already problematic, the performance difference caused by dif
 modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
 
 Benchmark                                                     Mode  Cnt    Score   Error  Units
-SimplePerformanceBenchmark.googleLiteProtobufDeserialization  avgt    5  182.057 ± 1.864  us/op
-SimplePerformanceBenchmark.googleProtobufDeserialization      avgt    5  117.276 ± 0.530  us/op
-SimplePerformanceBenchmark.modernProtobufDeserialization      avgt    5   68.307 ± 0.314  us/op
-SimplePerformanceBenchmark.googleLiteProtobufSerialization    avgt    5  164.186 ± 0.504  us/op
-SimplePerformanceBenchmark.googleProtobufSerialization        avgt    5   78.753 ± 0.440  us/op
-SimplePerformanceBenchmark.modernProtobufSerialization        avgt    5   97.389 ± 0.286  us/op
+SimplePerformanceBenchmark.googleLiteProtobufDeserialization  avgt    5  178.045 ± 0.546  us/op
+SimplePerformanceBenchmark.googleLiteProtobufSerialization    avgt    5  156.157 ± 0.322  us/op
+SimplePerformanceBenchmark.googleProtobufDeserialization      avgt    5  122.011 ± 0.859  us/op
+SimplePerformanceBenchmark.googleProtobufSerialization        avgt    5   75.812 ± 0.150  us/op
+SimplePerformanceBenchmark.modernProtobufDeserialization      avgt    5   71.126 ± 0.725  us/op
+SimplePerformanceBenchmark.modernProtobufSerialization        avgt    5  105.338 ± 0.786  us/op
 
 Process finished with exit code 0

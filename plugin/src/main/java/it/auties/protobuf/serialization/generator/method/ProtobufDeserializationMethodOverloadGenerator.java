@@ -6,6 +6,9 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import java.util.List;
 
 public class ProtobufDeserializationMethodOverloadGenerator extends ProtobufMethodGenerator {
+    private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
+    private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
+
     public ProtobufDeserializationMethodOverloadGenerator(ProtobufObjectElement element) {
         super(element);
     }
@@ -13,12 +16,16 @@ public class ProtobufDeserializationMethodOverloadGenerator extends ProtobufMeth
     @Override
     protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
         // Check if the input is null
-        try(var ifWriter = writer.printIfStatement("input == null")) {
+        try(var ifWriter = writer.printIfStatement("%s == null".formatted(INPUT_OBJECT_PARAMETER))) {
             ifWriter.printReturn("null");
         }
 
         // Return the result
-        writer.printReturn("decode(new ProtobufInputStream(input, 0, input.length))");
+        if(message.isGroup()) {
+            writer.printReturn("decode(%s, new ProtobufInputStream(%s, 0, %s.length))".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
+        }else {
+            writer.printReturn("decode(new ProtobufInputStream(%s, 0, %s.length))".formatted(INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
+        }
     }
 
     @Override
@@ -43,11 +50,19 @@ public class ProtobufDeserializationMethodOverloadGenerator extends ProtobufMeth
 
     @Override
     protected List<String> parametersTypes() {
-        return List.of("byte[]");
+        if(message.isGroup()) {
+            return List.of("int", "byte[]");
+        }else {
+            return List.of("byte[]");
+        }
     }
 
     @Override
     protected List<String> parametersNames() {
-        return List.of("input");
+        if(message.isGroup()) {
+            return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
+        }else {
+        return List.of(INPUT_OBJECT_PARAMETER);
+        }
     }
 }

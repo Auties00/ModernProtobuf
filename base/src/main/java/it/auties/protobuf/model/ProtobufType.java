@@ -6,35 +6,35 @@ import java.util.Map;
 import java.util.Optional;
 
 public enum ProtobufType {
-    UNKNOWN(null, null, null, false),
-    OBJECT(Object.class, Object.class, null, false),
-    GROUP(Object.class, Object.class, null, false),
-    MAP(Map.class, Map.class, null, false),
-    FLOAT(float.class, Float.class, null, true),
-    DOUBLE(double.class, Double.class, null, true),
-    BOOL(boolean.class, Boolean.class, null, true),
-    STRING(ProtobufString.class, ProtobufString.class, null, false),
-    BYTES(ByteBuffer.class, ByteBuffer.class, null, false),
-    INT32(int.class, Integer.class, null, true),
-    SINT32(int.class, Integer.class, null, true),
-    UINT32(int.class, Integer.class, null, true),
-    FIXED32(int.class, Integer.class, null, true),
-    SFIXED32(int.class, Integer.class, null, true),
-    INT64(long.class, Long.class, null, true),
-    SINT64(long.class, Long.class, null, true),
-    UINT64(long.class, Long.class, null, true),
-    FIXED64(long.class, Long.class, null, true),
-    SFIXED64(long.class, Long.class, null, true);
+    UNKNOWN(null, null, new Class[0], false),
+    OBJECT(Object.class, Object.class, new Class[0], false),
+    GROUP(Map.class, Map.class, new Class[]{Integer.class, Object.class}, false),
+    MAP(Map.class, Map.class, new Class[0], false),
+    FLOAT(float.class, Float.class, new Class[0], true),
+    DOUBLE(double.class, Double.class, new Class[0], true),
+    BOOL(boolean.class, Boolean.class, new Class[0], true),
+    STRING(ProtobufString.class, ProtobufString.class, new Class[0], false),
+    BYTES(ByteBuffer.class, ByteBuffer.class, new Class[0], false),
+    INT32(int.class, Integer.class, new Class[0], true),
+    SINT32(int.class, Integer.class, new Class[0], true),
+    UINT32(int.class, Integer.class, new Class[0], true),
+    FIXED32(int.class, Integer.class, new Class[0], true),
+    SFIXED32(int.class, Integer.class, new Class[0], true),
+    INT64(long.class, Long.class, new Class[0], true),
+    SINT64(long.class, Long.class, new Class[0], true),
+    UINT64(long.class, Long.class, new Class[0], true),
+    FIXED64(long.class, Long.class, new Class[0], true),
+    SFIXED64(long.class, Long.class, new Class[0], true);
 
     private final Class<?> primitiveType;
     private final Class<?> wrappedType;
-    private final Class<?> wrappedTypeSerializationAlias;
+    private final Class<?>[] wrappedTypeParameters;
     private final boolean packable;
 
-    ProtobufType(Class<?> primitiveType, Class<?> wrappedType, Class<?> wrappedTypeSerializationAlias, boolean packable) {
+    ProtobufType(Class<?> primitiveType, Class<?> wrappedType, Class<?>[] wrappedTypeParameters, boolean packable) {
         this.primitiveType = primitiveType;
         this.wrappedType = wrappedType;
-        this.wrappedTypeSerializationAlias = wrappedTypeSerializationAlias;
+        this.wrappedTypeParameters = wrappedTypeParameters;
         this.packable = packable;
     }
 
@@ -60,12 +60,12 @@ public enum ProtobufType {
         return this.wrappedType;
     }
 
-    public Optional<Class<?>> wrappedTypeSerializationAlias() {
+    public Class<?>[] wrappedTypeParameters() {
         if(this == UNKNOWN) {
             throw new UnsupportedOperationException();
         }
 
-        return Optional.ofNullable(this.wrappedTypeSerializationAlias);
+        return this.wrappedTypeParameters;
     }
 
     public boolean isPackable() {

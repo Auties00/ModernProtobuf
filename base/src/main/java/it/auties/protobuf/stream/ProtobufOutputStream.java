@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 public final class ProtobufOutputStream {
@@ -19,7 +18,7 @@ public final class ProtobufOutputStream {
     // Long values go from [-2^63, 2^63)
     // A negative var-int always take up 10 bits
     // A positive var int takes up log_2(value) / 7 + 1
-    // Constants where folded here to save time
+    // Constants were folded here to save time
     public static int getVarIntSize(long value) {
         if(value < 0) {
             return 10;
@@ -49,44 +48,60 @@ public final class ProtobufOutputStream {
         return getVarIntSize(count) + count;
     }
 
-    // Adapted from https://stackoverflow.com/a/8512877
-    // Tested other alternatives including Guava's, seems the fastest considering all possibilities
-    public static int getStringSize(String value) {
-        if(value == null) {
-            return 0;
-        }
-
-        var count = 0;
-        for (int i = 0, len = value.length(); i < len; i++) {
-            var ch = value.charAt(i);
-            if (ch <= 0x7F) {
-                count++;
-            } else if (ch <= 0x7FF) {
-                count += 2;
-            } else if (Character.isHighSurrogate(ch)) {
-                count += 4;
-                ++i;
-            } else {
-                count += 3;
-            }
-        }
-        return getVarIntSize(count) + count;
-    }
-
-    public static int getBytesSize(byte[] value) {
-        if(value == null) {
-            return 0;
-        }
-
-        return getVarIntSize(value.length) + value.length;
-    }
-
     public static int getBytesSize(ByteBuffer value) {
         if(value == null) {
             return 0;
         }
 
         return getVarIntSize(value.remaining()) + value.remaining();
+    }
+
+    public static int getVarIntPackedSize(int fieldNumber, Collection<? extends Number> values) {
+        if(values == null){
+            return 0;
+        }
+
+        var size = getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);;
+        var valueSize = 0;
+        for (var value : values) {
+            valueSize += getVarIntSize(value.longValue());
+        }
+        size += getVarIntSize(valueSize);
+        size += valueSize;
+        return size;
+    }
+
+    public int getFixed32PackedSize(int fieldNumber, Collection<? extends Number> values) {
+        if(values == null){
+            return 0;
+        }
+
+        var valuesSize = values.size() * 4;
+        return getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED)
+                + getVarIntSize(valuesSize)
+                + valuesSize;
+    }
+
+    public static int getFixed64PackedSize(int fieldNumber, Collection<? extends Number> values) {
+        if(values == null){
+            return 0;
+        }
+
+        var valuesSize = values.size() * 8;
+        return getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED)
+                + getVarIntSize(valuesSize)
+                + valuesSize;
+    }
+
+    public static int getBoolPackedSize(int fieldNumber, Collection<Long> values) {
+        if(values == null){
+            return 0;
+        }
+
+        var valuesSize = values.size();
+        return getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED)
+                + getVarIntSize(valuesSize)
+                + valuesSize;
     }
 
     private final Output output;
@@ -102,13 +117,27 @@ public final class ProtobufOutputStream {
         writeVarIntNoTag(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
 
-    public void writeInt32(int fieldNumber, Collection<Integer> values) {
+    public void writeGroupStart(int fieldNumber) {
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_START_OBJECT);
+    }
+
+    public void writeGroupEnd(int fieldNumber) {
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_END_OBJECT);
+    }
+
+    public void writeInt32Packed(int fieldNumber, Collection<Integer> values) {
         if(values == null){
             return;
         }
 
+        var size = 0;
         for (var value : values) {
-            writeInt32(fieldNumber, value);
+            size += getVarIntSize(value);
+        }
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
+        for (var value : values) {
+            writeVarIntNoTag(value);
         }
     }
     
@@ -121,13 +150,19 @@ public final class ProtobufOutputStream {
         writeVarIntNoTag(value);
     }
     
-    public void writeUInt32(int fieldNumber, Collection<Integer> values) {
+    public void writeUInt32Packed(int fieldNumber, Collection<Integer> values) {
         if(values == null){
             return;
         }
 
+        var size = 0;
         for (var value : values) {
-            writeUInt32(fieldNumber, value);
+            size += getVarIntSize(value);
+        }
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
+        for (var value : values) {
+            writeVarIntNoTag(value);
         }
     }
 
@@ -140,13 +175,16 @@ public final class ProtobufOutputStream {
         writeVarIntNoTag(value);
     }
 
-    public void writeFloat(int fieldNumber, Collection<Float> values) {
+    public void writeFloatPacked(int fieldNumber, Collection<Float> values) {
         if(values == null){
             return;
         }
 
+        var size = values.size() * 4;
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
         for (var value : values) {
-            writeFloat(fieldNumber, value);
+            writeFixed32NoTag(Float.floatToRawIntBits(value));
         }
     }
     
@@ -158,13 +196,16 @@ public final class ProtobufOutputStream {
         writeFixed32(fieldNumber, Float.floatToRawIntBits(value));
     }
 
-    public void writeFixed32(int fieldNumber, Collection<Integer> values) {
+    public void writeFixed32Packed(int fieldNumber, Collection<Integer> values) {
         if(values == null){
             return;
         }
 
+        var size = values.size() * 4;
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
         for (var value : values) {
-            writeFixed32(fieldNumber, value);
+            writeFixed32NoTag(value);
         }
     }
     
@@ -174,19 +215,26 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED32);
+        writeFixed32NoTag(value);
+    }
+
+    private void writeFixed32NoTag(Integer value) {
         output.write((byte) (value & 0xFF));
         output.write((byte) ((value >> 8) & 0xFF));
         output.write((byte) ((value >> 16) & 0xFF));
         output.write((byte) ((value >> 24) & 0xFF));
     }
 
-    public void writeInt64(int fieldNumber, Collection<Long> values) {
+    public void writeInt64Packed(int fieldNumber, Collection<Long> values) {
         if(values == null){
             return;
         }
 
+        var size = values.size() * 8;
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
         for (var value : values) {
-            writeInt64(fieldNumber, value);
+            writeFixed64NoTag(value);
         }
     }
     
@@ -198,7 +246,7 @@ public final class ProtobufOutputStream {
         writeUInt64(fieldNumber, value);
     }
 
-    public void writeUInt64(int fieldNumber, Collection<Long> values) {
+    public void writeUInt64Packed(int fieldNumber, Collection<Long> values) {
         if(values == null){
             return;
         }
@@ -217,13 +265,16 @@ public final class ProtobufOutputStream {
         writeVarIntNoTag(value);
     }
 
-    public void writeDouble(int fieldNumber, Collection<Double> values) {
+    public void writeDoublePacked(int fieldNumber, Collection<Double> values) {
         if(values == null){
             return;
         }
 
+        var size = values.size() * 8;
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
         for (var value : values) {
-            writeDouble(fieldNumber, value);
+            writeFixed64NoTag(Double.doubleToRawLongBits(value));
         }
     }
     
@@ -235,7 +286,7 @@ public final class ProtobufOutputStream {
         writeFixed64(fieldNumber, Double.doubleToRawLongBits(value));
     }
 
-    public void writeFixed64(int fieldNumber, Collection<Long> values) {
+    public void writeFixed64Packed(int fieldNumber, Collection<Long> values) {
         if(values == null){
             return;
         }
@@ -251,6 +302,10 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_FIXED64);
+        writeFixed64NoTag(value);
+    }
+
+    private void writeFixed64NoTag(Long value) {
         output.write((byte) ((int) ((long) value) & 0xFF));
         output.write((byte) ((int) (value >> 8) & 0xFF));
         output.write((byte) ((int) (value >> 16) & 0xFF));
@@ -261,13 +316,16 @@ public final class ProtobufOutputStream {
         output.write((byte) ((int) (value >> 56) & 0xFF));
     }
 
-    public void writeBool(int fieldNumber, Collection<Boolean> values) {
+    public void writeBoolPacked(int fieldNumber, Collection<Boolean> values) {
         if(values == null){
             return;
         }
 
+        var size = values.size();
+        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        writeVarIntNoTag(size);
         for (var value : values) {
-            writeBool(fieldNumber, value);
+            output.write((byte)( value ? 1 : 0));
         }
     }
 
@@ -280,51 +338,12 @@ public final class ProtobufOutputStream {
         output.write((byte) (value ? 1 : 0));
     }
 
-    public void writeString(int fieldNumber, Collection<?> values) {
-        if(values == null){
-            return;
-        }
-
-        for (var value : values) {
-            switch (value) {
-                case String string -> writeString(fieldNumber, string);
-                case ProtobufString protobufString -> writeString(fieldNumber, protobufString);
-                default -> throw new IllegalStateException("Unexpected value: " + value);
-            }
-        }
-    }
-
     public void writeString(int fieldNumber, ProtobufString value) {
         if(value == null){
             return;
         }
 
         value.write(fieldNumber, this);
-    }
-
-    public void writeString(int fieldNumber, String value) {
-        if(value == null){
-            return;
-        }
-
-        writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-        var bytes = value.getBytes(StandardCharsets.UTF_8);
-        writeVarIntNoTag(bytes.length);
-        output.write(bytes);
-    }
-
-    public void writeBytes(int fieldNumber, Collection<?> values) {
-        if(values == null){
-            return;
-        }
-
-        for (var value : values) {
-            switch (value) {
-                case byte[] bytes -> writeBytes(fieldNumber, bytes);
-                case ByteBuffer byteBuffer -> writeBytes(fieldNumber, byteBuffer);
-                default -> throw new IllegalStateException("Unexpected value: " + value);
-            }
-        }
     }
 
     public void writeBytes(int fieldNumber, ByteBuffer value) {

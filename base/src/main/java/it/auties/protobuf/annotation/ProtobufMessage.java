@@ -11,5 +11,5 @@ public @interface ProtobufMessage {
     String name() default "";
     String[] reservedNames() default {};
     int[] reservedIndexes() default {};
-    int[] reservedRanges() default {};
+    ProtobufReservedRange[] reservedRanges() default {};
 }

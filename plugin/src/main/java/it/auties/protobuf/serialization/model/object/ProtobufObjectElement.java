@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization.model.object;
 
-import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 
@@ -14,15 +14,76 @@ public class ProtobufObjectElement {
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
     private final ExecutableElement deserializer;
+    private final Set<String> reservedNames;
+    private final Set<? extends ReservedIndex> reservedIndexes;
     private ProtobufUnknownFieldsElement unknownFieldsElement;
+    private final boolean group;
 
-    public ProtobufObjectElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement deserializer) {
+    public ProtobufObjectElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement deserializer, boolean group) {
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
         this.deserializer = deserializer;
+        this.reservedNames = getReservedNames();
+        this.reservedIndexes = getReservedIndexes();
         this.builders = new ArrayList<>();
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
+        this.group = group;
+    }
+
+    private Set<String> getReservedNames() {
+        if(enumMetadata != null) {
+            var enumeration = typeElement.getAnnotation(ProtobufEnum.class);
+            return enumeration == null ? Set.of() : Set.of(enumeration.reservedNames());
+        }
+
+        if(group) {
+            var group = typeElement.getAnnotation(ProtobufGroup.class);
+            return group == null ? Set.of() : Set.of(group.reservedNames());
+        }
+
+        var message = typeElement.getAnnotation(ProtobufMessage.class);
+        return message == null ? Set.of() : Set.of(message.reservedNames());
+    }
+
+    private Set<ReservedIndex> getReservedIndexes() {
+        if(enumMetadata != null) {
+            var enumeration = typeElement.getAnnotation(ProtobufEnum.class);
+            if (enumeration == null) {
+                return Set.of();
+            }
+
+            return getReservedIndexes(enumeration.reservedIndexes(), enumeration.reservedRanges());
+        }
+
+        if(group) {
+            var group = typeElement.getAnnotation(ProtobufGroup.class);
+            if (group == null) {
+                return Set.of();
+            }
+
+            return getReservedIndexes(group.reservedIndexes(), group.reservedRanges());
+        }
+
+        var message = typeElement.getAnnotation(ProtobufMessage.class);
+        if (message == null) {
+            return Set.of();
+        }
+
+        return getReservedIndexes(message.reservedIndexes(), message.reservedRanges());
+    }
+
+    private Set<ReservedIndex> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
+        var results = new HashSet<ReservedIndex>();
+        for(var index : indexes) {
+            results.add(new ReservedIndex.Value(index));
+        }
+
+        for(var range : ranges) {
+            results.add(new ReservedIndex.Range(range.min(), range.max()));
+        }
+
+        return results;
     }
 
     public TypeElement element() {
@@ -89,5 +150,53 @@ public class ProtobufObjectElement {
 
     public void setUnknownFieldsElement(ProtobufUnknownFieldsElement unknownFieldsElement) {
         this.unknownFieldsElement = unknownFieldsElement;
+    }
+
+    public boolean isGroup() {
+        return group;
+    }
+
+    public Set<String> reservedNames() {
+        return reservedNames;
+    }
+
+    public boolean isNameDisallowed(String name) {
+        return reservedNames.contains(name);
+    }
+
+    public Set<? extends ReservedIndex> reservedIndexes() {
+        return reservedIndexes;
+    }
+
+    public boolean isIndexDisallowed(int index) {
+        return !reservedIndexes.stream()
+                .allMatch(entry -> entry.isAllowed(index));
+    }
+
+
+    public sealed interface ReservedIndex {
+        static ReservedIndex range(int min, int max) {
+            return new Range(min, max);
+        }
+
+        static ReservedIndex value(int index) {
+            return new Value(index);
+        }
+
+        boolean isAllowed(int index);
+
+        record Range(int min, int max) implements ReservedIndex {
+            @Override
+            public boolean isAllowed(int index) {
+                return index < min || index > max;
+            }
+        }
+
+        record Value(int value) implements ReservedIndex {
+            @Override
+            public boolean isAllowed(int index) {
+                return index != value;
+            }
+        }
     }
 }

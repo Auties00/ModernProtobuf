@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ProtobufInputStream {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
@@ -32,11 +33,11 @@ public class ProtobufInputStream {
     private int wireType;
     private int index;
     public ProtobufInputStream(byte[] buffer, int offset, int length) {
-        this.input = Input.wrap(buffer, offset, length);
+        this(new Input.Bytes(buffer, offset, length));
     }
 
     public ProtobufInputStream(ByteBuffer buffer) {
-        this.input = Input.wrap(buffer);
+        this(new Input.Buffer(buffer, buffer.remaining()));
     }
 
     public ProtobufInputStream(Path channel) throws IOException {
@@ -44,11 +45,13 @@ public class ProtobufInputStream {
     }
 
     public ProtobufInputStream(InputStream inputStream, long size){
-        this.input = Input.wrap(inputStream, size);
+        this.input = new Input.Stream(inputStream, size);
     }
 
     private ProtobufInputStream(Input input) {
         this.input = input;
+        this.wireType = -1;
+        this.index = -1;
     }
 
     public boolean readTag() {
@@ -62,7 +65,7 @@ public class ProtobufInputStream {
         if(index == 0) {
             throw ProtobufDeserializationException.invalidFieldIndex(index);
         }
-        return true;
+        return wireType != ProtobufWireType.WIRE_TYPE_END_OBJECT;
     }
 
     public List<Float> readFloatPacked() {
@@ -70,15 +73,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Float>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isFinished()){
-                    results.add(input.readFloat());
+                    results.add(input.readFloatUnchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFloat());
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFloatUnchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -88,15 +90,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Double>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isFinished()){
-                    results.add(input.readDouble());
+                    results.add(input.readDoubleUnchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readDouble());
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readDoubleUnchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -106,15 +107,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isFinished()){
-                    results.add(input.readInt32());
+                    results.add(input.readInt32Unchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt32());
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt32Unchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -124,15 +124,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isFinished()){
-                    results.add(input.readInt64());
+                    results.add(input.readInt64Unchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt64());
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readInt64Unchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -142,15 +141,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED32;
                 while (!input.isFinished()){
-                    results.add(input.readFixed32());
+                    results.add(input.readFixed32Unchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFixed32());
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> List.of(readFixed32Unchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -160,15 +158,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_FIXED64;
                 while (!input.isFinished()){
-                    results.add(input.readFixed64());
+                    results.add(input.readFixed64Unchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readFixed64());
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> List.of(readFixed64Unchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -178,15 +175,14 @@ public class ProtobufInputStream {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Boolean>();
                 var input = lengthDelimitedStream();
-                this.wireType = ProtobufWireType.WIRE_TYPE_VAR_INT;
                 while (!input.isFinished()){
-                    results.add(input.readBool());
+                    results.add(input.readBoolUnchecked());
                 }
 
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readBool());
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readBoolUnchecked());
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -195,11 +191,27 @@ public class ProtobufInputStream {
         return Float.intBitsToFloat(readFixed32());
     }
 
+    public float readFloatUnchecked() {
+        return Float.intBitsToFloat(readFixed32());
+    }
+
     public double readDouble() {
         return Double.longBitsToDouble(readFixed64());
     }
 
-    public boolean readBool(){
+    public double readDoubleUnchecked() {
+        return Double.longBitsToDouble(readFixed64Unchecked());
+    }
+
+    public boolean readBool() {
+        if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
+            throw ProtobufDeserializationException.invalidWireType(wireType);
+        }
+
+        return readBoolUnchecked();
+    }
+
+    private boolean readBoolUnchecked() {
         return readInt64() == 1;
     }
 
@@ -268,6 +280,10 @@ public class ProtobufInputStream {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
 
+        return readInt64Unchecked();
+    }
+
+    private long readInt64Unchecked() {
         input.mark();
         fspath:
         {
@@ -337,18 +353,26 @@ public class ProtobufInputStream {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED32) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
-        
+
+        return readFixed32Unchecked();
+    }
+
+    private int readFixed32Unchecked() {
         return input.readByte() & 255
                 | (input.readByte() & 255) << 8
                 | (input.readByte() & 255) << 16
                 | (input.readByte() & 255) << 24;
     }
-    
+
     public long readFixed64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED64) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
-        
+
+        return readFixed64Unchecked();
+    }
+
+    private long readFixed64Unchecked() {
         return (long) input.readByte() & 255L
                 | ((long) input.readByte() & 255L) << 8
                 | ((long) input.readByte() & 255L) << 16
@@ -374,10 +398,6 @@ public class ProtobufInputStream {
         }
     }
 
-    public Object readUnknown() {
-        return readUnknown(true);
-    }
-
     public Object readUnknown(boolean allocate) {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> readInt64();
@@ -389,11 +409,11 @@ public class ProtobufInputStream {
         };
     }
 
-    private HashMap<Integer, Object> readGroup(boolean allocate) {
+    private Map<Integer, Object> readGroup(boolean allocate) {
         var group = allocate ? new HashMap<Integer, Object>() : null;
         var groupIndex = index;
-        while (!isFinished()) {
-            var value = readUnknown();
+        while (readTag()) {
+            var value = readUnknown(allocate);
             if(group != null) {
                 group.put(index, value);
             }
@@ -402,7 +422,13 @@ public class ProtobufInputStream {
         return group;
     }
 
-    private void assertGroupClosed(int groupIndex) {
+    public void assertGroupOpened(int groupIndex) {
+        if((wireType == -1 && !readTag()) || wireType != ProtobufWireType.WIRE_TYPE_START_OBJECT || index != groupIndex) {
+            throw ProtobufDeserializationException.invalidStartObject(groupIndex);
+        }
+    }
+
+    public void assertGroupClosed(int groupIndex) {
         if(wireType != ProtobufWireType.WIRE_TYPE_END_OBJECT) {
             throw ProtobufDeserializationException.malformedGroup();
         }
@@ -445,18 +471,6 @@ public class ProtobufInputStream {
         public abstract void rewind();
         public abstract boolean isFinished();
         public abstract Input subInput(int size);
-
-        private static Input wrap(InputStream channel, long size) {
-            return new Stream(channel, size);
-        }
-
-        private static Input wrap(byte[] buffer, int offset, int size) {
-            return new Bytes(buffer, offset, size);
-        }
-
-        private static Input wrap(ByteBuffer buffer) {
-            return new Buffer(buffer, buffer.remaining());
-        }
         
         private static final class Stream extends Input{
             private final InputStream inputStream;

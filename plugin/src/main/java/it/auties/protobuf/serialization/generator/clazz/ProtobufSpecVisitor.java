@@ -42,6 +42,16 @@ public class ProtobufSpecVisitor {
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
+                if(result.isEnum()) {
+                    var objectType = result.element().getSimpleName().toString();
+                    classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufDeserializationMethodGenerator.ENUM_VALUES_FIELD));
+                    try(var staticInitBlock = classWriter.printStaticBlock()) {
+                        for(var entry : result.constants().entrySet()) {
+                            staticInitBlock.println("%s.put(%s, %s.%s);".formatted(ProtobufDeserializationMethodGenerator.ENUM_VALUES_FIELD, entry.getKey(), objectType, entry.getValue()));
+                        }
+                    }
+                }
+
                 // Write the serializer
                 var serializationOverloadVisitor = new ProtobufSerializationMethodOverloadGenerator(result);
                 serializationOverloadVisitor.generate(classWriter);
@@ -68,7 +78,9 @@ public class ProtobufSpecVisitor {
                     message.element().getQualifiedName().toString(),
                     Arrays.class.getName(),
                     Optional.class.getName(),
-                    ProtobufOutputStream.class.getName()
+                    ProtobufOutputStream.class.getName(),
+                    Map.class.getName(),
+                    HashMap.class.getName()
             );
         }
 

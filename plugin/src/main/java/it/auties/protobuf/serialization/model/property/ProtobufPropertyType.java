@@ -80,6 +80,15 @@ public sealed interface ProtobufPropertyType {
             return descriptorElementType();
         }
 
+        return deserializers.getLast().returnType();
+    }
+
+    default TypeMirror deserializedParameterType() {
+        var deserializers = deserializers();
+        if(deserializers.isEmpty()) {
+            return descriptorElementType();
+        }
+
         return deserializers.getLast().parameterType();
     }
 
@@ -130,7 +139,7 @@ public sealed interface ProtobufPropertyType {
 
         @Override
         public String defaultValue() {
-            return Objects.requireNonNullElse(defaultValue, "The default value was not computed");
+            return defaultValue;
         }
 
         public Optional<String> deserializedDefaultValue() {
@@ -164,7 +173,6 @@ public sealed interface ProtobufPropertyType {
                     "protobufType=" + protobufType + ", " +
                     "descriptorElementType=" + descriptorElementType + ", " +
                     "accessorType=" + accessorType + ", " +
-                    "converters=" + converters + ", " +
                     "defaultValue=" + defaultValue + ']';
         }
     }

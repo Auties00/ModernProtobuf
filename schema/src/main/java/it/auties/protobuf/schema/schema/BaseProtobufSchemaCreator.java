@@ -15,11 +15,11 @@ import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
 import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -322,7 +322,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
                 .flatMap(Collection::stream)
                 .map(StringLiteralExpr::new)
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
-        if(!indexes.isEmpty()){
+        if(!names.isEmpty()){
             annotation.addPair("reservedNames", new ArrayInitializerExpr(names));
         }
 
@@ -333,7 +333,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
                 .flatMap(entry -> Stream.of(entry.min().orElseThrow(), entry.max().orElseThrow()))
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
-        if(!indexes.isEmpty()){
+        if(!ranges.isEmpty()){
             annotation.addPair("reservedRanges", new ArrayInitializerExpr(ranges));
         }
     }
