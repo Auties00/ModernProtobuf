@@ -25,7 +25,8 @@ public @interface ProtobufSerializer {
                 ProtobufURIMixin.class,
                 ProtobufRepeatedMixin.class,
                 ProtobufMapMixin.class,
-                ProtobufFutureMixin.class
+                ProtobufFutureMixin.class,
+                ProtobufLazyMixin.class
         };
         boolean packed() default false;
         Class<?> implementation() default Object.class;

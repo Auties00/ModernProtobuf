@@ -1,40 +1,43 @@
-package it.auties.protobuf.serialization.generator.clazz;
+package it.auties.protobuf.serialization.generator.clazz.object;
 
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.generator.method.*;
+import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
+import it.auties.protobuf.serialization.generator.method.deserialization.object.ProtobufObjectDeserializationGenerator;
+import it.auties.protobuf.serialization.generator.method.deserialization.object.ProtobufObjectDeserializationOverloadGenerator;
+import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSerializationGenerator;
+import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSerializationOverloadGenerator;
+import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSizeGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
-import javax.annotation.processing.ProcessingEnvironment;
+import javax.annotation.processing.Filer;
 import javax.lang.model.element.PackageElement;
 import java.io.IOException;
 import java.util.*;
 
-public class ProtobufSpecVisitor {
-    private final ProcessingEnvironment processingEnv;
-
-    public ProtobufSpecVisitor(ProcessingEnvironment processingEnv) {
-        this.processingEnv = processingEnv;
+public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
+    public ProtobufObjectSpecGenerator(Filer filer) {
+        super(filer);
     }
 
-    public void createClass(ProtobufObjectElement result, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufObjectElement objectElement, PackageElement packageElement) throws IOException {
         // Names
-        var simpleGeneratedClassName = result.getGeneratedClassNameBySuffix("Spec");
-        var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
-        var sourceFile = processingEnv.getFiler().createSourceFile(qualifiedGeneratedClassName);
+        var simpleGeneratedClassName = getGeneratedClassNameBySuffix(objectElement.element(), "Spec");
+        var qualifiedGeneratedClassName = packageElement != null ? packageElement + "." + simpleGeneratedClassName : simpleGeneratedClassName;
+        var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
 
         // Declare a new compilation unit
         try (var compilationUnitWriter = new JavaWriter.CompilationUnit(sourceFile.openWriter())) {
             // If a package is available, write it in the compilation unit
-            if(packageName != null) {
-                compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
+            if(packageElement != null) {
+                compilationUnitWriter.printPackageDeclaration(packageElement.getQualifiedName().toString());
             }
 
             // Declare the imports needed for everything to work
-            var imports = getSpecImports(result);
+            var imports = getSpecImports(objectElement);
             imports.forEach(compilationUnitWriter::printImportDeclaration);
 
             // Separate imports from classes
@@ -42,30 +45,30 @@ public class ProtobufSpecVisitor {
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                if(result.isEnum()) {
-                    var objectType = result.element().getSimpleName().toString();
-                    classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufDeserializationMethodGenerator.ENUM_VALUES_FIELD));
+                if(objectElement.isEnum()) {
+                    var objectType = objectElement.element().getSimpleName().toString();
+                    classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
                     try(var staticInitBlock = classWriter.printStaticBlock()) {
-                        for(var entry : result.constants().entrySet()) {
-                            staticInitBlock.println("%s.put(%s, %s.%s);".formatted(ProtobufDeserializationMethodGenerator.ENUM_VALUES_FIELD, entry.getKey(), objectType, entry.getValue()));
+                        for(var entry : objectElement.constants().entrySet()) {
+                            staticInitBlock.println("%s.put(%s, %s.%s);".formatted(ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD, entry.getKey(), objectType, entry.getValue()));
                         }
                     }
                 }
 
                 // Write the serializer
-                var serializationOverloadVisitor = new ProtobufSerializationMethodOverloadGenerator(result);
+                var serializationOverloadVisitor = new ProtobufObjectSerializationOverloadGenerator(objectElement);
                 serializationOverloadVisitor.generate(classWriter);
-                var serializationVisitor = new ProtobufSerializationMethodGenerator(result);
+                var serializationVisitor = new ProtobufObjectSerializationGenerator(objectElement);
                 serializationVisitor.generate(classWriter);
 
                 // Write the deserializer
-                var deserializationOverloadVisitor = new ProtobufDeserializationMethodOverloadGenerator(result);
+                var deserializationOverloadVisitor = new ProtobufObjectDeserializationOverloadGenerator(objectElement);
                 deserializationOverloadVisitor.generate(classWriter);
-                var deserializationVisitor = new ProtobufDeserializationMethodGenerator(result);
+                var deserializationVisitor = new ProtobufObjectDeserializationGenerator(objectElement);
                 deserializationVisitor.generate(classWriter);
 
                 // Write the size calculator
-                var sizeVisitor = new ProtobufSizeMethodGenerator(result);
+                var sizeVisitor = new ProtobufObjectSizeGenerator(objectElement);
                 sizeVisitor.generate(classWriter);
             }
         }

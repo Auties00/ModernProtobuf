@@ -90,21 +90,6 @@ public class ProtobufObjectElement {
         return typeElement;
     }
 
-    public String getGeneratedClassNameBySuffix(String suffix) {
-       return getGeneratedClassNameByName(element().getSimpleName() + suffix);
-    }
-
-    public String getGeneratedClassNameByName(String className) {
-        var name = new StringBuilder();
-        var element = element();
-        while (element.getEnclosingElement() instanceof TypeElement parent) {
-            name.append(parent.getSimpleName());
-            element = parent;
-        }
-
-        return name + className;
-    }
-
     public Optional<ProtobufEnumMetadata> enumMetadata() {
         return Optional.of(enumMetadata);
     }
@@ -175,14 +160,6 @@ public class ProtobufObjectElement {
 
 
     public sealed interface ReservedIndex {
-        static ReservedIndex range(int min, int max) {
-            return new Range(min, max);
-        }
-
-        static ReservedIndex value(int index) {
-            return new Value(index);
-        }
-
         boolean isAllowed(int index);
 
         record Range(int min, int max) implements ReservedIndex {

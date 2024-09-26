@@ -10,7 +10,7 @@ import java.util.ArrayList;
 public record ModernBetaRepeatedMessage(
         @ProtobufProperty(index = 1, type = ProtobufType.INT32)
         ArrayList<Integer> content,
-        @ProtobufProperty(index = 2, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
         ArrayList<ModernRepeatedMessage> content2
 ) {
 

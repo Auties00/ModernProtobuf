@@ -1,10 +1,8 @@
 package it.auties.protobuf.serialization.generator.method;
 
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyVariables.ProtobufPropertyVariable;
+import it.auties.protobuf.annotation.ProtobufEnum;
+import it.auties.protobuf.annotation.ProtobufGroup;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
@@ -15,11 +13,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
-public abstract class ProtobufMethodGenerator {
-    protected final ProtobufObjectElement message;
+public abstract class ProtobufMethodGenerator<INPUT> {
+    protected final INPUT objectElement;
     protected final List<Runnable> deferredOperations;
-    protected ProtobufMethodGenerator(ProtobufObjectElement message) {
-        this.message = message;
+    protected ProtobufMethodGenerator(INPUT objectElement) {
+        this.objectElement = objectElement;
         this.deferredOperations = new ArrayList<>();
     }
 
@@ -64,7 +62,7 @@ public abstract class ProtobufMethodGenerator {
 
     protected abstract List<String> parametersNames();
 
-    protected String getSpecFromObject(TypeMirror typeMirror) {
+    public static String getSpecFromObject(TypeMirror typeMirror) {
         if(!(typeMirror instanceof DeclaredType declaredType)) {
             return "";
         }
@@ -103,30 +101,6 @@ public abstract class ProtobufMethodGenerator {
         };
     }
 
-    protected ProtobufPropertyVariables getPropertyVariables(String name, String value, ProtobufPropertyType type) {
-        var serializers = type.serializers();
-        var variable = new ProtobufPropertyVariable(type.accessorType(), name, value, type.accessorType().getKind().isPrimitive());
-        if (serializers.isEmpty()) {
-            return new ProtobufPropertyVariables(false, List.of(variable));
-        }
-
-        var results = new ArrayList<ProtobufPropertyVariable>();
-        results.add(variable);
-        for (var index = 0; index < serializers.size(); index++) {
-            var serializerElement = serializers.get(index);
-            var lastInitializer = index == 0 ? name : name + (index - 1);
-            var convertedInitializer = getConvertedInitializer(serializerElement, lastInitializer);
-            var currentVariable = new ProtobufPropertyVariable(
-                    serializerElement.returnType(),
-                    name + index, convertedInitializer,
-                    serializerElement.returnType().getKind().isPrimitive()
-            );
-            results.add(currentVariable);
-        }
-
-        return new ProtobufPropertyVariables(true, results);
-    }
-
     protected String getQualifiedName(TypeMirror type) {
         if(!(type instanceof DeclaredType declaredType)) {
             return type.toString();
@@ -144,17 +118,18 @@ public abstract class ProtobufMethodGenerator {
         return parts[parts.length - 1].replaceAll("\\$", ".");
     }
 
-    private String getConvertedInitializer(ProtobufSerializerElement serializerElement, String lastInitializer) {
-        if (serializerElement.delegate().getKind() == ElementKind.CONSTRUCTOR) {
-            var converterWrapperClass = (TypeElement) serializerElement.delegate().getEnclosingElement();
-            return "new %s(%s)".formatted(converterWrapperClass.getQualifiedName(), lastInitializer);
-        }
+    protected boolean isMessage(TypeMirror deserializedType) {
+        return deserializedType instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufMessage.class) != null;
+    }
 
-        if (serializerElement.delegate().getModifiers().contains(Modifier.STATIC)) {
-            var converterWrapperClass = (TypeElement) serializerElement.delegate().getEnclosingElement();
-            return "%s.%s(%s)".formatted(converterWrapperClass.getQualifiedName(), serializerElement.delegate().getSimpleName(), lastInitializer);
-        }
+    protected boolean isGroup(TypeMirror deserializedType) {
+        return deserializedType instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufGroup.class) != null;
+    }
 
-        return "%s.%s()".formatted(lastInitializer, serializerElement.delegate().getSimpleName());
+    protected boolean isEnum(TypeMirror deserializedType) {
+        return deserializedType instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufEnum.class) != null;
     }
 }

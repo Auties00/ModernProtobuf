@@ -1,10 +1,10 @@
-package it.auties.protobuf.serialization.generator.clazz;
+package it.auties.protobuf.serialization.generator.clazz.object;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
-import it.auties.protobuf.serialization.model.converter.ProtobufDeserializerElement;
+import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 
@@ -15,16 +15,15 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
-public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
-    public ProtobufBuilderVisitor(Filer filer) {
+public class ProtobufObjectBuilderGenerator extends ProtobufClassGenerator {
+    public ProtobufObjectBuilderGenerator(Filer filer) {
         super(filer);
     }
 
-    public void createClass(ProtobufObjectElement messageElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufObjectElement objectElement, ProtobufBuilderElement builderElement, PackageElement packageName) throws IOException {
         // Names
-        var simpleGeneratedClassName = builderElement != null ? messageElement.getGeneratedClassNameByName(builderElement.name()) : messageElement.getGeneratedClassNameBySuffix("Builder");
+        var simpleGeneratedClassName = builderElement != null ? getGeneratedClassNameByName(objectElement.element(), builderElement.name()) : getGeneratedClassNameBySuffix(objectElement.element(), "Builder");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
 
@@ -45,7 +44,7 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                         invocationArgs.add(parameter.getSimpleName().toString());
                     }
                 }else {
-                    for (var property : messageElement.properties()) {
+                    for (var property : objectElement.properties()) {
                         if(property.synthetic()) {
                             continue;
                         }
@@ -62,12 +61,12 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 try(var builderConstructorWriter = builderClassWriter.printConstructorDeclaration(simpleGeneratedClassName)) {
                     if (builderElement == null) {
                         // Assign each field in the builder to its default value
-                        for (var property : messageElement.properties()) {
+                        for (var property : objectElement.properties()) {
                             if(property.synthetic()) {
                                 continue;
                             }
 
-                            builderConstructorWriter.printFieldAssignment(property.name(), property.type().defaultValue());
+                            builderConstructorWriter.printFieldAssignment(property.name(), property.type().descriptorDefaultValue());
                         }
                     }
                 }
@@ -85,31 +84,44 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                         );
                     }
                 }else {
-                    for(var property : messageElement.properties()) {
+                    for(var property : objectElement.properties()) {
                         if(property.synthetic()) {
                             continue;
                         }
 
+                        var deserializers = property.type().deserializers();
                         var hasOverride = false;
-                        var overloads = getBuilderOverloads(property);
-                        if(!overloads.isEmpty()) {
-                            var fieldValue = property.name();
-                            for(var override : overloads) {
-                                var enclosingElement = (TypeElement) override.delegate().getEnclosingElement();
-                                fieldValue = "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.delegate().getSimpleName(), fieldValue);
-                                hasOverride |= override.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
-                            }
+                        if(property.type() instanceof ProtobufPropertyType.NormalType) {
+                            for (var i = 0; i < deserializers.size(); i++) {
+                                var deserializer = deserializers.get(i);
+                                if (deserializer.behaviour() == ProtobufDeserializer.BuilderBehaviour.DISCARD) {
+                                    continue;
+                                }
 
-                            writeBuilderSetter(
-                                    builderClassWriter,
-                                    property.name(),
-                                    fieldValue,
-                                    overloads.getLast().parameterType(),
-                                    simpleGeneratedClassName
-                            );
+                                if (hasOverride) {
+                                    hasOverride = deserializer.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+                                    continue;
+                                }
+
+                                var value = property.name();
+                                for (var j = i; j < deserializers.size(); j++) {
+                                    var override = deserializers.get(j);
+                                    var enclosingElement = (TypeElement) override.delegate().getEnclosingElement();
+                                    value = "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.delegate().getSimpleName(), value);
+                                }
+
+                                writeBuilderSetter(
+                                        builderClassWriter,
+                                        property.name(),
+                                        value,
+                                        deserializer.parameterType(),
+                                        simpleGeneratedClassName
+                                );
+                                hasOverride = deserializer.behaviour() == ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
+                            }
                         }
 
-                        if(!hasOverride) { // If there are no overrides, print the default setter
+                        if(!hasOverride) {
                             writeBuilderSetter(
                                     builderClassWriter,
                                     property.name(),
@@ -122,11 +134,11 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 }
 
                 // Print the build method
-                var resultQualifiedName = messageElement.element().getQualifiedName();
+                var resultQualifiedName = objectElement.element().getQualifiedName();
                 try(var buildMethodWriter = builderClassWriter.printMethodDeclaration(resultQualifiedName.toString(), "build")) {
                     var invocationArgsJoined = String.join(", ", invocationArgs);
-                    var builderDelegate = messageElement.deserializer();
-                    var unknownFieldsValue = messageElement.unknownFieldsElement().isEmpty() ? "" : ", " + messageElement.unknownFieldsElement().get().defaultValue();
+                    var builderDelegate = objectElement.deserializer();
+                    var unknownFieldsValue = objectElement.unknownFieldsElement().isEmpty() ? "" : ", " + objectElement.unknownFieldsElement().get().defaultValue();
                     if (builderDelegate.isEmpty() && (builderElement == null || builderElement.delegate().getKind() == ElementKind.CONSTRUCTOR)) {
                         buildMethodWriter.printReturn("new %s(%s%s)".formatted(resultQualifiedName, invocationArgsJoined, unknownFieldsValue));
                     } else {
@@ -136,14 +148,6 @@ public class ProtobufBuilderVisitor extends ProtobufClassVisitor {
                 }
             }
         }
-    }
-
-    private List<ProtobufDeserializerElement> getBuilderOverloads(ProtobufPropertyElement element) {
-        return element.type()
-                .deserializers()
-                .stream()
-                .filter(converter -> converter.behaviour() != ProtobufDeserializer.BuilderBehaviour.DISCARD)
-                .toList();
     }
 
     private void writeBuilderSetter(ClassWriter writer, String fieldName, String fieldValue, TypeMirror fieldType, String className) {

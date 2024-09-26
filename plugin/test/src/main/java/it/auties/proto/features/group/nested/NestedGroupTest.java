@@ -12,8 +12,8 @@ public class NestedGroupTest {
         var message = new MessageRecord(record);
         var encoded = MessageRecordSpec.encode(message);
         var decoded = MessageRecordSpec.decode(encoded);
-        Assertions.assertEquals(record.string(), decoded.record().string());
-        Assertions.assertEquals(record.record(), decoded.record().record());
+        Assertions.assertEquals(record.string(), decoded.messageRecordValue().string());
+        Assertions.assertEquals(record.record(), decoded.messageRecordValue().record());
     }
 
     @Test
@@ -24,7 +24,7 @@ public class NestedGroupTest {
         var message = new MessageRecord(record);
         var encoded = MessageRecordSpec.encode(message);
         var decoded = MessageRecordSpec.decode(encoded);
-        Assertions.assertEquals(record.string(), decoded.record().string());
-        Assertions.assertEquals(record.record(), decoded.record().record());
+        Assertions.assertEquals(record.string(), decoded.messageRecordValue().string());
+        Assertions.assertEquals(record.record(), decoded.messageRecordValue().record());
     }
 }

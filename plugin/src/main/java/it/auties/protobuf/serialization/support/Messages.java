@@ -10,11 +10,15 @@ public class Messages {
         this.processingEnv = processingEnv;
     }
 
-    public void printWarning(String msg, Element constructor) {
-        processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, msg, constructor);
+    public void printWarning(String msg, Element element) {
+        if(element == null) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, msg);
+        }else {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, msg, element);
+        }
     }
 
-    public void printError(String msg, Element constructor) {
-        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, msg, constructor);
+    public void printError(String msg, Element element) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, msg, element);
     }
 }

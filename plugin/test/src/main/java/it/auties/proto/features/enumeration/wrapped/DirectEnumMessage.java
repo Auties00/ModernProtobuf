@@ -6,10 +6,9 @@ import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage
 public record DirectEnumMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
         EnumType content,
-
-        @ProtobufProperty(index = 2, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
         EnumType content1
 ) {
 

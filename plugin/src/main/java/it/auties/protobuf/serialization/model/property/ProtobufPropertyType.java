@@ -1,10 +1,13 @@
 package it.auties.protobuf.serialization.model.property;
 
+import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.converter.ProtobufConverterElement;
 import it.auties.protobuf.serialization.model.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
 
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import java.util.*;
 
@@ -42,10 +45,13 @@ public sealed interface ProtobufPropertyType {
     // The default value of the type
     // For a primitive type, the value is 0 (or false)
     // For an object, it's null, or the default value assigned by @ProtobufDefaultValue in a ProtobufMixin registered in a @ProtobufProperty
-    String defaultValue();
+    String descriptorDefaultValue();
+
+    // The mixins associated to this type
+    List<TypeElement> mixins();
 
     // Adds a nullable converter to the type
-    void addNullableConverter(ProtobufConverterElement element);
+    void addConverter(ProtobufConverterElement element);
 
     // Default implementation to get the serializers for the converters
     default List<ProtobufSerializerElement> serializers() {
@@ -83,13 +89,23 @@ public sealed interface ProtobufPropertyType {
         return deserializers.getLast().returnType();
     }
 
-    default TypeMirror deserializedParameterType() {
-        var deserializers = deserializers();
-        if(deserializers.isEmpty()) {
-            return descriptorElementType();
+    default Optional<ProtobufSerializerElement> rawGroupSerializer() {
+        var concreteGroup = false;
+        var serializers = serializers();
+        for(var serializer : serializers) {
+            concreteGroup = !(serializer.parameterType() instanceof DeclaredType declaredType)
+                    || !(declaredType.asElement() instanceof TypeElement typeElement)
+                    || typeElement.getAnnotation(ProtobufGroup.class) != null;
+            if(concreteGroup) {
+                break;
+            }
         }
 
-        return deserializers.getLast().parameterType();
+        if(concreteGroup || serializers.size() < 2) {
+            return Optional.empty();
+        }
+
+        return Optional.ofNullable(serializers.get(serializers.size() - 2));
     }
 
     final class NormalType implements ProtobufPropertyType {
@@ -97,15 +113,17 @@ public sealed interface ProtobufPropertyType {
         private final TypeMirror descriptorElementType;
         private final TypeMirror accessorType;
         private final List<ProtobufConverterElement> converters;
-        private final String defaultValue;
+        private final String descriptorDefaultValue;
+        private final List<TypeElement> mixins;
         private String deserializedDefaultValue;
 
-        public NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror accessorType, String defaultValue) {
+        public NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror accessorType, String descriptorDefaultValue, List<TypeElement> mixins) {
             this.protobufType = protobufType;
             this.descriptorElementType = descriptorElementType;
             this.accessorType = accessorType;
             this.converters = new ArrayList<>();
-            this.defaultValue = defaultValue;
+            this.descriptorDefaultValue = descriptorDefaultValue;
+            this.mixins = mixins;
         }
 
         @Override
@@ -114,11 +132,7 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
-        public void addNullableConverter(ProtobufConverterElement element) {
-            if (element == null) {
-                return;
-            }
-
+        public void addConverter(ProtobufConverterElement element) {
             converters.add(element);
         }
 
@@ -138,8 +152,8 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
-        public String defaultValue() {
-            return defaultValue;
+        public String descriptorDefaultValue() {
+            return descriptorDefaultValue;
         }
 
         public Optional<String> deserializedDefaultValue() {
@@ -151,6 +165,11 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
+        public List<TypeElement> mixins() {
+            return Collections.unmodifiableList(mixins);
+        }
+
+        @Override
         public boolean equals(Object obj) {
             if (obj == this) return true;
             if (obj == null || obj.getClass() != this.getClass()) return false;
@@ -159,12 +178,12 @@ public sealed interface ProtobufPropertyType {
                     Objects.equals(this.descriptorElementType, that.descriptorElementType) &&
                     Objects.equals(this.accessorType, that.accessorType) &&
                     Objects.equals(this.converters, that.converters) &&
-                    Objects.equals(this.defaultValue, that.defaultValue);
+                    Objects.equals(this.descriptorDefaultValue, that.descriptorDefaultValue);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(protobufType, descriptorElementType, accessorType, converters, defaultValue);
+            return Objects.hash(protobufType, descriptorElementType, accessorType, converters, descriptorDefaultValue);
         }
 
         @Override
@@ -173,11 +192,11 @@ public sealed interface ProtobufPropertyType {
                     "protobufType=" + protobufType + ", " +
                     "descriptorElementType=" + descriptorElementType + ", " +
                     "accessorType=" + accessorType + ", " +
-                    "defaultValue=" + defaultValue + ']';
+                    "defaultValue=" + descriptorDefaultValue + ']';
         }
     }
 
-    record CollectionType(TypeMirror descriptorElementType, NormalType value, String defaultValue) implements ProtobufPropertyType {
+    record CollectionType(TypeMirror descriptorElementType, NormalType value, String descriptorDefaultValue, List<TypeElement> mixins) implements ProtobufPropertyType {
         @Override
         public TypeMirror accessorType() {
             return descriptorElementType;
@@ -194,16 +213,17 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
-        public void addNullableConverter(ProtobufConverterElement element) {
-            if(element == null) {
-                return;
-            }
+        public List<TypeElement> mixins() {
+            return Collections.unmodifiableList(mixins);
+        }
 
-            value.addNullableConverter(element);
+        @Override
+        public void addConverter(ProtobufConverterElement element) {
+            value.addConverter(element);
         }
     }
 
-    record MapType(TypeMirror descriptorElementType, NormalType keyType, NormalType valueType, String defaultValue) implements ProtobufPropertyType {
+    record MapType(TypeMirror descriptorElementType, NormalType keyType, NormalType valueType, String descriptorDefaultValue, List<TypeElement> mixins) implements ProtobufPropertyType {
         @Override
         public TypeMirror accessorType() {
             return descriptorElementType;
@@ -215,13 +235,14 @@ public sealed interface ProtobufPropertyType {
         }
 
         @Override
-        public void addNullableConverter(ProtobufConverterElement element) {
-            if(element == null) {
-                return;
-            }
+        public List<TypeElement> mixins() {
+            return Collections.unmodifiableList(mixins);
+        }
 
-            keyType.addNullableConverter(element);
-            valueType.addNullableConverter(element);
+        @Override
+        public void addConverter(ProtobufConverterElement element) {
+            keyType.addConverter(element);
+            valueType.addConverter(element);
         }
 
         @Override

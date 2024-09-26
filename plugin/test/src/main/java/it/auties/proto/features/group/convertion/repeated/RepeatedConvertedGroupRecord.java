@@ -24,13 +24,15 @@ public record RepeatedConvertedGroupRecord(
         @ProtobufSerializer(groupProperties = {
                 @GroupProperty(index = 1, type = ProtobufType.STRING),
                 @GroupProperty(index = 2, type = ProtobufType.UINT32),
-                @GroupProperty(index = 3, type = ProtobufType.UINT32, repeatedValueImplementation = Integer.class, packed = true)
+                @GroupProperty(index = 3, type = ProtobufType.UINT32, repeatedValueImplementation = Integer.class, packed = true),
+                @GroupProperty(index = 4, type = ProtobufType.UINT32, repeatedValueImplementation = Integer.class)
         })
         public Map<Integer, Object> toData() {
                 var results = new HashMap<Integer, Object>();
                 results.put(1, string);
                 results.put(2, number);
                 results.put(3, repeated);
+                results.put(4, repeated);
                 return results;
         }
 }

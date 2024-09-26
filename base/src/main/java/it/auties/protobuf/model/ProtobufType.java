@@ -3,38 +3,37 @@ package it.auties.protobuf.model;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 public enum ProtobufType {
-    UNKNOWN(null, null, new Class[0], false),
-    OBJECT(Object.class, Object.class, new Class[0], false),
-    GROUP(Map.class, Map.class, new Class[]{Integer.class, Object.class}, false),
-    MAP(Map.class, Map.class, new Class[0], false),
-    FLOAT(float.class, Float.class, new Class[0], true),
-    DOUBLE(double.class, Double.class, new Class[0], true),
-    BOOL(boolean.class, Boolean.class, new Class[0], true),
-    STRING(ProtobufString.class, ProtobufString.class, new Class[0], false),
-    BYTES(ByteBuffer.class, ByteBuffer.class, new Class[0], false),
-    INT32(int.class, Integer.class, new Class[0], true),
-    SINT32(int.class, Integer.class, new Class[0], true),
-    UINT32(int.class, Integer.class, new Class[0], true),
-    FIXED32(int.class, Integer.class, new Class[0], true),
-    SFIXED32(int.class, Integer.class, new Class[0], true),
-    INT64(long.class, Long.class, new Class[0], true),
-    SINT64(long.class, Long.class, new Class[0], true),
-    UINT64(long.class, Long.class, new Class[0], true),
-    FIXED64(long.class, Long.class, new Class[0], true),
-    SFIXED64(long.class, Long.class, new Class[0], true);
+    UNKNOWN(null, null, false),
+    MESSAGE(byte[].class, null, false),
+    ENUM(Integer.class, null, false),
+    GROUP(byte[].class, null, false),
+    MAP(Map.class, null, false),
+    FLOAT(float.class, Float.class, true),
+    DOUBLE(double.class, Double.class, true),
+    BOOL(boolean.class, Boolean.class, true),
+    STRING(ProtobufString.class, null, false),
+    BYTES(ByteBuffer.class, null, false),
+    INT32(int.class, Integer.class, true),
+    SINT32(int.class, Integer.class, true),
+    UINT32(int.class, Integer.class, true),
+    FIXED32(int.class, Integer.class, true),
+    SFIXED32(int.class, Integer.class, true),
+    INT64(long.class, Long.class, true),
+    SINT64(long.class, Long.class, true),
+    UINT64(long.class, Long.class, true),
+    FIXED64(long.class, Long.class, true),
+    SFIXED64(long.class, Long.class, true);
 
-    private final Class<?> primitiveType;
-    private final Class<?> wrappedType;
-    private final Class<?>[] wrappedTypeParameters;
+    private final Class<?> serializedType;
+    private final Class<?> wrapperType;
     private final boolean packable;
-
-    ProtobufType(Class<?> primitiveType, Class<?> wrappedType, Class<?>[] wrappedTypeParameters, boolean packable) {
-        this.primitiveType = primitiveType;
-        this.wrappedType = wrappedType;
-        this.wrappedTypeParameters = wrappedTypeParameters;
+    ProtobufType(Class<?> serializedType, Class<?> descriptorType, boolean packable) {
+        this.serializedType = serializedType;
+        this.wrapperType = descriptorType;
         this.packable = packable;
     }
 
@@ -44,35 +43,29 @@ public enum ProtobufType {
                 .findFirst();
     }
 
-    public Class<?> primitiveType() {
+    public Class<?> serializedType() {
         if(this == UNKNOWN) {
             throw new UnsupportedOperationException();
         }
 
-        return this.primitiveType;
+        return this.serializedType;
     }
 
-    public Class<?> wrappedType() {
+    public Class<?> wrapperType() {
         if(this == UNKNOWN) {
             throw new UnsupportedOperationException();
         }
 
-        return this.wrappedType;
-    }
-
-    public Class<?>[] wrappedTypeParameters() {
-        if(this == UNKNOWN) {
-            throw new UnsupportedOperationException();
-        }
-
-        return this.wrappedTypeParameters;
+        return Objects.requireNonNullElse(this.wrapperType, this.serializedType);
     }
 
     public boolean isPackable() {
-        if(this == UNKNOWN) {
-            throw new UnsupportedOperationException();
-        }
-
         return this.packable;
+    }
+
+    public boolean isObject() {
+        return this == MESSAGE
+                || this == ENUM
+                || this == GROUP;
     }
 }

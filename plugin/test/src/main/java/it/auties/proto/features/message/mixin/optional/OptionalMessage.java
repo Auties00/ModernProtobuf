@@ -21,7 +21,7 @@ public record OptionalMessage(
         OptionalLong optionalLong,
         @ProtobufProperty(index = 4, type = DOUBLE)
         OptionalDouble optionalDouble,
-        @ProtobufProperty(index = 5, type = OBJECT)
+        @ProtobufProperty(index = 5, type = MESSAGE)
         Optional<OptionalMessage> optionalMessage
 ) {
 

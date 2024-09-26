@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 @ProtobufMessage
 public record RepeatedEmbeddedWrapperMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
         ArrayList<RepeatedEmbeddedMessage> contentAbc
 ) {
 

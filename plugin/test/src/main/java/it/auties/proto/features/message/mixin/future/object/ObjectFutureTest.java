@@ -10,7 +10,7 @@ public class ObjectFutureTest {
     public void test() {
         var mapMessage = new ObjectFutureMessageBuilder()
                 .content(new VersionMessage(3, 5))
-                .nestedContent(new VersionMessage(3, 5))
+                .nestedTwoFuture(new VersionMessage(3, 5))
                 .build();
         var encoded = ObjectFutureMessageSpec.encode(mapMessage);
         var decoded = ObjectFutureMessageSpec.decode(encoded);
@@ -19,8 +19,8 @@ public class ObjectFutureTest {
                 mapMessage.content().getNow(null)
         );
         Assertions.assertEquals(
-                decoded.nestedContent().getNow(CompletableFuture.completedFuture(null)).getNow(null),
-                mapMessage.nestedContent().getNow(CompletableFuture.completedFuture(null)).getNow(null)
+                decoded.nestedTwoFuture().getNow(CompletableFuture.completedFuture(null)).getNow(null),
+                mapMessage.nestedTwoFuture().getNow(CompletableFuture.completedFuture(null)).getNow(null)
         );
     }
 }

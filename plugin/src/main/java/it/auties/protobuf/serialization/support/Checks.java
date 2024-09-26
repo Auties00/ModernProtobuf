@@ -7,15 +7,12 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
-public class PreliminaryChecks {
+public class Checks {
     private final Types types;
     private final Messages messages;
-    public PreliminaryChecks(Types types, Messages messages) {
+    public Checks(Types types, Messages messages) {
         this.types = types;
         this.messages = messages;
     }
@@ -300,6 +297,11 @@ public class PreliminaryChecks {
 
         if(executableElement.getParameters().size() != 1) {
             messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must take exactly one parameter", executableElement);
+            return;
+        }
+
+        if(enclosingType.getAnnotation(ProtobufMixin.class) != null && !types.isAssignable(executableElement.getReturnType(), enclosingType)) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must return a type assignable to its parent or be in a mixin", executableElement);
         }
     }
     
@@ -333,4 +335,22 @@ public class PreliminaryChecks {
         }
     }
 
+    public boolean isValidRequiredProperty(Element variableElement) {
+        if(variableElement.asType().getKind().isPrimitive()) {
+            messages.printError("Required properties cannot be primitives", variableElement);
+            return false;
+        }
+
+        return true;
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public boolean isValidPackedProperty(Element variableElement, ProtobufProperty propertyAnnotation) {
+        if(!propertyAnnotation.packed() || types.isAssignable(variableElement.asType(), Collection.class)) {
+            return true;
+        }
+
+        messages.printError("Only scalar properties can be packed", variableElement);
+        return false;
+    }
 }

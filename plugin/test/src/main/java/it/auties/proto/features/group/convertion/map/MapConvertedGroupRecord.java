@@ -26,7 +26,7 @@ public record MapConvertedGroupRecord(
                 @GroupProperty(index = 1, type = ProtobufType.STRING),
                 @GroupProperty(index = 2, type = ProtobufType.UINT32),
                 @GroupProperty(index = 3, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.STRING),
-                @GroupProperty(index = 4, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.OBJECT, mapValueImplementation = Message.class)
+                @GroupProperty(index = 4, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.ENUM, mapValueImplementation = Message.class)
         })
         public Map<Integer, Object> toData() {
                 var results = new HashMap<Integer, Object>();

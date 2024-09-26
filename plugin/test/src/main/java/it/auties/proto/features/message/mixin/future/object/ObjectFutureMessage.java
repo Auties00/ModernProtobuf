@@ -8,10 +8,10 @@ import java.util.concurrent.CompletableFuture;
 
 @ProtobufMessage
 public record ObjectFutureMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
         CompletableFuture<VersionMessage> content,
-        @ProtobufProperty(index = 2, type = ProtobufType.OBJECT)
-        CompletableFuture<CompletableFuture<VersionMessage>> nestedContent
+        @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
+        CompletableFuture<CompletableFuture<VersionMessage>> nestedTwoFuture
 ) {
 
 }

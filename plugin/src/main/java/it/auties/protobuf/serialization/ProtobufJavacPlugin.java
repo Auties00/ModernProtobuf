@@ -5,8 +5,12 @@ import com.sun.source.util.Trees;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.builtin.*;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.generator.clazz.ProtobufBuilderVisitor;
-import it.auties.protobuf.serialization.generator.clazz.ProtobufSpecVisitor;
+import it.auties.protobuf.serialization.generator.clazz.group.ProtobufRawGroupSpecGenerator;
+import it.auties.protobuf.serialization.generator.clazz.object.ProtobufObjectBuilderGenerator;
+import it.auties.protobuf.serialization.generator.clazz.object.ProtobufObjectSpecGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
+import it.auties.protobuf.serialization.generator.method.deserialization.ProtobufDeserializationGenerator;
+import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSerializationGenerator;
 import it.auties.protobuf.serialization.model.converter.ProtobufDeserializerElement;
 import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
 import it.auties.protobuf.serialization.model.object.ProtobufEnumMetadata;
@@ -14,16 +18,20 @@ import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.object.ProtobufUnknownFieldsElement;
 import it.auties.protobuf.serialization.model.property.ProtobufGroupPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.Converters;
+import it.auties.protobuf.serialization.support.Checks;
 import it.auties.protobuf.serialization.support.Messages;
-import it.auties.protobuf.serialization.support.PreliminaryChecks;
 import it.auties.protobuf.serialization.support.Types;
+import it.auties.protobuf.stream.ProtobufInputStream;
+import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -38,6 +46,7 @@ import java.util.stream.Stream;
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class ProtobufJavacPlugin extends AbstractProcessor {
+    // Mirrored list of default mixins
     private static final Class<?>[] DEFAULT_MIXINS = {
             ProtobufAtomicMixin.class,
             ProtobufOptionalMixin.class,
@@ -45,15 +54,24 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class
+            ProtobufFutureMixin.class,
+            ProtobufLazyMixin.class
     };
 
+    // Useful utility classes to perform checks and print errors/warnings
     private Trees trees;
     private Types types;
     private Messages messages;
-    private Converters converters;
-    private PreliminaryChecks preliminaryChecks;
-    private Map<ExecutableElement, Map<Integer, ProtobufGroupPropertyElement>> groupPropertiesMap;
+    private Checks checks;
+
+    // A graph-like representation of converters to speed up the discovering process
+    private ProtobufConverterGraph serializersGraph;
+    private ProtobufConverterGraph deserializersGraph;
+
+    // This cache is needed because if a raw groups uses itself as a type in one of its properties
+    // Then computing the properties in its serializer would cause a StackOverFlow
+    // This is because the groupProperties are defined in the ProtobufSerializer
+    private Map<ExecutableElement, Map<Integer, ProtobufGroupPropertyElement>> rawGroupPropertiesMap;
 
     // Called when the annotation processor is initialized
     @Override
@@ -63,9 +81,10 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         this.trees = Trees.instance(processingEnv);
         this.types = new Types(processingEnv);
         this.messages = new Messages(processingEnv);
-        this.converters = new Converters(types);
-        this.preliminaryChecks = new PreliminaryChecks(types, messages);
-        this.groupPropertiesMap = new HashMap<>();
+        this.checks = new Checks(types, messages);
+        this.serializersGraph = new ProtobufConverterGraph(types);
+        this.deserializersGraph = new ProtobufConverterGraph(types);
+        this.rawGroupPropertiesMap = new HashMap<>();
     }
 
     // Unwrap the processing environment
@@ -84,12 +103,107 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         // Make sure that annotations are not being used in the wrong scope
-        preliminaryChecks.runChecks(roundEnv);
+        checks.runChecks(roundEnv);
+
+        // Build graph representation of serializers and deserializers
+        buildConvertersGraph(roundEnv);
 
         // Do the actual processing of the annotations
         processObjects(roundEnv);
 
         return true;
+    }
+
+    private void buildConvertersGraph(RoundEnvironment roundEnv) {
+        var intType = types.getType(int.class);
+        var inputStreamType = types.getType(ProtobufInputStream.class);
+        var outputStreamType = types.getType(ProtobufOutputStream.class);
+        var serializedGroupType = types.getType(ProtobufType.GROUP.serializedType());
+        for(var serializer : roundEnv.getElementsAnnotatedWith(ProtobufSerializer.class)) {
+            if(serializer instanceof ExecutableElement serializerMethod) {
+                linkSerializer(serializerMethod);
+
+                var serializerAnnotation = serializer.getAnnotation(ProtobufSerializer.class);
+                for(var rawGroupProperty : serializerAnnotation.groupProperties()) {
+                    linkMixins(types.getMirroredTypes(rawGroupProperty::mixins));
+                }
+
+                if(serializerAnnotation.groupProperties().length != 0) {
+                    var groupType = serializer.getEnclosingElement().asType();
+                    var specName = ProtobufMethodGenerator.getSpecFromObject(groupType);
+                    var syntheticSerializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, types.voidType(), intType, types.rawGroupType(), outputStreamType);
+                    serializersGraph.link(types.rawGroupType(), serializedGroupType, groupType, syntheticSerializer);
+                    var syntheticDeserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, types.rawGroupType(), intType, inputStreamType);
+                    deserializersGraph.link(serializedGroupType, types.rawGroupType(), groupType, syntheticDeserializer);
+                }
+            }
+        }
+        for(var deserializer : roundEnv.getElementsAnnotatedWith(ProtobufDeserializer.class)) {
+            if(deserializer instanceof ExecutableElement deserializerMethod) {
+                linkDeserializer(deserializerMethod);
+            }
+        }
+        for(var property : roundEnv.getElementsAnnotatedWith(ProtobufProperty.class)) {
+            var propertyMixins = types.getMixins(property.getAnnotation(ProtobufProperty.class));
+            linkMixins(propertyMixins);
+        }
+        for(var getter : roundEnv.getElementsAnnotatedWith(ProtobufGetter.class)) {
+            var getterMixins = types.getMixins(getter.getAnnotation(ProtobufGetter.class));
+            linkMixins(getterMixins);
+        }
+        for(var unknownFields : roundEnv.getElementsAnnotatedWith(ProtobufUnknownFields.class)) {
+            var unknownFieldsMixins = types.getMixins(unknownFields.getAnnotation(ProtobufUnknownFields.class));
+            linkMixins(unknownFieldsMixins);
+        }
+        var serializedMessageType = types.getType(ProtobufType.MESSAGE.serializedType());
+        for(var message : roundEnv.getElementsAnnotatedWith(ProtobufMessage.class)) {
+            var specName = ProtobufMethodGenerator.getSpecFromObject(message.asType());
+            var serializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, serializedMessageType, message.asType(), outputStreamType);
+            serializersGraph.link(message.asType(), serializedMessageType, null, serializer);
+            var deserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, message.asType(), serializedMessageType);
+            deserializersGraph.link(serializedMessageType, message.asType(), null, deserializer);
+        }
+        for(var group : roundEnv.getElementsAnnotatedWith(ProtobufGroup.class)) {
+            var specName = ProtobufMethodGenerator.getSpecFromObject(group.asType());
+            var serializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, serializedGroupType, intType, group.asType(), outputStreamType);
+            serializersGraph.link(group.asType(), serializedGroupType, null, serializer);
+            var deserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, group.asType(), intType, serializedGroupType);
+            deserializersGraph.link(serializedGroupType, group.asType(), null, deserializer);
+        }
+        var serializedEnumType = types.getType(ProtobufType.ENUM.serializedType());
+        for(var enumeration : roundEnv.getElementsAnnotatedWith(ProtobufEnum.class)) {
+            var specName = ProtobufMethodGenerator.getSpecFromObject(enumeration.asType());
+            var serializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, serializedEnumType, enumeration.asType());
+            serializersGraph.link(enumeration.asType(), serializedEnumType, null, serializer);
+            var deserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, enumeration.asType(), serializedEnumType);
+            deserializersGraph.link(serializedEnumType, enumeration.asType(), null, deserializer);
+        }
+    }
+
+    private void linkSerializer(ExecutableElement serializerMethod) {
+        var from = !serializerMethod.getParameters().isEmpty() ? serializerMethod.getParameters().getFirst().asType() : serializerMethod.getEnclosingElement().asType();
+        var to = serializerMethod.getReturnType();
+        serializersGraph.link(from, to, null, serializerMethod);
+    }
+
+    private void linkDeserializer(ExecutableElement deserializerMethod) {
+        var from = deserializerMethod.getParameters().getFirst().asType();
+        var to = deserializerMethod.getReturnType();
+        deserializersGraph.link(from, to, null, deserializerMethod);
+    }
+
+    private void linkMixins(List<TypeElement> mixins) {
+        for(var mixin : mixins) {
+            for(var element : mixin.getEnclosedElements()) {
+                if(element instanceof ExecutableElement method) {
+                    if(method.getAnnotation(ProtobufSerializer.class) != null) {
+                        linkSerializer(method);
+                    }else if(method.getAnnotation(ProtobufDeserializer.class) != null) {
+                        linkDeserializer(method);
+                    }
+                }
+            }
+        }
     }
 
     // This is where the actual processing happens
@@ -105,13 +219,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 var packageName = processingEnv.getElementUtils().getPackageOf(result.get().element());
-                var specVisitor = new ProtobufSpecVisitor(processingEnv);
+                var specVisitor = new ProtobufObjectSpecGenerator(processingEnv.getFiler());
                 specVisitor.createClass(result.get(), packageName);
                 if(result.get().isEnum()){
                     continue;
                 }
 
-                var buildVisitor = new ProtobufBuilderVisitor(processingEnv.getFiler());
+                var buildVisitor = new ProtobufObjectBuilderGenerator(processingEnv.getFiler());
                 buildVisitor.createClass(result.get(), null, packageName);
                 for (var builder : result.get().builders()) {
                     buildVisitor.createClass(result.get(), builder, packageName);
@@ -224,13 +338,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
-        var property = converters.getProperty(getter);
+        var property = types.getProperty(getter);
         if(getter.type() == ProtobufType.UNKNOWN) {
             messages.printError("Type error: standalone property getters must specify a valid protobuf type", executableElement);
             return;
         }
 
-        if(getter.packed() && !isValidPackedProperty(executableElement, property)) {
+        if(getter.packed() && !checks.isValidPackedProperty(executableElement, property)) {
             return;
         }
 
@@ -239,7 +353,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
-        var syntheticPropertyName = converters.getPropertyName(executableElement.getSimpleName().toString());
+        var syntheticPropertyName = types.getPropertyName(executableElement.getSimpleName().toString());
         if(messageElement.isNameDisallowed(syntheticPropertyName)) {
             messages.printError("Restricted message property name: %s is not allowed as it's marked as reserved".formatted(syntheticPropertyName), executableElement);
         }
@@ -435,11 +549,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return;
         }
 
-        if(propertyAnnotation.required() && !isValidRequiredProperty(variableElement)) {
+        if(propertyAnnotation.required() && !checks.isValidRequiredProperty(variableElement)) {
             return;
         }
 
-        if(propertyAnnotation.packed() && !isValidPackedProperty(variableElement, propertyAnnotation)) {
+        if(propertyAnnotation.packed() && !checks.isValidPackedProperty(variableElement, propertyAnnotation)) {
             return;
         }
 
@@ -485,9 +599,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         };
     }
 
-    private Optional<String> getWrapperDefaultValue(Element element, TypeMirror collectionType, List<TypeElement> mixins) {
-        var type = types.getTypeWithDefaultConstructor(collectionType);
-        return type.map(typeElement -> "new %s()".formatted(typeElement.getQualifiedName()))
+    private Optional<String> getCollectionDefaultValue(Element element, TypeMirror collectionType, List<TypeElement> mixins) {
+        return types.getDefaultConstructor(collectionType)
+                .map(typeElement -> "new %s()".formatted(typeElement.getQualifiedName()))
                 .or(() -> getDefaultValue(element, collectionType, mixins));
     }
 
@@ -604,20 +718,24 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return getConcreteMapType(property, element, elementType, mixins, rawGroupMapValueType);
         }
 
-        return getNormalType(element, accessorType, property, elementType, mixins);
+        return getNormalType(element, accessorType, property, elementType, mixins, rawGroupRepeatedValueType != null || rawGroupMapValueType != null);
     }
 
-    private Optional<ProtobufPropertyType.NormalType> getNormalType(Element element, TypeMirror accessorType, ProtobufProperty property, TypeMirror elementType, List<TypeElement> mixins) {
+    private Optional<ProtobufPropertyType.NormalType> getNormalType(Element element, TypeMirror accessorType, ProtobufProperty property, TypeMirror elementType, List<TypeElement> mixins, boolean rawGroupContext) {
         var defaultValue = getDefaultValue(element, elementType, mixins)
                 .orElse("null");
         var implementation = new ProtobufPropertyType.NormalType(
                 property.type(),
                 elementType,
                 accessorType,
-                defaultValue
+                defaultValue,
+                mixins
         );
-        attributeSerializers(element, implementation, mixins);
-        attributeDeserializers(element, implementation, mixins);
+        attributeSerializers(element, implementation);
+        attributeDeserializers(element, implementation);
+        if(!rawGroupContext) {
+            createRawGroupSpec(implementation);
+        }
         if(!types.isSameType(implementation.serializedType(), implementation.descriptorElementType())) {
             var deserializedDefaultValue = getDefaultValue(element, implementation.deserializedType(), mixins)
                     .orElse("null");
@@ -627,15 +745,37 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return Optional.of(implementation);
     }
 
+
+    private void createRawGroupSpec(ProtobufPropertyType.NormalType implementation) {
+        try {
+            if(implementation.protobufType() != ProtobufType.GROUP) {
+                return;
+            }
+
+            var lastSerializer = implementation.rawGroupSerializer()
+                    .orElse(null);
+            if (lastSerializer == null) {
+                return;
+            }
+
+            var typeElement = (TypeElement) ((DeclaredType) lastSerializer.parameterType()).asElement();
+            var creator = new ProtobufRawGroupSpecGenerator(processingEnv.getFiler());
+            var packageName = processingEnv.getElementUtils().getPackageOf(typeElement);
+            creator.createClass(typeElement, lastSerializer, packageName);
+        }catch (IOException exception) {
+            throw new UncheckedIOException(exception);
+        }
+    }
+
     private Optional<? extends ProtobufPropertyType> getConcreteCollectionType(Element element, ProtobufProperty property, TypeMirror elementType, List<TypeElement> mixins, TypeMirror rawGroupRepeatedValueType) {
         var collectionTypeParameter = rawGroupRepeatedValueType != null && !types.isSameType(rawGroupRepeatedValueType, Object.class) ? rawGroupRepeatedValueType
-                : getTypeParameter(elementType, types.getType(Collection.class), 0).orElse(null);
+                : types.getTypeParameter(elementType, types.getType(Collection.class), 0).orElse(null);
         if (collectionTypeParameter == null) {
             messages.printError("Type inference error: cannot determine collection's type parameter", element);
             return Optional.empty();
         }
 
-        var collectionDefaultValue = getWrapperDefaultValue(element, rawGroupRepeatedValueType != null && !types.isSameType(rawGroupRepeatedValueType, Object.class) ? types.getType(Collection.class) : elementType, mixins);
+        var collectionDefaultValue = getCollectionDefaultValue(element, rawGroupRepeatedValueType != null && !types.isSameType(rawGroupRepeatedValueType, Object.class) ? types.getType(Collection.class) : elementType, mixins);
         if(collectionDefaultValue.isEmpty()) {
             messages.printError("Type inference error: cannot determine collection's default value, provide one either in the definition or using a mixin", element);
             return Optional.empty();
@@ -645,16 +785,21 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 property.type(),
                 collectionTypeParameter,
                 collectionTypeParameter,
-                null
+                null,
+                mixins
         );
+        attributeSerializers(element, collectionTypeParameterType);
+        attributeDeserializers(element, collectionTypeParameterType);
+        if(rawGroupRepeatedValueType == null) {
+            createRawGroupSpec(collectionTypeParameterType);
+        }
 
         var type = new ProtobufPropertyType.CollectionType(
                 elementType,
                 collectionTypeParameterType,
-                collectionDefaultValue.get()
+                collectionDefaultValue.get(),
+                mixins
         );
-        attributeSerializers(element, collectionTypeParameterType, mixins);
-        attributeDeserializers(element, collectionTypeParameterType, mixins);
         return Optional.of(type);
     }
 
@@ -707,8 +852,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        if(property.mapKeyType() == ProtobufType.OBJECT || property.mapKeyType() == ProtobufType.GROUP) { // Objects can't be used as keys in a map following the proto spec
-            messages.printError("Type error: protobuf doesn't support objects or groups as keys in a map", invoker);
+        if(property.mapKeyType() == ProtobufType.MESSAGE || property.mapKeyType() == ProtobufType.ENUM || property.mapKeyType() == ProtobufType.GROUP) { // Objects can't be used as keys in a map following the proto spec
+            messages.printError("Type error: protobuf doesn't support messages, enums or groups as keys in a map", invoker);
             return Optional.empty();
         }
 
@@ -717,15 +862,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        if(property.mapValueType() == ProtobufType.OBJECT && rawGroupMapValueType != null && types.isSameType(rawGroupMapValueType, Object.class)) { // Objects need metadata when specified by a raw group serializer
-            messages.printError("Type error: a map property in a raw group serializer must specify mapValueImplementation", invoker);
+        if((property.mapValueType() == ProtobufType.MESSAGE || property.mapValueType() == ProtobufType.ENUM) && rawGroupMapValueType != null && types.isSameType(rawGroupMapValueType, Object.class)) { // Objects need metadata when specified by a raw group serializer
+            messages.printError("Type error: a property whose type is message or enum in a raw group serializer must specify mapValueImplementation", invoker);
             return Optional.empty();
         }
 
         // Get the key type of the map that represents the property
         // Example: Map<String, Integer> -> String
-        var keyTypeParameter = getTypeParameter(elementType, types.getType(Map.class), 0)
-                .orElse(property.mapKeyType() != ProtobufType.OBJECT ? types.getType(property.mapKeyType().wrappedType()) : null);
+        var keyTypeParameter = types.getTypeParameter(elementType, types.getType(Map.class), 0)
+                .orElse((property.mapKeyType() != ProtobufType.MESSAGE && property.mapKeyType() != ProtobufType.ENUM) ? types.getType(property.mapKeyType().wrapperType()) : null);
         if (keyTypeParameter == null) {
             messages.printError("Type inference error: cannot determine map's key type", invoker);
             return Optional.empty();
@@ -735,14 +880,18 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 property.mapKeyType(), // Just the proto type of the key
                 keyTypeParameter,
                 keyTypeParameter,
-                null
+                null,
+                mixins
         );
-        attributeSerializers(invoker, keyEntry, mixins);
-        attributeDeserializers(invoker, keyEntry, mixins);
+        attributeSerializers(invoker, keyEntry);
+        attributeDeserializers(invoker, keyEntry);
+        if(rawGroupMapValueType == null) {
+            createRawGroupSpec(keyEntry);
+        }
 
         // Same thing but for the value type
-        var valueTypeParameter =  rawGroupMapValueType != null && !types.isSameType(rawGroupMapValueType, Object.class) ? rawGroupMapValueType : getTypeParameter(elementType, types.getType(Map.class), 1)
-                .orElse(property.mapValueType() != ProtobufType.OBJECT ? types.getType(property.mapValueType().wrappedType()) : null);
+        var valueTypeParameter = rawGroupMapValueType != null && !types.isSameType(rawGroupMapValueType, Object.class) ? rawGroupMapValueType : types.getTypeParameter(elementType, types.getType(Map.class), 1)
+                .orElse((property.mapValueType() != ProtobufType.MESSAGE && property.mapValueType() != ProtobufType.ENUM) ? types.getType(property.mapValueType().wrapperType()) : null);
         if (valueTypeParameter == null) {
             messages.printError("Type inference error: cannot determine map's value type", invoker);
             return Optional.empty();
@@ -754,10 +903,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 property.mapValueType(), // Just the protobuf type
                 valueTypeParameter,
                 valueTypeParameter,
-                valueDefaultValue
+                valueDefaultValue,
+                mixins
         );
-        attributeSerializers(invoker, valueEntry, mixins);
-        attributeDeserializers(invoker, valueEntry, mixins);
+        attributeSerializers(invoker, valueEntry);
+        attributeDeserializers(invoker, valueEntry);
+        if(rawGroupMapValueType == null) {
+            createRawGroupSpec(valueEntry);
+        }
+
         if(!types.isSameType(valueEntry.serializedType(), valueEntry.descriptorElementType())) {
             var deserializedDefaultValue = getDefaultValue(invoker, valueEntry.deserializedType(), mixins)
                     .orElse("null");
@@ -765,7 +919,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         // If the map type is not abstract, create the type as we would with a normal type
-        var mapDefaultValue = getWrapperDefaultValue(invoker, elementType, mixins);
+        var mapDefaultValue = getCollectionDefaultValue(invoker, elementType, mixins);
         if(mapDefaultValue.isEmpty()) {
             messages.printError("Type inference error: cannot determine map default value", invoker);
             return Optional.empty();
@@ -775,307 +929,130 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 elementType,
                 keyEntry,
                 valueEntry,
-                mapDefaultValue.get()
+                mapDefaultValue.get(),
+                mixins
         ));
     }
 
-    private void attributeSerializers(Element invoker, ProtobufPropertyType implementation, List<TypeElement> mixins) {
-        attributeSerializers(invoker, implementation.accessorType(), implementation, mixins);
+    private void attributeSerializers(Element invoker, ProtobufPropertyType implementation) {
+        attributeSerializers(invoker, implementation.accessorType(), implementation);
     }
 
     // Add the necessary converters for the provided types using as sources the target type's class and the provided mixins
-    private void attributeSerializers(Element invoker, TypeMirror from, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+    private void attributeSerializers(Element invoker, TypeMirror from, ProtobufPropertyType implementation) {
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var to = implementation.protobufType();
-        var toType = types.getType(to.wrappedType(), to.wrappedTypeParameters());
-        if ((to == ProtobufType.GROUP && types.isGroup(from)) || (types.isAssignable(from, toType) && (to != ProtobufType.OBJECT || types.isMessage(from) || types.isEnum(from)))) {
+        var toWrapped = types.getType(to.wrapperType());
+        if (to != ProtobufType.MESSAGE && to != ProtobufType.ENUM && to != ProtobufType.GROUP && types.isAssignable(from, toWrapped)) {
             return;
         }
 
         // Look for valid serializers and deserializers in the toType and mixins
-        var serializers = new ArrayList<ProtobufSerializerElement>();
-        var candidates = new ArrayList<>(mixins);
-        if(from instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
-            candidates.add(typeElement);
+        var methodPath = serializersGraph.get(from, toWrapped, implementation.mixins());
+        if(methodPath.isEmpty()) {
+            var toName = getProtobufTypeName(to);
+            messages.printError("Missing converter: cannot find a serializer from %s to %s".formatted(from, toName), invoker);
+            return;
         }
 
-        for (var candidate : candidates) {
-            for (var entry : candidate.getEnclosedElements()) {
-                if (!(entry instanceof ExecutableElement element)) {
-                    continue;
-                }
-
-                var serializer = converters.getSerializer(element, from, toType);
-                if (serializer.isEmpty()) {
-                    continue;
-                }
-
-                var groupProperties = getGroupProperties(to, element, serializer.get());
-                if (!isParametrized(element)) {
-                    var serializerElement = new ProtobufSerializerElement(
-                            element,
-                            from,
-                            element.getReturnType(),
-                            groupProperties
-                    );
-                    serializers.add(serializerElement);
-                    continue;
-                }
-
-                var serializerInputType = element.getParameters()
-                        .getFirst()
-                        .asType();
-                var inferredType = getTypeParameter(from, serializerInputType, 0);
-                if (inferredType.isEmpty()) {
-                    messages.printError("Type inference error: cannot determine serializer's type parameter", element); // There is no solution here, if the type cannot be inferred
-                    continue;
-                }
-
-                var serializerElement = new ProtobufSerializerElement(
-                        element,
-                        from,
-                        inferredType.get(),
-                        groupProperties
-                );
-                serializers.add(serializerElement);
-            }
-        }
-
-        // Add the best serializer or error out
-        if (serializers.isEmpty()) {
-            messages.printError("Missing converter: cannot find a serializer from %s to %s".formatted(from, to == ProtobufType.OBJECT ? "ProtobufMessage/ProtobufEnum" : toType), invoker);
-        } else {
-            var bestSerializer = serializers.stream()
-                    .reduce((first, second) -> {
-                        var firstType = first.delegate().getReturnType();
-                        var secondType = second.delegate().getReturnType();
-                        if (types.isSameType(firstType, secondType)) {
-                            messages.printError("Duplicated protobuf serializer for %s".formatted(firstType), second.delegate());
-                        }
-
-                        return types.isAssignable(firstType, secondType) ? first : second;
-                    })
-                    .orElseThrow();
-            if(to == ProtobufType.GROUP && !types.isGroup(bestSerializer.returnType()) && bestSerializer.groupProperties().isEmpty()) {
-                messages.printError("Malformed serializer: serializers that target a group must provide properties", invoker);
-            }
-
-            implementation.addNullableConverter(bestSerializer);
-
-            // Prevent repeated attribution of the serializer/deserializer type if it's not a protobuf message/enum
-            var recursiveNonProtoAttribution = !types.isMessage(bestSerializer.returnType()) && !types.isEnum(bestSerializer.returnType());
-            if (recursiveNonProtoAttribution) {
-                attributeSerializers(
-                        invoker,
-                        bestSerializer.returnType(),
-                        implementation,
-                        mixins
-                );
-            }
+        for (var element : methodPath) {
+            var annotation = element.method().getAnnotation(ProtobufSerializer.class);
+            var groupProperties = getGroupProperties(to, element.method(), annotation);
+            var serializerElement = new ProtobufSerializerElement(
+                    element.method(),
+                    from,
+                    element.returnType(),
+                    groupProperties
+            );
+            implementation.addConverter(serializerElement);
+            from = element.returnType();
         }
     }
 
     private Map<Integer, ProtobufGroupPropertyElement> getGroupProperties(ProtobufType to, ExecutableElement element, ProtobufSerializer serializer) {
-        if (to != ProtobufType.GROUP) {
+        if (to != ProtobufType.GROUP || serializer.groupProperties().length == 0) {
             return Map.of();
         }
 
-        var cached = groupPropertiesMap.get(element);
+        var cached = rawGroupPropertiesMap.get(element);
         if(cached != null) {
-            return Collections.unmodifiableMap(cached);
+            return cached;
         }
 
         var results = new HashMap<Integer, ProtobufGroupPropertyElement>();
-        groupPropertiesMap.put(element, results);
-        Arrays.stream(serializer.groupProperties())
-                .map(groupProperty -> getGroupProperty(element, groupProperty))
-                .flatMap(Optional::stream)
-                .forEach(entry -> {
-                    if(results.put(entry.getKey(), entry.getValue()) != null) {
-                        messages.printError("Duplicated group property with index %s".formatted(entry.getKey()), element);
-                    }
-                });
-        return Collections.unmodifiableMap(results);
+        rawGroupPropertiesMap.put(element, results);
+        for(var groupProperty : serializer.groupProperties()) {
+            var implementationType = types.getMirroredType(groupProperty::implementation).asType();
+            var actualType = types.isSameType(implementationType, Object.class) ? types.getType(groupProperty.type().wrapperType()) : implementationType;
+            var repeatedValueType = types.getMirroredType(groupProperty::repeatedValueImplementation).asType();
+            var mapValueType = types.getMirroredType(groupProperty::mapValueImplementation).asType();
+            var protobufPropertyType = getPropertyType(element, actualType, actualType, types.getProperty(groupProperty), repeatedValueType, mapValueType);
+            if(protobufPropertyType.isEmpty()) {
+                messages.printError("Type error: cannot determine type of group property with index %s".formatted(groupProperty.index()), element);
+                continue;
+            }
+
+            var type = new ProtobufGroupPropertyElement(groupProperty.index(), protobufPropertyType.get(), groupProperty.packed());
+            if(results.put(groupProperty.index(), type) != null) {
+                messages.printError("Duplicated group property with index %s".formatted(groupProperty.index()), element);
+            }
+        }
+
+        return results;
     }
 
-    private Optional<Map.Entry<Integer, ProtobufGroupPropertyElement>> getGroupProperty(Element invoker, ProtobufSerializer.GroupProperty groupProperty) {
-        var implementationType = types.getMirroredType(groupProperty::implementation).asType();
-        var actualType = types.isSameType(implementationType, Object.class) ? types.getType(groupProperty.type().wrappedType()) : implementationType;
-        return getPropertyType(invoker, actualType, actualType, converters.getProperty(groupProperty), types.getMirroredType(groupProperty::repeatedValueImplementation).asType(), types.getMirroredType(groupProperty::mapValueImplementation).asType())
-                .map(protobufPropertyType -> Map.entry(groupProperty.index(), new ProtobufGroupPropertyElement(groupProperty.index(), protobufPropertyType, groupProperty.packed())));
-    }
 
     // Add the necessary converters for the provided types using as sources the target type's class and the provided mixins
-    private void attributeDeserializers(Element invoker, ProtobufPropertyType implementation, List<TypeElement> mixins) {
-        attributeDeserializers(invoker, implementation.descriptorElementType(), implementation, mixins);
+    private void attributeDeserializers(Element invoker, ProtobufPropertyType implementation) {
+        attributeDeserializers(invoker, implementation.descriptorElementType(), implementation);
     }
 
-    private void attributeDeserializers(Element invoker, TypeMirror to, ProtobufPropertyType implementation, List<TypeElement> mixins) {
+    private void attributeDeserializers(Element invoker, TypeMirror to, ProtobufPropertyType implementation) {
         // If to is a primitive no conversions are necessary
         // We don't support arrays so no check is necessary
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var from = implementation.protobufType();
-        var fromType = types.getType(from.wrappedType(), from.wrappedTypeParameters());
-        if ((from == ProtobufType.GROUP && types.isGroup(to)) || (types.isAssignable(to, fromType) && (from != ProtobufType.OBJECT || types.isMessage(to) || types.isEnum(to)))) {
+        var fromType = types.getType(from.wrapperType());
+        if (from != ProtobufType.MESSAGE && from != ProtobufType.ENUM && from != ProtobufType.GROUP && types.isAssignable(to, fromType)) {
             return;
         }
 
         // Look for valid serializers and deserializers in the toType and mixins
-        var deserializers = new ArrayList<ProtobufDeserializerElement>();
-        var candidates = new ArrayList<>(mixins);
-        if(to instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
-            candidates.add(typeElement);
+        var methodPath = deserializersGraph.get(fromType, to, implementation.mixins());
+        if(methodPath.isEmpty()) {
+            var fromName = getProtobufTypeName(from);
+            messages.printError("Missing converter: cannot find a deserializer from %s to %s".formatted(fromName, to), invoker);
+            return;
         }
-        for(var candidate : candidates) {
-            for(var entry : candidate.getEnclosedElements()) {
-                if (!(entry instanceof ExecutableElement element)) {
-                    continue;
+
+        for (var element : methodPath) {
+            var annotation = element.method().getAnnotation(ProtobufDeserializer.class);
+            var deserializerElement = new ProtobufDeserializerElement(
+                    element.method(),
+                    fromType,
+                    element.returnType(),
+                    annotation.builderBehaviour()
+            );
+            implementation.addConverter(deserializerElement);
+            fromType = element.returnType();
+        }
+    }
+
+    private Object getProtobufTypeName(ProtobufType type) {
+        return switch (type) {
+            case MESSAGE -> "ProtobufMessage";
+            case ENUM -> "ProtobufEnum";
+            case GROUP -> "ProtobufGroup";
+            default -> {
+                var primitiveName = type.serializedType().getSimpleName();
+                var wrappedName = type.wrapperType().getSimpleName();
+                if(Objects.equals(primitiveName, wrappedName)) {
+                    yield "%s(%s)".formatted(type.name(), primitiveName);
+                }else {
+                    yield "%s(%s/%s)".formatted(type.name(), primitiveName, wrappedName);
                 }
-
-                converters.getDeserializer(element, to, fromType).ifPresent(builderBehaviour -> {
-                    if (!isParametrized(element)) {
-                        var deserializer = new ProtobufDeserializerElement(element, fromType, builderBehaviour);
-                        deserializers.add(deserializer);
-                        return;
-                    }
-
-                    var inferredType = getTypeParameter(to, element.getReturnType(), 0);
-                    if(inferredType.isEmpty()) {
-                        messages.printError("Type inference error: cannot determine deserializer's type parameter", element); // There is no solution here, if the type cannot be inferred
-                        return;
-                    }
-
-                    var deserializer = new ProtobufDeserializerElement(element, inferredType.get(), builderBehaviour);
-                    deserializers.add(deserializer);
-                });
             }
-        }
-
-        // Add the best deserializer or error out
-        if (deserializers.isEmpty()) {
-            messages.printError("Missing converter: cannot find a deserializer from %s to %s".formatted(from == ProtobufType.OBJECT ? "ProtobufMessage/ProtobufEnum" : fromType, to), invoker);
-        } else {
-            var bestDeserializer = deserializers.stream()
-                    .reduce((first, second) -> {
-                        var firstType = first.delegate().getParameters().getFirst().asType();
-                        var secondType = second.delegate().getParameters().getFirst().asType();
-                        if(types.isSameType(firstType, secondType)) {
-                            messages.printError("Duplicated protobuf deserializer for %s".formatted(firstType) , second.delegate());
-                        }
-
-                        return types.isAssignable(firstType, secondType) ? first : second;
-                    })
-                    .orElseThrow();
-            implementation.addNullableConverter(bestDeserializer);
-            if(!types.isMessage(bestDeserializer.parameterType()) && !types.isEnum(bestDeserializer.parameterType())) {
-                attributeDeserializers(
-                        invoker,
-                        bestDeserializer.parameterType(),
-                        implementation,
-                        mixins
-                );
-            }
-        }
-    }
-
-    // Checks if a method takes any number of parameters whose type is generic, ex. T, or whose definition depends on a generic type, ex. Map<String, T>
-    private boolean isParametrized(ExecutableElement element) {
-        return (!element.getTypeParameters().isEmpty() || (element.getEnclosingElement() instanceof TypeElement typeElement && !typeElement.getTypeParameters().isEmpty()))
-                && element.getParameters().stream().anyMatch(this::isParametrized);
-    }
-
-    private boolean isParametrized(VariableElement parameter) {
-        return parameter.asType().getKind() == TypeKind.TYPEVAR ||
-                parameter.asType() instanceof DeclaredType declaredType
-                        && declaredType.asElement() instanceof TypeElement typeElement
-                        && isParametrized(typeElement);
-    }
-
-    private boolean isParametrized(Element element) {
-        return element instanceof TypeElement typeElement && typeElement.getTypeParameters()
-                .stream()
-                .anyMatch(entry -> entry.asType().getKind() == TypeKind.TYPEVAR || isParametrized(entry));
-    }
-
-    private Optional<TypeMirror> getTypeParameter(TypeMirror mirror, TypeMirror targetType, int index) {
-        if(!(mirror instanceof DeclaredType declaredType)) {
-            return Optional.empty();
-        }
-
-        if (types.isSameType(mirror, targetType) && index < declaredType.getTypeArguments().size()) {
-            var collectionTypeArgument = declaredType.getTypeArguments().get(index);
-            return getConcreteTypeParameter(collectionTypeArgument, declaredType, index);
-        }
-
-        var typeElement = (TypeElement) declaredType.asElement();
-        return typeElement.getInterfaces()
-                .stream()
-                .filter(implemented -> implemented instanceof DeclaredType)
-                .map(implemented -> (DeclaredType) implemented)
-                .map(implemented -> getTypeParameterByImplement(declaredType, implemented, targetType, index))
-                .flatMap(Optional::stream)
-                .findFirst()
-                .or(() -> getTypeParameterBySuperClass(declaredType, typeElement, targetType, index));
-    }
-
-    private Optional<TypeMirror> getTypeParameterByImplement(DeclaredType declaredType, DeclaredType implemented, TypeMirror targetType, int index) {
-        if (types.isSameType(implemented, targetType)) {
-            var collectionTypeArgument = implemented.getTypeArguments().get(index);
-            return getConcreteTypeParameter(collectionTypeArgument, declaredType, index);
-        }
-
-        return getTypeParameter(implemented, targetType, index)
-                .flatMap(result -> getConcreteTypeParameter(result, declaredType, index));
-    }
-
-    private Optional<TypeMirror> getTypeParameterBySuperClass(DeclaredType declaredType, TypeElement typeElement, TypeMirror targetType, int index) {
-        if (!(typeElement.getSuperclass() instanceof DeclaredType superDeclaredType)) {
-            return Optional.empty();
-        }
-
-        return getTypeParameter(superDeclaredType, targetType, index)
-                .flatMap(result -> getConcreteTypeParameter(result, superDeclaredType, index))
-                .flatMap(result -> getConcreteTypeParameter(result, declaredType, index));
-    }
-
-    private Optional<TypeMirror> getConcreteTypeParameter(TypeMirror argumentMirror, DeclaredType previousType, int index) {
-        return switch (argumentMirror) {
-            case DeclaredType declaredTypeArgument -> Optional.of(declaredTypeArgument);
-            case ArrayType arrayType -> Optional.of(arrayType);
-            case TypeVariable typeVariableArgument -> getConcreteTypeFromTypeVariable(typeVariableArgument, previousType, index);
-            case null, default -> Optional.empty();
         };
-    }
-
-    private Optional<TypeMirror> getConcreteTypeFromTypeVariable(TypeVariable typeVariableArgument, DeclaredType previousType, int index) {
-        var currentTypeVarName = typeVariableArgument.asElement().getSimpleName();
-        var previousTypeArguments = previousType.getTypeArguments();
-        var previousElement = (TypeElement) previousType.asElement();
-        var previousTypeParameters = previousElement.getTypeParameters();
-        for(;index < previousTypeParameters.size() && index < previousTypeArguments.size(); index++) {
-            if(previousTypeParameters.get(index).getSimpleName().equals(currentTypeVarName)){
-                return Optional.of(previousTypeArguments.get(index));
-            }
-        }
-        return Optional.empty();
-    }
-
-    private boolean isValidRequiredProperty(Element variableElement) {
-        if(variableElement.asType().getKind().isPrimitive()) {
-            messages.printError("Required properties cannot be primitives", variableElement);
-            return false;
-        }
-
-        return true;
-    }
-
-    private boolean isValidPackedProperty(Element variableElement, ProtobufProperty propertyAnnotation) {
-        if(!propertyAnnotation.packed() || types.isAssignable(variableElement.asType(), Collection.class)) {
-            return true;
-        }
-
-        messages.printError("Only scalar properties can be packed", variableElement);
-        return false;
     }
 
     private Optional<ProtobufObjectElement> processEnum(TypeElement enumElement) {

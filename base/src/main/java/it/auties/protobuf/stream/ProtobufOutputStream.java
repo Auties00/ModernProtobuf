@@ -61,7 +61,7 @@ public final class ProtobufOutputStream {
             return 0;
         }
 
-        var size = getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);;
+        var size = getFieldSize(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         var valueSize = 0;
         for (var value : values) {
             valueSize += getVarIntSize(value.longValue());
@@ -377,7 +377,7 @@ public final class ProtobufOutputStream {
         output.write(value, offset, size);
     }
 
-    public void writeObject(int fieldNumber, int size) {
+    public void writeMessage(int fieldNumber, int size) {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeVarIntNoTag(size);
     }
@@ -502,8 +502,9 @@ public final class ProtobufOutputStream {
 
             @Override
             public byte[] toByteArray() {
-                if(position != buffer.length) {
-                    throw ProtobufSerializationException.sizeMismatch();
+                var delta = buffer.length - position;
+                if(delta != 0) {
+                    throw ProtobufSerializationException.sizeMismatch(delta);
                 }
 
                 return buffer;

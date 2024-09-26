@@ -6,7 +6,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage
 public record WrapperMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.OBJECT)
+        @ProtobufProperty(index = 1, type = ProtobufType.ENUM)
         EnumType enumType
 ) {
 

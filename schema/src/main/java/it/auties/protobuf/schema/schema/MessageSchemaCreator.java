@@ -380,7 +380,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         }
 
         var fieldStatementType = fieldStatement.type().orElseThrow();
-        if (repeated || fieldStatementType.protobufType() != ProtobufType.OBJECT) {
+        if (repeated || fieldStatementType.protobufType() != ProtobufType.MESSAGE || fieldStatementType.protobufType() != ProtobufType.ENUM) {
             var fieldName = AstUtils.toJavaName(fieldStatement.name().orElseThrow());
             var wrapperQualifiedName = fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
             var wrapperRecord = createWrapperRecord(scope, wrapperQualifiedName, parseType(AstUtils.toCanonicalJavaName(javaType.fieldType())));
@@ -437,13 +437,13 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     private String getJavaType(ProtobufTypeReference type, boolean required, boolean repeated, boolean forceNullable) {
         if (!repeated && required) {
             return type.protobufType()
-                    .primitiveType()
+                    .serializedType()
                     .getSimpleName();
         }
 
         if(forceNullable || nullable) {
             return type.protobufType() == ProtobufType.BYTES ? "byte[]" : type.protobufType()
-                    .wrappedType()
+                    .wrapperType()
                     .getSimpleName();
         }
 

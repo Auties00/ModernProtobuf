@@ -1,15 +1,16 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator.method.serialization.object;
 
+import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 
 import java.util.List;
 
-public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethodGenerator {
+public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethodGenerator<ProtobufObjectElement> {
     private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
     private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
 
-    public ProtobufSerializationMethodOverloadGenerator(ProtobufObjectElement element) {
+    public ProtobufObjectSerializationOverloadGenerator(ProtobufObjectElement element) {
         super(element);
     }
 
@@ -21,11 +22,11 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
         }
 
         // Return the result
-        if(message.isGroup()) {
-            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s, %s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
+        if(objectElement.isGroup()) {
+            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s, %s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, %s, stream);".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
-            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s))".formatted(ProtobufSizeMethodGenerator.METHOD_NAME, INPUT_OBJECT_PARAMETER));
+            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, stream);".formatted(INPUT_OBJECT_PARAMETER));
         }
 
@@ -34,7 +35,7 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
 
     @Override
     public boolean shouldInstrument() {
-        return !message.isEnum();
+        return !objectElement.isEnum();
     }
 
     @Override
@@ -44,7 +45,7 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
 
     @Override
     protected String returnType() {
-        return message.isEnum() ? "Integer" : "byte[]";
+        return objectElement.isEnum() ? "Integer" : "byte[]";
     }
 
     @Override
@@ -54,8 +55,8 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
 
     @Override
     protected List<String> parametersTypes() {
-        var objectType = message.element().getSimpleName().toString();
-        if(message.isGroup()) {
+        var objectType = objectElement.element().getSimpleName().toString();
+        if(objectElement.isGroup()) {
             return List.of("int", objectType);
         }else {
             return List.of(objectType);
@@ -64,7 +65,7 @@ public class ProtobufSerializationMethodOverloadGenerator extends ProtobufMethod
 
     @Override
     protected List<String> parametersNames() {
-        if(message.isGroup()) {
+        if(objectElement.isGroup()) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);
