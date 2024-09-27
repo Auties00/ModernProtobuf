@@ -920,7 +920,6 @@ public final class ProtobufParser {
         }
     }
 
-    @SuppressWarnings("deprecation")
     private void handleOneOfField(String token, ProtobufGroupableFieldTree fieldTree, ProtobufBodyTree<?, ?> parent) {
         if(fieldTree.type().isEmpty()) {
             fieldTree.setType(ProtobufTypeReference.of(token));
@@ -980,7 +979,6 @@ public final class ProtobufParser {
         jumpIntoInstruction(Instruction.GROUP_BODY);
     }
 
-    @SuppressWarnings("deprecation")
     private void handleMessageField(String token, ProtobufGroupableFieldTree fieldTree, ProtobufBodyTree<?, ?> parent) {
         if(fieldTree.modifier().isEmpty()) {
             var modifier = ProtobufFieldTree.Modifier.of(token);

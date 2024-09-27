@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
 import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
 
@@ -26,7 +27,11 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
 
     @Override
     public ProtobufType protobufType() {
-        return ProtobufType.OBJECT;
+        if(declaration == null) {
+            return ProtobufType.UNKNOWN;
+        }
+
+        return declaration instanceof ProtobufEnumTree ? ProtobufType.ENUM : ProtobufType.MESSAGE;
     }
 
     @Override

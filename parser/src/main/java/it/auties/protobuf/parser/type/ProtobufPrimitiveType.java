@@ -13,7 +13,7 @@ public final class ProtobufPrimitiveType implements ProtobufTypeReference {
     }
 
     private ProtobufPrimitiveType(ProtobufType protobufType) {
-        if (protobufType == ProtobufType.OBJECT || protobufType == ProtobufType.MAP) {
+        if (protobufType.isObject() || protobufType == ProtobufType.MAP) {
             throw new ProtobufParserException("A primitive type cannot wrap an object or a map");
         }
 
