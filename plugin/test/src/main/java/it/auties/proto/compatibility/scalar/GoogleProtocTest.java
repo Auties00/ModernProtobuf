@@ -5,13 +5,25 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Random;
 
 public class GoogleProtocTest {
     @Test
         public void encodeScalarTypes() {
+        var random = new Random();
         var googleMessage = GoogleScalarMessage.newBuilder()
-                .setString("Hello, this is an automated test!")
-                .setBytes(ByteString.copyFromUtf8("Hello, this is an automated test!"))
+                .setString("Hello, this is an automated test")
+                .setBytes(ByteString.copyFrom("Hello, this is an automated test".getBytes(StandardCharsets.UTF_8)))
+                .setFixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
+                .setSfixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
+                .setInt32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
+                .setUint32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
+                .setFixed64(random.nextLong(Long.MIN_VALUE, Long.MAX_VALUE))
+                .setSfixed64(random.nextLong(Long.MIN_VALUE, Long.MAX_VALUE))
+                .setBool(random.nextBoolean())
+                .setDouble(random.nextDouble(Double.MIN_VALUE, Double.MAX_VALUE))
+                .setFloat(random.nextFloat(Float.MIN_VALUE, Float.MAX_VALUE))
                 .build();
         var modernDecoded = ModernScalarMessageSpec.decode(googleMessage.toByteArray());
         equals(modernDecoded, googleMessage);

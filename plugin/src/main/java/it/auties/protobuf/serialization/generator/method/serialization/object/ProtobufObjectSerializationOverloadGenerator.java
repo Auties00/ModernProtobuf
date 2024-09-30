@@ -23,14 +23,14 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
         // Return the result
         if(objectElement.isGroup()) {
-            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s, %s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
+            writer.printVariableDeclaration("stream", "ProtobufOutputStream.toBytes(%s(%s, %s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, %s, stream);".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
-            writer.printVariableDeclaration("stream", "new ProtobufOutputStream(%s(%s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, INPUT_OBJECT_PARAMETER));
+            writer.printVariableDeclaration("stream", "ProtobufOutputStream.toBytes(%s(%s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, stream);".formatted(INPUT_OBJECT_PARAMETER));
         }
 
-        writer.printReturn("stream.toByteArray()");
+        writer.printReturn("stream.toOutput()");
     }
 
     @Override

@@ -18,7 +18,7 @@ public abstract class ProtobufDeserializationGenerator<INPUT> extends ProtobufMe
 
     protected void writeMapDeserializer(SwitchStatementWriter writer, int index, String name, ProtobufPropertyType.MapType mapType) {
         try(var switchBranchWriter = writer.printSwitchBranch(String.valueOf(index))) {
-            var streamName = switchBranchWriter.printVariableDeclaration("%sInputStream".formatted(name), "%s.lengthDelimitedStream()".formatted(INPUT_STREAM_NAME));
+            var streamName = switchBranchWriter.printVariableDeclaration("%sInputStream".formatted(name), "%s.readLengthDelimited()".formatted(INPUT_STREAM_NAME));
             var keyName = switchBranchWriter.printVariableDeclaration(getQualifiedName(mapType.keyType().accessorType()), "%sKey".formatted(name), "null");
             var valueName = switchBranchWriter.printVariableDeclaration(getQualifiedName(mapType.valueType().accessorType()), "%sValue".formatted(name), "null");
             var keyReadMethod = getDeserializerStreamMethod(mapType.keyType(), false);
@@ -37,18 +37,9 @@ public abstract class ProtobufDeserializationGenerator<INPUT> extends ProtobufMe
 
     protected void writeDeserializer(SwitchStatementWriter writer, String name, int index, ProtobufPropertyType type, boolean repeated, boolean packed, String mapTargetName) {
         var readMethod = getDeserializerStreamMethod(type, packed);
-        var inputStream = getDeserializerStream(type);
-        var readFunction = getConvertedValue(index, inputStream, type, readMethod);
+        var readFunction = getConvertedValue(index, INPUT_STREAM_NAME, type, readMethod);
         var readAssignment = getReadAssignment(name, repeated, packed, readFunction, mapTargetName);
         writer.printSwitchBranch(String.valueOf(index), readAssignment);
-    }
-
-    private String getDeserializerStream(ProtobufPropertyType type) {
-        if (type.protobufType() == ProtobufType.MESSAGE) {
-            return "%s.lengthDelimitedStream()".formatted(INPUT_STREAM_NAME);
-        }
-
-        return INPUT_STREAM_NAME;
     }
 
     private String getReadAssignment(String name, boolean repeated, boolean packed, String readFunction, String mapTargetName) {
@@ -69,14 +60,21 @@ public abstract class ProtobufDeserializationGenerator<INPUT> extends ProtobufMe
     }
 
     private String getConvertedValue(int index, String value, ProtobufPropertyType implementation, String readMethod) {
-        var result = readMethod.isEmpty() ? value : "%s.%s()".formatted(value, readMethod);
+        if (implementation.protobufType() == ProtobufType.MESSAGE) {
+            value = "%s.readLengthDelimited()".formatted(value);
+        }
+
+        if(!readMethod.isEmpty()) {
+            value = "%s.%s()".formatted(value, readMethod);
+        }
+
         for (var i = 0; i < implementation.deserializers().size(); i++) {
             var deserializer = implementation.deserializers().get(i);
             var parent = (TypeElement) deserializer.delegate().getEnclosingElement();
             var converterMethodName = deserializer.delegate().getSimpleName();
             switch (deserializer.delegate().getParameters().size()) {
-                case 1 -> result = "%s.%s(%s)".formatted(parent.getQualifiedName(), converterMethodName, result);
-                case 2 -> result = "%s.%s(%s, %s)".formatted(parent.getQualifiedName(), converterMethodName, index, result);
+                case 1 -> value = "%s.%s(%s)".formatted(parent.getQualifiedName(), converterMethodName, value);
+                case 2 -> value = "%s.%s(%s, %s)".formatted(parent.getQualifiedName(), converterMethodName, index, value);
                 default -> throw new IllegalArgumentException(
                         "Unexpected number of arguments for deserializer "
                                 +  deserializer.delegate().getSimpleName()
@@ -86,7 +84,7 @@ public abstract class ProtobufDeserializationGenerator<INPUT> extends ProtobufMe
             }
         }
 
-        return result;
+        return value;
     }
 
     private String getDeserializerStreamMethod(ProtobufPropertyType type, boolean packed) {

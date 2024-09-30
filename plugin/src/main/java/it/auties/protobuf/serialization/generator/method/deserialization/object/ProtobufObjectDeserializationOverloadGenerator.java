@@ -28,9 +28,9 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
         }
         // Return the result
         if(objectElement.isGroup()) {
-            writer.printReturn("%s(%s, new ProtobufInputStream(%s, 0, %s.length))".formatted(name(), GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
+            writer.printReturn("%s(%s, ProtobufInputStream.fromBytes(%s, 0, %s.length))".formatted(name(), GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
-            writer.printReturn("%s(new ProtobufInputStream(%s, 0, %s.length))".formatted(name(), INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
+            writer.printReturn("%s(ProtobufInputStream.fromBytes(%s, 0, %s.length))".formatted(name(), INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
         }
     }
 

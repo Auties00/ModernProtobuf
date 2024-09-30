@@ -10,7 +10,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 
-public final class ProtobufOutputStream {
+public abstract class ProtobufOutputStream<OUTPUT> {
     public static int getFieldSize(int fieldNumber, int wireType) {
         return getVarIntSize(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
@@ -41,6 +41,22 @@ public final class ProtobufOutputStream {
         }else {
             return 9;
         }
+    }
+
+    public static ProtobufOutputStream<byte[]> toBytes(int length) {
+        return new ProtobufOutputStream.Bytes(new byte[length], 0);
+    }
+
+    public static ProtobufOutputStream<byte[]> toBytes(byte[] bytes, int offset) {
+        return new ProtobufOutputStream.Bytes(bytes, offset);
+    }
+
+    public static ProtobufOutputStream<ByteBuffer> toBuffer(ByteBuffer buffer) {
+        return new ProtobufOutputStream.Buffer(buffer);
+    }
+
+    public static ProtobufOutputStream<OutputStream> toStream(OutputStream buffer) {
+        return new ProtobufOutputStream.Stream(buffer);
     }
 
     public static int getStringSize(ProtobufString value) {
@@ -104,15 +120,6 @@ public final class ProtobufOutputStream {
                 + valuesSize;
     }
 
-    private final Output output;
-    public ProtobufOutputStream(int size) {
-        this.output = Output.allocate(size);
-    }
-
-    public ProtobufOutputStream(OutputStream outputStream) {
-        this.output = Output.wrap(outputStream);
-    }
-
     private void writeTag(int fieldNumber, int wireType) {
         writeVarIntNoTag(ProtobufWireType.makeTag(fieldNumber, wireType));
     }
@@ -140,7 +147,7 @@ public final class ProtobufOutputStream {
             writeVarIntNoTag(value);
         }
     }
-    
+
     public void writeInt32(int fieldNumber, Integer value) {
         if(value == null){
             return;
@@ -149,7 +156,7 @@ public final class ProtobufOutputStream {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
         writeVarIntNoTag(value);
     }
-    
+
     public void writeUInt32Packed(int fieldNumber, Collection<Integer> values) {
         if(values == null){
             return;
@@ -187,7 +194,7 @@ public final class ProtobufOutputStream {
             writeFixed32NoTag(Float.floatToRawIntBits(value));
         }
     }
-    
+
     public void writeFloat(int fieldNumber, Float value) {
         if(value == null){
             return;
@@ -208,7 +215,7 @@ public final class ProtobufOutputStream {
             writeFixed32NoTag(value);
         }
     }
-    
+
     public void writeFixed32(int fieldNumber, Integer value) {
         if(value == null){
             return;
@@ -219,10 +226,10 @@ public final class ProtobufOutputStream {
     }
 
     private void writeFixed32NoTag(Integer value) {
-        output.write((byte) (value & 0xFF));
-        output.write((byte) ((value >> 8) & 0xFF));
-        output.write((byte) ((value >> 16) & 0xFF));
-        output.write((byte) ((value >> 24) & 0xFF));
+        write((byte) (value & 0xFF));
+        write((byte) ((value >> 8) & 0xFF));
+        write((byte) ((value >> 16) & 0xFF));
+        write((byte) ((value >> 24) & 0xFF));
     }
 
     public void writeInt64Packed(int fieldNumber, Collection<Long> values) {
@@ -237,7 +244,7 @@ public final class ProtobufOutputStream {
             writeFixed64NoTag(value);
         }
     }
-    
+
     public void writeInt64(int fieldNumber, Long value) {
         if(value == null){
             return;
@@ -255,7 +262,7 @@ public final class ProtobufOutputStream {
             writeUInt64(fieldNumber, value);
         }
     }
-    
+
     public void writeUInt64(int fieldNumber, Long value) {
         if(value == null){
             return;
@@ -277,7 +284,7 @@ public final class ProtobufOutputStream {
             writeFixed64NoTag(Double.doubleToRawLongBits(value));
         }
     }
-    
+
     public void writeDouble(int fieldNumber, Double value) {
         if(value == null){
             return;
@@ -306,14 +313,14 @@ public final class ProtobufOutputStream {
     }
 
     private void writeFixed64NoTag(Long value) {
-        output.write((byte) ((int) ((long) value) & 0xFF));
-        output.write((byte) ((int) (value >> 8) & 0xFF));
-        output.write((byte) ((int) (value >> 16) & 0xFF));
-        output.write((byte) ((int) (value >> 24) & 0xFF));
-        output.write((byte) ((int) (value >> 32) & 0xFF));
-        output.write((byte) ((int) (value >> 40) & 0xFF));
-        output.write((byte) ((int) (value >> 48) & 0xFF));
-        output.write((byte) ((int) (value >> 56) & 0xFF));
+        write((byte) ((int) ((long) value) & 0xFF));
+        write((byte) ((int) (value >> 8) & 0xFF));
+        write((byte) ((int) (value >> 16) & 0xFF));
+        write((byte) ((int) (value >> 24) & 0xFF));
+        write((byte) ((int) (value >> 32) & 0xFF));
+        write((byte) ((int) (value >> 40) & 0xFF));
+        write((byte) ((int) (value >> 48) & 0xFF));
+        write((byte) ((int) (value >> 56) & 0xFF));
     }
 
     public void writeBoolPacked(int fieldNumber, Collection<Boolean> values) {
@@ -325,7 +332,7 @@ public final class ProtobufOutputStream {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeVarIntNoTag(size);
         for (var value : values) {
-            output.write((byte)( value ? 1 : 0));
+            write((byte)( value ? 1 : 0));
         }
     }
 
@@ -335,7 +342,7 @@ public final class ProtobufOutputStream {
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        output.write((byte) (value ? 1 : 0));
+        write((byte) (value ? 1 : 0));
     }
 
     public void writeString(int fieldNumber, ProtobufString value) {
@@ -354,7 +361,7 @@ public final class ProtobufOutputStream {
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         var size = value.remaining();
         writeVarIntNoTag(size);
-        output.write(value);
+        write(value);
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {
@@ -364,7 +371,7 @@ public final class ProtobufOutputStream {
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeVarIntNoTag(value.length);
-        output.write(value);
+        write(value);
     }
 
     public void writeBytes(int fieldNumber, byte[] value, int offset, int size) {
@@ -374,7 +381,7 @@ public final class ProtobufOutputStream {
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
         writeVarIntNoTag(size);
-        output.write(value, offset, size);
+        write(value, offset, size);
     }
 
     public void writeMessage(int fieldNumber, int size) {
@@ -382,133 +389,155 @@ public final class ProtobufOutputStream {
         writeVarIntNoTag(size);
     }
 
-    public byte[] toByteArray() {
-        return output.toByteArray();
-    }
-
     private void writeVarIntNoTag(long value) {
         while (true) {
             if ((value & ~0x7FL) == 0) {
-                output.write((byte) value);
+                write((byte) value);
                 return;
             } else {
-                output.write((byte) (((int) value & 0x7F) | 0x80));
+                write((byte) (((int) value & 0x7F) | 0x80));
                 value >>>= 7;
             }
         }
     }
 
-    private static abstract sealed class Output {
-        public abstract void write(byte entry);
-        public abstract void write(byte[] entry);
-        public abstract void write(byte[] entry, int offset, int length);
-        public abstract void write(ByteBuffer entry);
-        public abstract byte[] toByteArray();
+    protected abstract void write(byte entry);
+    protected abstract void write(byte[] entry);
+    protected abstract void write(byte[] entry, int offset, int length);
+    protected abstract void write(ByteBuffer entry);
+    public abstract OUTPUT toOutput();
 
-        private static Output wrap(OutputStream outputStream) {
-            return new Stream(outputStream);
+    private static final class Stream extends ProtobufOutputStream<OutputStream> {
+        private final OutputStream outputStream;
+        private Stream(OutputStream outputStream) {
+            this.outputStream = outputStream;
         }
 
-        private static Output allocate(int size) {
-            return new Bytes(size);
-        }
-
-        private static final class Stream extends Output {
-            private final OutputStream outputStream;
-            private Stream(OutputStream outputStream) {
-                this.outputStream = outputStream;
-            }
-
-            @Override
-            public void write(byte entry) {
-                try {
-                    outputStream.write(entry);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-
-            @Override
-            public void write(byte[] entry) {
-                try {
-                    outputStream.write(entry);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-
-            @Override
-            public void write(byte[] entry, int offset, int length) {
-                try {
-                    outputStream.write(entry, offset, length);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-
-            @Override
-            public void write(ByteBuffer entry) {
-                try {
-                    var size = entry.remaining();
-                    var bufferPosition = entry.position();
-                    for(var i = 0; i < size; i++) {
-                        outputStream.write(entry.get(bufferPosition + i));
-                    }
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-
-            @Override
-            public byte[] toByteArray() {
-                throw new UnsupportedOperationException();
+        @Override
+        public void write(byte entry) {
+            try {
+                outputStream.write(entry);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
         }
 
-        private static final class Bytes extends Output {
-            private final byte[] buffer;
-            private int position;
-            private Bytes(int size) {
-                this.buffer = new byte[size];
+        @Override
+        public void write(byte[] entry) {
+            try {
+                outputStream.write(entry);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
+        }
 
-            @Override
-            public void write(byte entry) {
-                buffer[position++] = entry;
+        @Override
+        public void write(byte[] entry, int offset, int length) {
+            try {
+                outputStream.write(entry, offset, length);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
+        }
 
-            @Override
-            public void write(byte[] entry) {
-                for (byte b : entry) {
-                    buffer[position++] = b;
-                }
-            }
-
-            @Override
-            public void write(byte[] entry, int offset, int length) {
-                for(var i = 0; i < length; i++) {
-                    buffer[position++] = entry[offset + i];
-                }
-            }
-
-            @Override
-            public void write(ByteBuffer entry) {
+        @Override
+        public void write(ByteBuffer entry) {
+            try {
                 var size = entry.remaining();
                 var bufferPosition = entry.position();
                 for(var i = 0; i < size; i++) {
-                    buffer[position++] = entry.get(bufferPosition + i);
+                    outputStream.write(entry.get(bufferPosition + i));
                 }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public OutputStream toOutput() {
+            return outputStream;
+        }
+    }
+
+    private static final class Bytes extends ProtobufOutputStream<byte[]> {
+        private final byte[] buffer;
+        private int position;
+        private Bytes(byte[] buffer, int offset) {
+            this.buffer = buffer;
+            this.position = offset;
+        }
+
+        @Override
+        public void write(byte entry) {
+            buffer[position++] = entry;
+        }
+
+        @Override
+        public void write(byte[] entry) {
+            var length = entry.length;
+            System.arraycopy(entry, 0, buffer, position, length);
+            position += length;
+        }
+
+        @Override
+        public void write(byte[] entry, int offset, int length) {
+            System.arraycopy(entry, offset, buffer, position, length);
+            position += length;
+        }
+
+        @Override
+        public void write(ByteBuffer entry) {
+            var length = entry.remaining();
+            entry.get(entry.position(), buffer, position, length);
+            position += length;
+        }
+
+        @Override
+        public byte[] toOutput() {
+            var delta = buffer.length - position;
+            if(delta != 0) {
+                throw ProtobufSerializationException.sizeMismatch(delta);
             }
 
-            @Override
-            public byte[] toByteArray() {
-                var delta = buffer.length - position;
-                if(delta != 0) {
-                    throw ProtobufSerializationException.sizeMismatch(delta);
-                }
+            return buffer;
+        }
+    }
 
-                return buffer;
+    private static final class Buffer extends ProtobufOutputStream<ByteBuffer> {
+        private final ByteBuffer buffer;
+        private Buffer(ByteBuffer buffer) {
+            this.buffer = buffer;
+        }
+
+        @Override
+        public void write(byte entry) {
+            buffer.put(entry);
+        }
+
+        @Override
+        public void write(byte[] entry) {
+            buffer.put(entry);
+        }
+
+        @Override
+        public void write(byte[] entry, int offset, int length) {
+            buffer.put(entry, offset, length);
+        }
+
+        @Override
+        public void write(ByteBuffer entry) {
+            buffer.put(entry);
+        }
+
+        @Override
+        public ByteBuffer toOutput() {
+            var remaining = buffer.limit() - buffer.position();
+            if(remaining != 0) {
+                throw ProtobufSerializationException.sizeMismatch(remaining);
             }
+
+            buffer.flip();
+            return buffer;
         }
     }
 }

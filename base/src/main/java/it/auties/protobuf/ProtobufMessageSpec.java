@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ProtobufMessageSpec {
-    public static Map<Integer, Object> decode(byte[] protoInputStream) {
-        return decode(new ProtobufInputStream(protoInputStream, 0, protoInputStream.length));
+    public static Map<Integer, Object> decode(byte[] bytes) {
+        return decode(ProtobufInputStream.fromBytes(bytes, 0, bytes.length));
     }
 
     public static Map<Integer, Object> decode(ProtobufInputStream protoInputStream) {
