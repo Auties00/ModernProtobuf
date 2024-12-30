@@ -26,14 +26,14 @@
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
-                            <groupId>org.openjdk.jmh</groupId>
-                            <artifactId>jmh-generator-annprocess</artifactId>
-                            <version>1.35</version>
-                        </annotationProcessorPath>
-                        <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
                             <artifactId>protobuf-serialization-plugin</artifactId>
                             <version>3.4.1</version>
+                        </annotationProcessorPath>
+                        <annotationProcessorPath>
+                            <groupId>org.openjdk.jmh</groupId>
+                            <artifactId>jmh-generator-annprocess</artifactId>
+                            <version>1.35</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
                 </configuration>
@@ -50,12 +50,12 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>3.24.2</version>
+            <version>4.28.2</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-javalite</artifactId>
-            <version>3.24.2</version>
+            <version>4.28.2</version>
         </dependency>
         <dependency>
             <groupId>org.openjdk.jmh</groupId>

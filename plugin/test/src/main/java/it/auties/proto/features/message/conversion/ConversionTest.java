@@ -13,7 +13,7 @@ public class ConversionTest {
         var someMessage = new WrapperMessage(new Wrapper(ProtobufString.wrap("Hello World")));
         var encoded = WrapperMessageSpec.encode(someMessage);
         var decoded = WrapperMessageSpec.decode(encoded);
-        Assertions.assertEquals(someMessage.wrapper().value(), decoded.wrapper().value());
+        Assertions.assertEquals(someMessage.wrapper777().value(), decoded.wrapper777().value());
     }
 
     @Test

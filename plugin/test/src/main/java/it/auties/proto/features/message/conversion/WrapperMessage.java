@@ -8,7 +8,7 @@ import static it.auties.protobuf.model.ProtobufType.STRING;
 @ProtobufMessage
 public record WrapperMessage(
         @ProtobufProperty(index = 1, type = STRING)
-        Wrapper wrapper
+        Wrapper wrapper777
 ) {
 
 }

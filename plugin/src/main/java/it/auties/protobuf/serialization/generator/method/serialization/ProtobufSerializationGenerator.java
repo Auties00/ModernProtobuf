@@ -2,7 +2,7 @@ package it.auties.protobuf.serialization.generator.method.serialization;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
 
@@ -166,7 +166,7 @@ public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMeth
         }
     }
 
-    private String getMessageMethod(int index, ProtobufSerializerElement serializer, String propertyName) {
+    private String getMessageMethod(int index, ProtobufAttributedConverterElement.Serializer serializer, String propertyName) {
         var parent = (TypeElement) serializer.delegate().getEnclosingElement();
         return "%s.writeMessage(%s, %s.%s(%s));".formatted(
                 OUTPUT_OBJECT_PARAMETER,
@@ -193,7 +193,7 @@ public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMeth
 
     // Creates the method invocation for a given serializer using a value argument
     // Serializers cannot be constructors, we can assume that because of PreliminaryChecks
-    private String createSerializerInvocation(ProtobufSerializerElement serializer, String value, int groupIndex) {
+    private String createSerializerInvocation(ProtobufAttributedConverterElement.Serializer serializer, String value, int groupIndex) {
         // If the serializer isn't static, invoke the serializer method on the value instance with no parameters
         // We can assume that the value on which the method is called will not be a message, enum or group because of PreliminaryChecks
         // class Wrapper {

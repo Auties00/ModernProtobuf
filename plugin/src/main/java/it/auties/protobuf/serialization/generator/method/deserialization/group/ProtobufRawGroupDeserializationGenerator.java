@@ -1,7 +1,7 @@
 package it.auties.protobuf.serialization.generator.method.deserialization.group;
 
 import it.auties.protobuf.serialization.generator.method.deserialization.ProtobufDeserializationGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
 import it.auties.protobuf.serialization.model.property.ProtobufGroupPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
@@ -16,8 +16,8 @@ public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializ
     private static final String INDEX_PARAMETER = "protoGroupIndex";
     private static final String INPUT_OBJECT_PARAMETER = "protoInputStream";
 
-    private final ProtobufSerializerElement serializerElement;
-    public ProtobufRawGroupDeserializationGenerator(TypeElement objectElement, ProtobufSerializerElement serializerElement) {
+    private final ProtobufAttributedConverterElement.Serializer serializerElement;
+    public ProtobufRawGroupDeserializationGenerator(TypeElement objectElement, ProtobufAttributedConverterElement.Serializer serializerElement) {
         super(objectElement);
         this.serializerElement = serializerElement;
     }

@@ -5,7 +5,7 @@ import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
 import it.auties.protobuf.serialization.generator.method.deserialization.group.ProtobufRawGroupDeserializationGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSerializationGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSizeGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
@@ -23,7 +23,7 @@ public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
         super(filer);
     }
 
-    public void createClass(TypeElement rawGroup, ProtobufSerializerElement serializerElement, PackageElement packageName) throws IOException {
+    public void createClass(TypeElement rawGroup, ProtobufAttributedConverterElement.Serializer serializerElement, PackageElement packageName) throws IOException {
         // Names
         var simpleGeneratedClassName = getGeneratedClassNameBySuffix(rawGroup, "Spec");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;

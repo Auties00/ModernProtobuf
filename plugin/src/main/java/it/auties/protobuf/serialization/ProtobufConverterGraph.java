@@ -39,21 +39,21 @@ public class ProtobufConverterGraph {
         return counter;
     }
 
-    public List<Element> get(TypeMirror from, TypeMirror to, List<TypeElement> mixins) {
+    public List<Arc> getPath(TypeMirror from, TypeMirror to, List<TypeElement> mixins) {
         var mixinsNames = mixins.stream()
                 .map(entry -> entry.getQualifiedName().toString())
                 .collect(Collectors.toUnmodifiableSet());
-        return get(from, from, to, mixinsNames);
+        return getArcs(from, from, to, mixinsNames);
     }
 
-    private List<Element> get(TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<String> mixins) {
+    private List<Arc> getArcs(TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<String> mixins) {
         for(var entry : nodes) {
             if (!types.isAssignable(currentFrom, entry.from())) {
                 continue;
             }
 
             if (isArcIllegal(originalFrom, currentFrom, currentTo, mixins, entry) || !types.isAssignable(currentTo, entry.to())) {
-                var results = get(currentFrom, currentTo, mixins, entry, null);
+                var results = getArcs(currentFrom, currentTo, mixins, entry, null);
                 if (results.isEmpty()) {
                     continue;
                 }
@@ -62,15 +62,15 @@ public class ProtobufConverterGraph {
             }
 
             if (!types.isParametrized(entry.arc())) {
-                return List.of(new Element(entry.arc()));
+                return List.of(new Arc(entry.arc()));
             }
 
             var returnType = types.getReturnType(entry.arc(), List.of(currentFrom));
             if (types.isAssignable(currentTo, returnType, false)) {
-                return List.of(new Element(entry.arc(), returnType));
+                return List.of(new Arc(entry.arc(), returnType));
             }
 
-            var results = get(currentFrom, currentTo, mixins, entry, returnType);
+            var results = getArcs(currentFrom, currentTo, mixins, entry, returnType);
             if (!results.isEmpty()) {
                 return results;
             }
@@ -120,9 +120,9 @@ public class ProtobufConverterGraph {
         return null;
     }
 
-    private List<Element> get(TypeMirror from, TypeMirror to, Set<String> mixins, Node entry, TypeMirror genericReturnType) {
+    private List<Arc> getArcs(TypeMirror from, TypeMirror to, Set<String> mixins, Node entry, TypeMirror genericReturnType) {
         if (!types.isParametrized(entry.arc())) {
-            var nested = get(from, entry.to(), to, mixins);
+            var nested = getArcs(from, entry.to(), to, mixins);
             if (nested.isEmpty()) {
                 return List.of();
             }
@@ -131,7 +131,7 @@ public class ProtobufConverterGraph {
                 return List.of();
             }
 
-            return getSteps(entry, entry.arc().getReturnType(), nested);
+            return getArcs(entry, entry.arc().getReturnType(), nested);
         }
 
         var returnType = genericReturnType != null ? genericReturnType : types.getReturnType(entry.arc(), List.of(from));
@@ -139,7 +139,7 @@ public class ProtobufConverterGraph {
             return List.of();
         }
 
-        var nested = get(from, returnType, to, mixins);
+        var nested = getArcs(from, returnType, to, mixins);
         if (nested.isEmpty()) {
             return List.of();
         }
@@ -148,18 +148,18 @@ public class ProtobufConverterGraph {
             return List.of();
         }
 
-        return getSteps(entry, returnType, nested);
+        return getArcs(entry, returnType, nested);
     }
 
-    private ArrayList<Element> getSteps(Node entry, TypeMirror returnType, List<Element> nested) {
-        var results = new ArrayList<Element>();
-        results.add(new Element(entry.arc(), returnType));
+    private ArrayList<Arc> getArcs(Node entry, TypeMirror returnType, List<Arc> nested) {
+        var results = new ArrayList<Arc>();
+        results.add(new Arc(entry.arc(), returnType));
         results.addAll(nested);
         return results;
     }
 
-    public record Element(ExecutableElement method, TypeMirror returnType) {
-        public Element(ExecutableElement method) {
+    public record Arc(ExecutableElement method, TypeMirror returnType) {
+        public Arc(ExecutableElement method) {
             this(method, method.getReturnType());
         }
     }

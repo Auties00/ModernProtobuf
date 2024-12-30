@@ -11,7 +11,7 @@ import java.util.Optional;
 @ProtobufMessage
 public record OptionalPrimitiveWrapper(
         @ProtobufProperty(index = 1, type = ProtobufType.BYTES)
-        Optional<Wrapper> wrapper
+        Optional<Wrapper> wrapper444
 ) {
     public record Wrapper(byte[] data) {
         @ProtobufDeserializer

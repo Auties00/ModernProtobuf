@@ -252,7 +252,7 @@ public class Types {
         for(var type : types) {
             while (type != null) {
                 counter.compute(type, (key, value) -> value == null ? 1 : value + 1);
-                type = getSuperClass(type);
+                type = getNullableSuperClass(type);
             }
         }
         TypeMirror bestElement = null;
@@ -270,7 +270,7 @@ public class Types {
         return bestElement;
     }
 
-    public TypeMirror getSuperClass(TypeMirror mirror) {
+    public TypeMirror getNullableSuperClass(TypeMirror mirror) {
         return switch (mirror) {
             case ArrayType ignored -> getType(Object.class);
             case DeclaredType declaredType when declaredType.asElement() instanceof TypeElement typeElement
@@ -324,22 +324,6 @@ public class Types {
         }
 
         return uses;
-    }
-
-    private List<String> getGenericVariables(TypeMirror mirror) {
-        if(!(mirror instanceof DeclaredType declaredType)) {
-            return List.of();
-        }
-
-        if(declaredType.getKind() == TypeKind.TYPEVAR) {
-            return List.of(declaredType.toString());
-        }
-
-        return declaredType.getTypeArguments()
-                .stream()
-                .map(this::getGenericVariables)
-                .flatMap(Collection::stream)
-                .toList();
     }
 
     public Optional<TypeMirror> getTypeParameter(TypeMirror concrete, TypeMirror model, int index) {
@@ -732,6 +716,10 @@ public class Types {
 
     public TypeElement createClassStub(String name) {
         return new StubTypeElement(name);
+    }
+
+    public List<TypeElement> getMixins(ProtobufSerializer.GroupProperty groupProperty) {
+        return getMirroredTypes(groupProperty::mixins);
     }
 
     private final class StubTypeElement implements TypeElement {

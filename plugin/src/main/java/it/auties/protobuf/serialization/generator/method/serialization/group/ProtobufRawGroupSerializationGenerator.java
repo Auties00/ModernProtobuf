@@ -1,7 +1,7 @@
 package it.auties.protobuf.serialization.generator.method.serialization.group;
 
 import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSerializationGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
@@ -38,8 +38,8 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
     private static final String PROPERTY_NAME = "protoGroupEntry";
     private static final String PROPERTY_VALUE_NAME = "protoGroupEntryValue";
 
-    private final ProtobufSerializerElement serializerElement;
-    public ProtobufRawGroupSerializationGenerator(TypeElement objectElement, ProtobufSerializerElement serializerElement) {
+    private final ProtobufAttributedConverterElement.Serializer serializerElement;
+    public ProtobufRawGroupSerializationGenerator(TypeElement objectElement, ProtobufAttributedConverterElement.Serializer serializerElement) {
         super(objectElement);
         this.serializerElement = serializerElement;
     }

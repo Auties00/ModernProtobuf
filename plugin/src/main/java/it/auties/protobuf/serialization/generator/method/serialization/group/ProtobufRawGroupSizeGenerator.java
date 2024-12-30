@@ -4,7 +4,7 @@ import it.auties.protobuf.exception.ProtobufSerializationException;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSizeGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufSerializerElement;
+import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
@@ -22,8 +22,8 @@ public class ProtobufRawGroupSizeGenerator extends ProtobufSizeGenerator<TypeEle
     private static final String PROTO_GROUP_ENTRY_VALUE = "protoGroupEntryValue";
     private static final String PROTO_GROUP_PROPERTY = "protoGroupProperty";
 
-    private final ProtobufSerializerElement serializerElement;
-    public ProtobufRawGroupSizeGenerator(TypeElement objectElement, ProtobufSerializerElement serializerElement) {
+    private final ProtobufAttributedConverterElement.Serializer serializerElement;
+    public ProtobufRawGroupSizeGenerator(TypeElement objectElement, ProtobufAttributedConverterElement.Serializer serializerElement) {
         super(objectElement);
         this.serializerElement = serializerElement;
     }
