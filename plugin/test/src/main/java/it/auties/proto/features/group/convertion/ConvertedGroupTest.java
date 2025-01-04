@@ -17,7 +17,6 @@ import it.auties.protobuf.model.ProtobufString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +44,13 @@ public class ConvertedGroupTest {
 
     @Test
     public void testMap() {
-        var groupRecord = new MapConvertedGroupRecord(ProtobufString.wrap("Hello World"), 123, null, Map.of(ProtobufString.wrap("Hello"), MapConvertedGroupRecord.Message.FIRST), List.of(MapConvertedGroupRecord.Message.FIRST));
+        var groupRecord = new MapConvertedGroupRecord(
+                ProtobufString.wrap("Hello World"),
+                123,
+                Map.of(ProtobufString.wrap("Hello"), ProtobufString.wrap("World")),
+                Map.of(ProtobufString.wrap("Hello"), MapConvertedGroupRecord.Message.FIRST),
+                List.of(MapConvertedGroupRecord.Message.FIRST)
+        );
         var messageRecord = new MapConvertedMessageRecord(groupRecord);
         var encoded = MapConvertedMessageRecordSpec.encode(messageRecord);
         var decoded = MapConvertedMessageRecordSpec.decode(encoded);

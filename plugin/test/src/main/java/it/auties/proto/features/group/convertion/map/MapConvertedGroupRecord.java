@@ -22,7 +22,6 @@ public record MapConvertedGroupRecord(
     @SuppressWarnings("unchecked")
     @ProtobufDeserializer
     public static MapConvertedGroupRecord of(Map<Integer, Object> data) {
-        System.out.println("DESERIALIZED: " + data);
         return new MapConvertedGroupRecord((ProtobufString) data.get(1), (Integer) data.get(2), (Map<ProtobufString, ProtobufString>) data.get(3), (Map<ProtobufString, Message>) data.get(4), (List<Message>) data.get(5));
     }
 
@@ -46,7 +45,6 @@ public record MapConvertedGroupRecord(
         if(messages != null) {
             results.put(5, messages);
         }
-        System.out.println("SERIALIZED: " + results);
         return results;
     }
 

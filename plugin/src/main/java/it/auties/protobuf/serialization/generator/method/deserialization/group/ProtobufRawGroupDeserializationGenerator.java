@@ -22,8 +22,16 @@ public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializ
         methodWriter.println("%s.assertGroupOpened(%s);".formatted(INPUT_OBJECT_PARAMETER, INDEX_PARAMETER));
         var rawGroupData = methodWriter.printVariableDeclaration("groupData", "new java.util.HashMap()");
         for(var property : objectElement.properties()) {
-            if(property.type() instanceof ProtobufPropertyType.CollectionType collectionType) {
-                methodWriter.printVariableDeclaration("property" + property.index(), collectionType.descriptorDefaultValue());
+            switch (property.type()) {
+                case ProtobufPropertyType.CollectionType collectionType -> {
+                    var collection = methodWriter.printVariableDeclaration("property" + property.index(), collectionType.descriptorDefaultValue());
+                    methodWriter.printf("%s.put(%s, %s);".formatted(rawGroupData, property.index(), collection));
+                }
+                case ProtobufPropertyType.MapType mapType -> {
+                    var map = methodWriter.printVariableDeclaration("property" + property.index(), mapType.descriptorDefaultValue());
+                    methodWriter.printf("%s.put(%s, %s);".formatted(rawGroupData, property.index(), map));
+                }
+                case ProtobufPropertyType.NormalType ignored -> {}
             }
         }
 
@@ -36,7 +44,7 @@ public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializ
                         case ProtobufPropertyType.MapType mapType -> writeMapDeserializer(
                                 mapSwitchWriter,
                                 groupPropertyIndex,
-                                rawGroupData,
+                                "property" + groupProperty.index(),
                                 mapType
                         );
                         case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(
