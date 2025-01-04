@@ -6,7 +6,7 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 
 import java.util.List;
 
-public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethodGenerator<ProtobufObjectElement> {
+public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethodGenerator {
     private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
     private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
 
@@ -22,7 +22,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
         }
 
         // Return the result
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             writer.printVariableDeclaration("stream", "ProtobufOutputStream.toBytes(%s(%s, %s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, %s, stream);".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
@@ -35,7 +35,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     public boolean shouldInstrument() {
-        return !objectElement.isEnum();
+        return !(objectElement.type() == ProtobufObjectElement.Type.ENUM);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     protected String returnType() {
-        return objectElement.isEnum() ? "Integer" : "byte[]";
+        return objectElement.type() == ProtobufObjectElement.Type.ENUM ? "Integer" : "byte[]";
     }
 
     @Override
@@ -56,7 +56,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
     @Override
     protected List<String> parametersTypes() {
         var objectType = objectElement.element().getSimpleName().toString();
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of("int", objectType);
         }else {
             return List.of(objectType);
@@ -65,7 +65,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);

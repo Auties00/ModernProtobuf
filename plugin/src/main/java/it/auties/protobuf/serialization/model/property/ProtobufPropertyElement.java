@@ -1,6 +1,7 @@
 package it.auties.protobuf.serialization.model.property;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import javax.lang.model.element.Element;
 
@@ -22,6 +23,18 @@ public record ProtobufPropertyElement(
                 annotation.required(),
                 annotation.packed(),
                 synthetic
+        );
+    }
+
+    public ProtobufPropertyElement(ProtobufPropertyType type, ProtobufSerializer.GroupProperty annotation) {
+        this(
+                annotation.index(),
+                String.valueOf(annotation.index()),
+                null,
+                type,
+                false,
+                annotation.packed(),
+                true
         );
     }
 }

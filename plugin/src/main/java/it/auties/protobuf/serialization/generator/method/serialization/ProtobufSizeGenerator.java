@@ -2,6 +2,7 @@ package it.auties.protobuf.serialization.generator.method.serialization;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufWireType;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
@@ -10,12 +11,12 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
 
-public abstract class ProtobufSizeGenerator<INPUT> extends ProtobufSerializationGenerator<INPUT> {
+public abstract class ProtobufSizeGenerator extends ProtobufSerializationGenerator {
     public static final String METHOD_NAME = "sizeOf";
     private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
     private static final String OUTPUT_SIZE_NAME = "protoOutputSize";
 
-    public ProtobufSizeGenerator(INPUT element) {
+    public ProtobufSizeGenerator(ProtobufObjectElement element) {
         super(element);
     }
 
@@ -37,8 +38,8 @@ public abstract class ProtobufSizeGenerator<INPUT> extends ProtobufSerialization
                         forEachWriter,
                         index,
                         repeatedEntryFieldName,
-                        collectionType.value(),
-                        cast ? collectionType.value().serializedType() : null,
+                        collectionType.valueType(),
+                        cast ? collectionType.valueType().serializedType() : null,
                         null
                 );
             }
@@ -46,13 +47,13 @@ public abstract class ProtobufSizeGenerator<INPUT> extends ProtobufSerialization
     }
 
     private String getPackedSizeCalculator(ProtobufPropertyType.CollectionType collectionType) {
-        return switch (collectionType.value().protobufType()) {
+        return switch (collectionType.valueType().protobufType()) {
             case FLOAT, FIXED32, SFIXED32 -> "getFixed32PackedSize";
             case DOUBLE, FIXED64, SFIXED64 -> "getFixed64PackedSize";
             case BOOL -> "getFixedBoolPackedSize";
             case INT32, SINT32, UINT32, INT64, SINT64, UINT64 -> "getVarIntPackedSize";
             default ->
-                    throw new IllegalArgumentException("Internal bug: unexpected packed type " + collectionType.value().protobufType());
+                    throw new IllegalArgumentException("Internal bug: unexpected packed type " + collectionType.valueType().protobufType());
         };
     }
 

@@ -2,17 +2,18 @@ package it.auties.protobuf.serialization.generator.method.deserialization;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
 
 import javax.lang.model.element.TypeElement;
 import java.util.List;
 
-public abstract class ProtobufDeserializationGenerator<INPUT> extends ProtobufMethodGenerator<INPUT> {
+public abstract class ProtobufDeserializationGenerator extends ProtobufMethodGenerator {
     public static final String METHOD_NAME = "decode";
     private static final String INPUT_STREAM_NAME = "protoInputStream";
 
-    public ProtobufDeserializationGenerator(INPUT element) {
+    public ProtobufDeserializationGenerator(ProtobufObjectElement element) {
         super(element);
     }
 

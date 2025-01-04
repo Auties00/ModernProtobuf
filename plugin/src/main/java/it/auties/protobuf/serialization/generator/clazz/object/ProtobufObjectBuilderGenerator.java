@@ -60,7 +60,7 @@ public class ProtobufObjectBuilderGenerator extends ProtobufClassGenerator {
                 // Write the builder's constructor
                 try(var builderConstructorWriter = builderClassWriter.printConstructorDeclaration(simpleGeneratedClassName)) {
                     if (builderElement == null) {
-                        // Assign each field in the builder to its default value
+                        // Assign each field in the builder to its default valueType
                         for (var property : objectElement.properties()) {
                             if(property.synthetic()) {
                                 continue;

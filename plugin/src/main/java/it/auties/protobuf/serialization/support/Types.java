@@ -252,7 +252,8 @@ public class Types {
         for(var type : types) {
             while (type != null) {
                 counter.compute(type, (key, value) -> value == null ? 1 : value + 1);
-                type = getNullableSuperClass(type);
+                type = getSuperClass(type)
+                        .orElse(null);
             }
         }
         TypeMirror bestElement = null;
@@ -270,14 +271,24 @@ public class Types {
         return bestElement;
     }
 
-    public TypeMirror getNullableSuperClass(TypeMirror mirror) {
+    public Optional<TypeMirror> getSuperClass(TypeMirror mirror) {
         return switch (mirror) {
-            case ArrayType ignored -> getType(Object.class);
+            case ArrayType ignored -> Optional.of(getType(Object.class));
             case DeclaredType declaredType when declaredType.asElement() instanceof TypeElement typeElement
                     && typeElement.getSuperclass() != null
-                    && typeElement.getSuperclass().getKind() != TypeKind.NONE -> typeElement.getSuperclass();
-            default -> null;
+                    && typeElement.getSuperclass().getKind() != TypeKind.NONE -> Optional.ofNullable(typeElement.getSuperclass());
+            default -> Optional.empty();
         };
+    }
+
+    public Optional<TypeElement> getSuperClass(TypeElement typeElement) {
+        var superClass = typeElement.getSuperclass();
+        if(superClass == null || superClass.getKind() == TypeKind.NONE) {
+            return Optional.empty();
+        }
+
+        var superClassElement = ((DeclaredType) superClass).asElement();
+        return Optional.of((TypeElement) superClassElement);
     }
 
     public List<? extends TypeMirror> getImplementedInterfaces(TypeMirror mirror) {

@@ -5,7 +5,7 @@ import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
 import it.auties.protobuf.serialization.generator.method.deserialization.group.ProtobufRawGroupDeserializationGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSerializationGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSizeGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.support.JavaWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
@@ -23,9 +23,9 @@ public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
         super(filer);
     }
 
-    public void createClass(TypeElement rawGroup, ProtobufAttributedConverterElement.Serializer serializerElement, PackageElement packageName) throws IOException {
+    public void createClass(ProtobufObjectElement object, PackageElement packageName) throws IOException {
         // Names
-        var simpleGeneratedClassName = getGeneratedClassNameBySuffix(rawGroup, "Spec");
+        var simpleGeneratedClassName = getGeneratedClassNameBySuffix(object.element(), "Spec");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
 
 
@@ -42,7 +42,7 @@ public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
             }
 
             // Declare the imports needed for everything to work
-            var imports = getSpecImports(rawGroup);
+            var imports = getSpecImports(object.element());
             imports.forEach(compilationUnitWriter::printImportDeclaration);
 
             // Separate imports from classes
@@ -51,15 +51,15 @@ public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
                 // Write the serializer
-                var serializationVisitor = new ProtobufRawGroupSerializationGenerator(rawGroup, serializerElement);
+                var serializationVisitor = new ProtobufRawGroupSerializationGenerator(object);
                 serializationVisitor.generate(classWriter);
 
                 // Write the deserializer
-                var deserializationVisitor = new ProtobufRawGroupDeserializationGenerator(rawGroup, serializerElement);
+                var deserializationVisitor = new ProtobufRawGroupDeserializationGenerator(object);
                 deserializationVisitor.generate(classWriter);
 
                 // Write the size calculator
-                var sizeVisitor = new ProtobufRawGroupSizeGenerator(rawGroup, serializerElement);
+                var sizeVisitor = new ProtobufRawGroupSizeGenerator(object);
                 sizeVisitor.generate(classWriter);
             }
         }

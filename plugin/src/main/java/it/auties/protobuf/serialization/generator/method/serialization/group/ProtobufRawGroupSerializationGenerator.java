@@ -1,12 +1,11 @@
 package it.auties.protobuf.serialization.generator.method.serialization.group;
 
 import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSerializationGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
-import javax.lang.model.element.TypeElement;
 import java.util.List;
 
 // SPECIAL CASE: raw groups
@@ -30,7 +29,7 @@ import java.util.List;
 //        }
 //        protoOutputStream.writeGroupEnd(index);
 //    }
-public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializationGenerator<TypeElement> {
+public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializationGenerator {
     private static final String INDEX_PARAMETER = "protoGroupIndex";
     private static final String PROPERTIES_PARAMETER = "protoGroupProperties";
     private static final String OUTPUT_OBJECT_PARAMETER = "protoOutputStream";
@@ -38,10 +37,8 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
     private static final String PROPERTY_NAME = "protoGroupEntry";
     private static final String PROPERTY_VALUE_NAME = "protoGroupEntryValue";
 
-    private final ProtobufAttributedConverterElement.Serializer serializerElement;
-    public ProtobufRawGroupSerializationGenerator(TypeElement objectElement, ProtobufAttributedConverterElement.Serializer serializerElement) {
+    public ProtobufRawGroupSerializationGenerator(ProtobufObjectElement objectElement) {
         super(objectElement);
-        this.serializerElement = serializerElement;
     }
 
     @Override
@@ -51,7 +48,7 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
 
         // Loop through the input properties
         try (var forEachBody = methodWriter.printForEachStatement(PROPERTY_NAME, PROPERTIES_PARAMETER + ".entrySet()")) {
-            // Declare a variable for the value of the property
+            // Declare a variable for the valueType of the property
             var propertyValueName = forEachBody.printVariableDeclaration(PROPERTY_VALUE_NAME, PROPERTY_NAME + ".getValue()");
 
             // Check if the property is not null, otherwise skip it
@@ -62,28 +59,28 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
 
                     // Define all possible serialization paths based on the properties defined in @ProtobufSerializer
                     // PreliminaryChecks guarantees that groupProperties will be filled
-                    for (var entry : serializerElement.groupProperties().entrySet()) {
+                    for (var entry : objectElement.properties()) {
 
                         // Open the switch case for a given serialization path
-                        try (var switchCaseBody = switchBody.printSwitchBranch(String.valueOf(entry.getKey()))) {
+                        try (var switchCaseBody = switchBody.printSwitchBranch(String.valueOf(entry.index()))) {
 
                             // Define serialization behaviour based on the type of the property
-                            switch (entry.getValue().type()) {
+                            switch (entry.type()) {
 
                                 // Repeated properties are supported by groups, so we handle them
                                 case ProtobufPropertyType.CollectionType collectionType -> {
-                                    // Cast the property's value to collection, as it's reasonable to assume that a repeated field is represented by a collection when serialized
+                                    // Cast the property's valueType to collection, as it's reasonable to assume that a repeated field is represented by a collection when serialized
                                     // The user could supply a non-collection type, but this is not a case that can be handled at compile time without complicated type checking analysis, paired with flow analysis
                                     var collectionField = "((java.util.Collection) %s)".formatted(propertyValueName);
 
                                     // Write the serialization logic
                                     writeRepeatedSerializer(
                                             switchCaseBody,
-                                            entry.getKey(),
+                                            entry.index(),
                                             PROPERTY_NAME,
                                             collectionField,
                                             collectionType,
-                                            entry.getValue().packed(),
+                                            entry.packed(),
                                             false,
                                             true
                                     );
@@ -91,15 +88,15 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
 
                                 // Map properties are supported by groups, so we handle them
                                 case ProtobufPropertyType.MapType mapType -> {
-                                    // Cast the property's value to map, as it's reasonable to assume that a repeated field is represented by a map when serialized
+                                    // Cast the property's valueType to map, as it's reasonable to assume that a map field is represented by a map when serialized
                                     // The user could supply a non-map type, but this is not a case that can be handled at compile time without complicated type checking analysis, paired with flow analysis
                                     var mapField = "((java.util.Map<?, ?>) %s)".formatted(propertyValueName);
 
                                     // Write the serialization logic
                                     writeMapSerializer(
                                             switchCaseBody,
-                                            entry.getKey(),
-                                            PROPERTY_NAME + entry.getKey(),
+                                            entry.index(),
+                                            PROPERTY_NAME + entry.index(),
                                             mapField,
                                             mapType,
                                             false,
@@ -110,10 +107,10 @@ public class ProtobufRawGroupSerializationGenerator extends ProtobufSerializatio
                                 // Write the serialization logic
                                 default -> writeNormalSerializer(
                                         switchCaseBody,
-                                        entry.getKey(),
+                                        entry.index(),
                                         PROPERTY_NAME,
                                         propertyValueName,
-                                        entry.getValue().type(),
+                                        entry.type(),
                                         false,
                                         false,
                                         true

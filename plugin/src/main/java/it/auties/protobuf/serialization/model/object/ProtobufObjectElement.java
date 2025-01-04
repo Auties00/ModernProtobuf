@@ -3,87 +3,55 @@ package it.auties.protobuf.serialization.model.object;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.support.Reserved;
 
 import javax.lang.model.element.*;
 import java.util.*;
 
 public class ProtobufObjectElement {
+    private final Type type;
     private final TypeElement typeElement;
     private final Map<Integer, ProtobufPropertyElement> properties;
     private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
+    private final ExecutableElement serializer;
     private final ExecutableElement deserializer;
     private final Set<String> reservedNames;
     private final Set<? extends ReservedIndex> reservedIndexes;
     private ProtobufUnknownFieldsElement unknownFieldsElement;
-    private final boolean group;
 
-    public ProtobufObjectElement(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement deserializer, boolean group) {
+    public static ProtobufObjectElement ofEnum(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
+        return new ProtobufObjectElement(Type.ENUM, typeElement, enumMetadata, null, null);
+    }
+
+    public static ProtobufObjectElement ofMessage(TypeElement typeElement, ExecutableElement deserializer) {
+        return new ProtobufObjectElement(Type.MESSAGE, typeElement, null, null, deserializer);
+    }
+
+    public static ProtobufObjectElement ofGroup(TypeElement typeElement, ExecutableElement deserializer) {
+        return new ProtobufObjectElement(Type.GROUP, typeElement, null, null, deserializer);
+    }
+
+    public static ProtobufObjectElement ofSynthetic(TypeElement typeElement, ExecutableElement serializer, ExecutableElement deserializer) {
+        return new ProtobufObjectElement(Type.SYNTHETIC, typeElement, null, serializer, deserializer);
+    }
+
+    private ProtobufObjectElement(Type type, TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ExecutableElement serializer, ExecutableElement deserializer) {
+        this.type = type;
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
+        this.serializer = serializer;
         this.deserializer = deserializer;
-        this.reservedNames = getReservedNames();
-        this.reservedIndexes = getReservedIndexes();
+        this.reservedNames = Reserved.getNames(this);
+        this.reservedIndexes = Reserved.getIndexes(this);
         this.builders = new ArrayList<>();
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
-        this.group = group;
     }
 
-    private Set<String> getReservedNames() {
-        if(enumMetadata != null) {
-            var enumeration = typeElement.getAnnotation(ProtobufEnum.class);
-            return enumeration == null ? Set.of() : Set.of(enumeration.reservedNames());
-        }
-
-        if(group) {
-            var group = typeElement.getAnnotation(ProtobufGroup.class);
-            return group == null ? Set.of() : Set.of(group.reservedNames());
-        }
-
-        var message = typeElement.getAnnotation(ProtobufMessage.class);
-        return message == null ? Set.of() : Set.of(message.reservedNames());
-    }
-
-    private Set<ReservedIndex> getReservedIndexes() {
-        if(enumMetadata != null) {
-            var enumeration = typeElement.getAnnotation(ProtobufEnum.class);
-            if (enumeration == null) {
-                return Set.of();
-            }
-
-            return getReservedIndexes(enumeration.reservedIndexes(), enumeration.reservedRanges());
-        }
-
-        if(group) {
-            var group = typeElement.getAnnotation(ProtobufGroup.class);
-            if (group == null) {
-                return Set.of();
-            }
-
-            return getReservedIndexes(group.reservedIndexes(), group.reservedRanges());
-        }
-
-        var message = typeElement.getAnnotation(ProtobufMessage.class);
-        if (message == null) {
-            return Set.of();
-        }
-
-        return getReservedIndexes(message.reservedIndexes(), message.reservedRanges());
-    }
-
-    private Set<ReservedIndex> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
-        var results = new HashSet<ReservedIndex>();
-        for(var index : indexes) {
-            results.add(new ReservedIndex.Value(index));
-        }
-
-        for(var range : ranges) {
-            results.add(new ReservedIndex.Range(range.min(), range.max()));
-        }
-
-        return results;
+    public Type type() {
+        return type;
     }
 
     public TypeElement element() {
@@ -96,10 +64,6 @@ public class ProtobufObjectElement {
 
     public List<ProtobufPropertyElement> properties() {
         return List.copyOf(properties.values());
-    }
-
-    public boolean isEnum() {
-        return typeElement.getKind() == ElementKind.ENUM;
     }
 
     public Map<Integer, String> constants() {
@@ -116,6 +80,11 @@ public class ProtobufObjectElement {
         return Optional.ofNullable(properties.put(property.index(), result));
     }
 
+    public Optional<ProtobufPropertyElement> addProperty(ProtobufPropertyType type, ProtobufSerializer.GroupProperty property) {
+        var result = new ProtobufPropertyElement(type, property);
+        return Optional.ofNullable(properties.put(property.index(), result));
+    }
+
     public void addBuilder(String className, List<? extends VariableElement> parameters, ExecutableElement executableElement) {
         var builderElement = new ProtobufBuilderElement(className, parameters, executableElement);
         builders.add(builderElement);
@@ -123,6 +92,10 @@ public class ProtobufObjectElement {
 
     public List<ProtobufBuilderElement> builders() {
         return Collections.unmodifiableList(builders);
+    }
+
+    public Optional<ExecutableElement> serializer() {
+        return Optional.ofNullable(serializer);
     }
 
     public Optional<ExecutableElement> deserializer() {
@@ -135,10 +108,6 @@ public class ProtobufObjectElement {
 
     public void setUnknownFieldsElement(ProtobufUnknownFieldsElement unknownFieldsElement) {
         this.unknownFieldsElement = unknownFieldsElement;
-    }
-
-    public boolean isGroup() {
-        return group;
     }
 
     public Set<String> reservedNames() {
@@ -175,5 +144,12 @@ public class ProtobufObjectElement {
                 return index != value;
             }
         }
+    }
+
+    public enum Type {
+        MESSAGE,
+        ENUM,
+        GROUP,
+        SYNTHETIC
     }
 }

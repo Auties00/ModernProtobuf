@@ -1,43 +1,38 @@
 package it.auties.protobuf.serialization.generator.method.deserialization.group;
 
 import it.auties.protobuf.serialization.generator.method.deserialization.ProtobufDeserializationGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
-import it.auties.protobuf.serialization.model.property.ProtobufGroupPropertyElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
-import javax.lang.model.element.TypeElement;
 import java.util.List;
-import java.util.Map;
 
 // SPECIAL CASE: raw groups
-public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializationGenerator<TypeElement> {
+public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializationGenerator {
     private static final String INDEX_PARAMETER = "protoGroupIndex";
     private static final String INPUT_OBJECT_PARAMETER = "protoInputStream";
 
-    private final ProtobufAttributedConverterElement.Serializer serializerElement;
-    public ProtobufRawGroupDeserializationGenerator(TypeElement objectElement, ProtobufAttributedConverterElement.Serializer serializerElement) {
-        super(objectElement);
-        this.serializerElement = serializerElement;
+    public ProtobufRawGroupDeserializationGenerator(ProtobufObjectElement element) {
+        super(element);
     }
 
     @Override
     protected void doInstrumentation(ClassWriter classWriter, MethodWriter methodWriter) {
         methodWriter.println("%s.assertGroupOpened(%s);".formatted(INPUT_OBJECT_PARAMETER, INDEX_PARAMETER));
         var rawGroupData = methodWriter.printVariableDeclaration("groupData", "new java.util.HashMap()");
-        for(var property : serializerElement.groupProperties().entrySet()) {
-            if(property.getValue().type() instanceof ProtobufPropertyType.CollectionType collectionType) {
-                methodWriter.printVariableDeclaration(getRawGroupCollectionFieldName(property), collectionType.descriptorDefaultValue());
+        for(var property : objectElement.properties()) {
+            if(property.type() instanceof ProtobufPropertyType.CollectionType collectionType) {
+                methodWriter.printVariableDeclaration("property" + property.index(), collectionType.descriptorDefaultValue());
             }
         }
 
         try(var whileWriter = methodWriter.printWhileStatement(INPUT_OBJECT_PARAMETER + ".readTag()")) {
             var index = whileWriter.printVariableDeclaration("index", INPUT_OBJECT_PARAMETER + ".index()");
             try(var mapSwitchWriter = whileWriter.printSwitchStatement(index)) {
-                for(var groupProperty : serializerElement.groupProperties().entrySet()) {
-                    var groupPropertyIndex = groupProperty.getValue().index();
-                    switch (groupProperty.getValue().type()) {
+                for(var groupProperty : objectElement.properties()) {
+                    var groupPropertyIndex = groupProperty.index();
+                    switch (groupProperty.type()) {
                         case ProtobufPropertyType.MapType mapType -> writeMapDeserializer(
                                 mapSwitchWriter,
                                 groupPropertyIndex,
@@ -46,20 +41,20 @@ public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializ
                         );
                         case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(
                                 mapSwitchWriter,
-                                getRawGroupCollectionFieldName(groupProperty),
+                                "property" + groupProperty.index(),
                                 groupPropertyIndex,
-                                collectionType.value(),
+                                collectionType.valueType(),
                                 true,
-                                groupProperty.getValue().packed(),
+                                groupProperty.packed(),
                                 rawGroupData
                         );
                         default -> writeDeserializer(
                                 mapSwitchWriter,
                                 rawGroupData,
                                 groupPropertyIndex,
-                                groupProperty.getValue().type(),
+                                groupProperty.type(),
                                 false,
-                                groupProperty.getValue().packed(),
+                                groupProperty.packed(),
                                 rawGroupData
                         );
                     }
@@ -68,10 +63,6 @@ public class ProtobufRawGroupDeserializationGenerator extends ProtobufDeserializ
         }
         methodWriter.println("%s.assertGroupClosed(%s);".formatted(INPUT_OBJECT_PARAMETER, INDEX_PARAMETER));
         methodWriter.printReturn(rawGroupData);
-    }
-
-    private String getRawGroupCollectionFieldName(Map.Entry<Integer, ProtobufGroupPropertyElement> property) {
-        return "property" + property.getKey();
     }
 
     @Override

@@ -3,6 +3,7 @@ package it.auties.protobuf.serialization.generator.method;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.annotation.ProtobufMessage;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
 
@@ -13,10 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
-public abstract class ProtobufMethodGenerator<INPUT> {
-    protected final INPUT objectElement;
+public abstract class ProtobufMethodGenerator {
+    protected final ProtobufObjectElement objectElement;
     protected final List<Runnable> deferredOperations;
-    protected ProtobufMethodGenerator(INPUT objectElement) {
+    protected ProtobufMethodGenerator(ProtobufObjectElement objectElement) {
         this.objectElement = objectElement;
         this.deferredOperations = new ArrayList<>();
     }
@@ -97,7 +98,7 @@ public abstract class ProtobufMethodGenerator<INPUT> {
         return switch (accessor) {
             case ExecutableElement executableElement -> "%s.%s()".formatted(object, executableElement.getSimpleName());
             case VariableElement variableElement -> "%s.%s".formatted(object, variableElement.getSimpleName());
-            default -> throw new IllegalStateException("Unexpected value: " + accessor);
+            default -> throw new IllegalStateException("Unexpected valueType: " + accessor);
         };
     }
 

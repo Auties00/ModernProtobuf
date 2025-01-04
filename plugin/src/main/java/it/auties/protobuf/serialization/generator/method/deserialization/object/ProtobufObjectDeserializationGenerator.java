@@ -16,7 +16,7 @@ import javax.lang.model.element.TypeElement;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializationGenerator<ProtobufObjectElement> {
+public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializationGenerator {
     private static final String INPUT_STREAM_NAME = "protoInputStream";
     private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
     private static final String ENUM_INDEX_PARAMETER = "protoEnumIndex";
@@ -31,7 +31,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected void doInstrumentation(ClassWriter classWriter, MethodWriter writer) {
-        if (objectElement.isEnum()) {
+        if (objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             createEnumDeserializer(writer);
         }else {
             createMessageDeserializer(writer);
@@ -50,9 +50,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected List<String> parametersTypes() {
-        if(objectElement.isEnum()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             return List.of("int", objectElement.element().getSimpleName().toString());
-        } else if(objectElement.isGroup()) {
+        } else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of("int", ProtobufInputStream.class.getSimpleName());
         } else {
             return List.of(ProtobufInputStream.class.getSimpleName());
@@ -61,9 +61,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.isEnum()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             return List.of(ENUM_INDEX_PARAMETER, ENUM_DEFAULT_VALUE_PARAMETER);
-        } else if(objectElement.isGroup()) {
+        } else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_STREAM_NAME);
         } else {
             return List.of(INPUT_STREAM_NAME);
@@ -91,7 +91,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
     }
 
     private void createMessageDeserializer(MethodWriter methodWriter) {
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             methodWriter.println("%s.assertGroupOpened(%s);".formatted(INPUT_STREAM_NAME, GROUP_INDEX_PARAMETER));
         }
 
@@ -108,7 +108,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
             methodWriter.printVariableDeclaration(propertyType, propertyName, propertyDefaultValue);
         }
 
-        // Declare the unknown fields value if needed
+        // Declare the unknown fields valueType if needed
         objectElement.unknownFieldsElement()
                 .ifPresent(unknownFieldsElement -> methodWriter.printVariableDeclaration(unknownFieldsElement.type().toString(), DEFAULT_UNKNOWN_FIELDS, unknownFieldsElement.defaultValue()));
 
@@ -125,7 +125,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
                     switch (property.type()) {
                         case ProtobufPropertyType.MapType mapType -> writeMapDeserializer(switchWriter, property.index(), property.name(), mapType);
-                        case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(switchWriter, property.name(), property.index(), collectionType.value(), true, property.packed(), null);
+                        case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(switchWriter, property.name(), property.index(), collectionType.valueType(), true, property.packed(), null);
                         default -> writeDeserializer(switchWriter, property.name(), property.index(), property.type(), false, property.packed(), null);
                     }
                     argumentsList.add(property.name());
@@ -134,7 +134,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
             }
         }
 
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             methodWriter.println("%s.assertGroupClosed(%s);".formatted(INPUT_STREAM_NAME, GROUP_INDEX_PARAMETER));
         }
 

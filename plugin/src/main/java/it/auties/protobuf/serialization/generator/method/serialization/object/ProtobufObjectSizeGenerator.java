@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
-public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator<ProtobufObjectElement> {
+public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
     private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
     private static final String OUTPUT_SIZE_NAME = "protoOutputSize";
     private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
@@ -27,7 +27,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator<ProtobufO
             ifWriter.printReturn("0");
         }
 
-        if(Objects.requireNonNull(objectElement).isEnum()) {
+        if(Objects.requireNonNull(objectElement).type() == ProtobufObjectElement.Type.ENUM) {
             writeEnumCalculator(methodWriter);
         }else {
             writeMessageCalculator(classWriter, methodWriter);
@@ -48,7 +48,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator<ProtobufO
 
     private void writeMessageCalculator(ClassWriter classWriter, MethodWriter methodWriter) {
         methodWriter.printVariableDeclaration(OUTPUT_SIZE_NAME,"0");
-        if(Objects.requireNonNull(objectElement).isGroup()) {
+        if(Objects.requireNonNull(objectElement).type() == ProtobufObjectElement.Type.GROUP) {
             methodWriter.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(OUTPUT_SIZE_NAME, GROUP_INDEX_PARAMETER, "ProtobufWireType.WIRE_TYPE_START_OBJECT"));
             methodWriter.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(OUTPUT_SIZE_NAME, GROUP_INDEX_PARAMETER, "ProtobufWireType.WIRE_TYPE_END_OBJECT"));
         }
@@ -86,7 +86,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator<ProtobufO
     @Override
     protected List<String> parametersTypes() {
         var objectType = objectElement.element().getSimpleName().toString();
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of("int", objectType);
         }else {
             return List.of(objectType);
@@ -95,7 +95,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator<ProtobufO
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);

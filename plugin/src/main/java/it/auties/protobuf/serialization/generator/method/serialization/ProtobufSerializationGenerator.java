@@ -3,6 +3,7 @@ package it.auties.protobuf.serialization.generator.method.serialization;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
 import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
 
@@ -14,23 +15,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMethodGenerator<INPUT> {
+public abstract class ProtobufSerializationGenerator extends ProtobufMethodGenerator {
     public static final String METHOD_NAME = "encode";
     private static final String OUTPUT_OBJECT_PARAMETER = "protoOutputStream";
 
-    public ProtobufSerializationGenerator(INPUT element) {
+    public ProtobufSerializationGenerator(ProtobufObjectElement element) {
         super(element);
     }
 
     protected void writeRepeatedSerializer(BodyWriter writer, int index, String name, String accessor, ProtobufPropertyType.CollectionType collectionType, boolean packed, boolean nullCheck, boolean cast) {
         if(packed) {
-            var writeMethod = getStreamMethodName(collectionType.value().protobufType(), true);
+            var writeMethod = getStreamMethodName(collectionType.valueType().protobufType(), true);
             writer.println("%s.%s(%s, %s);".formatted(OUTPUT_OBJECT_PARAMETER, writeMethod.orElseThrow(), index, accessor));
         }else {
             var bodyWriter = nullCheck ? writer.printIfStatement("%s != null".formatted(accessor)) : writer;
             var localVariableName = "%sEntry".formatted(name); // Prevent shadowing
             try(var forEachWriter = bodyWriter.printForEachStatement(localVariableName, accessor)) {
-                writeNormalSerializer(forEachWriter, index, name, localVariableName, collectionType.value(), false, true, cast);
+                writeNormalSerializer(forEachWriter, index, name, localVariableName, collectionType.valueType(), false, true, cast);
             }
             if(nullCheck) {
                 bodyWriter.close();
@@ -100,7 +101,7 @@ public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMeth
             value = "((%s) %s)".formatted(castType, value);
         }
 
-        // Declare a variable using the provided name and value if necessary, or treat the value parameter as a property name
+        // Declare a variable using the provided name and valueType if necessary, or treat the valueType parameter as a property name
         var propertyName = declareVariable ? writer.printVariableDeclaration(name, value) : value;
 
         // Get the stream method used to serialize the final result
@@ -187,15 +188,15 @@ public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMeth
     protected interface CustomSerializerHandler {
         // Writer: the body writer currently being used
         // Value: The expression produced by the current serializer
-        // Statements: The statements adapted from the value, can be called to execute the serializer
+        // Statements: The statements adapted from the valueType, can be called to execute the serializer
         void handle(BodyWriter writer, String value, List<String> statements);
     }
 
-    // Creates the method invocation for a given serializer using a value argument
+    // Creates the method invocation for a given serializer using a valueType argument
     // Serializers cannot be constructors, we can assume that because of PreliminaryChecks
     private String createSerializerInvocation(ProtobufAttributedConverterElement.Serializer serializer, String value, int groupIndex) {
-        // If the serializer isn't static, invoke the serializer method on the value instance with no parameters
-        // We can assume that the value on which the method is called will not be a message, enum or group because of PreliminaryChecks
+        // If the serializer isn't static, invoke the serializer method on the valueType instance with no parameters
+        // We can assume that the valueType on which the method is called will not be a message, enum or group because of PreliminaryChecks
         // class Wrapper {
         //    @ProtobufSerializer
         //    public String toValue() {
@@ -210,7 +211,7 @@ public abstract class ProtobufSerializationGenerator<INPUT> extends ProtobufMeth
         // Casting TypeElement should be fine here because a method's parent must be a class-like or interface program element
         var parent = (TypeElement) serializer.delegate().getEnclosingElement();
         return switch (serializer.delegate().getParameters().size()) {
-            // If the method only takes a parameter this is a normal mixin serializer, so we invoke the static method using value as a parameter
+            // If the method only takes a parameter this is a normal mixin serializer, so we invoke the static method using valueType as a parameter
             // @ProtobufMixin
             // class SomeMixin {
             //    @ProtobufSerializer

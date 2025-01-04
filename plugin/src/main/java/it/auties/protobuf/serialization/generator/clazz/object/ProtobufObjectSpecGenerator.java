@@ -45,7 +45,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                if(objectElement.isEnum()) {
+                if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
                     var objectType = objectElement.element().getSimpleName().toString();
                     classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
                     try(var staticInitBlock = classWriter.printStaticBlock()) {
@@ -76,7 +76,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
     // Get the imports to include in the compilation unit
     private List<String> getSpecImports(ProtobufObjectElement message) {
-        if(message.isEnum()) {
+        if(message.type() == ProtobufObjectElement.Type.ENUM) {
             return List.of(
                     message.element().getQualifiedName().toString(),
                     Arrays.class.getName(),

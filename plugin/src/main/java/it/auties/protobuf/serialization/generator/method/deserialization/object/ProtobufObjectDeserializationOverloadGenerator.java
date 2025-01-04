@@ -6,7 +6,7 @@ import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
 
 import java.util.List;
 
-public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDeserializationGenerator<ProtobufObjectElement> {
+public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDeserializationGenerator {
     private static final String INPUT_OBJECT_PARAMETER = "protoInputObject";
     private static final String ENUM_INDEX_PARAMETER = "protoEnumIndex";
     private static final String GROUP_INDEX_PARAMETER = "protoGroupIndex";
@@ -17,7 +17,7 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
 
     @Override
     protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
-        if(objectElement.isEnum()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             writer.printReturn("%s(%s, null)".formatted(name(), ENUM_INDEX_PARAMETER));
             return;
         }
@@ -27,7 +27,7 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
             ifWriter.printReturn("null");
         }
         // Return the result
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             writer.printReturn("%s(%s, ProtobufInputStream.fromBytes(%s, 0, %s.length))".formatted(name(), GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
             writer.printReturn("%s(ProtobufInputStream.fromBytes(%s, 0, %s.length))".formatted(name(), INPUT_OBJECT_PARAMETER, INPUT_OBJECT_PARAMETER));
@@ -48,9 +48,9 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
 
     @Override
     protected List<String> parametersTypes() {
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of("int", "byte[]");
-        }else if(objectElement.isEnum()) {
+        }else if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             return List.of("int");
         }else {
             return List.of("byte[]");
@@ -59,9 +59,9 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.isGroup()) {
+        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
-        }else if(objectElement.isEnum()) {
+        }else if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
             return List.of(ENUM_INDEX_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);
