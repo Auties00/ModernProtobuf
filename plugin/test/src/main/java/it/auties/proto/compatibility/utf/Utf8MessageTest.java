@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 public class Utf8MessageTest {
     @Test
-        public void testNormal() {
+    public void testNormal() {
         var someMessage = new UtfMessage(ProtobufString.wrap("abc"));
         var encoded = UtfMessageSpec.encode(someMessage);
         var decoded = UtfMessageSpec.decode(encoded);
@@ -14,7 +14,7 @@ public class Utf8MessageTest {
     }
 
     @Test
-        public void testUtf() {
+    public void testUtf() {
         var someMessage = new UtfMessage(ProtobufString.wrap("è"));
         var encoded = UtfMessageSpec.encode(someMessage);
         var decoded = UtfMessageSpec.decode(encoded);

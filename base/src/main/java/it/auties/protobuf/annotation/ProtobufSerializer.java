@@ -11,6 +11,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufSerializer {
+    String warning() default "";
     GroupProperty[] groupProperties() default {};
 
     @interface GroupProperty {

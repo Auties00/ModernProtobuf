@@ -21,7 +21,11 @@ public class ProtobufConverterGraph {
     }
 
     public void link(TypeMirror from, TypeMirror to, TypeMirror rawGroupParent, ExecutableElement arc) {
-        var node = new Node(from, to, rawGroupParent, arc);
+        link(from, to, rawGroupParent, arc, "");
+    }
+
+    public void link(TypeMirror from, TypeMirror to, TypeMirror rawGroupParent, ExecutableElement arc, String warning) {
+        var node = new Node(from, to, rawGroupParent, arc, warning);
         nodes.add(node);
         this.maxGenericLevel = Math.max(maxGenericLevel, count(from));
     }
@@ -62,12 +66,12 @@ public class ProtobufConverterGraph {
             }
 
             if (!types.isParametrized(entry.arc())) {
-                return List.of(new Arc(entry.arc()));
+                return List.of(new Arc(entry.arc(), entry.warning()));
             }
 
             var returnType = types.getReturnType(entry.arc(), List.of(currentFrom));
             if (types.isAssignable(currentTo, returnType, false)) {
-                return List.of(new Arc(entry.arc(), returnType));
+                return List.of(new Arc(entry.arc(), returnType, entry.warning()));
             }
 
             var results = getArcs(currentFrom, currentTo, mixins, entry, returnType);
@@ -153,18 +157,18 @@ public class ProtobufConverterGraph {
 
     private ArrayList<Arc> getArcs(Node entry, TypeMirror returnType, List<Arc> nested) {
         var results = new ArrayList<Arc>();
-        results.add(new Arc(entry.arc(), returnType));
+        results.add(new Arc(entry.arc(), returnType, entry.warning()));
         results.addAll(nested);
         return results;
     }
 
-    public record Arc(ExecutableElement method, TypeMirror returnType) {
-        public Arc(ExecutableElement method) {
-            this(method, method.getReturnType());
+    public record Arc(ExecutableElement method, TypeMirror returnType, String warning) {
+        public Arc(ExecutableElement method, String warning) {
+            this(method, method.getReturnType(), warning);
         }
     }
 
-    private record Node(TypeMirror from, TypeMirror to, TypeMirror rawGroupOwner, ExecutableElement arc) {
+    private record Node(TypeMirror from, TypeMirror to, TypeMirror rawGroupOwner, ExecutableElement arc, String warning) {
         @Override
         public int hashCode() {
             return (from + "_" + to).hashCode();

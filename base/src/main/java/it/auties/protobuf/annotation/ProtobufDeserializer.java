@@ -8,6 +8,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufDeserializer {
+    String warning() default "";
     BuilderBehaviour builderBehaviour() default BuilderBehaviour.DISCARD;
 
     enum BuilderBehaviour {

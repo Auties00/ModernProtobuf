@@ -12,9 +12,9 @@ public class Messages {
 
     public void printWarning(String msg, Element element) {
         if(element == null) {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, msg);
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.MANDATORY_WARNING, msg);
         }else {
-            processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, msg, element);
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.MANDATORY_WARNING, msg, element);
         }
     }
 

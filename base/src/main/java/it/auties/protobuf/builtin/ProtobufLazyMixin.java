@@ -12,7 +12,7 @@ import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviou
 @SuppressWarnings("unused")
 @ProtobufMixin
 public class ProtobufLazyMixin {
-    @ProtobufDeserializer(builderBehaviour = ADD)
+    @ProtobufDeserializer(warning = "Implicit conversion between ProtobufString and String (triggers UTF-8 decode from ProtobufString source)", builderBehaviour = ADD)
     public static String ofNullable(ProtobufString value) {
         return value == null ? null : value.toString();
     }
@@ -22,7 +22,7 @@ public class ProtobufLazyMixin {
         return value == null ? null : ProtobufString.wrap(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = ADD)
+    @ProtobufDeserializer(warning = "Implicit conversion between ByteBuffer and byte[] (triggers byte[] copy from ByteBuffer source)", builderBehaviour = ADD)
     public static byte[] ofNullable(ByteBuffer value) {
         if(value == null) {
             return null;

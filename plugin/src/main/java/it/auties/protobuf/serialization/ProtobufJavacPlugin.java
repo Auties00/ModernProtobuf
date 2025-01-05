@@ -209,6 +209,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 for (var element : methodPath) {
+                    if(!element.warning().isEmpty()) {
+                        messages.printWarning(element.warning(), unattributedElement.invoker());
+                    }
                     var serializerElement = new ProtobufAttributedConverterElement.Serializer(
                             element.method(),
                             from,
@@ -227,6 +230,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 for (var element : methodPath) {
+                    if(!element.warning().isEmpty()) {
+                        messages.printWarning(element.warning(), unattributedElement.invoker());
+                    }
                     var annotation = element.method().getAnnotation(ProtobufDeserializer.class);
                     var deserializerElement = new ProtobufAttributedConverterElement.Deserializer(
                             element.method(),
@@ -374,7 +380,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // Links the method in the graph, so it can be used to resolve type dependencies later
         var from = executableElement.getParameters().getFirst().asType();
         var to = executableElement.getReturnType();
-        deserializersGraph.link(from, to, null, executableElement);
+        deserializersGraph.link(from, to, null, executableElement, deserializer.warning());
         return true;
     }
 
@@ -389,7 +395,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // Links the method in the graph, so it can be used to resolve type dependencies later
         var from = !executableElement.getParameters().isEmpty() ? executableElement.getParameters().getFirst().asType() : executableElement.getEnclosingElement().asType();
         var to = executableElement.getReturnType();
-        serializersGraph.link(from, to, null, executableElement);
+        serializersGraph.link(from, to, null, executableElement, serializer.warning());
 
         // Checks if any group properties were specified
         if (serializer.groupProperties().length == 0) {
@@ -772,12 +778,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private void linkEnum(TypeMirror type) {
-        var serializedEnumType = types.getType(ProtobufType.ENUM.serializedType());
         var specName = ProtobufMethodGenerator.getSpecFromObject(type);
-        var serializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, serializedEnumType, type);
-        serializersGraph.link(type, serializedEnumType, null, serializer);
-        var deserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, type, serializedEnumType);
-        deserializersGraph.link(serializedEnumType, type, null, deserializer);
+        var serializer = types.createMethodStub(specName, ProtobufSerializationGenerator.METHOD_NAME, intType, type);
+        serializersGraph.link(type, intType, null, serializer);
+        var deserializer = types.createMethodStub(specName, ProtobufDeserializationGenerator.METHOD_NAME, type, intType);
+        deserializersGraph.link(intType, type, null, deserializer);
     }
 
     private void linkMessage(TypeMirror type) {

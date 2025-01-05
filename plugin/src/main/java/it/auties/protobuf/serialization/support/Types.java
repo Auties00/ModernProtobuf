@@ -513,6 +513,11 @@ public class Types {
                 public BuilderBehaviour builderBehaviour() {
                     return BuilderBehaviour.DISCARD;
                 }
+
+                @Override
+                public String warning() {
+                    return "";
+                }
             };
         }else if(annotationType.getName().equals(ProtobufSerializer.class.getName())) {
             return (A) new ProtobufSerializer() {
@@ -524,6 +529,11 @@ public class Types {
                 @Override
                 public GroupProperty[] groupProperties() {
                     return new GroupProperty[0];
+                }
+
+                @Override
+                public String warning() {
+                    return "";
                 }
             };
         }else {
