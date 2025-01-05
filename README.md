@@ -20,7 +20,7 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
    <dependency>
        <groupId>com.github.auties00</groupId>
        <artifactId>protobuf-base</artifactId>
-       <version>3.4.1</version>
+       <version>3.4.2</version>
    </dependency>
    ```
 
@@ -34,7 +34,7 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
                <annotationProcessorPath>
                    <groupId>com.github.auties00</groupId>
                    <artifactId>protobuf-serialization-plugin</artifactId>
-                   <version>3.4.1</version>
+                   <version>3.4.2</version>
                <annotationProcessorPath>
            <annotationProcessorPaths>
        <configuration>
@@ -46,23 +46,23 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
 - Groovy DSL
     - Dependency
     ```groovy
-    implementation 'com.github.auties00:protobuf-base:3.4.1'
+    implementation 'com.github.auties00:protobuf-base:3.4.2'
     ```
 
     - Annotation processor
     ```groovy
-    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.4.1'
+    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.4.2'
     ```
 
 - Kotlin DSL
     - Dependency
     ```kotlin
-    implementation("com.github.auties00:protobuf-base:3.4.1")
+    implementation("com.github.auties00:protobuf-base:3.4.2")
     ```
 
     - Annotation processor
     ```kotlin
-    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.4.1")
+    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.4.2")
     ```
   
 ### Schema generation and updating
