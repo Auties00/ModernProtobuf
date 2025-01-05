@@ -2,7 +2,7 @@
 // I remembered seeing some time ago that they were using a custom Utf8 decoder, so I thought they had achieved some incredible feat of engineering and left me in the dust
 // After tracking down their implementation, available at https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/Utf8.java,
 // I benchmarked it against the JDK's implementation and discovered that it was actually around 1.5-2x slower
-// I used JDK 21, I'm sure the implementation in JDK 7/8, which is the lowest version they support as far as I remember, is much worse than what Google uses
+// I used JDK 21, but I'm sure the implementation in JDK 7/8, which is the lowest version they support as far as I remember, is much worse than what Google uses
 // At this point I was almost certain that they just deferred the utf8 decoding to the message accessor, and sure enough when I invoked the latter in my tests the results flipped in our favour
 // With this knowledge, I decided I might as well do the same thing, but here comes the problem: ModernProtobuf can't defer the decoding to the accessor because it doesn't control how that's implemented
 // I than thought that the easy solution would be to create a lazy string implementation that extends java.lang.String and defers the decoding to the methods inherited from its super class that need that data
@@ -11,7 +11,6 @@
 // I thought some more about it and decided that having ProtobufString <-> String interoperability using a mixin would be good enough,
 // but this solution is not perfect because a developer might use the String type in their model without realizing that this "disables" lazy string decoding
 // This can be partially solved by making the compiler print a supportable warning telling the dev to consider the performance hit, but still this adds friction to the development process
-//
 // While thinking about possible solutions, I remembered when, around five years ago, I used Java agents to instrument Minecraft's server code using bytecode manipulation to alter the physics of the game
 // I then figured that I could theoretically craft a class that is theoretically eligible to extend java.lang.String(i.e. all the methods from the super class are inherited and there are no conflicts)
 // and then at runtime, using a java agent, instrument java.lang.String to remove the final modifier and modify the crafted class' bytecode to extend java.lang.String
@@ -27,8 +26,6 @@
 // Sometimes we loose to the language designers, I'm sure that moments like this lead Google engineers to develop more than once new programming languages in house
 // One day I'll probably do the same, just not right now because I feel like I still don't know enough about type systems and I'd hate to be clowned on like Go developers when they were asked about their interesting type system choices
 //
-// I also considered ByteBuddy, but it obviously can't magically make the JVM accept a class that extends a final class, we still need an agent
-//
 // FINAL DESIGN DECISION
 // Implement all String methods in a sealed classes that specializes already deserialized string and string that can be deserialized if needed
 // Don't provide default mixin as ProtobufString offers all the String features
@@ -40,7 +37,6 @@ import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import java.io.UnsupportedEncodingException;
 import java.lang.invoke.MethodHandles;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -59,12 +55,7 @@ import java.util.stream.Stream;
  * This means that the hashCode produced by a ProtobufString and String will NOT match
  * All methods from String are also available in ProtobufString, if you need to pass it to a method that takes a String use {@link ProtobufString#toString()}, or modify the method to accept a {@link CharSequence}
  */
-@SuppressWarnings({
-        "EqualsWhichDoesntCheckParameterClass", // Equality is implemented differently
-        "unused",  // All methods are needed, consider design explanation in the class header
-        "ReplaceNullCheck", // Don't want to use Objects.requireNonNullElseGet as old style if check is faster
-        "NullableProblems" // Don't want to provide annotations for null properties
-})
+@SuppressWarnings("all")
 public sealed abstract class ProtobufString implements CharSequence {
     public static ProtobufString wrap(String string) {
         return new Value(string);
@@ -72,6 +63,10 @@ public sealed abstract class ProtobufString implements CharSequence {
 
     public static ProtobufString lazy(byte[] bytes, int offset, int length) {
         return new Bytes(bytes, offset, length);
+    }
+
+    public static ProtobufString lazy(byte[] bytes) {
+        return new Bytes(bytes, 0, bytes.length);
     }
 
     public static ProtobufString lazy(ByteBuffer buffer) {
@@ -278,9 +273,8 @@ public sealed abstract class ProtobufString implements CharSequence {
 
         @Override
         public int hashCode() {
-            var end = offset + length;
             var result = 1;
-            for (var i = offset; i < end; i++) {
+            for (var i = offset; i < offset + length; i++) {
                 result = 31 * result + bytes[i];
             }
             return result;
@@ -1014,7 +1008,6 @@ public sealed abstract class ProtobufString implements CharSequence {
 
     private static final class Value extends ProtobufString {
         private final String value;
-        private WeakReference<byte[]> bytes;
         private Value(String value) {
             this.value = value;
         }
@@ -1235,25 +1228,7 @@ public sealed abstract class ProtobufString implements CharSequence {
 
         @Override
         public byte[] getBytes() {
-            if(bytes != null) {
-                var result = bytes.get();
-                if(result != null) {
-                    return result;
-                }
-            }
-
-            synchronized (this) {
-                if(bytes != null) {
-                    var result = bytes.get();
-                    if(result != null) {
-                        return result;
-                    }
-                }
-
-                var result = value.getBytes(StandardCharsets.UTF_8);
-                this.bytes = new WeakReference<>(result);
-                return result;
-            }
+            return value.getBytes(StandardCharsets.UTF_8);
         }
 
         @Override
