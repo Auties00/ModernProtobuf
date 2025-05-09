@@ -1,9 +1,6 @@
 package it.auties.protobuf.serialization.generator.clazz;
 
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-
 import javax.annotation.processing.Filer;
-import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 
 public abstract class ProtobufClassGenerator {

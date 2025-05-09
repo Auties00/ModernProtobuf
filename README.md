@@ -20,7 +20,7 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
    <dependency>
        <groupId>com.github.auties00</groupId>
        <artifactId>protobuf-base</artifactId>
-       <version>3.4.2</version>
+       <version>3.4.3</version>
    </dependency>
    ```
 
@@ -34,7 +34,7 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
                <annotationProcessorPath>
                    <groupId>com.github.auties00</groupId>
                    <artifactId>protobuf-serialization-plugin</artifactId>
-                   <version>3.4.2</version>
+                   <version>3.4.3</version>
                <annotationProcessorPath>
            <annotationProcessorPaths>
        <configuration>
@@ -46,23 +46,23 @@ While developing [Cobalt](https://github.com/Auties00/Cobalt), I faced these iss
 - Groovy DSL
     - Dependency
     ```groovy
-    implementation 'com.github.auties00:protobuf-base:3.4.2'
+    implementation 'com.github.auties00:protobuf-base:3.4.3'
     ```
 
     - Annotation processor
     ```groovy
-    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.4.2'
+    annotationProcessor 'com.github.auties00:protobuf-serialization-plugin:3.4.3'
     ```
 
 - Kotlin DSL
     - Dependency
     ```kotlin
-    implementation("com.github.auties00:protobuf-base:3.4.2")
+    implementation("com.github.auties00:protobuf-base:3.4.3")
     ```
 
     - Annotation processor
     ```kotlin
-    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.4.2")
+    annotationProcessor("com.github.auties00:protobuf-serialization-plugin:3.4.3")
     ```
   
 ### Schema generation and updating
@@ -3530,7 +3530,7 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
       ```java
       record BirthdayDate(int day, int month, int year) {
          @ProtobufDeserializer
-         static of(ProtobufString date) {
+         static of(String date) {
             if(date == null) {
                return null;
             }
@@ -3551,7 +3551,7 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
          }
          
          @ProtobufSerializer
-         public ProtobufString formatted() {
+         public String formatted() {
                return "%s/%s/%s".formatted(day, month, year);
          }
       }
@@ -3559,39 +3559,6 @@ I think that Jackson doesn't fall in this category. As a result, ModernProtobuf,
    This record is not a ProtobufMessage, but `of(String date)` and `@toString()` allow the library to serialize and deserialize a valid protobuf value, without needing to modify the protobuf schema.
    As you can also see, `of(String date)` is a package-private method: this is allowed because if the records `Person` and `BirthdayDate` are in the same package, the `PersonSpec` and `PersonBuilder` classes, that need to access that method,
    will also be in the same package. This is very convenient because you might not want to expose those methods to a developer using your API to make it less confusing and/or because they may return nullable values, which is, at least generally speaking, not good practice.
-
-   `@ProtobufDeserializer` can also be used in a `ProtobufMessage` to modify how the enclosing message's spec and builder initialize a new instance of the message.
-   Here is a relatively complex example where that could be useful:
-   ```java
-   @ProtobufMessage
-   public final class OptionalMessage {
-    private static final OptionalMessage EMPTY = new OptionalMessage(null);
-
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    private final ProtobufString value;
-   
-    // This constructor is not accessible by the Spec or builder
-    private OptionalMessage(String value) {
-        this.value = value;
-    }
-
-    // Override the default value from null to OptionalMessage.empty()
-    @ProtobufDefaultValue
-    public static OptionalMessage empty() {
-        return EMPTY;
-    }
-
-    // Override the default initialization strategy for OptionalMessage from the constructor to OptionalMessage.ofNullable(String) 
-    @ProtobufDeserializer
-    public static OptionalMessage ofNullable(String value) {
-        return value == null ? EMPTY : new OptionalMessage(value);
-    }
-
-    public ProtobufString value() {
-        return value;
-    }
-   }
-   ```
 
 5.  `@ProtobufUnknownFields`
 

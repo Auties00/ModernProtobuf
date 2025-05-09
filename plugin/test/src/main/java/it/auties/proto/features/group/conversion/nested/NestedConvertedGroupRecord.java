@@ -1,4 +1,4 @@
-package it.auties.proto.features.group.convertion.nested;
+package it.auties.proto.features.group.conversion.nested;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;

@@ -2,8 +2,9 @@ package it.auties.protobuf.serialization.model.property;
 
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
+import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterDeserializer;
 import it.auties.protobuf.serialization.model.converter.ProtobufConverterElement;
+import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterSerializer;
 
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
@@ -21,6 +22,12 @@ public sealed interface ProtobufPropertyType {
     // 1. The protobuf input -> the model
     // 2. The protobuf model -> the output
     List<ProtobufConverterElement> converters();
+
+    // Adds a nullable converter to the type
+    void addConverter(ProtobufConverterElement element);
+
+    // Remove all converters
+    void clearConverters();
 
     // The type of the Element that describes this property
     // This can be interpreted as the input type as this is used by the deserializer and builder
@@ -49,26 +56,21 @@ public sealed interface ProtobufPropertyType {
     // The mixins associated to this type
     List<TypeElement> mixins();
 
-    // Adds a nullable converter to the type
-    void addConverter(ProtobufConverterElement element);
-
-    void clearConverters();
-
     // Default implementation to get the serializers for the converters
-    default List<ProtobufAttributedConverterElement.Serializer> serializers() {
+    default List<ProtobufAttributedConverterSerializer> serializers() {
         return converters()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufAttributedConverterElement.Serializer)
-                .map(entry -> (ProtobufAttributedConverterElement.Serializer) entry)
+                .filter(entry -> entry instanceof ProtobufAttributedConverterSerializer)
+                .map(entry -> (ProtobufAttributedConverterSerializer) entry)
                 .toList();
     }
 
     // Default implementation to get the deserializers for the converters
-    default List<ProtobufAttributedConverterElement.Deserializer> deserializers() {
+    default List<ProtobufAttributedConverterDeserializer> deserializers() {
         return converters()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufAttributedConverterElement.Deserializer)
-                .map(entry -> (ProtobufAttributedConverterElement.Deserializer) entry)
+                .filter(entry -> entry instanceof ProtobufAttributedConverterDeserializer)
+                .map(entry -> (ProtobufAttributedConverterDeserializer) entry)
                 .toList();
     }
 
@@ -78,7 +80,8 @@ public sealed interface ProtobufPropertyType {
             return descriptorElementType();
         }
 
-        return serializers.getLast().returnType();
+        return serializers.getLast()
+                .returnType();
     }
 
     default TypeMirror deserializedType() {
@@ -87,10 +90,11 @@ public sealed interface ProtobufPropertyType {
             return descriptorElementType();
         }
 
-        return deserializers.getLast().returnType();
+        return deserializers.getLast()
+                .returnType();
     }
 
-    default Optional<ProtobufAttributedConverterElement.Serializer> rawGroupSerializer() {
+    default Optional<ProtobufAttributedConverterSerializer> rawGroupSerializer() {
         var concreteGroup = false;
         var serializers = serializers();
         for (var serializer : serializers) {

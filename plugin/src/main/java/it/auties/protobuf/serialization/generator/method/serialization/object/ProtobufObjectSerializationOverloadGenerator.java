@@ -2,7 +2,9 @@ package it.auties.protobuf.serialization.generator.method.serialization.object;
 
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
+import it.auties.protobuf.serialization.writer.ClassWriter;
+import it.auties.protobuf.serialization.writer.MethodWriter;
 
 import java.util.List;
 
@@ -15,14 +17,14 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
     }
 
     @Override
-    protected void doInstrumentation(ClassWriter classWriter, ClassWriter.MethodWriter writer) {
+    protected void doInstrumentation(ClassWriter classWriter, MethodWriter writer) {
         // Check if the input is null
         try(var ifWriter = writer.printIfStatement("%s == null".formatted(INPUT_OBJECT_PARAMETER))) {
             ifWriter.printReturn("null");
         }
 
         // Return the result
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             writer.printVariableDeclaration("stream", "ProtobufOutputStream.toBytes(%s(%s, %s))".formatted(ProtobufObjectSizeGenerator.METHOD_NAME, GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
             writer.println("encode(%s, %s, stream);".formatted(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER));
         }else {
@@ -35,7 +37,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     public boolean shouldInstrument() {
-        return !(objectElement.type() == ProtobufObjectElement.Type.ENUM);
+        return !(objectElement.type() == ProtobufObjectType.ENUM);
     }
 
     @Override
@@ -45,7 +47,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     protected String returnType() {
-        return objectElement.type() == ProtobufObjectElement.Type.ENUM ? "Integer" : "byte[]";
+        return objectElement.type() == ProtobufObjectType.ENUM ? "Integer" : "byte[]";
     }
 
     @Override
@@ -56,7 +58,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
     @Override
     protected List<String> parametersTypes() {
         var objectType = objectElement.element().getSimpleName().toString();
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of("int", objectType);
         }else {
             return List.of(objectType);
@@ -65,7 +67,7 @@ public class ProtobufObjectSerializationOverloadGenerator extends ProtobufMethod
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);

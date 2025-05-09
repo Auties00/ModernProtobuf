@@ -8,4 +8,8 @@ public abstract class ProtobufException extends RuntimeException {
     public ProtobufException(String message) {
         super(message);
     }
+
+    public ProtobufException(Throwable cause) {
+        super(cause);
+    }
 }

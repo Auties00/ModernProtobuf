@@ -3,12 +3,14 @@ package it.auties.protobuf.serialization.generator.method.deserialization.object
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serialization.generator.method.deserialization.ProtobufDeserializationGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
+import it.auties.protobuf.serialization.model.object.ProtobufReservedIndex;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
+import it.auties.protobuf.serialization.writer.BodyWriter;
+import it.auties.protobuf.serialization.writer.ClassWriter;
+import it.auties.protobuf.serialization.writer.MethodWriter;
+import it.auties.protobuf.serialization.writer.SwitchStatementWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import javax.lang.model.element.Modifier;
@@ -31,7 +33,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected void doInstrumentation(ClassWriter classWriter, MethodWriter writer) {
-        if (objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if (objectElement.type() == ProtobufObjectType.ENUM) {
             createEnumDeserializer(writer);
         }else {
             createMessageDeserializer(writer);
@@ -50,9 +52,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected List<String> parametersTypes() {
-        if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if(objectElement.type() == ProtobufObjectType.ENUM) {
             return List.of("int", objectElement.element().getSimpleName().toString());
-        } else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        } else if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of("int", ProtobufInputStream.class.getSimpleName());
         } else {
             return List.of(ProtobufInputStream.class.getSimpleName());
@@ -61,9 +63,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if(objectElement.type() == ProtobufObjectType.ENUM) {
             return List.of(ENUM_INDEX_PARAMETER, ENUM_DEFAULT_VALUE_PARAMETER);
-        } else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        } else if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_STREAM_NAME);
         } else {
             return List.of(INPUT_STREAM_NAME);
@@ -74,8 +76,8 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         var conditions = new ArrayList<String>();
         for(var index : objectElement.reservedIndexes()) {
             switch (index) {
-                case ProtobufObjectElement.ReservedIndex.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
-                case ProtobufObjectElement.ReservedIndex.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
+                case ProtobufReservedIndex.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
+                case ProtobufReservedIndex.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
             }
         }
         if(!conditions.isEmpty()) {
@@ -91,7 +93,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
     }
 
     private void createMessageDeserializer(MethodWriter methodWriter) {
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             methodWriter.println("%s.assertGroupOpened(%s);".formatted(INPUT_STREAM_NAME, GROUP_INDEX_PARAMETER));
         }
 
@@ -134,7 +136,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
             }
         }
 
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             methodWriter.println("%s.assertGroupClosed(%s);".formatted(INPUT_STREAM_NAME, GROUP_INDEX_PARAMETER));
         }
 
@@ -147,7 +149,7 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         // Return statement
         var unknownFieldsArg = objectElement.unknownFieldsElement().isEmpty() ? "" : ", " + DEFAULT_UNKNOWN_FIELDS;
         if(objectElement.deserializer().isPresent()) {
-            methodWriter.printReturn("%s.%s(%s%s)".formatted(objectElement.element().getQualifiedName(), objectElement.deserializer().get().getSimpleName(), String.join(", ", argumentsList), unknownFieldsArg));
+            methodWriter.printReturn("%s.%s(%s%s)".formatted(objectElement.element().getQualifiedName(), objectElement.deserializer().get().name(), String.join(", ", argumentsList), unknownFieldsArg));
         }else {
             methodWriter.printReturn("new %s(%s%s)".formatted(objectElement.element().getQualifiedName(), String.join(", ", argumentsList), unknownFieldsArg));
         }

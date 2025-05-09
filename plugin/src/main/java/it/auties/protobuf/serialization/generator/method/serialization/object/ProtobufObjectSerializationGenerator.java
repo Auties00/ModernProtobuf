@@ -2,10 +2,11 @@ package it.auties.protobuf.serialization.generator.method.serialization.object;
 
 import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSerializationGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
+import it.auties.protobuf.serialization.writer.ClassWriter;
+import it.auties.protobuf.serialization.writer.MethodWriter;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.lang.model.element.Element;
@@ -23,7 +24,7 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
 
     @Override
     protected void doInstrumentation(ClassWriter classWriter, MethodWriter writer) {
-        if (objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if (objectElement.type() == ProtobufObjectType.ENUM) {
             createEnumSerializer(writer);
         } else {
             createMessageSerializer(writer);
@@ -42,15 +43,15 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
 
     @Override
     protected String returnType() {
-        return objectElement.type() == ProtobufObjectElement.Type.ENUM ? "Integer" : "void";
+        return objectElement.type() == ProtobufObjectType.ENUM ? "Integer" : "void";
     }
 
     @Override
     protected List<String> parametersTypes() {
         var objectType = objectElement.element().getSimpleName().toString();
-        if (objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if (objectElement.type() == ProtobufObjectType.ENUM) {
             return List.of(objectType);
-        }else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        }else if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of("int", objectType, ProtobufOutputStream.class.getSimpleName());
         }else {
             return List.of(objectType, ProtobufOutputStream.class.getSimpleName());
@@ -59,9 +60,9 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
 
     @Override
     protected List<String> parametersNames() {
-        if (objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+        if (objectElement.type() == ProtobufObjectType.ENUM) {
             return List.of(INPUT_OBJECT_PARAMETER);
-        }else if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        }else if(objectElement.type() == ProtobufObjectType.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER, OUTPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER, OUTPUT_OBJECT_PARAMETER);
@@ -88,7 +89,7 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
             ifWriter.printReturn();
         }
 
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             writer.println("%s.writeGroupStart(%s);".formatted(OUTPUT_OBJECT_PARAMETER, GROUP_INDEX_PARAMETER));
         }
 
@@ -101,7 +102,7 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
             }
         }
 
-        if(objectElement.type() == ProtobufObjectElement.Type.GROUP) {
+        if(objectElement.type() == ProtobufObjectType.GROUP) {
             writer.println("%s.writeGroupEnd(%s);".formatted(OUTPUT_OBJECT_PARAMETER, GROUP_INDEX_PARAMETER));
         }
     }

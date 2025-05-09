@@ -5,7 +5,10 @@ import it.auties.protobuf.stream.ProtobufInputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ProtobufMessageSpec {
+/**
+ * Dynamically deserializes a protobuf message
+ */
+public final class ProtobufMessageSpec {
     public static Map<Integer, Object> decode(byte[] bytes) {
         return decode(ProtobufInputStream.fromBytes(bytes, 0, bytes.length));
     }

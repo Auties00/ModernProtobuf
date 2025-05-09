@@ -5,13 +5,12 @@ import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
+import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
+import it.auties.protobuf.serialization.writer.ClassWriter;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,7 +27,7 @@ public class ProtobufObjectBuilderGenerator extends ProtobufClassGenerator {
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
 
         // Declare a new compilation unit
-        try (var compilationUnitWriter = new JavaWriter.CompilationUnit(sourceFile.openWriter())) {
+        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
             // If a package is available, write it in the compilation unit
             if(packageName != null) {
                 compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
@@ -106,8 +105,11 @@ public class ProtobufObjectBuilderGenerator extends ProtobufClassGenerator {
                                 var value = property.name();
                                 for (var j = i; j < deserializers.size(); j++) {
                                     var override = deserializers.get(j);
-                                    var enclosingElement = (TypeElement) override.delegate().getEnclosingElement();
-                                    value = "%s.%s(%s)".formatted(enclosingElement.getQualifiedName(), override.delegate().getSimpleName(), value);
+                                    value = "%s.%s(%s)".formatted(
+                                            override.delegate().ownerName(),
+                                            override.delegate().name(),
+                                            value
+                                    );
                                 }
 
                                 writeBuilderSetter(
@@ -142,7 +144,7 @@ public class ProtobufObjectBuilderGenerator extends ProtobufClassGenerator {
                     if (builderDelegate.isEmpty() && (builderElement == null || builderElement.delegate().getKind() == ElementKind.CONSTRUCTOR)) {
                         buildMethodWriter.printReturn("new %s(%s%s)".formatted(resultQualifiedName, invocationArgsJoined, unknownFieldsValue));
                     } else {
-                        var methodName = builderElement != null ? builderElement.delegate().getSimpleName() : builderDelegate.get().getSimpleName();
+                        var methodName = builderElement != null ? builderElement.delegate().getSimpleName() : builderDelegate.get().name();
                         buildMethodWriter.printReturn("%s.%s(%s%s)".formatted(resultQualifiedName, methodName, invocationArgsJoined, unknownFieldsValue));
                     }
                 }

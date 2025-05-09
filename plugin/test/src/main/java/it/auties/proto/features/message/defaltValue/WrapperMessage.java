@@ -6,7 +6,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 @ProtobufMessage
 public record WrapperMessage(
-        @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+        @ProtobufProperty(index = 1, type = ProtobufType.STRING)
         OptionalMessage optionalMessage
 ) {
 

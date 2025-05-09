@@ -3,20 +3,19 @@ package it.auties.protobuf.model;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 public enum ProtobufType {
     UNKNOWN(null, null, false),
-    MESSAGE(byte[].class, null, false),
-    ENUM(Integer.class, null, false),
-    GROUP(byte[].class, null, false),
-    MAP(Map.class, null, false),
+    MESSAGE(byte[].class, byte[].class, false),
+    ENUM(Integer.class, Integer.class, false),
+    GROUP(byte[].class, byte[].class, false),
+    MAP(Map.class, Map.class, false),
     FLOAT(float.class, Float.class, true),
     DOUBLE(double.class, Double.class, true),
     BOOL(boolean.class, Boolean.class, true),
-    STRING(ProtobufString.class, null, false),
-    BYTES(ByteBuffer.class, null, false),
+    STRING(ProtobufString.class, ProtobufString.class, false),
+    BYTES(ByteBuffer.class, ByteBuffer.class, false),
     INT32(int.class, Integer.class, true),
     SINT32(int.class, Integer.class, true),
     UINT32(int.class, Integer.class, true),
@@ -29,11 +28,11 @@ public enum ProtobufType {
     SFIXED64(long.class, Long.class, true);
 
     private final Class<?> serializedType;
-    private final Class<?> wrapperType;
+    private final Class<?> serializedWrappedType;
     private final boolean packable;
-    ProtobufType(Class<?> serializedType, Class<?> descriptorType, boolean packable) {
+    ProtobufType(Class<?> serializedType, Class<?> serializedWrappedType, boolean packable) {
         this.serializedType = serializedType;
-        this.wrapperType = descriptorType;
+        this.serializedWrappedType = serializedWrappedType;
         this.packable = packable;
     }
 
@@ -51,12 +50,12 @@ public enum ProtobufType {
         return this.serializedType;
     }
 
-    public Class<?> wrapperType() {
+    public Class<?> serializedWrappedType() {
         if(this == UNKNOWN) {
             throw new UnsupportedOperationException();
         }
 
-        return Objects.requireNonNullElse(this.wrapperType, this.serializedType);
+        return serializedWrappedType;
     }
 
     public boolean isPackable() {

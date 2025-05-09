@@ -1,15 +1,15 @@
-package it.auties.proto.features.group.convertion;
+package it.auties.proto.features.group.conversion;
 
-import it.auties.proto.features.group.convertion.map.MapConvertedGroupRecord;
-import it.auties.proto.features.group.convertion.map.MapConvertedMessageRecord;
-import it.auties.proto.features.group.convertion.map.MapConvertedMessageRecordSpec;
-import it.auties.proto.features.group.convertion.nested.NestedConvertedGroupRecord;
-import it.auties.proto.features.group.convertion.nested.NestedConvertedMessageRecord;
-import it.auties.proto.features.group.convertion.nested.NestedConvertedMessageRecordSpec;
-import it.auties.proto.features.group.convertion.repeated.RepeatedConvertedGroupRecord;
-import it.auties.proto.features.group.convertion.repeated.RepeatedConvertedMessageRecord;
-import it.auties.proto.features.group.convertion.repeated.RepeatedConvertedMessageRecordSpec;
-import it.auties.proto.features.group.convertion.simple.ConvertedMessageRecordSpec;
+import it.auties.proto.features.group.conversion.map.MapConvertedGroupRecord;
+import it.auties.proto.features.group.conversion.map.MapConvertedMessageRecord;
+import it.auties.proto.features.group.conversion.map.MapConvertedMessageRecordSpec;
+import it.auties.proto.features.group.conversion.nested.NestedConvertedGroupRecord;
+import it.auties.proto.features.group.conversion.nested.NestedConvertedMessageRecord;
+import it.auties.proto.features.group.conversion.nested.NestedConvertedMessageRecordSpec;
+import it.auties.proto.features.group.conversion.repeated.RepeatedConvertedGroupRecord;
+import it.auties.proto.features.group.conversion.repeated.RepeatedConvertedMessageRecord;
+import it.auties.proto.features.group.conversion.repeated.RepeatedConvertedMessageRecordSpec;
+import it.auties.proto.features.group.conversion.simple.ConvertedMessageRecordSpec;
 import it.auties.proto.features.group.simple.GroupRecord;
 import it.auties.proto.features.group.simple.MessageRecord;
 import it.auties.proto.features.group.simple.MessageRecordSpec;

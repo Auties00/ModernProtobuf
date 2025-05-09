@@ -8,8 +8,9 @@ import it.auties.protobuf.serialization.generator.method.serialization.object.Pr
 import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSerializationOverloadGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSizeGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.support.JavaWriter;
+import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
@@ -30,7 +31,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
 
         // Declare a new compilation unit
-        try (var compilationUnitWriter = new JavaWriter.CompilationUnit(sourceFile.openWriter())) {
+        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
             // If a package is available, write it in the compilation unit
             if(packageElement != null) {
                 compilationUnitWriter.printPackageDeclaration(packageElement.getQualifiedName().toString());
@@ -45,7 +46,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                if(objectElement.type() == ProtobufObjectElement.Type.ENUM) {
+                if(objectElement.type() == ProtobufObjectType.ENUM) {
                     var objectType = objectElement.element().getSimpleName().toString();
                     classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
                     try(var staticInitBlock = classWriter.printStaticBlock()) {
@@ -76,7 +77,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
     // Get the imports to include in the compilation unit
     private List<String> getSpecImports(ProtobufObjectElement message) {
-        if(message.type() == ProtobufObjectElement.Type.ENUM) {
+        if(message.type() == ProtobufObjectType.ENUM) {
             return List.of(
                     message.element().getQualifiedName().toString(),
                     Arrays.class.getName(),

@@ -5,8 +5,8 @@ import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
+import it.auties.protobuf.serialization.writer.BodyWriter;
+import it.auties.protobuf.serialization.writer.ClassWriter;
 
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
@@ -50,7 +50,7 @@ public abstract class ProtobufSizeGenerator extends ProtobufSerializationGenerat
         return switch (collectionType.valueType().protobufType()) {
             case FLOAT, FIXED32, SFIXED32 -> "getFixed32PackedSize";
             case DOUBLE, FIXED64, SFIXED64 -> "getFixed64PackedSize";
-            case BOOL -> "getFixedBoolPackedSize";
+            case BOOL -> "getBoolPackedSize";
             case INT32, SINT32, UINT32, INT64, SINT64, UINT64 -> "getVarIntPackedSize";
             default ->
                     throw new IllegalArgumentException("Internal bug: unexpected packed type " + collectionType.valueType().protobufType());

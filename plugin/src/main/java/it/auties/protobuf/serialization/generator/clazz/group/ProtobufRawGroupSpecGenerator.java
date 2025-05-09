@@ -6,15 +6,13 @@ import it.auties.protobuf.serialization.generator.method.deserialization.group.P
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSerializationGenerator;
 import it.auties.protobuf.serialization.generator.method.serialization.group.ProtobufRawGroupSizeGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.support.JavaWriter;
+import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.annotation.processing.Filer;
-import javax.annotation.processing.FilerException;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.util.*;
 
@@ -28,48 +26,41 @@ public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
         var simpleGeneratedClassName = getGeneratedClassNameBySuffix(object.element(), "Spec");
         var qualifiedGeneratedClassName = packageName != null ? packageName + "." + simpleGeneratedClassName : simpleGeneratedClassName;
 
-
-        var sourceFile = createSourceFile(qualifiedGeneratedClassName);
-        if(sourceFile.isEmpty()) {
-            return;
-        }
-
-        // Declare a new compilation unit
-        try (var compilationUnitWriter = new JavaWriter.CompilationUnit(sourceFile.get().openWriter())) {
-            // If a package is available, write it in the compilation unit
-            if(packageName != null) {
-                compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
-            }
-
-            // Declare the imports needed for everything to work
-            var imports = getSpecImports(object.element());
-            imports.forEach(compilationUnitWriter::printImportDeclaration);
-
-            // Separate imports from classes
-            compilationUnitWriter.printSeparator();
-
-            // Declare the spec class
-            try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                // Write the serializer
-                var serializationVisitor = new ProtobufRawGroupSerializationGenerator(object);
-                serializationVisitor.generate(classWriter);
-
-                // Write the deserializer
-                var deserializationVisitor = new ProtobufRawGroupDeserializationGenerator(object);
-                deserializationVisitor.generate(classWriter);
-
-                // Write the size calculator
-                var sizeVisitor = new ProtobufRawGroupSizeGenerator(object);
-                sizeVisitor.generate(classWriter);
-            }
-        }
-    }
-
-    private Optional<JavaFileObject> createSourceFile(String qualifiedGeneratedClassName) throws IOException {
         try {
-            return Optional.of(filer.createSourceFile(qualifiedGeneratedClassName));
-        }catch (FilerException filerException) {
-            return Optional.empty();
+            // Generate a source file
+            var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
+
+            // Declare a new compilation unit
+            try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
+                // If a package is available, write it in the compilation unit
+                if(packageName != null) {
+                    compilationUnitWriter.printPackageDeclaration(packageName.getQualifiedName().toString());
+                }
+
+                // Declare the imports needed for everything to work
+                var imports = getSpecImports(object.element());
+                imports.forEach(compilationUnitWriter::printImportDeclaration);
+
+                // Separate imports from classes
+                compilationUnitWriter.printSeparator();
+
+                // Declare the spec class
+                try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
+                    // Write the serializer
+                    var serializationVisitor = new ProtobufRawGroupSerializationGenerator(object);
+                    serializationVisitor.generate(classWriter);
+
+                    // Write the deserializer
+                    var deserializationVisitor = new ProtobufRawGroupDeserializationGenerator(object);
+                    deserializationVisitor.generate(classWriter);
+
+                    // Write the size calculator
+                    var sizeVisitor = new ProtobufRawGroupSizeGenerator(object);
+                    sizeVisitor.generate(classWriter);
+                }
+            }
+        }catch (IOException ignored) {
+
         }
     }
 

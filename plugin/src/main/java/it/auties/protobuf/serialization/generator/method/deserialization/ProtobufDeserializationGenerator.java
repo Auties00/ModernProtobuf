@@ -4,9 +4,8 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.SwitchStatementWriter;
+import it.auties.protobuf.serialization.writer.SwitchStatementWriter;
 
-import javax.lang.model.element.TypeElement;
 import java.util.List;
 
 public abstract class ProtobufDeserializationGenerator extends ProtobufMethodGenerator {
@@ -71,16 +70,14 @@ public abstract class ProtobufDeserializationGenerator extends ProtobufMethodGen
 
         for (var i = 0; i < implementation.deserializers().size(); i++) {
             var deserializer = implementation.deserializers().get(i);
-            var parent = (TypeElement) deserializer.delegate().getEnclosingElement();
-            var converterMethodName = deserializer.delegate().getSimpleName();
-            switch (deserializer.delegate().getParameters().size()) {
-                case 1 -> value = "%s.%s(%s)".formatted(parent.getQualifiedName(), converterMethodName, value);
-                case 2 -> value = "%s.%s(%s, %s)".formatted(parent.getQualifiedName(), converterMethodName, index, value);
+            switch (deserializer.delegate().parameters().size()) {
+                case 1 -> value = "%s.%s(%s)".formatted(deserializer.delegate().ownerName(), deserializer.delegate().name(), value);
+                case 2 -> value = "%s.%s(%s, %s)".formatted(deserializer.delegate().ownerName(), deserializer.delegate().name(), index, value);
                 default -> throw new IllegalArgumentException(
                         "Unexpected number of arguments for deserializer "
-                                +  deserializer.delegate().getSimpleName()
+                                +  deserializer.delegate().name()
                                 + " in "
-                                + parent.getQualifiedName()
+                                + deserializer.delegate().ownerName()
                 );
             }
         }

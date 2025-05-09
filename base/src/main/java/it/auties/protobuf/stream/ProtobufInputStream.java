@@ -24,12 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public abstract class ProtobufInputStream {
+public abstract class ProtobufInputStream implements AutoCloseable {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     private int wireType;
     private int index;
-    private ProtobufInputStream() {
+    protected ProtobufInputStream() {
         this.wireType = -1;
         this.index = -1;
     }
@@ -43,7 +43,7 @@ public abstract class ProtobufInputStream {
     }
 
     public static ProtobufInputStream fromBuffer(ByteBuffer buffer) {
-        return new Buffer(buffer, buffer.remaining());
+        return new Buffer(buffer);
     }
 
     public static ProtobufInputStream fromStream(InputStream buffer) {
@@ -68,9 +68,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Float>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readFloatUnchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readFloatUnchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -85,9 +88,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Double>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readDoubleUnchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readDoubleUnchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -102,9 +108,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readInt32Unchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readInt32Unchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -119,9 +128,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readInt64Unchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readInt64Unchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -136,9 +148,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Integer>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readFixed32Unchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readFixed32Unchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -153,9 +168,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Long>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readFixed64Unchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readFixed64Unchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -170,9 +188,12 @@ public abstract class ProtobufInputStream {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var results = new ArrayList<Boolean>();
-                var input = readLengthDelimited();
-                while (!input.isFinished()){
-                    results.add(input.readBoolUnchecked());
+                try(var input = readLengthDelimited()) {
+                    while (!input.isFinished()) {
+                        results.add(input.readBoolUnchecked());
+                    }
+                }catch (Exception exception) {
+                    throw new ProtobufDeserializationException(exception);
                 }
 
                 yield results;
@@ -211,7 +232,7 @@ public abstract class ProtobufInputStream {
         return readInt64() == 1;
     }
 
-    public ProtobufString readString() {
+    public ProtobufString.Lazy readString() {
         if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         }
@@ -268,9 +289,6 @@ public abstract class ProtobufInputStream {
         return (int) readVarInt64Slow();
     }
 
-    // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
-    // Fastest implementation I could find
-    // Adapted to work with Channels
     public long readInt64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_VAR_INT) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
@@ -279,6 +297,9 @@ public abstract class ProtobufInputStream {
         return readInt64Unchecked();
     }
 
+    // Source: https://github.com/protocolbuffers/protobuf/blob/main/java/core/src/main/java/com/google/protobuf/CodedInputStream.java
+    // Fastest implementation I could find
+    // Adapted to work with Channels
     private long readInt64Unchecked() {
         mark();
         fspath:
@@ -452,7 +473,7 @@ public abstract class ProtobufInputStream {
 
     protected abstract byte readByte();
     protected abstract ByteBuffer readBytes(int size);
-    protected abstract ProtobufString readString(int size);
+    protected abstract ProtobufString.Lazy readString(int size);
     protected abstract void mark();
     protected abstract void rewind();
     protected abstract boolean isFinished();
@@ -462,20 +483,25 @@ public abstract class ProtobufInputStream {
         private static final int MAX_VAR_INT_SIZE = 10;
 
         private final InputStream inputStream;
+        private final boolean autoclose;
         private final long length;
-        private final byte[] buffer;
         private long position;
+
+        private final byte[] buffer;
         private int bufferReadPosition;
         private int bufferWritePosition;
         private int bufferLength;
+
         private Stream(InputStream inputStream) {
             this.inputStream = inputStream;
+            this.autoclose = true;
             this.length = -1;
             this.buffer = new byte[MAX_VAR_INT_SIZE];
         }
 
         private Stream(InputStream inputStream, long length, byte[] buffer, int bufferReadPosition, int bufferWritePosition, int bufferLength) {
             this.inputStream = inputStream;
+            this.autoclose = false;
             this.length = length;
             this.buffer = buffer;
             this.bufferReadPosition = bufferReadPosition;
@@ -513,7 +539,7 @@ public abstract class ProtobufInputStream {
         }
 
         @Override
-        public ProtobufString readString(int size) {
+        public ProtobufString.Lazy readString(int size) {
             try {
                 return ProtobufString.lazy(readStreamBytes(size), 0, size);
             } catch (IOException exception) {
@@ -575,6 +601,13 @@ public abstract class ProtobufInputStream {
             }
             return result;
         }
+
+        @Override
+        public void close() throws IOException {
+            if(autoclose) {
+                inputStream.close();
+            }
+        }
     }
 
     private static final class Bytes extends ProtobufInputStream {
@@ -602,7 +635,7 @@ public abstract class ProtobufInputStream {
         }
 
         @Override
-        public ProtobufString readString(int size) {
+        public ProtobufString.Lazy readString(int size) {
             var result = ProtobufString.lazy(buffer, offset + position, size);
             position += size;
             return result;
@@ -633,39 +666,37 @@ public abstract class ProtobufInputStream {
             position += size;
             return result;
         }
+
+        @Override
+        public void close() throws Exception {
+
+        }
     }
 
     private static final class Buffer extends ProtobufInputStream {
         private final ByteBuffer buffer;
-        private int length;
-        private Buffer(ByteBuffer buffer, int length) {
+        private Buffer(ByteBuffer buffer) {
             this.buffer = buffer;
-            this.length = length;
         }
 
         @Override
         public byte readByte() {
-            var result = buffer.get();
-            length--;
-            return result;
+            return buffer.get();
         }
 
         @Override
         public ByteBuffer readBytes(int size) {
             var position = buffer.position();
-            var result = buffer.slice(position, position + size);
+            var result = buffer.slice(position, size);
             buffer.position(position + size);
-            length -= size;
             return result;
         }
 
         @Override
-        public ProtobufString readString(int size) {
-            var position = buffer.position();
-            var result = buffer.slice(position, position + size);
-            buffer.position(position + size);
-            length -= size;
-            return ProtobufString.lazy(result.asReadOnlyBuffer());
+        public ProtobufString.Lazy readString(int size) {
+            var data = new byte[size];
+            buffer.get(data);
+            return ProtobufString.lazy(data);
         }
 
         @Override
@@ -680,15 +711,20 @@ public abstract class ProtobufInputStream {
 
         @Override
         public boolean isFinished() {
-            return length <= 0;
+            return !buffer.hasRemaining();
         }
 
         @Override
         public Buffer subStream(int size) {
-            var result = new Buffer(buffer, size);
-            buffer.position(buffer.position() + size);
-            length -= size;
+            var position = buffer.position();
+            var result = new Buffer(buffer.slice(position, size));
+            buffer.position(position + size);
             return result;
+        }
+
+        @Override
+        public void close() {
+
         }
     }
 }

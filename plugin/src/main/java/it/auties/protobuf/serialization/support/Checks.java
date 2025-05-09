@@ -5,7 +5,6 @@ import it.auties.protobuf.model.ProtobufType;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
-import javax.lang.model.type.DeclaredType;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
@@ -20,6 +19,7 @@ public class Checks {
     public void runChecks(RoundEnvironment roundEnv) {
         checkMessages(roundEnv);
         checkGroups(roundEnv);
+        checkMixins(roundEnv);
         checkMessageProperties(roundEnv);
         checkEnums(roundEnv);
         checkEnumProperties(roundEnv);
@@ -94,24 +94,29 @@ public class Checks {
     }
 
     private void checkDefaultValue(Element entry) {
-        var enclosingElement = getEnclosingTypeElement(entry);
-        if(enclosingElement.getAnnotation(ProtobufMessage.class) == null && enclosingElement.getAnnotation(ProtobufEnum.class) == null && enclosingElement.getAnnotation(ProtobufMixin.class) == null) {
-            messages.printError("Illegal enclosing class: a method or enum constant annotated with @ProtobufDefaultValue should be enclosed by a class/record annotated with @ProtobufMessage, @ProtobufEnum or @ProtobufMixin", entry);
-            return;
-        }
+        switch(entry.getKind()) {
+            case METHOD -> {
+                if(entry.getModifiers().contains(Modifier.PRIVATE)) {
+                    messages.printError("Weak visibility: a method annotated with @ProtobufDefaultValue must have at least package-private visibility", entry);
+                    return;
+                }
 
-        if(entry.getKind() != ElementKind.METHOD && (entry.getKind() != ElementKind.ENUM_CONSTANT || getEnclosingTypeElement(entry).getAnnotation(ProtobufEnum.class) == null)) {
-            messages.printError("Invalid delegate: only methods, and enum constants in a ProtobufEnum, can be annotated with @ProtobufDefaultValue", entry);
-            return;
-        }
+                if(!entry.getModifiers().contains(Modifier.STATIC)) {
+                    messages.printError("Illegal method: a method annotated with @ProtobufDefaultValue must be static", entry); // Enum constants are implicitly static
+                    return;
+                }
 
-        if(entry.getModifiers().contains(Modifier.PRIVATE)) {
-            messages.printError("Weak visibility: a method annotated with @ProtobufDefaultValue must have at least package-private visibility", entry);
-            return;
-        }
+                var enclosingElement = getEnclosingTypeElement(entry);
+                if(!types.isMixin(enclosingElement.asType()) && !types.isAssignable(((ExecutableElement) entry).getReturnType(), enclosingElement.asType())) {
+                    messages.printError("Illegal method: a method annotated with @ProtobufDefaultValue must return a type assignable to its parent or be in a mixin", entry); // Enum constants are implicitly static
+                }
+            }
 
-        if(!entry.getModifiers().contains(Modifier.STATIC)) {
-            messages.printError("Illegal method: a method annotated with @ProtobufDefaultValue must be static", entry);
+            case ENUM_CONSTANT -> {
+                // All uses are fine
+            }
+
+            default -> messages.printError("Invalid delegate: only methods and enum constants can be annotated with @ProtobufDefaultValue", entry);
         }
     }
 
@@ -159,11 +164,9 @@ public class Checks {
 
     private void checkMixins(Element property, List<TypeElement> mixins) {
         for(var mixin : mixins) {
-            if (mixin.asType() instanceof DeclaredType declaredType && declaredType.asElement().getAnnotation(ProtobufMixin.class) != null) {
-                continue;
+            if (!types.isMixin(mixin.asType())) {
+                messages.printError("Illegal argument: %s is not a valid mixin".formatted(mixin.getSimpleName()), property);
             }
-
-            messages.printError("Illegal argument: %s is not a valid mixin".formatted(mixin.getSimpleName()), property);
         }
     }
 
@@ -193,6 +196,16 @@ public class Checks {
                 "Illegal annotation: only classes and records can be annotated with @ProtobufMessage",
                 ElementKind.CLASS,
                 ElementKind.RECORD
+        );
+    }
+
+    private void checkMixins(RoundEnvironment roundEnv) {
+        checkAnnotation(
+                roundEnv,
+                ProtobufMixin.class,
+                "Illegal annotation: only classes and interfaces can be annotated with @ProtobufMixin",
+                ElementKind.CLASS,
+                ElementKind.INTERFACE
         );
     }
 
@@ -238,8 +251,8 @@ public class Checks {
         }
 
         var enclosingType = executableElement.getEnclosingElement().asType();
-        if(enclosingType.getAnnotation(ProtobufMessage.class) != null || enclosingType.getAnnotation(ProtobufEnum.class) != null) {
-            messages.printError("Illegal method: a method annotated with @ProtobufSerializer cannot be inside a ProtobufMessage or ProtobufEnum", executableElement);
+        if(types.isObject(enclosingType)) {
+            messages.printError("Illegal method: a method annotated with @ProtobufSerializer cannot be inside a ProtobufMessage, ProtobufEnum or ProtobufGroup", executableElement);
             return;
         }
 
@@ -248,7 +261,7 @@ public class Checks {
             return;
         }
 
-        var inMixin = enclosingType.getAnnotation(ProtobufMixin.class) != null;
+        var inMixin = types.isMixin(enclosingType);
         if(executableElement.getModifiers().contains(Modifier.STATIC) != inMixin) {
             var message = inMixin ? "Illegal method: a method annotated with @ProtobufSerializer in a mixin must be static" : "Illegal method: a method annotated with @ProtobufSerializer must not be static";
             messages.printError(message, executableElement);
@@ -275,8 +288,8 @@ public class Checks {
         }
 
         var enclosingType = executableElement.getEnclosingElement().asType();
-        if(enclosingType.getAnnotation(ProtobufMessage.class) != null || enclosingType.getAnnotation(ProtobufEnum.class) != null) {
-            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer cannot be inside a ProtobufMessage or ProtobufEnum", executableElement);
+        if(types.isObject(enclosingType)) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer cannot be inside a ProtobufMessage, ProtobufEnum or ProtobufGroup", executableElement);
             return;
         }
 
@@ -290,7 +303,8 @@ public class Checks {
             return;
         }
 
-        if(executableElement.getKind() == ElementKind.CONSTRUCTOR && enclosingType.getAnnotation(ProtobufMixin.class) != null) {
+        var inMixin = types.isMixin(enclosingType);
+        if(executableElement.getKind() == ElementKind.CONSTRUCTOR && inMixin) {
             messages.printError( "Illegal method: a method annotated with @ProtobufDeserializer in a mixin cannot be a constructor", executableElement);
             return;
         }
@@ -300,7 +314,7 @@ public class Checks {
             return;
         }
 
-        if(enclosingType.getAnnotation(ProtobufMixin.class) != null && !types.isAssignable(executableElement.getReturnType(), enclosingType)) {
+        if(inMixin && !types.isAssignable(executableElement.getReturnType(), enclosingType)) {
             messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must return a type assignable to its parent or be in a mixin", executableElement);
         }
     }

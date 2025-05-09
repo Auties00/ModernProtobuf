@@ -1,4 +1,4 @@
-package it.auties.proto.features.group.convertion.repeated;
+package it.auties.proto.features.group.conversion.repeated;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;

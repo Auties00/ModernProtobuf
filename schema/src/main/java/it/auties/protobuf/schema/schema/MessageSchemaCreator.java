@@ -443,7 +443,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
         if(forceNullable || nullable) {
             return type.protobufType() == ProtobufType.BYTES ? "byte[]" : type.protobufType()
-                    .wrapperType()
+                    .serializedWrappedType()
                     .getSimpleName();
         }
 

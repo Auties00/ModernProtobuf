@@ -21,4 +21,8 @@ public class Messages {
     public void printError(String msg, Element element) {
         processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, msg, element);
     }
+
+    public void printInfo(String msg) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, msg);
+    }
 }

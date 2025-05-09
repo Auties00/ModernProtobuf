@@ -46,7 +46,7 @@ public class Types {
             return processingEnv.getTypeUtils().getArrayType(getType(type.getComponentType()));
         }
 
-        var result = processingEnv.getElementUtils().getTypeElement(type.getName());
+        var result = processingEnv.getElementUtils().getTypeElement(type.getCanonicalName());
         if(params.length == 0) {
             return erase(result.asType());
         }else {
@@ -72,6 +72,11 @@ public class Types {
                 && declaredType.asElement().getAnnotation(ProtobufEnum.class) != null;
     }
 
+    public boolean isMixin(TypeMirror mirror) {
+        return erase(mirror) instanceof DeclaredType declaredType
+                && declaredType.asElement().getAnnotation(ProtobufMixin.class) != null;
+    }
+
     public boolean isObject(TypeMirror mirror) {
         return erase(mirror) instanceof DeclaredType declaredType
                 && (declaredType.asElement().getAnnotation(ProtobufMessage.class) != null
@@ -88,7 +93,9 @@ public class Types {
     }
 
     public boolean isSameType(TypeMirror firstType, TypeMirror secondType, boolean erase) {
-        return processingEnv.getTypeUtils().isSameType(erase ? erase(firstType) : firstType, erase ? erase(secondType) : secondType);
+        return firstType != null &&
+                secondType != null
+                && processingEnv.getTypeUtils().isSameType(erase ? erase(firstType) : firstType, erase ? erase(secondType) : secondType);
     }
 
     public TypeMirror erase(TypeMirror typeMirror) {
@@ -139,6 +146,19 @@ public class Types {
                 .anyMatch(entry -> entry.getKind() == ElementKind.CONSTRUCTOR && ((ExecutableElement) entry).getParameters().isEmpty());
     }
 
+    public Optional<TypeElement> getTypeElement(TypeMirror entry) {
+        if(entry instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement typeElement) {
+            return Optional.of(typeElement);
+        }else {
+            return Optional.empty();
+        }
+    }
+
+    public List<TypeElement> getMixins(ProtobufSerializer.GroupProperty groupProperty) {
+        return getMirroredTypes(groupProperty::mixins);
+    }
+
     public List<TypeElement> getMixins(ProtobufProperty property) {
         return getMirroredTypes(property::mixins);
     }
@@ -163,23 +183,20 @@ public class Types {
         try {
             return Arrays.stream(supplier.get())
                     .map(mixin -> processingEnv.getElementUtils().getTypeElement(mixin.getName()))
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
                     .collect(Collectors.toList());
         }catch (MirroredTypesException exception) {
             return exception.getTypeMirrors()
                     .stream()
-                    .filter(entry -> entry instanceof DeclaredType)
-                    .map(entry -> (TypeElement) ((DeclaredType) entry).asElement())
+                    .map(this::getTypeElement)
+                    .flatMap(Optional::stream)
                     .collect(Collectors.toList());
         }
     }
 
-    // Checks if a method takes any number of parameters whose type is generic, ex. T, or whose definition depends on a generic type, ex. Map<String, T>
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean isParametrized(ExecutableElement element) {
-        return (!element.getTypeParameters().isEmpty() || (element.getEnclosingElement() instanceof TypeElement typeElement && !typeElement.getTypeParameters().isEmpty()))
-                && element.getParameters().stream().anyMatch(this::isParametrized);
+        return element.getParameters()
+                .stream()
+                .anyMatch(this::isParametrized);
     }
 
     private boolean isParametrized(VariableElement parameter) {
@@ -190,8 +207,10 @@ public class Types {
     }
 
     public boolean isParametrized(TypeMirror mirror) {
-        return mirror.getKind() == TypeKind.TYPEVAR || (mirror instanceof DeclaredType declaredType
-                && declaredType.getTypeArguments().stream().anyMatch(this::isParametrized));
+        return mirror.getKind() == TypeKind.TYPEVAR ||
+                (mirror instanceof DeclaredType declaredType && declaredType.getTypeArguments()
+                        .stream()
+                        .anyMatch(this::isParametrized));
     }
 
     public boolean isParametrized(Element element) {
@@ -200,6 +219,7 @@ public class Types {
                 .anyMatch(entry -> entry.asType().getKind() == TypeKind.TYPEVAR || isParametrized(entry));
     }
 
+    /// NEEDS REFACTOR
     public TypeMirror getReturnType(ExecutableElement method, List<TypeMirror> arguments) {
         var returnType = method.getReturnType();
         if(!isParametrized(returnType)) {
@@ -269,34 +289,6 @@ public class Types {
             }
         }
         return bestElement;
-    }
-
-    public Optional<TypeMirror> getSuperClass(TypeMirror mirror) {
-        return switch (mirror) {
-            case ArrayType ignored -> Optional.of(getType(Object.class));
-            case DeclaredType declaredType when declaredType.asElement() instanceof TypeElement typeElement
-                    && typeElement.getSuperclass() != null
-                    && typeElement.getSuperclass().getKind() != TypeKind.NONE -> Optional.ofNullable(typeElement.getSuperclass());
-            default -> Optional.empty();
-        };
-    }
-
-    public Optional<TypeElement> getSuperClass(TypeElement typeElement) {
-        var superClass = typeElement.getSuperclass();
-        if(superClass == null || superClass.getKind() == TypeKind.NONE) {
-            return Optional.empty();
-        }
-
-        var superClassElement = ((DeclaredType) superClass).asElement();
-        return Optional.of((TypeElement) superClassElement);
-    }
-
-    public List<? extends TypeMirror> getImplementedInterfaces(TypeMirror mirror) {
-        if(!(mirror instanceof DeclaredType declaredType) || !(declaredType.asElement() instanceof TypeElement typeElement)) {
-            return List.of();
-        }
-
-        return typeElement.getInterfaces();
     }
 
     private Map<String, List<TypeMirror>> getTypeUses(TypeMirror methodParameterType, TypeMirror methodArgumentType) {
@@ -400,233 +392,25 @@ public class Types {
         return Optional.empty();
     }
 
-    public ExecutableElement createMethodStub(String className, String methodName, TypeMirror returnType, TypeMirror... parameterTypes) {
-        var methodType = createMethodStubType();
-        var parameters = Arrays.stream(parameterTypes)
-                .map(this::createMethodStubParameter)
-                .toList();
-        var methodStubClass = createClassStub(className);
-        return new ExecutableElement() {
-            @Override
-            public TypeMirror asType() {
-                return methodType;
-            }
 
-            @Override
-            public List<? extends TypeParameterElement> getTypeParameters() {
-                return List.of();
-            }
-
-            @Override
-            public TypeMirror getReturnType() {
-                return returnType;
-            }
-
-            @Override
-            public List<? extends VariableElement> getParameters() {
-                return parameters;
-            }
-
-            @Override
-            public TypeMirror getReceiverType() {
-                return null;
-            }
-
-            @Override
-            public boolean isVarArgs() {
-                return false;
-            }
-
-            @Override
-            public boolean isDefault() {
-                return false;
-            }
-
-            @Override
-            public List<? extends TypeMirror> getThrownTypes() {
-                return List.of();
-            }
-
-            @Override
-            public AnnotationValue getDefaultValue() {
-                return null;
-            }
-
-            @Override
-            public Element getEnclosingElement() {
-                return methodStubClass;
-            }
-
-            @Override
-            public Name getSimpleName() {
-                return processingEnv.getElementUtils().getName(methodName);
-            }
-
-            @Override
-            public ElementKind getKind() {
-                return ElementKind.METHOD;
-            }
-
-            @Override
-            public Set<Modifier> getModifiers() {
-                return Set.of(Modifier.PUBLIC, Modifier.STATIC);
-            }
-
-            @Override
-            public List<? extends Element> getEnclosedElements() {
-                return List.of();
-            }
-
-            @Override
-            public List<? extends AnnotationMirror> getAnnotationMirrors() {
-                return List.of();
-            }
-
-            @Override
-            public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-                return getMethodStubAnnotation(annotationType);
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationType) {
-                return (A[]) new Annotation[]{getAnnotation(annotationType)};
-            }
-
-            @Override
-            public <R, P> R accept(ElementVisitor<R, P> v, P p) {
-                return null;
-            }
+    public Optional<TypeMirror> getSuperClass(TypeMirror mirror) {
+        return switch (mirror) {
+            case ArrayType ignored -> Optional.of(getType(Object.class));
+            case DeclaredType declaredType when declaredType.asElement() instanceof TypeElement typeElement
+                    && typeElement.getSuperclass() != null
+                    && typeElement.getSuperclass().getKind() != TypeKind.NONE -> Optional.ofNullable(typeElement.getSuperclass());
+            default -> Optional.empty();
         };
     }
 
-    @SuppressWarnings("unchecked")
-    private <A extends Annotation> A getMethodStubAnnotation(Class<A> annotationType) {
-        if(annotationType.getName().equals(ProtobufDeserializer.class.getName())) {
-            return (A) new ProtobufDeserializer() {
-                @Override
-                public Class<? extends Annotation> annotationType() {
-                    return ProtobufDeserializer.class;
-                }
-
-                @Override
-                public BuilderBehaviour builderBehaviour() {
-                    return BuilderBehaviour.DISCARD;
-                }
-
-                @Override
-                public String warning() {
-                    return "";
-                }
-            };
-        }else if(annotationType.getName().equals(ProtobufSerializer.class.getName())) {
-            return (A) new ProtobufSerializer() {
-                @Override
-                public Class<? extends Annotation> annotationType() {
-                    return ProtobufSerializer.class;
-                }
-
-                @Override
-                public GroupProperty[] groupProperties() {
-                    return new GroupProperty[0];
-                }
-
-                @Override
-                public String warning() {
-                    return "";
-                }
-            };
-        }else {
-            return null;
+    public Optional<TypeElement> getSuperClass(TypeElement typeElement) {
+        var superClass = typeElement.getSuperclass();
+        if(superClass == null || superClass.getKind() == TypeKind.NONE) {
+            return Optional.empty();
         }
-    }
 
-    private VariableElement createMethodStubParameter(TypeMirror from) {
-        return new VariableElement() {
-            @Override
-            public TypeMirror asType() {
-                return from;
-            }
-
-            @Override
-            public Object getConstantValue() {
-                return null;
-            }
-
-            @Override
-            public Name getSimpleName() {
-                return processingEnv.getElementUtils().getName("input");
-            }
-
-            @Override
-            public Element getEnclosingElement() {
-                return null;
-            }
-
-            @Override
-            public ElementKind getKind() {
-                return ElementKind.PARAMETER;
-            }
-
-            @Override
-            public Set<Modifier> getModifiers() {
-                return Set.of();
-            }
-
-            @Override
-            public List<? extends Element> getEnclosedElements() {
-                return List.of();
-            }
-
-            @Override
-            public List<? extends AnnotationMirror> getAnnotationMirrors() {
-                return List.of();
-            }
-
-            @Override
-            public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-                return null;
-            }
-
-            @Override
-            public <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationType) {
-                return null;
-            }
-
-            @Override
-            public <R, P> R accept(ElementVisitor<R, P> v, P p) {
-                return null;
-            }
-        };
-    }
-
-    private TypeMirror createMethodStubType() {
-        return new TypeMirror() {
-            @Override
-            public TypeKind getKind() {
-                return TypeKind.EXECUTABLE;
-            }
-
-            @Override
-            public List<? extends AnnotationMirror> getAnnotationMirrors() {
-                return List.of();
-            }
-
-            @Override
-            public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-                return null;
-            }
-
-            @Override
-            public <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationType) {
-                return null;
-            }
-
-            @Override
-            public <R, P> R accept(TypeVisitor<R, P> v, P p) {
-                return null;
-            }
-        };
+        var superClassElement = ((DeclaredType) superClass).asElement();
+        return Optional.of((TypeElement) superClassElement);
     }
 
     public ProtobufProperty getProperty(ProtobufGetter getter) {
@@ -728,141 +512,15 @@ public class Types {
     }
 
     public String getPropertyName(String string) {
-        if(string.toLowerCase().startsWith(GETTER_PREFIX)) {
-            return string.length() < GETTER_PREFIX.length() + 1 ? "" : string.substring(GETTER_PREFIX.length() + 1);
+        if (!string.toLowerCase().startsWith(GETTER_PREFIX)) {
+            return string;
         }
 
-        return string;
-    }
-
-    public TypeElement createClassStub(String name) {
-        return new StubTypeElement(name);
-    }
-
-    public List<TypeElement> getMixins(ProtobufSerializer.GroupProperty groupProperty) {
-        return getMirroredTypes(groupProperty::mixins);
-    }
-
-    private final class StubTypeElement implements TypeElement {
-        private final String name;
-        private StubTypeElement(String name) {
-            this.name = name;
+        var start = GETTER_PREFIX.length() + 1;
+        if (string.length() <= start) {
+            return "";
         }
 
-        @Override
-        public TypeMirror asType() {
-            return new DeclaredType() {
-                @Override
-                public Element asElement() {
-                    return StubTypeElement.this;
-                }
-
-                @Override
-                public TypeMirror getEnclosingType() {
-                    return null;
-                }
-
-                @Override
-                public List<? extends TypeMirror> getTypeArguments() {
-                    return List.of();
-                }
-
-                @Override
-                public TypeKind getKind() {
-                    return TypeKind.DECLARED;
-                }
-
-                @Override
-                public List<? extends AnnotationMirror> getAnnotationMirrors() {
-                    return List.of();
-                }
-
-                @Override
-                public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-                    return null;
-                }
-
-                @Override
-                public <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationType) {
-                    return null;
-                }
-
-                @Override
-                public <R, P> R accept(TypeVisitor<R, P> v, P p) {
-                    return null;
-                }
-            };
-        }
-
-        @Override
-        public List<? extends Element> getEnclosedElements() {
-            return List.of();
-        }
-
-        @Override
-        public NestingKind getNestingKind() {
-            return NestingKind.TOP_LEVEL;
-        }
-
-        @Override
-        public Name getQualifiedName() {
-            return processingEnv.getElementUtils().getName(name);
-        }
-
-        @Override
-        public Name getSimpleName() {
-            var parts = name.split("\\.");
-            return processingEnv.getElementUtils().getName(parts[parts.length - 1]);
-        }
-
-        @Override
-        public TypeMirror getSuperclass() {
-            return getType(Object.class);
-        }
-
-        @Override
-        public List<? extends TypeMirror> getInterfaces() {
-            return List.of();
-        }
-
-        @Override
-        public List<? extends TypeParameterElement> getTypeParameters() {
-            return List.of();
-        }
-
-        @Override
-        public Element getEnclosingElement() {
-            return null;
-        }
-
-        @Override
-        public ElementKind getKind() {
-            return ElementKind.CLASS;
-        }
-
-        @Override
-        public Set<Modifier> getModifiers() {
-            return Set.of(Modifier.PUBLIC);
-        }
-
-        @Override
-        public List<? extends AnnotationMirror> getAnnotationMirrors() {
-            return List.of();
-        }
-
-        @Override
-        public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
-            return null;
-        }
-
-        @Override
-        public <A extends Annotation> A[] getAnnotationsByType(Class<A> annotationType) {
-            return null;
-        }
-
-        @Override
-        public <R, P> R accept(ElementVisitor<R, P> v, P p) {
-            return null;
-        }
+        return string.substring(start);
     }
 }

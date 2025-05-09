@@ -2,18 +2,14 @@ package it.auties.proto.features.message.defaltValue;
 
 import it.auties.protobuf.annotation.ProtobufDefaultValue;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
-import it.auties.protobuf.annotation.ProtobufMessage;
-import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufSerializer;
 import it.auties.protobuf.model.ProtobufString;
-import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
 
-@ProtobufMessage
 public final class OptionalMessage {
     private static final OptionalMessage EMPTY = new OptionalMessage(null);
 
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
     private final ProtobufString value;
     private OptionalMessage(ProtobufString value) {
         this.value = value;
@@ -29,6 +25,7 @@ public final class OptionalMessage {
         return value == null ? EMPTY : new OptionalMessage(value);
     }
 
+    @ProtobufSerializer
     public ProtobufString value() {
         return value;
     }
@@ -48,7 +45,7 @@ public final class OptionalMessage {
 
     @Override
     public String toString() {
-        return "WrapperMessage[" +
+        return "OptionalMessage[" +
                 "value=" + value + ']';
     }
 }

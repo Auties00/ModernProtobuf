@@ -8,6 +8,10 @@ public class ProtobufDeserializationException extends ProtobufException {
         super(message);
     }
 
+    public ProtobufDeserializationException(Throwable cause) {
+        super(cause);
+    }
+
     public static ProtobufDeserializationException truncatedMessage() {
         return new ProtobufDeserializationException("A message ended unexpectedly");
     }

@@ -2,13 +2,12 @@ package it.auties.protobuf.serialization.generator.method.serialization;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
-import it.auties.protobuf.serialization.model.converter.ProtobufAttributedConverterElement;
+import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterSerializer;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.BodyWriter;
+import it.auties.protobuf.serialization.writer.BodyWriter;
 
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
 import java.util.ArrayList;
@@ -155,7 +154,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     OUTPUT_OBJECT_PARAMETER,
                     writeMethod.get(),
                     index,
-                    cast ? "(%s) ".formatted(type.protobufType().wrapperType().getName()) : "",
+                    cast ? "(%s) ".formatted(type.protobufType().serializedWrappedType().getName()) : "",
                     propertyName
             );
             streamWriter.handle(nestedWriters.getLast(), propertyName, List.of(result));
@@ -167,12 +166,11 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         }
     }
 
-    private String getMessageMethod(int index, ProtobufAttributedConverterElement.Serializer serializer, String propertyName) {
-        var parent = (TypeElement) serializer.delegate().getEnclosingElement();
+    private String getMessageMethod(int index, ProtobufAttributedConverterSerializer serializer, String propertyName) {
         return "%s.writeMessage(%s, %s.%s(%s));".formatted(
                 OUTPUT_OBJECT_PARAMETER,
                 index,
-                parent.getQualifiedName(),
+                serializer.delegate().ownerName(),
                 ProtobufSizeGenerator.METHOD_NAME,
                 propertyName
         );
@@ -194,7 +192,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
 
     // Creates the method invocation for a given serializer using a valueType argument
     // Serializers cannot be constructors, we can assume that because of PreliminaryChecks
-    private String createSerializerInvocation(ProtobufAttributedConverterElement.Serializer serializer, String value, int groupIndex) {
+    private String createSerializerInvocation(ProtobufAttributedConverterSerializer serializer, String value, int groupIndex) {
         // If the serializer isn't static, invoke the serializer method on the valueType instance with no parameters
         // We can assume that the valueType on which the method is called will not be a message, enum or group because of PreliminaryChecks
         // class Wrapper {
@@ -203,14 +201,13 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         //        ...
         //    }
         // }
-        if (!serializer.delegate().getModifiers().contains(Modifier.STATIC)) {
-            return "%s.%s()".formatted(value, serializer.delegate().getSimpleName());
+        if (!serializer.delegate().modifiers().contains(Modifier.STATIC)) {
+            return "%s.%s()".formatted(value, serializer.delegate().name());
         }
 
         // If the serializer was declared in a mixin, access the type of the mixin
         // Casting TypeElement should be fine here because a method's parent must be a class-like or interface program element
-        var parent = (TypeElement) serializer.delegate().getEnclosingElement();
-        return switch (serializer.delegate().getParameters().size()) {
+        return switch (serializer.delegate().parameters().size()) {
             // If the method only takes a parameter this is a normal mixin serializer, so we invoke the static method using valueType as a parameter
             // @ProtobufMixin
             // class SomeMixin {
@@ -220,8 +217,8 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
             //    }
             // }
             case 1 -> "%s.%s(%s)".formatted(
-                    parent.getQualifiedName(),
-                    serializer.delegate().getSimpleName(),
+                   serializer.delegate().ownerName(),
+                    serializer.delegate().name(),
                     value
             );
 
@@ -234,14 +231,14 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
             //    }
             // }
             case 2 -> "%s.%s(%s, %s)".formatted(
-                    parent.getQualifiedName(),
-                    serializer.delegate().getSimpleName(),
+                    serializer.delegate().ownerName(),
+                    serializer.delegate().name(),
                     value,
                     OUTPUT_OBJECT_PARAMETER
             );
 
             // If the method takes three parameters, this is a special case
-            // In fact the only serializers allowed to take two parameters are synthetic serializers defined in the Spec class for groups
+            // In fact the only serializers allowed to take three parameters are synthetic serializers defined in the Spec class for groups
             // We can assume this because of PreliminaryChecks
             // public class GroupSpec {
             //     public static void encode(int protoGroupIndex, GroupRecord protoInputObject, ProtobufOutputStream protoOutputStream) {
@@ -249,8 +246,8 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
             //     }
             // }
             case 3 -> "%s.%s(%s, %s, %s)".formatted(
-                    parent.getQualifiedName(),
-                    serializer.delegate().getSimpleName(),
+                    serializer.delegate().ownerName(),
+                    serializer.delegate().name(),
                     groupIndex,
                     value,
                     OUTPUT_OBJECT_PARAMETER
@@ -259,9 +256,9 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
             // This should never happen
             default -> throw new IllegalArgumentException(
                     "Unexpected number of arguments for serializer "
-                            +  serializer.delegate().getSimpleName()
+                            +  serializer.delegate().name()
                             + " in "
-                            + parent.getQualifiedName()
+                            + serializer.delegate().ownerName()
             );
         };
     }

@@ -18,7 +18,7 @@ public class GoogleProtocTest {
                 .setFixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
                 .setSfixed32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
                 .setInt32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
-                .setUint32(random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE))
+                .setUint32(random.nextInt(0, Integer.MAX_VALUE))
                 .setFixed64(random.nextLong(Long.MIN_VALUE, Long.MAX_VALUE))
                 .setSfixed64(random.nextLong(Long.MIN_VALUE, Long.MAX_VALUE))
                 .setBool(random.nextBoolean())
@@ -26,13 +26,13 @@ public class GoogleProtocTest {
                 .setFloat(random.nextFloat(Float.MIN_VALUE, Float.MAX_VALUE))
                 .build();
         var modernDecoded = ModernScalarMessageSpec.decode(googleMessage.toByteArray());
-        equals(modernDecoded, googleMessage);
+        assertEquals(modernDecoded, googleMessage);
         var modernEncoded = ModernScalarMessageSpec.encode(modernDecoded);
         var modernDecoded1 = ModernScalarMessageSpec.decode(modernEncoded);
-        equals(modernDecoded, modernDecoded1);
+        assertEquals(modernDecoded, modernDecoded1);
     }
 
-    private void equals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
+    private void assertEquals(ModernScalarMessage modernScalarMessage, ModernScalarMessage modernDecoded) {
         Assertions.assertEquals(modernScalarMessage.fixed32(), modernDecoded.fixed32());
         Assertions.assertEquals(modernScalarMessage.sfixed32(), modernDecoded.sfixed32());
         Assertions.assertEquals(modernScalarMessage.int32(), modernDecoded.int32());
@@ -45,10 +45,10 @@ public class GoogleProtocTest {
         Assertions.assertEquals(modernScalarMessage._double(), modernDecoded._double());
         Assertions.assertEquals(modernScalarMessage.bool(), modernDecoded.bool());
         Assertions.assertEquals(modernScalarMessage.string(), modernDecoded.string());
-        equals(modernScalarMessage.bytes(), modernDecoded.bytes());
+        assertEquals(modernScalarMessage.bytes(), modernDecoded.bytes());
     }
 
-    private void equals(ModernScalarMessage modernDecoded, GoogleScalarMessage oldDecoded) {
+    private void assertEquals(ModernScalarMessage modernDecoded, GoogleScalarMessage oldDecoded) {
         Assertions.assertEquals(modernDecoded.fixed32(), oldDecoded.getFixed32());
         Assertions.assertEquals(modernDecoded.sfixed32(), oldDecoded.getSfixed32());
         Assertions.assertEquals(modernDecoded.int32(), oldDecoded.getInt32());
@@ -60,15 +60,15 @@ public class GoogleProtocTest {
         Assertions.assertEquals(modernDecoded._float(), oldDecoded.getFloat());
         Assertions.assertEquals(modernDecoded._double(), oldDecoded.getDouble());
         Assertions.assertEquals(modernDecoded.bool(), oldDecoded.getBool());
-        Assertions.assertTrue( modernDecoded.string().contentEquals(oldDecoded.getString()));
-        equals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
+        Assertions.assertEquals(modernDecoded.string().toString(), oldDecoded.getString());
+        assertEquals(modernDecoded.bytes(), oldDecoded.getBytes().toByteArray());
     }
 
-    private void equals(ByteBuffer buffer, byte[] array) {
-        equals(buffer, ByteBuffer.wrap(array));
+    private void assertEquals(ByteBuffer buffer, byte[] array) {
+        assertEquals(buffer, ByteBuffer.wrap(array));
     }
 
-    private void equals(ByteBuffer buffer, ByteBuffer other) {
+    private void assertEquals(ByteBuffer buffer, ByteBuffer other) {
         Assertions.assertEquals(buffer.remaining(), other.remaining());
         var bufferPosition = buffer.position();
         var otherPosition = other.position();

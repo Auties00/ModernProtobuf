@@ -5,6 +5,7 @@ import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufReservedRange;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.object.ProtobufReservedIndex;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,7 +30,7 @@ public final class Reserved {
         };
     }
 
-    public static Set<ProtobufObjectElement.ReservedIndex> getIndexes(ProtobufObjectElement objectElement) {
+    public static Set<ProtobufReservedIndex> getIndexes(ProtobufObjectElement objectElement) {
         return switch (objectElement.type()) {
             case MESSAGE -> {
                 var message = objectElement.element().getAnnotation(ProtobufMessage.class);
@@ -47,14 +48,14 @@ public final class Reserved {
         };
     }
 
-    private static Set<ProtobufObjectElement.ReservedIndex> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
-        var results = new HashSet<ProtobufObjectElement.ReservedIndex>();
+    private static Set<ProtobufReservedIndex> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
+        var results = new HashSet<ProtobufReservedIndex>();
         for(var index : indexes) {
-            results.add(new ProtobufObjectElement.ReservedIndex.Value(index));
+            results.add(new ProtobufReservedIndex.Value(index));
         }
 
         for(var range : ranges) {
-            results.add(new ProtobufObjectElement.ReservedIndex.Range(range.min(), range.max()));
+            results.add(new ProtobufReservedIndex.Range(range.min(), range.max()));
         }
 
         return Collections.unmodifiableSet(results);

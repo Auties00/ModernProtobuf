@@ -1,4 +1,4 @@
-package it.auties.proto.features.group.convertion.map;
+package it.auties.proto.features.group.conversion.map;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufEnum;

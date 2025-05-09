@@ -3,8 +3,8 @@ package it.auties.protobuf.serialization.generator.method.deserialization.group;
 import it.auties.protobuf.serialization.generator.method.deserialization.ProtobufDeserializationGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter;
-import it.auties.protobuf.serialization.support.JavaWriter.ClassWriter.MethodWriter;
+import it.auties.protobuf.serialization.writer.ClassWriter;
+import it.auties.protobuf.serialization.writer.MethodWriter;
 
 import java.util.List;
 
