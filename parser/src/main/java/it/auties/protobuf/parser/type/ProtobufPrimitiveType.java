@@ -41,15 +41,13 @@ public final class ProtobufPrimitiveType implements ProtobufTypeReference {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (ProtobufPrimitiveType) obj;
-        return Objects.equals(this.protobufType, that.protobufType);
+    public boolean equals(Object o) {
+        return o instanceof ProtobufPrimitiveType that
+                && protobufType == that.protobufType;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(protobufType);
+        return Objects.hashCode(protobufType);
     }
 }

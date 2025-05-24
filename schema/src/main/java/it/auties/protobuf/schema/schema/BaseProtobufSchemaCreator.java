@@ -15,11 +15,7 @@ import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
-import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
-import it.auties.protobuf.parser.tree.nested.field.ProtobufGroupableFieldTree;
+import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -29,7 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, ?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
+abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
     private static final String SRC_MAIN_JAVA = "src.main.java.";
     private static final String SRC_TEST_JAVA = "src.test.java.";
 
@@ -221,11 +217,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
             compilationUnit.setPackageDeclaration(packageName);
         }
 
-        if(protoStatement instanceof ProtobufMessageTree || protoStatement.getStatementRecursive(ProtobufMessageTree.class).isPresent()) {
+        if(protoStatement instanceof ProtobufMessageTree || protoStatement.getAnyChildByType(ProtobufMessageTree.class).isPresent()) {
             compilationUnit.addImport(ProtobufMessage.class.getName());
         }
 
-        if(protoStatement instanceof ProtobufEnumTree || protoStatement.getStatementRecursive(ProtobufEnumTree.class).isPresent()){
+        if(protoStatement instanceof ProtobufEnumTree || protoStatement.getAnyChildByType(ProtobufEnumTree.class).isPresent()){
             compilationUnit.addImport(ProtobufEnum.class.getName());
             compilationUnit.addImport(ProtobufEnumIndex.class.getName());
         }
@@ -249,21 +245,21 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
             }
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type.REQUIRED)){
+        if(hasFieldsWithModifier(ProtobufFieldModifier.Type.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type.REPEATED)){
+        if(hasFieldsWithModifier(ProtobufFieldModifier.Type.REPEATED)){
             compilationUnit.addImport(List.class.getName());
         }
 
         return new CompilationUnitResult(compilationUnit, false);
     }
 
-    private boolean hasFields(ProtobufObjectTree statement) {
-        return statement instanceof ProtobufMessageTree messageTree && messageTree.statements()
+    private boolean hasFields(ProtobufBlock statement) {
+        return statement instanceof ProtobufMessageTree messageTree && messageTree.children()
                 .stream()
-                .anyMatch(entry -> entry instanceof ProtobufGroupableFieldTree
+                .anyMatch(entry -> entry instanceof ProtobufFieldStatement
                         || (entry instanceof ProtobufMessageTree nestedMessageTree && hasFields(nestedMessageTree)));
     }
 
@@ -271,15 +267,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
 
     }
 
-    private boolean hasFieldsWithModifier(ProtobufFieldTree.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufFieldModifier.Type modifier) {
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufObjectTree<?, ?> statement, ProtobufFieldTree.Modifier.Type modifier) {
-        return statement.statements()
+    private boolean hasFieldsWithModifier(ProtobufBlock<?, ?> statement, ProtobufFieldModifier.Type modifier) {
+        return statement.children()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithModifier(messageStatement, modifier))
-                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.modifier().map(ProtobufFieldTree.Modifier::type).orElse(null) == modifier));
+                        || (entry instanceof ProtobufFieldStatement fieldStatement && fieldStatement.modifier().map(ProtobufFieldModifier::type).orElse(null) == modifier));
 
     }
 
@@ -287,26 +283,26 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
         return hasFieldsWithType(protoStatement, types);
     }
 
-    private boolean hasFieldsWithType(ProtobufObjectTree<?, ?> statement, ProtobufType... types) {
+    private boolean hasFieldsWithType(ProtobufBlock<?, ?> statement, ProtobufType... types) {
         var typesSet = Set.of(types);
-        return statement.statements()
+        return statement.children()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithType(messageStatement, types))
-                        || (entry instanceof ProtobufGroupableFieldTree fieldStatement && fieldStatement.type().isPresent() && typesSet.contains(fieldStatement.type().get().protobufType())));
+                        || (entry instanceof ProtobufFieldStatement fieldStatement && fieldStatement.type().isPresent() && typesSet.contains(fieldStatement.type().get().protobufType())));
 
     }
 
     void addReservedAnnotation(TypeDeclaration<?> ctEnum) {
-        if(!(protoStatement instanceof ProtobufObjectTree<?, ?> protobufReservable) || protobufReservable.reserved().isEmpty()){
+        if(!(protoStatement instanceof ProtobufBlock<?, ?> protobufReservable) || protobufReservable.reserved().isEmpty()){
             return;
         }
 
         var annotation = getOrAddAnnotation(ctEnum, ProtobufEnum.class);
         var indexes = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufObjectTree<?, ?>.ReservedIndexes)
-                .map(entry -> (ProtobufObjectTree<?, ?>.ReservedIndexes) entry)
-                .map(ProtobufObjectTree.ReservedIndexes::values)
+                .filter(entry -> entry instanceof ProtobufBlock<?, ?>.ReservedIndexes)
+                .map(entry -> (ProtobufBlock<?, ?>.ReservedIndexes) entry)
+                .map(ProtobufBlock.ReservedIndexes::values)
                 .flatMap(Collection::stream)
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
@@ -316,9 +312,9 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
 
         var names = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufObjectTree<?, ?>.ReservedNames)
-                .map(entry -> (ProtobufObjectTree<?, ?>.ReservedNames) entry)
-                .map(ProtobufObjectTree.ReservedNames::values)
+                .filter(entry -> entry instanceof ProtobufBlock<?, ?>.ReservedNames)
+                .map(entry -> (ProtobufBlock<?, ?>.ReservedNames) entry)
+                .map(ProtobufBlock.ReservedNames::values)
                 .flatMap(Collection::stream)
                 .map(StringLiteralExpr::new)
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
@@ -328,8 +324,8 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufObjectTree<?, 
 
         var ranges = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufObjectTree.ReservedRange)
-                .map(entry -> (ProtobufObjectTree.ReservedRange) entry)
+                .filter(entry -> entry instanceof ProtobufBlock.ReservedRange)
+                .map(entry -> (ProtobufBlock.ReservedRange) entry)
                 .flatMap(entry -> Stream.of(entry.min().orElseThrow(), entry.max().orElseThrow()))
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));

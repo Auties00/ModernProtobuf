@@ -1,0 +1,4 @@
+message Example {
+  required string abc = 1;
+  extensions 1;
+}

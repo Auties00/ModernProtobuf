@@ -11,8 +11,7 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.nested.field.ProtobufFieldTree;
+import it.auties.protobuf.parser.tree.ProtobufEnumTree;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;
@@ -60,10 +59,10 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
     }
 
     private void createEnumConstants(EnumDeclaration ctEnum) {
-        protoStatement.statements().forEach(statement -> createEnumConstant(ctEnum, statement));
+        protoStatement.children().forEach(statement -> createEnumConstant(ctEnum, statement));
     }
 
-    private void createEnumConstant(EnumDeclaration ctEnum, ProtobufFieldTree statement) {
+    private void createEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         var existing = getEnumConstant(ctEnum, statement);
         if(existing.isPresent()){
             return;
@@ -73,14 +72,14 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
         name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index().orElseThrow())));
     }
 
-    private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufFieldTree statement) {
+    private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         return ctEnum.getEntries()
                 .stream()
                 .filter(entry -> getEnumConstant(statement, entry))
                 .findFirst();
     }
 
-    private boolean getEnumConstant(ProtobufFieldTree statement, EnumConstantDeclaration entry) {
+    private boolean getEnumConstant(ProtobufFieldStatement statement, EnumConstantDeclaration entry) {
         if (entry.getArguments().isEmpty()) {
             return false;
         }

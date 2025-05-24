@@ -8,9 +8,9 @@ import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration.ConfigOption;
 import com.github.javaparser.printer.configuration.imports.IntelliJImportOrderingStrategy;
 import it.auties.protobuf.parser.tree.ProtobufTree;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.ProtobufDocumentTree;
+import it.auties.protobuf.parser.tree.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.ProtobufMessageTree;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 
 public record ProtobufSchemaCreator(ProtobufDocumentTree document, File directory) {
     public void generate(List<CompilationUnit> classPool, boolean mutable, boolean nullable) {
-        var results = document.statements()
+        var results = document.children()
                 .stream()
                 .map(entry -> generate(entry, mutable, nullable, classPool))
                 .toList();
@@ -75,7 +75,7 @@ public record ProtobufSchemaCreator(ProtobufDocumentTree document, File director
     }
 
     public void update(boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
-        var results = document.statements()
+        var results = document.children()
                 .stream()
                 .map(entry -> update(entry, mutable, nullable, classPool))
                 .flatMap(Optional::stream)

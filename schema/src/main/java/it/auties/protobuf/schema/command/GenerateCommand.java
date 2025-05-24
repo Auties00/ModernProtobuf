@@ -2,7 +2,7 @@ package it.auties.protobuf.schema.command;
 
 import com.github.javaparser.ast.CompilationUnit;
 import it.auties.protobuf.parser.ProtobufParser;
-import it.auties.protobuf.parser.tree.body.document.ProtobufDocumentTree;
+import it.auties.protobuf.parser.tree.ProtobufDocumentTree;
 import it.auties.protobuf.schema.schema.ProtobufSchemaCreator;
 import it.auties.protobuf.schema.util.AstUtils;
 import it.auties.protobuf.schema.util.LogProvider;

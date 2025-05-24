@@ -28,18 +28,18 @@ public sealed abstract class ProtobufConverterMethod {
     }
 
     public static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized) {
-        return new Concrete(element, parametrized);
+        return new Element(element, parametrized);
     }
 
     public static ProtobufConverterMethod of(String owner, Set<Modifier> modifiers, TypeMirror returnType, String name, TypeMirror... parameters) {
         return new Synthetic(owner, modifiers, returnType, name, parameters);
     }
 
-    private static final class Concrete extends ProtobufConverterMethod {
+    private static final class Element extends ProtobufConverterMethod {
         private final ExecutableElement element;
         private final boolean parametrized;
 
-        private Concrete(ExecutableElement element, boolean parametrized) {
+        private Element(ExecutableElement element, boolean parametrized) {
             this.element = element;
             this.parametrized = parametrized;
         }
@@ -90,7 +90,7 @@ public sealed abstract class ProtobufConverterMethod {
 
         @Override
         public boolean equals(Object obj) {
-            return obj instanceof Concrete that
+            return obj instanceof Element that
                     && Objects.equals(element, that.element);
         }
 

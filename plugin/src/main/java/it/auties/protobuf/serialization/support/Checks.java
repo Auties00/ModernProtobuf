@@ -343,7 +343,10 @@ public class Checks {
     private void checkAnnotation(RoundEnvironment roundEnv, Class<? extends Annotation> protobufMessageClass, String error, ElementKind... elementKind) {
         var kinds = Set.of(elementKind);
         for(var element : roundEnv.getElementsAnnotatedWith(protobufMessageClass)) {
-            if(!kinds.contains(element.getKind())) {
+            if(element.getModifiers().contains(Modifier.PRIVATE)) {
+                messages.printError("Weak visibility: a method annotated with @" + protobufMessageClass.getSimpleName() + " must have at least package-private visibility", element);
+                return;
+            }else if(!kinds.contains(element.getKind())) {
                 messages.printError(error, element);
             }
         }

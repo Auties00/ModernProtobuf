@@ -1,16 +1,16 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.body.object.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufMessageTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufObjectTree;
+import it.auties.protobuf.parser.tree.ProtobufBlock;
+import it.auties.protobuf.parser.tree.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.ProtobufMessageTree;
 
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufObjectTree<?, ?> declaration;
+    private ProtobufBlock<?, ?> declaration;
 
     public static ProtobufObjectType unattributed(String typeName){
         return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
@@ -27,7 +27,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
 
     @Override
     public ProtobufType protobufType() {
-        if(declaration == null) {
+        if (declaration == null) {
             return ProtobufType.UNKNOWN;
         }
 
@@ -44,7 +44,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return name();
     }
 
-    public Optional<ProtobufObjectTree<?, ?>> declaration() {
+    public Optional<ProtobufBlock<?, ?>> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -53,7 +53,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufObjectTree<?, ?> statement) {
+    public void attribute(ProtobufBlock<?, ?> statement) {
         this.declaration = statement;
     }
 }

@@ -1,8 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.body.ProtobufBodyTree;
-import it.auties.protobuf.parser.tree.body.object.ProtobufGroupTree;
+import it.auties.protobuf.parser.tree.ProtobufGroupTree;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -25,16 +24,17 @@ public final class ProtobufGroupType implements ProtobufTypeReference {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
     public ProtobufType protobufType() {
         return ProtobufType.GROUP;
     }
 
     @Override
     public String name() {
-        return Optional.ofNullable(declaration)
-                .flatMap(ProtobufBodyTree::qualifiedCanonicalName)
-                .orElse(name);
+        if(declaration == null) {
+            return name;
+        }
+
+        return declaration.qualifiedCanonicalName();
     }
 
     @Override

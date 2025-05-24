@@ -1,0 +1,8 @@
+message Example {
+  extensions 10;
+  optional string abc = 9;
+}
+
+extend Example {
+  optional string abc = 10;
+}

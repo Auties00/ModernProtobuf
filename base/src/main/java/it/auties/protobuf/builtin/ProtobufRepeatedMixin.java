@@ -15,6 +15,11 @@ public class ProtobufRepeatedMixin {
     }
 
     @ProtobufDefaultValue
+    public static <T> SequencedCollection<T> newSequencedCollection() {
+        return new ArrayList<>();
+    }
+
+    @ProtobufDefaultValue
     public static <T> List<T> newList() {
         return new ArrayList<>();
     }
@@ -32,6 +37,11 @@ public class ProtobufRepeatedMixin {
     @ProtobufDefaultValue
     public static <T> Deque<T> newDeque() {
         return new LinkedList<>();
+    }
+
+    @ProtobufDefaultValue
+    public static <T> SequencedSet<T> newSequencedSet() {
+        return new LinkedHashSet<>();
     }
 
     @ProtobufDefaultValue

@@ -9,7 +9,6 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 // Let's consider the following transformations:
@@ -62,7 +61,7 @@ import java.util.stream.Collectors;
 public final class ProtobufConverterGraph {
     private final Types types;
     private final Set<Node> nodes;
-    private int maxTypeArguments;
+
     public ProtobufConverterGraph(Types types) {
         this.types = types;
         this.nodes = new HashSet<>();
@@ -74,110 +73,58 @@ public final class ProtobufConverterGraph {
 
     public void link(TypeMirror from, TypeMirror to, TypeMirror rawGroupOwner, ProtobufConverterMethod arc, String warning) {
         var node = new Node(from, to, arc, rawGroupOwner, warning);
-        if (!nodes.add(node)) {
-            return;
-        }
-
-        var fromGenericLevel = countTypeArguments(from);
-        if (fromGenericLevel > maxTypeArguments) {
-            this.maxTypeArguments = fromGenericLevel;
-        }
-
-        var toGenericLevel = countTypeArguments(to);
-        if (toGenericLevel > maxTypeArguments) {
-            this.maxTypeArguments = toGenericLevel;
-        }
+        nodes.add(node);
     }
 
     public List<ProtobufConverterArc> findPath(TypeMirror from, TypeMirror to, List<TypeElement> mixins) {
         var mixinsSet = Set.copyOf(mixins);
-        return findPath(from, from, to, mixinsSet);
+        return findAnyPath(from, from, to, mixinsSet);
     }
 
-    // Finds a path using a Node from currentTo to currentFrom with a set of mixins
-    private List<ProtobufConverterArc> findPath(Node node, TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<TypeElement> mixins) {
-        var arc = new ProtobufConverterArc(node.arc(), node.arc().returnType(), node.warning());
-        if (types.isAssignable(currentTo, node.to()) && isPathLegal(node, originalFrom, currentFrom, currentTo, mixins)) {
-            if (node.arc().parametrized()) {
-                return findParametrizedPath(node, currentFrom, currentTo, mixins);
-            } else {
-                return List.of(arc);
-            }
-        } else {
-            if (node.arc().parametrized()) {
-                return findParametrizedPath(node, currentFrom, currentTo, mixins);
-            }else {
-                var nested = findPath(currentFrom, node.to(), currentTo, mixins);
-                if (nested.isEmpty()) {
-                    return List.of();
-                }
-
-                if (node.rawGroupOwner() != null && !isPathLegal(node, currentFrom, currentFrom, currentTo, mixins)) {
-                    return List.of();
-                }
-
-                return ProtobufConverterArcs.of(arc, nested);
-            }
-        }
-    }
-
-    private List<ProtobufConverterArc> findParametrizedPath(Node node, TypeMirror currentFrom, TypeMirror currentTo, Set<TypeElement> mixins) {
-        var returnType = node.arc()
-                .element()
-                .map(element -> types.getReturnType(element, List.of(currentFrom)))
-                .orElse(node.arc().returnType());
-        var arc = new ProtobufConverterArc(node.arc(), returnType, node.warning());
-        if (types.isAssignable(currentTo, returnType, false)) {
-            return List.of(arc);
-        }
-
-        var length = countTypeArguments(returnType);
-        if (length > maxTypeArguments && length > countTypeArguments(currentTo) && length > countTypeArguments(currentFrom)) {
-            return List.of();
-        }
-
-        var nested = findPath(currentFrom, returnType, currentTo, mixins);
-        if (nested.isEmpty()) {
-            return List.of();
-        }
-
-        if (node.rawGroupOwner() != null && !isPathLegal(node, currentFrom, currentFrom, currentTo, mixins)) {
-            return List.of();
-        }
-
-        return ProtobufConverterArcs.of(arc, nested);
-    }
-
-    private final ConcurrentMap<PathOwner, List<ProtobufConverterArc>> path = new ConcurrentHashMap<>();
-
-    private List<ProtobufConverterArc> findPath(TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<TypeElement> mixins) {
-        var owner = new PathOwner(originalFrom, currentFrom, currentTo, mixins);
-        var cached = path.get(owner);
-        if(cached != null) {
-            return cached;
-        }
-
-        // FIXME: use parallelStream instead of stream
-        //        for some reason this breaks compilation, even without a cache
-        //        there is probably something not thread safe somewhere
-        var result = nodes.stream()
-                .map(entry -> {
-                    if(!types.isAssignable(currentFrom, entry.from())) {
-                        return null;
-                    }
-
-                    var value = findPath(entry, originalFrom, currentFrom, currentTo, mixins);
-                    if(value.isEmpty()) {
-                        return null;
-                    }
-
-                    return value;
-                })
-                .filter(Objects::nonNull)
+    private List<ProtobufConverterArc> findAnyPath(TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<TypeElement> mixins) {
+        return nodes.parallelStream()
+                .map(entry -> findSubPath(originalFrom, currentFrom, currentTo, mixins, entry))
+                .filter(entry -> !entry.isEmpty())
                 .findFirst()
                 .orElse(List.of());
-        path.put(owner, result);
-        return result;
+    }
+
+    private List<ProtobufConverterArc> findSubPath(TypeMirror originalFrom, TypeMirror currentFrom, TypeMirror currentTo, Set<TypeElement> mixins, Node entry) {
+        if(!types.isAssignable(currentFrom, entry.from())) {
+            return List.of();
+        }else if (entry.arc().parametrized()) {
+            var returnType = entry.arc()
+                    .element()
+                    .map(element -> types.getReturnType(element, List.of(currentFrom)))
+                    .orElse(entry.arc().returnType());
+            var arc = new ProtobufConverterArc(entry.arc(), returnType, entry.warning());
+            if (types.isAssignable(currentTo, returnType, false)) {
+                return List.of(arc);
+            }
+
+            var length = countTypeArguments(returnType);
+            if (length > countTypeArguments(currentTo) && length > countTypeArguments(currentFrom)) {
+                return List.of();
+            }
+
+            var nested = findAnyPath(currentFrom, returnType, currentTo, mixins);
+            if (nested.isEmpty() || (entry.rawGroupOwner() != null && !isPathLegal(entry, currentFrom, currentFrom, currentTo, mixins))) {
+                return List.of();
+            }
+
+            return ProtobufConverterArcs.of(arc, nested);
+        } else if (types.isAssignable(currentTo, entry.to()) && isPathLegal(entry, originalFrom, currentFrom, currentTo, mixins)) {
+            var arc = new ProtobufConverterArc(entry.arc(), entry.arc().returnType(), entry.warning());
+            return List.of(arc);
+        }else {
+            var nested = findAnyPath(currentFrom, entry.to(), currentTo, mixins);
+            if (nested.isEmpty() || (entry.rawGroupOwner() != null && !isPathLegal(entry, currentFrom, currentFrom, currentTo, mixins))) {
+                return List.of();
+            }
+
+            var arc = new ProtobufConverterArc(entry.arc(), entry.arc().returnType(), entry.warning());
+            return ProtobufConverterArcs.of(arc, nested);
+        }
     }
 
     // Checks whether the call necessary to walk this path is legal
@@ -201,7 +148,9 @@ public final class ProtobufConverterGraph {
     // Checks whether the node's arc is inside the provided type
     // This check is necessary because non-object messages can be interpreted as messages if they contain a @ProtobufSerializer and @ProtobufDeserializer
     private boolean isPathLegalThroughInterpretedObject(Node node, TypeMirror type) {
-        return isSameType(type, node.arc().ownerName());
+        return type instanceof DeclaredType firstDeclaredType
+                && firstDeclaredType.asElement() instanceof TypeElement firstTypeElement
+                && firstTypeElement.getQualifiedName().contentEquals(node.arc().ownerName());
     }
 
     // Checks whether the node's arc is inside the spec of the provided type
@@ -214,24 +163,11 @@ public final class ProtobufConverterGraph {
     // Checks whether the node's arc is inside the spec of the raw group type
     // This check is necessary because groups can be converted from/to Map<Integer, Object> using decode/encode methods in the corresponding raw group spec class
     private boolean isPathLegalThroughGroup(Node node, TypeMirror originalFrom, TypeMirror to) {
-        return isSameType(originalFrom, node.rawGroupOwner())
-                || isSameType(to, node.rawGroupOwner());
-    }
-
-    // Checks if firstType's qualified name matches secondType's
-    private boolean isSameType(TypeMirror firstType, TypeMirror secondType) {
-        return  secondType instanceof DeclaredType secondDeclaredType
-                && secondDeclaredType.asElement() instanceof TypeElement secondTypeElement
-                && isSameType(firstType, secondTypeElement.getQualifiedName());
+        return types.isSameType(originalFrom, node.rawGroupOwner())
+                || types.isSameType(to, node.rawGroupOwner());
     }
 
     // Checks if firstType's qualified name matches secondTypeQualifiedName
-    private boolean isSameType(TypeMirror firstType, CharSequence secondTypeQualifiedName) {
-        return secondTypeQualifiedName != null
-                && firstType instanceof DeclaredType firstDeclaredType
-                && firstDeclaredType.asElement() instanceof TypeElement firstTypeElement
-                && firstTypeElement.getQualifiedName().contentEquals(secondTypeQualifiedName);
-    }
 
     // Counts the number of type arguments(not parameters) in a type
     private int countTypeArguments(TypeMirror type) {

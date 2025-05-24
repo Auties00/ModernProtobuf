@@ -2,4 +2,39 @@ import "google/protobuf/wrappers.proto";
 
 message Message {
     optional google.protobuf.Int64Value int64_value = 1;
+    required group Value = 2 [deprecated = true] {
+        required group Value = 2 [deprecated = true] {
+            message Message {
+
+            }
+            oneof abc {
+                group Value = 2000 [deprecated = true] {
+                    message Message {
+
+                    }
+                    oneof abc {
+
+                        string def = 7;
+                    }
+                    message Def {
+                        optional string def = 7;
+                    }
+                    option no_standard_descriptor_accessor = true;
+                    reserved 1 to 10;
+                    extensions 17 to 19;
+                    enum Enum {
+                        A = 0;
+                    }
+                    required Enum enum = 11;
+                }
+            }
+            option no_standard_descriptor_accessor = true;
+            reserved 1 to 10, 8;
+            extensions 17 to 19;
+            enum Enum {
+                A = 0;
+            }
+            required Enum enum = 11;
+        }
+    }
 }

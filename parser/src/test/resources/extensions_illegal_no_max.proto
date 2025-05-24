@@ -1,0 +1,3 @@
+message Example {
+  extensions 1 to;
+}

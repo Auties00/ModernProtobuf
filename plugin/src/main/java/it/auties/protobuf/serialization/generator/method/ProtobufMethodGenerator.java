@@ -103,7 +103,7 @@ public abstract class ProtobufMethodGenerator {
         return switch (accessor) {
             case ExecutableElement executableElement -> "%s.%s()".formatted(object, executableElement.getSimpleName());
             case VariableElement variableElement -> "%s.%s".formatted(object, variableElement.getSimpleName());
-            default -> throw new IllegalStateException("Unexpected valueType: " + accessor);
+            default -> throw new IllegalStateException("Unexpected value: " + accessor);
         };
     }
 

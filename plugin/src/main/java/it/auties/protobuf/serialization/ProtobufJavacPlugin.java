@@ -840,7 +840,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         return switch (accessor) {
             case VariableElement element -> element.asType();
             case ExecutableElement element -> element.getReturnType();
-            default -> throw new IllegalStateException("Unexpected valueType: " + accessor);
+            default -> throw new IllegalStateException("Unexpected value: " + accessor);
         };
     }
 
@@ -974,7 +974,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         var collectionDefaultValue = getCollectionDefaultValue(invoker, rawGroupRepeatedValueType != null && !types.isSameType(rawGroupRepeatedValueType, Object.class) ? types.getType(Collection.class) : elementType, mixins);
         if(collectionDefaultValue.isEmpty()) {
-            messages.printError("Type inference error: cannot determine collection's default valueType, provide one either in the definition or using a mixin", invoker);
+            messages.printError("Type inference error: cannot determine collection's default value, provide one either in the definition or using a mixin", invoker);
             return Optional.empty();
         }
 

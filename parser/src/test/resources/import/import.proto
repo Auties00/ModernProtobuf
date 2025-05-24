@@ -3,3 +3,5 @@ import "imported.proto";
 message ImportMessage {
     optional ImportedMessage imported = 1;
 }
+
+package abc;

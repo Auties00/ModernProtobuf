@@ -2,7 +2,8 @@ package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
 
-public sealed interface ProtobufTypeReference permits ProtobufGroupType, ProtobufMapType, ProtobufObjectType, ProtobufPrimitiveType {
+public sealed interface ProtobufTypeReference
+        permits ProtobufGroupType, ProtobufMapType, ProtobufObjectType, ProtobufPrimitiveType {
     String name();
     ProtobufType protobufType();
     boolean isAttributed();
