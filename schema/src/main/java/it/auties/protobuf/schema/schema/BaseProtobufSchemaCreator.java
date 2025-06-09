@@ -25,7 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
+abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?>> implements LogProvider permits EnumSchemaCreator, MessageSchemaCreator {
     private static final String SRC_MAIN_JAVA = "src.main.java.";
     private static final String SRC_TEST_JAVA = "src.test.java.";
 
@@ -271,7 +271,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> i
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufBlock<?, ?> statement, ProtobufFieldModifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufBlock<?> statement, ProtobufFieldModifier.Type modifier) {
         return statement.children()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageTree messageStatement && hasFieldsWithModifier(messageStatement, modifier))
@@ -283,7 +283,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> i
         return hasFieldsWithType(protoStatement, types);
     }
 
-    private boolean hasFieldsWithType(ProtobufBlock<?, ?> statement, ProtobufType... types) {
+    private boolean hasFieldsWithType(ProtobufBlock<?> statement, ProtobufType... types) {
         var typesSet = Set.of(types);
         return statement.children()
                 .stream()
@@ -293,15 +293,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> i
     }
 
     void addReservedAnnotation(TypeDeclaration<?> ctEnum) {
-        if(!(protoStatement instanceof ProtobufBlock<?, ?> protobufReservable) || protobufReservable.reserved().isEmpty()){
+        if(!(protoStatement instanceof ProtobufBlock<?> protobufReservable) || protobufReservable.reserved().isEmpty()){
             return;
         }
 
         var annotation = getOrAddAnnotation(ctEnum, ProtobufEnum.class);
         var indexes = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufBlock<?, ?>.ReservedIndexes)
-                .map(entry -> (ProtobufBlock<?, ?>.ReservedIndexes) entry)
+                .filter(entry -> entry instanceof ProtobufBlock<?>.ReservedIndexes)
+                .map(entry -> (ProtobufBlock<?>.ReservedIndexes) entry)
                 .map(ProtobufBlock.ReservedIndexes::values)
                 .flatMap(Collection::stream)
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry)))
@@ -312,8 +312,8 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufBlock<?, ?>> i
 
         var names = protobufReservable.reserved()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufBlock<?, ?>.ReservedNames)
-                .map(entry -> (ProtobufBlock<?, ?>.ReservedNames) entry)
+                .filter(entry -> entry instanceof ProtobufBlock<?>.ReservedNames)
+                .map(entry -> (ProtobufBlock<?>.ReservedNames) entry)
                 .map(ProtobufBlock.ReservedNames::values)
                 .flatMap(Collection::stream)
                 .map(StringLiteralExpr::new)

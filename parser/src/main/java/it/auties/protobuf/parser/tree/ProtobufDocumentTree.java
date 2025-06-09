@@ -9,15 +9,15 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 public final class ProtobufDocumentTree
-        extends ProtobufBlock<ProtobufDocumentTree, ProtobufDocumentChildTree> {
+        extends ProtobufBlock<ProtobufDocumentChildTree> {
     private final Path location;
     public ProtobufDocumentTree(Path location) {
         super(0, false);
         this.location = location;
     }
 
-    public Optional<Path> location() {
-        return Optional.ofNullable(location);
+    public Path location() {
+        return location;
     }
 
     public Optional<ProtobufVersion> syntax() {
@@ -38,50 +38,50 @@ public final class ProtobufDocumentTree
     }
 
     @Override
-    public Optional<ProtobufNameableTree> getDirectChildByName(String name){
+    public Optional<ProtobufNamedTree> getDirectChildByName(String name){
         return super.getDirectChildByName(name)
                 .or(() -> getImportedStatement(name));
     }
 
-    private Optional<ProtobufNameableTree> getImportedStatement(String name) {
+    private Optional<ProtobufNamedTree> getImportedStatement(String name) {
         return children.stream()
                 .filter(entry -> entry instanceof ProtobufImportStatement)
                 .map(entry -> (ProtobufImportStatement) entry)
                 .map(ProtobufImportStatement::document)
-                .flatMap(Optional::stream)
+                .filter(Objects::nonNull)
                 .map(imported -> imported.getDirectChildByName(name))
                 .flatMap(Optional::stream)
                 .findFirst();
     }
 
-    public <V extends ProtobufNameableTree> Optional<V> getChild(String name, Class<V> clazz) {
+    public <V extends ProtobufNamedTree> Optional<V> getChild(String name, Class<V> clazz) {
         return super.getDirectChildByNameAndType(name, clazz)
                 .or(() -> getImportedStatement(name, clazz));
     }
 
-    private <V extends ProtobufNameableTree> Optional<V> getImportedStatement(String name, Class<V> clazz) {
+    private <V extends ProtobufNamedTree> Optional<V> getImportedStatement(String name, Class<V> clazz) {
         return children.stream()
                 .filter(entry -> entry instanceof ProtobufImportStatement)
                 .map(entry -> (ProtobufImportStatement) entry)
                 .map(ProtobufImportStatement::document)
-                .flatMap(Optional::stream)
+                .filter(Objects::nonNull)
                 .map(imported -> imported.getChild(name, clazz))
                 .flatMap(Optional::stream)
                 .findFirst();
     }
 
     @Override
-    public <V extends ProtobufNameableTree> Optional<V> getAnyChildByNameAndType(String name, Class<V> clazz) {
+    public <V extends ProtobufNamedTree> Optional<V> getAnyChildByNameAndType(String name, Class<V> clazz) {
         return super.getAnyChildByNameAndType(name, clazz)
                 .or(() -> getImportedStatementRecursive(name, clazz));
     }
 
-    private <V extends ProtobufNameableTree> Optional<V> getImportedStatementRecursive(String name, Class<V> clazz) {
+    private <V extends ProtobufNamedTree> Optional<V> getImportedStatementRecursive(String name, Class<V> clazz) {
         return children.stream()
                 .filter(entry -> entry instanceof ProtobufImportStatement)
                 .map(entry -> (ProtobufImportStatement) entry)
                 .map(ProtobufImportStatement::document)
-                .flatMap(Optional::stream)
+                .filter(Objects::nonNull)
                 .map(imported -> imported.getAnyChildByNameAndType(name, clazz))
                 .flatMap(Optional::stream)
                 .findFirst();
@@ -96,8 +96,7 @@ public final class ProtobufDocumentTree
                     continue;
                 }
 
-                var imported = importStatement.document()
-                        .orElse(null);
+                var imported = importStatement.document();
                 if(imported == null) {
                     continue;
                 }
@@ -123,43 +122,23 @@ public final class ProtobufDocumentTree
     protected <V extends ProtobufTree> void consumeChildren(ProtobufTree child, Class<V> expectedType, Consumer<V> consumer) {
         if(expectedType.isAssignableFrom(child.getClass())){
             consumer.accept((V) child);
-        }else if(child instanceof ProtobufBlock<?, ?> objectChild){
+        }else if(child instanceof ProtobufBlock<?> objectChild){
             objectChild.consumeChildren(objectChild, expectedType, consumer);
         }else if(child instanceof ProtobufImportStatement importStatement){
-            importStatement.document()
-                    .ifPresent(imported -> imported.consumeChildren(imported, expectedType, consumer));
+            var document = importStatement.document();
+            if(document != null) {
+                document.consumeChildren(document, expectedType, consumer);
+            }
         }
     }
 
     @Override
-    public String qualifiedName() {
-        return qualifiedCanonicalName();
-    }
-
-    @Override
-    public String qualifiedCanonicalName() {
-        var packageName = packageName();
-        var fileName = location.getFileName().toString();
-        if(packageName.isEmpty()) {
-            return fileName;
-        }
-
-        return packageName + "." + fileName;
-    }
-
-    @Override
-    public boolean isAttributed() {
-        return children().stream().allMatch(ProtobufDocumentChildTree::isAttributed);
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        return other instanceof ProtobufDocumentTree that
-                && Objects.equals(that.qualifiedName(), this.qualifiedName());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(this.qualifiedName());
+    public String toString() {
+        var builder = new StringBuilder();
+        children.forEach(statement -> {
+            builder.append(statement);
+            builder.append("\n");
+        });
+        return builder.toString();
     }
 }

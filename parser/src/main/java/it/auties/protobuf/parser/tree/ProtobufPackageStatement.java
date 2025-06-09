@@ -5,15 +5,22 @@ import java.util.Objects;
 public final class ProtobufPackageStatement
         extends ProtobufStatement
         implements ProtobufDocumentChildTree {
-    private final String name;
+    private String name;
 
-    public ProtobufPackageStatement(int line, String name) {
+    public ProtobufPackageStatement(int line) {
         super(line);
-        this.name = name;
     }
 
     public String name() {
         return name;
+    }
+
+    public boolean hasName() {
+        return name != null;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     @Override
@@ -34,6 +41,6 @@ public final class ProtobufPackageStatement
 
     @Override
     public boolean isAttributed() {
-        return true;
+        return hasName();
     }
 }

@@ -6,48 +6,55 @@ import java.util.Optional;
 public final class ProtobufOptionStatement
         extends ProtobufStatement
         implements ProtobufDocumentChildTree, ProtobufMessageChildTree, ProtobufEnumChildTree, ProtobufOneofChildTree, ProtobufGroupChildTree {
-    private final String name;
-    private final ProtobufFieldStatement definition;
-    private Object value;
-    private boolean attributed;
+    private String name;
+    private ProtobufFieldStatement definition;
+    private ProtobufOptionValue value;
 
-    public ProtobufOptionStatement(int line, String name, ProtobufFieldStatement definition) {
+    public ProtobufOptionStatement(int line) {
         super(line);
-        this.name = name;
-        this.definition = definition;
     }
 
     @Override
     public boolean isAttributed() {
-        return attributed;
-    }
-
-    public boolean hasValue() {
-        return value != null;
+        return hasName()
+                && hasDefinition()
+                && hasValue();
     }
 
     public String name() {
         return name;
     }
 
+    public boolean hasName() {
+        return name != null;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public Optional<ProtobufFieldStatement> definition() {
         return Optional.ofNullable(definition);
+    }
+
+    public boolean hasDefinition() {
+        return definition != null;
+    }
+
+    public void setDefinition(ProtobufFieldStatement definition) {
+        this.definition = definition;
     }
 
     public Object value() {
         return value;
     }
 
-    public ProtobufOptionStatement setRawValue(Object value) {
-        this.value = value;
-        this.attributed = false;
-        return this;
+    public boolean hasValue() {
+        return value != null;
     }
 
-    public ProtobufOptionStatement setAttributedValue(Object value) {
+    public void setValue(ProtobufOptionValue value) {
         this.value = value;
-        this.attributed = true;
-        return this;
     }
 
     @Override
@@ -66,7 +73,7 @@ public final class ProtobufOptionStatement
     public String toString() {
         var leading = parent == null ? "" : "option ";
         var name = Objects.requireNonNullElse(this.name, "[missing]");
-        var value = this.value instanceof String ? "\"%s\"".formatted(this.value) : Objects.requireNonNullElse(this.value, "[missing]");
+        var value = Objects.requireNonNullElse(this.value, "[missing]");
         var trailing = parent instanceof ProtobufDocumentTree ? ";" : "";
         var result = "%s%s = %s%s".formatted(leading, name, value, trailing);
         return parent == null ? result : toLeveledString(result);

@@ -7,20 +7,27 @@ import java.util.Objects;
 public final class ProtobufSyntaxStatement
         extends ProtobufStatement
         implements ProtobufDocumentChildTree {
-    private final ProtobufVersion version;
+    private ProtobufVersion version;
 
-    public ProtobufSyntaxStatement(int line, ProtobufVersion version) {
+    public ProtobufSyntaxStatement(int line) {
         super(line);
-        this.version = version;
     }
 
     public ProtobufVersion version() {
         return version;
     }
 
+    public boolean hasVersion() {
+        return version != null;
+    }
+
+    public void setVersion(ProtobufVersion version) {
+        this.version = version;
+    }
+
     @Override
     public String toString() {
-        return "syntax " + version.versionCode() + ";";
+        return "syntax = " + (version == null ? "<missing>" : version.versionCode()) + ";";
     }
 
     @Override
@@ -36,6 +43,6 @@ public final class ProtobufSyntaxStatement
 
     @Override
     public boolean isAttributed() {
-        return true;
+        return hasVersion();
     }
 }

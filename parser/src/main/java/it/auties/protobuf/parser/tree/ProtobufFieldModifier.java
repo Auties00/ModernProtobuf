@@ -41,7 +41,11 @@ public final class ProtobufFieldModifier {
 
     @Override
     public String toString() {
-        return token();
+        if(type == Type.NOTHING) {
+            return "";
+        }else {
+            return token;
+        }
     }
 
     public enum Type {

@@ -1,38 +1,44 @@
 package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
-import java.util.Optional;
 
 public final class ProtobufImportStatement
         extends ProtobufStatement
         implements ProtobufDocumentChildTree {
-    private final String location;
+    private String location;
     private ProtobufDocumentTree document;
 
-    public ProtobufImportStatement(int line, String location) {
+    public ProtobufImportStatement(int line) {
         super(line);
-        this.location = Objects.requireNonNull(location);
     }
 
     public String location() {
         return location;
     }
 
-    public Optional<ProtobufDocumentTree> document() {
-        return Optional.ofNullable(document);
+    public boolean hasLocation() {
+        return location != null;
     }
 
-    public ProtobufImportStatement setDocument(ProtobufDocumentTree document) {
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public ProtobufDocumentTree document() {
+        return document;
+    }
+
+    public boolean hasDocument() {
+        return document != null;
+    }
+
+    public void setDocument(ProtobufDocumentTree document) {
         this.document = document;
-        return this;
     }
 
     @Override
     public String toString() {
-        var imported = document != null
-                ? document.qualifiedCanonicalName()
-                : location;
-        return "import \"" + imported + "\";";
+        return "import \"" + location + "\";";
     }
 
     @Override
@@ -48,6 +54,6 @@ public final class ProtobufImportStatement
 
     @Override
     public boolean isAttributed() {
-        return document != null;
+        return hasDocument();
     }
 }

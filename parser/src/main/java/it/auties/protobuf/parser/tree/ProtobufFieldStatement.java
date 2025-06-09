@@ -5,11 +5,10 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 
 public sealed class ProtobufFieldStatement
         extends ProtobufStatement
-        implements ProtobufNameableTree, ProtobufIndexableTree, ProtobufOneofChildTree, ProtobufMessageChildTree, ProtobufGroupChildTree
+        implements ProtobufNamedTree, ProtobufIndexedTree, ProtobufOneofChildTree, ProtobufMessageChildTree, ProtobufGroupChildTree
         permits ProtobufEnumConstantStatement {
     protected ProtobufFieldModifier modifier;
     protected ProtobufTypeReference type;
@@ -21,42 +20,62 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public Optional<String> name() {
-        return Optional.ofNullable(name);
-    }
-
-    public ProtobufFieldStatement setName(String name) {
-        this.name = name;
-        return this;
+    public String name() {
+        return name;
     }
 
     @Override
-    public OptionalInt index() {
-        return index == null ? OptionalInt.empty() : OptionalInt.of(index);
+    public boolean hasName() {
+        return name != null;
     }
 
-    public ProtobufFieldStatement setIndex(Integer index) {
+    @Override
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public int index() {
+        return index;
+    }
+
+    @Override
+    public boolean hasIndex() {
+        return index != null;
+    }
+
+    @Override
+    public void setIndex(int index) {
         this.index = index;
-        return this;
     }
 
-    public Optional<ProtobufTypeReference> type() {
-        return Optional.ofNullable(type);
+    public ProtobufTypeReference type() {
+        return type;
     }
 
-    public ProtobufFieldStatement setType(ProtobufTypeReference type) {
+    public boolean hasType() {
+        return type != null;
+    }
+
+    public void setType(ProtobufTypeReference type) {
         this.type = type;
-        return this;
     }
 
-    public ProtobufFieldStatement setModifier(ProtobufFieldModifier modifier) {
+    public ProtobufFieldModifier modifier() {
+        return modifier;
+    }
+
+    public boolean hasModifier() {
+        return modifier != null;
+    }
+
+    public void setModifier(ProtobufFieldModifier modifier) {
         this.modifier = modifier;
-        return this;
     }
 
     @Override
     public boolean isAttributed() {
-        return index != null && name != null && modifier != null && type != null;
+        return hasIndex() && hasName() && hasModifier() && hasType();
     }
 
     @Override
@@ -65,13 +84,13 @@ public sealed class ProtobufFieldStatement
                 .filter(entry -> entry.type() != ProtobufFieldModifier.Type.NOTHING)
                 .map(entry -> entry + " ")
                 .orElse("");
-        var type = Objects.requireNonNull(this.type, "[missing]");
-        var name = Objects.requireNonNullElse(this.name, "[missing]");
-        var index = Objects.requireNonNull(this.index, "[missing]");
+        var type = Objects.requireNonNullElse(this.type.toString(), "<missing>");
+        var name = Objects.requireNonNullElse(this.name, "<unknown>");
+        var index = Objects.requireNonNullElse(this.index, "<unknown>");
         var optionsString = optionsToString();
-        var end = type instanceof ProtobufGroupType ? "" : ";";
+        var end = this.type instanceof ProtobufGroupType ? "" : ";";
         var string = toLeveledString(modifier + type + " " + name + " = " + index + optionsString + end);
-        if(type instanceof ProtobufGroupType groupType) {
+        if(this.type instanceof ProtobufGroupType groupType) {
             var body = groupType.declaration()
                     .map(ProtobufGroupTree::toString)
                     .orElse("[missing];");
@@ -79,9 +98,5 @@ public sealed class ProtobufFieldStatement
         }else {
             return string;
         }
-    }
-
-    public Optional<ProtobufFieldModifier> modifier() {
-        return Optional.ofNullable(modifier);
     }
 }

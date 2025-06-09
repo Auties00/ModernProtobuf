@@ -1,14 +1,13 @@
 package it.auties.protobuf.parser.tree;
 
-import java.io.File;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C extends ProtobufTree>
+public sealed abstract class ProtobufBlock<C extends ProtobufTree>
         extends ProtobufStatement
-        permits ProtobufDocumentTree, ProtobufNameableBlock {
+        permits ProtobufDocumentTree, ProtobufExtensionsListStatement, ProtobufNamedBlock, ProtobufReservedListStatement {
     protected final LinkedList<C> children;
     protected final boolean inheritsScope;
     protected ProtobufBlock(int line, boolean inheritsScope) {
@@ -21,26 +20,22 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
         return inheritsScope;
     }
 
-    public abstract String qualifiedName();
-
-    public abstract String qualifiedCanonicalName();
-
-    public String qualifiedPath() {
-        return qualifiedCanonicalName()
-                .replaceAll("\\.", File.separator);
+    @Override
+    public boolean isAttributed() {
+        return children.stream()
+                .allMatch(ProtobufTree::isAttributed);
     }
 
     public SequencedCollection<C> children() {
         return Collections.unmodifiableSequencedCollection(children);
     }
 
-    public ProtobufBlock<T, C> addChild(C statement){
+    public void addChild(C statement){
         if(statement instanceof ProtobufStatement nestedTree) {
-            nestedTree.setParent(this, 1);
+            nestedTree.setParent(this);
         }
 
         children.add(statement);
-        return this;
     }
 
     public void removeChild() {
@@ -51,18 +46,18 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
         children.remove(statement);
     }
 
-    private Stream<ProtobufNameableTree> getDirectChildrenByName(String name){
+    private Stream<ProtobufNamedTree> getDirectChildrenByName(String name){
         if (name == null) {
             return Stream.empty();
         }
 
         return children.stream()
-                .filter(entry -> entry instanceof ProtobufNameableTree)
-                .map(entry -> (ProtobufNameableTree) entry)
-                .filter(entry -> entry.name().filter(name::equals).isPresent());
+                .filter(entry -> entry instanceof ProtobufNamedTree)
+                .map(entry -> (ProtobufNamedTree) entry)
+                .filter(entry -> Objects.equals(entry.name(), name));
     }
 
-    public Optional<ProtobufNameableTree> getDirectChildByName(String name){
+    public Optional<ProtobufNamedTree> getDirectChildByName(String name){
         return getDirectChildrenByName(name)
                 .findFirst();
     }
@@ -75,7 +70,7 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
                 .map(entry -> (V) entry);
     }
 
-    public <V extends ProtobufNameableTree> Optional<V> getAnyChildByNameAndType(String name, Class<V> clazz){
+    public <V extends ProtobufNamedTree> Optional<V> getAnyChildByNameAndType(String name, Class<V> clazz){
         var child = getDirectChildByNameAndType(name, clazz);
         if (child.isPresent()) {
             return child;
@@ -83,7 +78,7 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
 
         return children.stream()
                 .filter(entry -> ProtobufBlock.class.isAssignableFrom(entry.getClass()))
-                .map(entry -> (ProtobufBlock<?, ?>) entry)
+                .map(entry -> (ProtobufBlock<?>) entry)
                 .flatMap(entry -> entry.getDirectChildByNameAndType(name, clazz).stream())
                 .findFirst();
     }
@@ -94,7 +89,7 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
                 .map((entry) -> {
                     if(clazz.isAssignableFrom(entry.getClass())){
                         return Optional.of((V) entry);
-                    }else if(entry instanceof ProtobufBlock<?, ?> object){
+                    }else if(entry instanceof ProtobufBlock<?> object){
                         return object.getAnyChildByType(clazz);
                     } else {
                         return Optional.<V>empty();
@@ -116,7 +111,7 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
             consumer.accept((V) child);
         }
 
-        if(child instanceof ProtobufBlock<?, ?> objectChild){
+        if(child instanceof ProtobufBlock<?> objectChild){
             objectChild.consumeChildren(objectChild, expectedType, consumer);
         }
     }
@@ -126,40 +121,18 @@ public sealed abstract class ProtobufBlock<T extends ProtobufBlock<T, C>, C exte
             throw new IllegalArgumentException("Index cannot be negative");
         }
 
-        for (var entry : children()) {
-            if (!(entry instanceof ProtobufIndexableTree indexableTree)) {
-                continue;
-            }
-
-            var entryIndex = indexableTree.index()
-                    .orElse(-1);
-            if (entryIndex != index) {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
+        return children()
+                .stream()
+                .filter(entry -> entry instanceof ProtobufIndexedTree)
+                .anyMatch(entry -> (((ProtobufIndexedTree) entry).index()) == index);
     }
 
     public boolean hasName(String name) {
         Objects.requireNonNull(name, "Name cannot be null");
-        for (var entry : children()) {
-            if (!(entry instanceof ProtobufNameableTree nameableTree)) {
-                continue;
-            }
-
-            var entryIndex = nameableTree.name()
-                    .orElse(null);
-            if (!name.equals(entryIndex)) {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
+        return children()
+                .stream()
+                .filter(entry -> entry instanceof ProtobufNamedTree)
+                .anyMatch(entry -> Objects.equals(name, ((ProtobufNamedTree) entry).name()));
     }
 
     @Override

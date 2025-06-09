@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufBlock<?, ?> declaration;
+    private ProtobufBlock<?> declaration;
 
     public static ProtobufObjectType unattributed(String typeName){
         return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
@@ -44,7 +44,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return name();
     }
 
-    public Optional<ProtobufBlock<?, ?>> declaration() {
+    public Optional<ProtobufBlock<?>> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -53,7 +53,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufBlock<?, ?> statement) {
+    public void attribute(ProtobufBlock<?> statement) {
         this.declaration = statement;
     }
 }
