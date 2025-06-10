@@ -11,16 +11,75 @@ import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+//  ProtobufConverterGraph requires this class to be thread-safe to optimize compilation times
+//  It turns out though that processingEnv.getTypeUtils() has operations that aren't thread-safe
+//
+//  An example I discover while debugging is isAssignable:
+//  at com.sun.tools.javac.code.Types$12.visitClassType (Types.java:2215)
+//  at com.sun.tools.javac.code.Types$12.visitClassType (Types.java:2180)
+//  at com.sun.tools.javac.code.Type$ClassType.accept (Type.java:1053)
+//  at com.sun.tools.javac.code.Types$DefaultTypeVisitor.visit (Types.java:4936)
+//  at com.sun.tools.javac.code.Types.asSuper (Types.java:2177)
+//  at com.sun.tools.javac.code.Types$4.visitClassType (Types.java:1186)
+//  at com.sun.tools.javac.code.Types$4.visitClassType (Types.java:1107)
+//  at com.sun.tools.javac.code.Type$ClassType.accept (Type.java:1053)
+//  at com.sun.tools.javac.code.Types$DefaultTypeVisitor.visit (Types.java:4936)
+//  at com.sun.tools.javac.code.Types.isSubtype (Types.java:1103)
+//  at com.sun.tools.javac.code.Types.isSubtypeUncheckedInternal (Types.java:1029)
+//  at com.sun.tools.javac.code.Types.isSubtypeUnchecked (Types.java:1015)
+//  at com.sun.tools.javac.code.Types.isConvertible (Types.java:610)
+//  at com.sun.tools.javac.code.Types.isAssignable (Types.java:2392)
+//  at com.sun.tools.javac.code.Types.isAssignable (Types.java:2360)
+//
+//  erase might have the same problem
+//
+//  As a general rule if a method in the Type/Element-Utils isn't:
+//  - called in the constructor
+//  - doesn't build a type/element, which I'm assuming has no side effects
+//  it shouldn't be called, as it might be broken now or might break in the future,
+//  and should instead be reimplemented(it is what it is)
 public class Types {
     private static final String GETTER_PREFIX = "get";
 
     private final ProcessingEnvironment processingEnv;
+    private final TypeMirror booleanType;
+    private final TypeMirror byteType;
+    private final TypeMirror shortType;
+    private final TypeMirror intType;
+    private final TypeMirror longType;
+    private final TypeMirror charType;
+    private final TypeMirror floatType;
+    private final TypeMirror doubleType;
+    private final TypeMirror wrappedBooleanType;
+    private final TypeMirror wrappedByteType;
+    private final TypeMirror wrappedShortType;
+    private final TypeMirror wrappedIntType;
+    private final TypeMirror wrappedLongType;
+    private final TypeMirror wrappedCharType;
+    private final TypeMirror wrappedFloatType;
+    private final TypeMirror wrappedDoubleType;
     private final TypeMirror rawGroupType;
     private final TypeMirror voidType;
     public Types(ProcessingEnvironment processingEnv) {
         this.processingEnv = processingEnv;
         this.rawGroupType = getType(Map.class, Integer.class, Object.class);
         this.voidType = processingEnv.getTypeUtils().getNoType(TypeKind.VOID);
+        this.booleanType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.BOOLEAN);
+        this.byteType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.BYTE);
+        this.shortType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.SHORT);
+        this.intType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.INT);
+        this.longType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.LONG);
+        this.charType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.CHAR);
+        this.floatType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.FLOAT);
+        this.doubleType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.DOUBLE);
+        this.wrappedBooleanType = getType(Boolean.class);
+        this.wrappedByteType = getType(Byte.class);
+        this.wrappedShortType = getType(Short.class);
+        this.wrappedIntType = getType(Integer.class);
+        this.wrappedLongType = getType(Long.class);
+        this.wrappedCharType = getType(Character.class);
+        this.wrappedFloatType = getType(Float.class);
+        this.wrappedDoubleType = getType(Double.class);
     }
 
     public TypeMirror rawGroupType() {
@@ -39,7 +98,17 @@ public class Types {
 
         if(type.isPrimitive()) {
             var kind = TypeKind.valueOf(type.getName().toUpperCase(Locale.ROOT));
-            return processingEnv.getTypeUtils().getPrimitiveType(kind);
+            return switch (kind) {
+                case BOOLEAN -> booleanType;
+                case BYTE -> byteType;
+                case SHORT -> shortType;
+                case INT -> intType;
+                case LONG -> longType;
+                case CHAR -> charType;
+                case FLOAT -> floatType;
+                case DOUBLE -> doubleType;
+                default -> throw new IllegalStateException("Unexpected value: " + kind);
+            };
         }
 
         if(type.isArray()) {
@@ -116,17 +185,34 @@ public class Types {
     }
 
     public boolean isAssignable(TypeMirror rhs, TypeMirror lhs, boolean erase) {
-        if(rhs instanceof PrimitiveType primitiveType) {
-            var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
-            rhs = boxed.asType();
+        lhs = boxOrErase(lhs, erase);
+        rhs = boxOrErase(rhs, erase);
+        var rhsTypes = new LinkedList<TypeMirror>();
+        rhsTypes.add(rhs);
+        while (!rhsTypes.isEmpty()) {
+            var rhsAncestorType = rhsTypes.removeFirst();
+            if(isSameType(rhsAncestorType, lhs, erase)) {
+                return true;
+            }
+            getSuperClass(rhsAncestorType)
+                    .ifPresent(rhsTypes::add);
+            rhsTypes.addAll(getInterfaces(rhsAncestorType));
         }
+        return false;
+    }
 
-        if(lhs instanceof PrimitiveType primitiveType) {
-            var boxed = processingEnv.getTypeUtils().boxedClass(primitiveType);
-            lhs = boxed.asType();
-        }
-
-        return processingEnv.getTypeUtils().isAssignable(erase ? erase(rhs) : rhs, erase ? erase(lhs) : lhs);
+    private TypeMirror boxOrErase(TypeMirror rhs, boolean erase) {
+        return switch (rhs.getKind()) {
+            case BOOLEAN -> wrappedBooleanType;
+            case BYTE -> wrappedByteType;
+            case SHORT -> wrappedShortType;
+            case INT -> wrappedIntType;
+            case LONG -> wrappedLongType;
+            case CHAR -> wrappedCharType;
+            case FLOAT -> wrappedFloatType;
+            case DOUBLE -> wrappedDoubleType;
+            default -> erase ? erase(rhs) : rhs;
+        };
     }
 
     public Optional<TypeElement> getDefaultConstructor(TypeMirror type) {
@@ -248,9 +334,7 @@ public class Types {
         }
 
         if(type instanceof PrimitiveType primitiveType) {
-            return processingEnv.getTypeUtils()
-                    .boxedClass(primitiveType)
-                    .asType();
+            return boxOrErase(primitiveType, false);
         }
 
         if(!(type instanceof DeclaredType declaredType)) {
@@ -392,6 +476,13 @@ public class Types {
         return Optional.empty();
     }
 
+
+    public List<? extends TypeMirror> getInterfaces(TypeMirror mirror) {
+        return mirror instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement typeElement
+                ? typeElement.getInterfaces()
+                : List.of();
+    }
 
     public Optional<TypeMirror> getSuperClass(TypeMirror mirror) {
         return switch (mirror) {

@@ -58,8 +58,9 @@ import java.util.stream.Collectors;
 //
 //   - byte[] -> CompletableFuture<CompletableFuture<String>>
 //      In this case no valid path exists, but the path resolver has to terminate in a finite amount of time.
+//
 public final class ProtobufConverterGraph {
-    private final Types types;
+    private final Types types; // Expected to be thread-safe
     private final Set<Node> nodes;
 
     public ProtobufConverterGraph(Types types) {
