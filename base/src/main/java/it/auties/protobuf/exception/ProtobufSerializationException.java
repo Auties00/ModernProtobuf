@@ -8,10 +8,6 @@ public class ProtobufSerializationException extends ProtobufException {
         super(message);
     }
 
-    public static ProtobufSerializationException negativeUnsignedValue(long value) {
-        return new ProtobufSerializationException("Invalid unsigned int at field " + value);
-    }
-
     // Fail fast, there should never be a bug like this, but it's better to report it than fail silently
     public static ProtobufSerializationException sizeMismatch(int size) {
         return new ProtobufSerializationException("A size calculation error occurred as there is space left for the message: " + size);

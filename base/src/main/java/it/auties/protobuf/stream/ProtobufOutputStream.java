@@ -176,9 +176,6 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         var size = 0;
         for (var value : values) {
             if(value != null) {
-                if (value < 0) {
-                    throw ProtobufSerializationException.negativeUnsignedValue(fieldNumber);
-                }
                 size += getVarIntSize(value);
             }
         }
@@ -194,10 +191,6 @@ public abstract class ProtobufOutputStream<OUTPUT> {
     public void writeUInt32(int fieldNumber, Integer value) {
         if(value == null){
             return;
-        }
-
-        if(value < 0) {
-            throw ProtobufSerializationException.negativeUnsignedValue(fieldNumber);
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
@@ -293,10 +286,6 @@ public abstract class ProtobufOutputStream<OUTPUT> {
             return;
         }
 
-        if(value < 0) {
-            throw ProtobufSerializationException.negativeUnsignedValue(fieldNumber);
-        }
-
         writeUInt64(fieldNumber, value);
     }
 
@@ -307,9 +296,6 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
         var size = 0;
         for (var value : values) {
-            if(value < 0) {
-                throw ProtobufSerializationException.negativeUnsignedValue(fieldNumber);
-            }
             size += getVarIntSize(value);
         }
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
@@ -324,10 +310,6 @@ public abstract class ProtobufOutputStream<OUTPUT> {
     public void writeUInt64(int fieldNumber, Long value) {
         if(value == null){
             return;
-        }
-
-        if(value < 0) {
-            throw ProtobufSerializationException.negativeUnsignedValue(fieldNumber);
         }
 
         writeTag(fieldNumber, ProtobufWireType.WIRE_TYPE_VAR_INT);
