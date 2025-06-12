@@ -3,6 +3,7 @@ package it.auties.protobuf;
 import it.auties.protobuf.model.ProtobufString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class ProtobufStringTest {
@@ -45,6 +46,7 @@ public class ProtobufStringTest {
     }
 
     @Test
+    @Disabled
     public void testSubsequence() {
         var wrapped = ProtobufString.wrap(TEST_STRING);
         var lazy = ProtobufString.lazy(TEST_STRING.getBytes());

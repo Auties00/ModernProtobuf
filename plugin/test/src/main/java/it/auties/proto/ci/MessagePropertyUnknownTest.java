@@ -1,7 +1,5 @@
 package it.auties.proto.ci;
 
-
-import it.auties.proto.ci.message.unknownFields.*;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
@@ -13,11 +11,11 @@ import java.util.*;
 public class MessagePropertyUnknownTest {
     @Test
     public void testSimple() {
-        var extendedMessage = new ExtendedMessageBuilder()
+        var extendedMessage = new MessagePropertyUnknownTestExtendedMessageBuilder()
                 .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
-        var baseMessage = SimpleMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));
+        var baseMessage = MessagePropertyUnknownTestSimpleMessageSpec.decode(MessagePropertyUnknownTestExtendedMessageSpec.encode(extendedMessage));
         var unknownField = (Number) baseMessage.unknownFields().get(2);
         Assertions.assertEquals(unknownField.intValue(), extendedMessage.extended());
     }
@@ -44,11 +42,11 @@ public class MessagePropertyUnknownTest {
 
     @Test
     public void testWrapper() {
-        var extendedMessage = new ExtendedMessageBuilder()
+        var extendedMessage = new MessagePropertyUnknownTestExtendedMessageBuilder()
                 .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
-        var baseMessage = WrapperMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));
+        var baseMessage = MessagePropertyUnknownTestWrapperMessageSpec.decode(MessagePropertyUnknownTestExtendedMessageSpec.encode(extendedMessage));
         var unknownField = baseMessage.unknownFields().get(2);
         Assertions.assertTrue(unknownField.isPresent());
         var unknownFieldValue = (Number) unknownField.get();
@@ -83,12 +81,12 @@ public class MessagePropertyUnknownTest {
 
     @Test
     public void testMixed() {
-        var extendedMessage = new ExtendedMessageBuilder()
+        var extendedMessage = new MessagePropertyUnknownTestExtendedMessageBuilder()
                 .value(ProtobufString.wrap("Hello World!"))
                 .extended(18)
                 .build();
-        var baseMessage = MixedMessageSpec.decode(ExtendedMessageSpec.encode(extendedMessage));
-        var unknownField = (Number) baseMessage.unknownFields().get(0);
+        var baseMessage = MessagePropertyUnknownTestMixedMessageSpec.decode(MessagePropertyUnknownTestExtendedMessageSpec.encode(extendedMessage));
+        var unknownField = (Number) baseMessage.unknownFields().getFirst();
         Assertions.assertEquals(unknownField.intValue(), extendedMessage.extended());
     }
 

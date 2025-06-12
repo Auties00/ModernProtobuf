@@ -12,8 +12,11 @@ import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviou
 @SuppressWarnings("unused")
 @ProtobufMixin
 public class ProtobufLazyMixin {
-    @ProtobufDeserializer(warning = "Implicit conversion between ProtobufString and String (triggers UTF-8 decode from ProtobufString source)", builderBehaviour = ADD)
-    public static String ofNullable(ProtobufString value) {
+    @ProtobufDeserializer(
+            warning = "Possible implicit UTF-8 decoding from ProtobufString source to String",
+            builderBehaviour = ADD
+    )
+    public static String ofAnyString(ProtobufString value) {
         return value == null ? null : value.toString();
     }
 
@@ -22,8 +25,24 @@ public class ProtobufLazyMixin {
         return value == null ? null : ProtobufString.wrap(value);
     }
 
-    @ProtobufDeserializer(warning = "Implicit conversion between ByteBuffer and byte[] (triggers byte[] copy from ByteBuffer source)", builderBehaviour = ADD)
-    public static byte[] ofNullable(ByteBuffer value) {
+    @ProtobufDeserializer(
+            warning = "Implicit UTF-8 decoding from ProtobufString.Lazy source to ProtobufString.Value",
+            builderBehaviour = ADD
+    )
+    public static ProtobufString.Value ofLazyString(ProtobufString.Lazy value) {
+        if(value == null) {
+            return null;
+        }
+
+        var string = new String(value.encodedBytes(), value.encodedOffset(), value.encodedLength());
+        return ProtobufString.wrap(string);
+    }
+
+    @ProtobufDeserializer(
+            warning = "Implicit memory copy from ByteBuffer to byte[]",
+            builderBehaviour = ADD
+    )
+    public static byte[] ofBuffer(ByteBuffer value) {
         if(value == null) {
             return null;
         }

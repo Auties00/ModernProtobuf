@@ -215,7 +215,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             case SERIALIZER -> {
                 var methodPath = serializersGraph.findPath(from, unattributedElement.to(), unattributedElement.mixins());
                 if(methodPath.isEmpty()) {
-                    var toName = getProtobufTypeName(unattributedElement.protobufType());
+                    var toName = getProtobufTypeName(unattributedElement.protobufType(), true);
                     messages.printError("Missing converter: cannot find a serializer from %s to %s".formatted(from, toName), unattributedElement.invoker());
                     break;
                 }
@@ -236,7 +236,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             case DESERIALIZER -> {
                 var methodPath = deserializersGraph.findPath(from, unattributedElement.to(), unattributedElement.mixins());
                 if(methodPath.isEmpty()) {
-                    var fromName = getProtobufTypeName(unattributedElement.protobufType());
+                    var fromName = getProtobufTypeName(unattributedElement.protobufType(), false);
                     messages.printError("Missing converter: cannot find a deserializer from %s to %s".formatted(fromName, unattributedElement.to()), unattributedElement.invoker());
                     break;
                 }
@@ -442,7 +442,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             var implementationType = types.getMirroredType(groupProperty::implementation)
                     .asType();
             linkType(implementationType);
-            var actualType = types.isSameType(implementationType, Object.class) ? types.getType(groupProperty.type().serializedWrappedType()) : implementationType;
+            TypeMirror actualType;
+            actualType = types.isSameType(implementationType, Object.class) ? types.getType(groupProperty.type().deserializableType()) : implementationType;
             var repeatedValueType = types.getMirroredType(groupProperty::repeatedValueImplementation)
                     .asType();
             linkType(repeatedValueType);
@@ -1064,7 +1065,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // Get the key type of the map that represents the property
         // Example: Map<String, Integer> -> String
         var keyTypeParameter = types.getTypeParameter(elementType, types.getType(Map.class), 0)
-                .orElse((property.mapKeyType() != ProtobufType.MESSAGE && property.mapKeyType() != ProtobufType.ENUM) ? types.getType(property.mapKeyType().serializedWrappedType()) : null);
+                .orElse((property.mapKeyType() != ProtobufType.MESSAGE && property.mapKeyType() != ProtobufType.ENUM) ? types.getType(property.mapKeyType().deserializableType()) : null);
         if (keyTypeParameter == null) {
             messages.printError("Type inference error: cannot determine map's key type", invoker);
             return Optional.empty();
@@ -1082,7 +1083,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         // Same thing but for the valueType type
         var valueTypeParameter = rawGroupMapValueType != null && !types.isSameType(rawGroupMapValueType, Object.class) ? rawGroupMapValueType : types.getTypeParameter(elementType, types.getType(Map.class), 1)
-                .orElse((property.mapValueType() != ProtobufType.MESSAGE && property.mapValueType() != ProtobufType.ENUM) ? types.getType(property.mapValueType().serializedWrappedType()) : null);
+                .orElse((property.mapValueType() != ProtobufType.MESSAGE && property.mapValueType() != ProtobufType.ENUM) ? types.getType(property.mapValueType().deserializableType()) : null);
         if (valueTypeParameter == null) {
             messages.printError("Type inference error: cannot determine map's valueType type", invoker);
             return Optional.empty();
@@ -1130,7 +1131,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private void createUnattributedSerializer(Element invoker, TypeMirror from, ProtobufPropertyType implementation) {
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var to = implementation.protobufType();
-        var toWrapped = types.getType(to.serializedWrappedType());
+        var toWrapped = types.getType(to.deserializableType());
         if (to != ProtobufType.MESSAGE && to != ProtobufType.ENUM && to != ProtobufType.GROUP && types.isAssignable(from, toWrapped)) {
             return;
         }
@@ -1150,7 +1151,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // We don't support arrays so no check is necessary
         // If to is a sub type of fromType(ex. Integer and Number) are related and the property isn't a non-protobuf object(i.e. the to type isn't annotated with @ProtobufMessage or @ProtobufEnum), no conversions are necessary
         var from = implementation.protobufType();
-        var fromType = types.getType(from.serializedWrappedType());
+        var fromType = types.getType(from.deserializableType());
         if (from != ProtobufType.MESSAGE && from != ProtobufType.ENUM && from != ProtobufType.GROUP && types.isAssignable(to, fromType)) {
             return;
         }
@@ -1159,20 +1160,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         implementation.addConverter(unattributed);
     }
 
-    private Object getProtobufTypeName(ProtobufType type) {
+    private Object getProtobufTypeName(ProtobufType type, boolean serializer) {
         return switch (type) {
             case MESSAGE -> "ProtobufMessage";
             case ENUM -> "ProtobufEnum";
             case GROUP -> "ProtobufGroup";
-            default -> {
-                var primitiveName = type.serializedType().getSimpleName();
-                var wrappedName = type.serializedWrappedType().getSimpleName();
-                if(Objects.equals(primitiveName, wrappedName)) {
-                    yield "%s(%s)".formatted(type.name(), primitiveName);
-                }else {
-                    yield "%s(%s/%s)".formatted(type.name(), primitiveName, wrappedName);
-                }
-            }
+            case STRING -> "ProtobufString";
+            default -> "%s(%s)".formatted(type.name(), serializer ? type.serializedType() : type.deserializableType());
         };
     }
 

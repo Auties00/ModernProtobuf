@@ -11,7 +11,10 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.parser.tree.ProtobufEnumChildTree;
+import it.auties.protobuf.parser.tree.ProtobufEnumConstantStatement;
 import it.auties.protobuf.parser.tree.ProtobufEnumTree;
+import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;
@@ -39,7 +42,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
 
     @Override
     TypeDeclaration<?> generate(Node parent) {
-        var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name().orElseThrow()));
+        var ctEnum = new EnumDeclaration(NodeList.nodeList(Modifier.publicModifier()), AstUtils.toJavaName(protoStatement.name()));
         allMembers.add(ctEnum);
         ctEnum.setParentNode(parent);
         addEnumName(ctEnum);
@@ -54,12 +57,16 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
 
     private void addEnumName(NodeWithAnnotations<?> node) {
         var annotation = getOrAddAnnotation(node, ProtobufEnum.class);
-        annotation.setPairs(NodeList.nodeList(new MemberValuePair("name", new StringLiteralExpr(protoStatement.qualifiedCanonicalName().orElseThrow()))));
+        annotation.setPairs(NodeList.nodeList(new MemberValuePair("name", new StringLiteralExpr(protoStatement.qualifiedName()))));
         node.addAnnotation(annotation);
     }
 
     private void createEnumConstants(EnumDeclaration ctEnum) {
-        protoStatement.children().forEach(statement -> createEnumConstant(ctEnum, statement));
+        for (ProtobufEnumChildTree statement : protoStatement.children()) {
+            if(statement instanceof ProtobufEnumConstantStatement enumConstantStatement) {
+                createEnumConstant(ctEnum, enumConstantStatement);
+            }
+        }
     }
 
     private void createEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
@@ -68,8 +75,8 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
             return;
         }
 
-        var name = ctEnum.addEnumConstant(AstUtils.toJavaName(statement.name().orElseThrow()));
-        name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index().orElseThrow())));
+        var name = ctEnum.addEnumConstant(AstUtils.toJavaName(statement.name()));
+        name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index())));
     }
 
     private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
@@ -89,7 +96,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumTree
             return false;
         }
 
-        return intExpression.asNumber().intValue() == statement.index().orElseThrow();
+        return intExpression.asNumber().intValue() == statement.index();
     }
 
     private void createIndexField(EnumDeclaration ctEnum) {

@@ -9,10 +9,9 @@ public sealed interface ProtobufTypeReference
     boolean isAttributed();
 
     static ProtobufTypeReference of(String type){
-        var protobufType = ProtobufType.of(type)
-                .orElse(null);
+        var protobufType = ProtobufType.of(type);
         return switch (protobufType) {
-            case null -> ProtobufObjectType.unattributed(type);
+            case UNKNOWN -> ProtobufObjectType.unattributed(type);
             case MAP -> ProtobufMapType.unattributed();
             case GROUP -> ProtobufGroupType.unattributed(type);
             default -> ProtobufPrimitiveType.attributed(protobufType);

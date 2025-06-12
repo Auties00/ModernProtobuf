@@ -1,6 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.packed.PackedMessageSpec;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import org.junit.jupiter.api.Assertions;
@@ -15,8 +14,8 @@ public class MessagePropertyPackedTest {
     @Test
         public void testModifiers() {
         var someMessage = new PackedMessage(new ArrayList<>(List.of(1, 2, 3)));
-        var encoded = PackedMessageSpec.encode(someMessage);
-        var decoded = PackedMessageSpec.decode(encoded);
+        var encoded = MessagePropertyPackedTestPackedMessageSpec.encode(someMessage);
+        var decoded = MessagePropertyPackedTestPackedMessageSpec.decode(encoded);
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 

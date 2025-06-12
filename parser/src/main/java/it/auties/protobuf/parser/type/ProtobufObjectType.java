@@ -4,13 +4,14 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.ProtobufBlock;
 import it.auties.protobuf.parser.tree.ProtobufEnumTree;
 import it.auties.protobuf.parser.tree.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.ProtobufNamedBlock;
 
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufBlock<?> declaration;
+    private ProtobufNamedBlock<?> declaration;
 
     public static ProtobufObjectType unattributed(String typeName){
         return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
@@ -44,7 +45,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return name();
     }
 
-    public Optional<ProtobufBlock<?>> declaration() {
+    public Optional<ProtobufNamedBlock<?>> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -53,7 +54,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufBlock<?> statement) {
+    public void attribute(ProtobufNamedBlock<?> statement) {
         this.declaration = statement;
     }
 }

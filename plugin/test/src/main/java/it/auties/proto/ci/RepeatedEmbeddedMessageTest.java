@@ -1,6 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.embeddedRepeated.RepeatedWrapperMessageSpec;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -19,25 +18,25 @@ public class RepeatedEmbeddedMessageTest {
         var anotherMessage = new RepeatedWrapperMessage.RepeatedEmbeddedWrapperMessage(new ArrayList<>(List.of(finalMessage, anotherFinalMessage, lastFinalMessage)));
         var anotherAnotherMessage = new RepeatedWrapperMessage.RepeatedEmbeddedWrapperMessage(new ArrayList<>(List.of(anotherFinalMessage)));
         var someMessage = new RepeatedWrapperMessage(new ArrayList<>(List.of(anotherMessage, anotherAnotherMessage)));
-        var encoded = RepeatedWrapperMessageSpec.encode(someMessage);
-        var decoded = RepeatedWrapperMessageSpec.decode(encoded);
+        var encoded = RepeatedEmbeddedMessageTestRepeatedWrapperMessageSpec.encode(someMessage);
+        var decoded = RepeatedEmbeddedMessageTestRepeatedWrapperMessageSpec.decode(encoded);
         Assertions.assertEquals(someMessage.content(), decoded.content());
     }
 
     @ProtobufMessage
-    public static record RepeatedWrapperMessage(
+    public record RepeatedWrapperMessage(
             @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
             ArrayList<RepeatedEmbeddedWrapperMessage> content
     ) {
 
             @ProtobufMessage
-            public static record RepeatedEmbeddedWrapperMessage(
+            public record RepeatedEmbeddedWrapperMessage(
                     @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
                     ArrayList<RepeatedEmbeddedMessage> contentAbc
             ) {
 
                     @ProtobufMessage
-                    public static record RepeatedEmbeddedMessage(
+                    public record RepeatedEmbeddedMessage(
                             @ProtobufProperty(index = 1, type = ProtobufType.INT32)
                             ArrayList<Integer> content
                     ) {

@@ -547,6 +547,44 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             }
         }
 
+        /*
+        FIXME: Can this be optimized?
+        var result = new byte[size];
+
+            var buffered = Math.min(size, bufferLength);
+            if(buffered > 0) {
+                System.arraycopy(buffer, bufferReadPosition, result, 0, buffered);
+                bufferReadPosition += buffered;
+                bufferLength -= buffered;
+            }
+
+            var remaining = size - buffered;
+            if(remaining > 0) {
+                var totalRead = 0;
+                int currentRead;
+                while (totalRead < remaining) {
+                    currentRead = inputStream.read(result, buffered + totalRead, remaining - totalRead);
+                    if(currentRead == -1) {
+                        throw ProtobufDeserializationException.truncatedMessage();
+                    }
+                    totalRead += currentRead;
+                }
+                var position = Math.max(result.length - VAR_INT_LENGTH, 0);
+                while (position < result.length) {
+                    var bufferPosition = bufferWritePosition++;
+                    if(bufferPosition == buffer.length - 1) {
+                        bufferWritePosition = 0;
+                    }
+                    buffer[bufferPosition] = result[position++];
+                }
+            }
+
+            if(length != -1) {
+                position += size;
+            }
+
+            return result;
+         */
         private byte[] readStreamBytes(int size) throws IOException {
             if(length != -1) {
                 position += size;

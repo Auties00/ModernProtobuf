@@ -1,7 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.input.ScalarMessageBuilder;
-import it.auties.proto.ci.message.input.ScalarMessageSpec;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufString;
@@ -18,7 +16,7 @@ public class ProtobufInputStreamTest {
 
     @BeforeAll
     public static void init() {
-        var message = new ScalarMessageBuilder()
+        var message = new ProtobufInputStreamTestScalarMessageBuilder()
                 .uint32(100)
                 .int32(100)
                 .string(ProtobufString.wrap("Hello World"))
@@ -26,17 +24,17 @@ public class ProtobufInputStreamTest {
                 .sfixed32(100)
                 .sfixed64(100)
                 .build();
-        source = ScalarMessageSpec.encode(message);
+        source = ProtobufInputStreamTestScalarMessageSpec.encode(message);
     }
 
     @Test
     public void testBytes() {
-        ScalarMessageSpec.decode(ProtobufInputStream.fromBytes(source));
+        ProtobufInputStreamTestScalarMessageSpec.decode(ProtobufInputStream.fromBytes(source));
     }
 
     @Test
     public void testAvailableInputStream() {
-        ScalarMessageSpec.decode(ProtobufInputStream.fromStream(new ByteArrayInputStream(source)));
+        ProtobufInputStreamTestScalarMessageSpec.decode(ProtobufInputStream.fromStream(new ByteArrayInputStream(source)));
     }
 
     @Test
@@ -51,12 +49,12 @@ public class ProtobufInputStreamTest {
                 return -1;
             }
         }
-        ScalarMessageSpec.decode(ProtobufInputStream.fromStream(new UnavailableInputStream(source)));
+        ProtobufInputStreamTestScalarMessageSpec.decode(ProtobufInputStream.fromStream(new UnavailableInputStream(source)));
     }
 
     @Test
     public void testBuffer() {
-        ScalarMessageSpec.decode(ProtobufInputStream.fromBuffer(ByteBuffer.wrap(source)));
+        ProtobufInputStreamTestScalarMessageSpec.decode(ProtobufInputStream.fromBuffer(ByteBuffer.wrap(source)));
     }
 
     @ProtobufMessage

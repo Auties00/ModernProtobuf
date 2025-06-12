@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 public class EnumDefaultValueTest {
     @Test
     public void testBuilder() {
-        var message = new EnumTestMessageBuilder()
+        var message = new EnumDefaultValueTestMessageBuilder()
                 .build();
         Assertions.assertEquals(Message.EnumConstant.THIRD, message.constant());
         Assertions.assertEquals(Message.EnumMethod.THIRD, message.method());
@@ -20,12 +20,12 @@ public class EnumDefaultValueTest {
     @Test
     public void testDecode() {
         // Create a message with a null value
-        var message = new EnumTestMessageBuilder()
+        var message = new EnumDefaultValueTestMessageBuilder()
                 .constant(null)
                 .method(null)
                 .build();
-        var encoded = EnumTestMessageSpec.encode(message); // Encode it
-        var decoded = EnumTestMessageSpec.decode(encoded); // Decode it, now it should contain the default value
+        var encoded = EnumDefaultValueTestMessageSpec.encode(message); // Encode it
+        var decoded = EnumDefaultValueTestMessageSpec.decode(encoded); // Decode it, now it should contain the default value
         Assertions.assertEquals(Message.EnumConstant.THIRD, decoded.constant());
         Assertions.assertEquals(Message.EnumMethod.THIRD, decoded.method());
     }

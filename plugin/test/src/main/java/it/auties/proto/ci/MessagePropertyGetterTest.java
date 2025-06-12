@@ -1,7 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.getter.BoxMessageSpec;
-import it.auties.proto.ci.message.getter.StandaloneGetterMessageSpec;
 import it.auties.protobuf.annotation.ProtobufGetter;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -16,16 +14,16 @@ public class MessagePropertyGetterTest {
     @Test
     public void testGetter() {
         var boxMessage = new BoxMessage(ProtobufString.wrap("Hello World!"));
-        var encoded = BoxMessageSpec.encode(boxMessage);
-        var decoded = BoxMessageSpec.decode(encoded);
+        var encoded = MessagePropertyGetterTestBoxMessageSpec.encode(boxMessage);
+        var decoded = MessagePropertyGetterTestBoxMessageSpec.decode(encoded);
         Assertions.assertEquals(decoded.unbox(), boxMessage.unbox());
     }
 
     @Test
     public void testMismatch() {
         var boxMessage = new StandaloneGetterMessage(ProtobufString.wrap("Hello World!"));
-        var encoded = StandaloneGetterMessageSpec.encode(boxMessage);
-        var decoded = StandaloneGetterMessageSpec.decode(encoded);
+        var encoded = MessagePropertyGetterTestStandaloneGetterMessageSpec.encode(boxMessage);
+        var decoded = MessagePropertyGetterTestStandaloneGetterMessageSpec.decode(encoded);
         Assertions.assertEquals(decoded.tag(), boxMessage.tag());
     }
 

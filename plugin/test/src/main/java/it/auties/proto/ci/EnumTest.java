@@ -12,8 +12,8 @@ public class EnumTest {
     @Test
         public void testSimple() {
         var someMessage = new Message(Enum.FIRST, Enum.THIRD, Enum.SECOND);
-        var encoded = EnumConstantValuesTestMessageSpec.encode(someMessage);
-        var decoded = EnumConstantValuesTestMessageSpec.decode(encoded);
+        var encoded = EnumTestMessageSpec.encode(someMessage);
+        var decoded = EnumTestMessageSpec.decode(encoded);
         Assertions.assertEquals(someMessage.content(), decoded.content());
         Assertions.assertEquals(someMessage.content1(), decoded.content1());
         Assertions.assertEquals(someMessage.content2(), decoded.content2());
@@ -23,8 +23,8 @@ public class EnumTest {
     public void testEmbedded() {
         var anotherMessage = new Message(Enum.SECOND, Enum.FIRST, Enum.THIRD);
         var someMessage = new MessageWrapper(anotherMessage);
-        var encoded = EnumConstantValuesTestMessageWrapperSpec.encode(someMessage);
-        var decoded = EnumConstantValuesTestMessageWrapperSpec.decode(encoded);
+        var encoded = EnumTestMessageWrapperSpec.encode(someMessage);
+        var decoded = EnumTestMessageWrapperSpec.decode(encoded);
         Assertions.assertNotNull(decoded.content());
         Assertions.assertEquals(someMessage.content().content(), decoded.content().content());
         Assertions.assertEquals(someMessage.content().content1(), decoded.content().content1());

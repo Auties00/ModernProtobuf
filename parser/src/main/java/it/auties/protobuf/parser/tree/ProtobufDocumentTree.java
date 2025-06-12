@@ -28,13 +28,12 @@ public final class ProtobufDocumentTree
                 .findFirst();
     }
 
-    public String packageName() {
+    public Optional<String> packageName() {
         return children.stream()
                 .filter(statement -> statement instanceof ProtobufPackageStatement)
                 .map(statement -> (ProtobufPackageStatement) statement)
                 .map(ProtobufPackageStatement::name)
-                .findFirst()
-                .orElse("");
+                .findFirst();
     }
 
     @Override

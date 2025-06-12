@@ -1,9 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.builder.ConstructorWrapperMessageBuilder;
-import it.auties.proto.ci.message.builder.StaticWrapperMessageBuilder;
-import it.auties.proto.ci.message.builder.WrapperMessageBuilder;
-import it.auties.proto.ci.message.builder.WrapperMessageSpec;
 import it.auties.protobuf.annotation.ProtobufBuilder;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -15,22 +11,22 @@ import static it.auties.protobuf.model.ProtobufType.STRING;
 public class MessageBuilderTest {
     @Test
     public void testBuilder() {
-        var defaultResult = new WrapperMessageBuilder()
+        var defaultResult = new MessageBuilderTestWrapperMessageBuilder()
                 .content(ProtobufString.wrap("123"))
                 .build();
-        WrapperMessageSpec.encode(defaultResult);
-        var constructorResult = new ConstructorWrapperMessageBuilder()
+        MessageBuilderTestWrapperMessageSpec.encode(defaultResult);
+        var constructorResult = new MessageBuilderTestConstructorWrapperMessageBuilder()
                 .content(123)
                 .build();
-        WrapperMessageSpec.encode(constructorResult);
-        var staticMethodResult = new StaticWrapperMessageBuilder()
+        MessageBuilderTestWrapperMessageSpec.encode(constructorResult);
+        var staticMethodResult = new MessageBuilderTestStaticWrapperMessageBuilder()
                 .content(123)
                 .build();
-        WrapperMessageSpec.encode(staticMethodResult);
+        MessageBuilderTestWrapperMessageSpec.encode(staticMethodResult);
     }
 
     @ProtobufMessage
-    public static record WrapperMessage(
+    public record WrapperMessage(
             @ProtobufProperty(index = 1, type = STRING)
             ProtobufString content
     ) {

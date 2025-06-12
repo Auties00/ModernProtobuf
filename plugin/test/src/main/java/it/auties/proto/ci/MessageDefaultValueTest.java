@@ -1,7 +1,5 @@
 package it.auties.proto.ci;
 
-import it.auties.proto.ci.message.defaltValue.WrapperMessageBuilder;
-import it.auties.proto.ci.message.defaltValue.WrapperMessageSpec;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
@@ -13,20 +11,19 @@ import java.util.Objects;
 public class MessageDefaultValueTest {
     @Test
     public void testDefaultValue() {
-        var defaultMessage = new WrapperMessageBuilder()
+        var defaultMessage = new MessageDefaultValueTestWrapperMessageBuilder()
                 .build();
         Assertions.assertEquals(defaultMessage.optionalMessage(), WrapperMessage.OptionalMessage.empty());
-        var encoded = WrapperMessageSpec.encode(new WrapperMessage(null));
-        var decoded = WrapperMessageSpec.decode(encoded);
+        var encoded = MessageDefaultValueTestWrapperMessageSpec.encode(new WrapperMessage(null));
+        var decoded = MessageDefaultValueTestWrapperMessageSpec.decode(encoded);
         Assertions.assertEquals(decoded.optionalMessage(), WrapperMessage.OptionalMessage.empty());
     }
 
     @ProtobufMessage
-    public static record WrapperMessage(
+    public record WrapperMessage(
             @ProtobufProperty(index = 1, type = ProtobufType.STRING)
             OptionalMessage optionalMessage
     ) {
-
             public static final class OptionalMessage {
                 private static final OptionalMessage EMPTY = new OptionalMessage(null);
 

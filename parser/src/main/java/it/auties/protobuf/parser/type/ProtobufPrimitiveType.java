@@ -9,12 +9,14 @@ public final class ProtobufPrimitiveType implements ProtobufTypeReference {
     private final ProtobufType protobufType;
 
     public static ProtobufPrimitiveType attributed(ProtobufType protobufType) {
+        Objects.requireNonNull(protobufType, "protobufType cannot be null");
         return new ProtobufPrimitiveType(protobufType);
     }
 
     private ProtobufPrimitiveType(ProtobufType protobufType) {
-        if (protobufType.isObject() || protobufType == ProtobufType.MAP) {
-            throw new ProtobufParserException("A primitive type cannot wrap an object or a map");
+        Objects.requireNonNull(protobufType, "protobufType cannot be null");
+        if (!protobufType.isPrimitive()) {
+            throw new ProtobufParserException(protobufType.name() + " is not a primitive type");
         }
 
         this.protobufType = protobufType;

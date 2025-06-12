@@ -154,7 +154,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     OUTPUT_OBJECT_PARAMETER,
                     writeMethod.get(),
                     index,
-                    cast ? "(%s) ".formatted(type.protobufType().serializedWrappedType().getName()) : "",
+                    cast ? "(%s) ".formatted(type.protobufType().deserializableType().getName()) : "",
                     propertyName
             );
             streamWriter.handle(nestedWriters.getLast(), propertyName, List.of(result));
