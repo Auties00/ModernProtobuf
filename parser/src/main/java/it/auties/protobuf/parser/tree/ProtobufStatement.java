@@ -1,21 +1,19 @@
 package it.auties.protobuf.parser.tree;
 
+import java.util.stream.Collectors;
+
 public sealed abstract class ProtobufStatement
         implements ProtobufTree
-        permits ProtobufBlock, ProtobufEmptyStatement, ProtobufExtensionStatement, ProtobufFieldStatement, ProtobufImportStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufSyntaxStatement {
+        permits ProtobufEmptyStatement, ProtobufEnum, ProtobufExtension, ProtobufExtensionsList, ProtobufField, ProtobufImport, ProtobufMessage, ProtobufMethod, ProtobufOneof, ProtobufOption, ProtobufPackage, ProtobufReserved, ProtobufReservedList, ProtobufService, ProtobufSyntax {
     private final int line;
-    protected ProtobufBlock<?> parent;
-    protected int level;
-    protected ProtobufStatement(int line) {
+    private ProtobufTreeBody<?> parent;
+
+    protected ProtobufStatement(int line, ProtobufTreeBody<?> parent) {
         this.line = line;
+        this.parent = parent;
     }
 
-    @Override
-    public int line() {
-        return line;
-    }
-
-    public ProtobufBlock<?> parent() {
+    public ProtobufTreeBody<?> parent() {
         return parent;
     }
 
@@ -23,17 +21,26 @@ public sealed abstract class ProtobufStatement
         return parent != null;
     }
 
-    public void setParent(ProtobufBlock<?> parent) {
-        this.parent = parent;
-        this.level = parent.level;
+    @Override
+    public int line() {
+        return line;
     }
 
-    // TODO: Print options?
-    protected String optionsToString() {
-        return "";
-    }
+    void writeOptions(StringBuilder builder) {
+        if(!(this instanceof ProtobufOptionableStatement optionableStatement)) {
+            return;
+        }
 
-    protected String toLeveledString(String input) {
-        return "    ".repeat(this.level == 0 ? 0 : this.level - 1) + input;
+        var options = optionableStatement.options();
+        if(options.isEmpty()) {
+            return;
+        }
+
+        builder.append(" [");
+        var values = options.stream()
+                .map(ProtobufOption::toString)
+                .collect(Collectors.joining(", "));
+        builder.append(values);
+        builder.append("]");
     }
 }

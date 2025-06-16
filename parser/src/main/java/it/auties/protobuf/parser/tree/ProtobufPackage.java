@@ -2,13 +2,16 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufPackageStatement
+public final class ProtobufPackage
         extends ProtobufStatement
-        implements ProtobufDocumentChildTree {
+        implements ProtobufDocumentChild {
     private String name;
 
-    public ProtobufPackageStatement(int line) {
-        super(line);
+    public ProtobufPackage(int line, ProtobufDocument parent) {
+        super(line, parent.body());
+        Objects.requireNonNull(parent, "parent cannot be null");
+        parent.body()
+                .addChild(this);
     }
 
     public String name() {
@@ -35,7 +38,7 @@ public final class ProtobufPackageStatement
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || obj instanceof ProtobufPackageStatement that
+        return this == obj || obj instanceof ProtobufPackage that
                 && Objects.equals(this.name(), that.name());
     }
 

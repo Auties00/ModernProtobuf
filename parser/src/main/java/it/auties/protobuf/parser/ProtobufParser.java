@@ -1,7 +1,9 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.parser.tree.ProtobufTreeBody;
 import it.auties.protobuf.parser.tree.*;
+import it.auties.protobuf.parser.type.ProtobufObjectType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.io.IOException;
@@ -15,7 +17,7 @@ import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 public final class ProtobufParser {
-    private static final Set<ProtobufDocumentTree> BUILT_INS;
+    private static final Set<ProtobufDocument> BUILT_INS;
     private static final Set<Character> SYMBOLS = Set.of('@', '!', '(', ')');
     private static final String STATEMENT_END = ";";
     private static final String OBJECT_START = "{";
@@ -52,24 +54,22 @@ public final class ProtobufParser {
     }
 
     private final ReentrantLock parserLock;
-    private ProtobufDocumentTree document;
-    private ProtobufStatement statement;
+    private ProtobufDocument document;
+    private ProtobufStatement tree;
     private StreamTokenizer tokenizer;
-    private final Set<String> syntacticSugar;
 
     public ProtobufParser() {
         this.parserLock = new ReentrantLock(true);
-        this.syntacticSugar = new HashSet<>();
     }
 
-    public Set<ProtobufDocumentTree> parse(Path path) throws IOException {
+    public Set<ProtobufDocument> parse(Path path) throws IOException {
         if (!Files.isDirectory(path)) {
             return Set.of(parseOnly(path));
         }
 
         try(var walker = Files.walk(path)) {
             var files = walker.filter(Files::isRegularFile).toList();
-            var results = new HashSet<ProtobufDocumentTree>();
+            var results = new HashSet<ProtobufDocument>();
             for(var file : files) {
                 var parsed = doParse(file, Files.newBufferedReader(file));
                 if(!results.add(parsed)) {
@@ -85,17 +85,17 @@ public final class ProtobufParser {
         }
     }
 
-    public ProtobufDocumentTree parseOnly(String input) {
+    public ProtobufDocument parseOnly(String input) {
         var result = doParse(null, new StringReader(input));
         attributeStatement(result, result);
         return result;
     }
 
-    private void attributeStatement(ProtobufDocumentTree document, ProtobufStatement statement) {
+    private void attributeStatement(ProtobufDocument document, ProtobufTree tree) {
         // TODO: Attribute
     }
 
-    public ProtobufDocumentTree parseOnly(Path path) throws IOException {
+    public ProtobufDocument parseOnly(Path path) throws IOException {
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("Expected file");
         }
@@ -106,16 +106,15 @@ public final class ProtobufParser {
         return result;
     }
 
-    private void attributeImports(Collection<ProtobufDocumentTree> documents) {
+    private void attributeImports(Collection<ProtobufDocument> documents) {
 
     }
 
-    private ProtobufDocumentTree doParse(Path location, Reader input) {
+    private ProtobufDocument doParse(Path location, Reader input) {
         try {
             parserLock.lock();
-            var document = new ProtobufDocumentTree(location);
+            var document = new ProtobufDocument(location);
             this.document = document;
-            this.statement = document;
             this.tokenizer = new StreamTokenizer(input);
             tokenizer.resetSyntax();
             tokenizer.wordChars('a', 'z');
@@ -141,174 +140,160 @@ public final class ProtobufParser {
             throw ProtobufParserException.wrap(syntaxException, location);
         } finally {
             document = null;
-            statement = null;
+            tree = null;
             tokenizer = null;
-            syntacticSugar.clear();
             parserLock.unlock();
         }
     }
 
     private void handleToken(String token) {
-        switch (statement) {
-            case ProtobufPackageStatement packageStatement -> handlePackageStatement(packageStatement, token);
-            case ProtobufSyntaxStatement syntaxStatement -> handleSyntaxStatement(syntaxStatement, token);
-            case ProtobufOptionStatement optionStatement -> handleOptionStatement(optionStatement, token);
-            case ProtobufFieldStatement fieldStatement -> handleFieldStatement(fieldStatement, token);
-            case ProtobufImportStatement importStatement -> handleImportStatement(importStatement, token);
-            case ProtobufReservedStatement<?> reservedStatement -> handleReservedStatement(reservedStatement, token);
-            case ProtobufExtensionStatement extensionStatement -> handleExtensionStatement(extensionStatement, token);
-            case ProtobufBlock<?> protobufBlock -> handleBlockStatement(token, protobufBlock);
-            case ProtobufEmptyStatement ignored -> {}
-        }
-    }
-
-    private void handleBlockStatement(String token, ProtobufBlock<?> protobufBlock) {
-        switch (protobufBlock) {
-            case ProtobufReservedListStatement reservedListStatement -> handleReservedListStatement(token, reservedListStatement);
-            case ProtobufExtensionsListStatement extensionsListStatement -> handleExtensionsListStatement(token, extensionsListStatement);
-            case ProtobufNamedBlock<?> protobufNamedBlock -> handleNamedBlock(token, protobufNamedBlock);
-            case ProtobufDocumentTree documentTree -> handleDocumentTree(documentTree, token);
-        }
-    }
-
-    private void handleExtensionsListStatement(String token, ProtobufExtensionsListStatement extensionsStatement) {
-        if(isStatementEnd(token)) {
-            ProtobufParserException.check(!extensionsStatement.children().isEmpty(),
-                    "Unexpected token: " + token, tokenizer.lineno());
+        if(tree == null) {
+            handleDocumentTree(document, token);
         }else {
-            var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufParserException("Unexpected token: " + token));
-            var extensionTree = new ProtobufExtensionStatement.Value(tokenizer.lineno());
-            extensionTree.setValue(index);
-            extensionsStatement.addChild(extensionTree);
-            statement = extensionTree;
-        }
-    }
-
-    private void handleReservedListStatement(String token, ProtobufReservedListStatement reservedStatement) {
-        if(isStatementEnd(token)) {
-            ProtobufParserException.check(!reservedStatement.children().isEmpty(),
-                    "Unexpected token: " + token, tokenizer.lineno());
-        }else {
-            var index = parseIndex(token, false, false);
-            if(index.isPresent()) {
-                var value = new ProtobufReservedStatement.FieldIndex.Value(tokenizer.lineno());
-                value.setValue(index.get());
-                reservedStatement.addChild(value);
-                statement = value;
-            } else {
-                var literal = parseStringLiteral(token)
-                        .orElseThrow(() -> new ProtobufParserException("Unexpected token: " + token));
-                var value = new ProtobufReservedStatement.FieldName(tokenizer.lineno());
-                value.setValue(literal);
-                reservedStatement.addChild(value);
-                statement = value;
+            switch (tree) {
+                case ProtobufPackage packageStatement -> handlePackageStatement(packageStatement, token);
+                case ProtobufSyntax syntaxStatement -> handleSyntaxStatement(syntaxStatement, token);
+                case ProtobufOption optionStatement -> handleOptionStatement(optionStatement, token);
+                case ProtobufField fieldStatement -> handleFieldStatement(fieldStatement, token);
+                case ProtobufImport importStatement -> handleImportStatement(importStatement, token);
+                case ProtobufReserved reservedStatement -> handleReservedStatement(reservedStatement, token);
+                case ProtobufExtension extensionStatement -> handleExtensionStatement(extensionStatement, token);
+                case ProtobufEmptyStatement ignored -> {}
+                case ProtobufEnum enumTree -> handleEnumTree(enumTree, token);
+                case ProtobufMessage messageTree -> handleMessageTree(messageTree, token);
+                case ProtobufOneof oneofTree -> handleOneofTree(oneofTree, token);
+                case ProtobufService serviceTree -> handleServiceTree(serviceTree, token);
+                case ProtobufMethod methodStatement -> handleMethodStatement(methodStatement, token);
+                case ProtobufReservedList reservedListStatement -> handleReservedListStatement(token, reservedListStatement);
+                case ProtobufExtensionsList extensionsListStatement -> handleExtensionsListStatement(token, extensionsListStatement);
             }
         }
     }
 
-    private void handleNamedBlock(String token, ProtobufNamedBlock<?> protobufNamedBlock) {
-        switch (protobufNamedBlock) {
-            case ProtobufEnumTree enumTree -> handleEnumTree(token, enumTree);
-            case ProtobufGroupTree groupTree -> handleGroupTree(token, groupTree);
-            case ProtobufMessageTree messageTree -> handleMessageTree(token, messageTree);
-            case ProtobufOneofTree oneofTree -> handleOneofTree(oneofTree, token);
-        }
+    private void handleMethodStatement(ProtobufMethod methodStatement, String token) {
+
     }
 
-    private void handleEnumTree(String token, ProtobufEnumTree enumTree) {
-        if(!enumTree.hasName()) {
-            enumTree.setName(token);
-        }else {
-            ProtobufParserException.check(isObjectEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
+    private void handleExtensionsListStatement(String token, ProtobufExtensionsList extensionsStatement) {
+        if(isStatementEnd(token)) {
+            throw new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno());
         }
+
+        var index = parseIndex(token, false, false)
+                .orElseThrow(() -> new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno()));
+        var extension = new ProtobufExtension(tokenizer.lineno(), extensionsStatement);
+        var fieldIndex = new ProtobufExtension.Value.FieldIndex(index);
+        extension.setValue(fieldIndex);
+        tree = extension;
     }
 
-    private void handleGroupTree(String token, ProtobufGroupTree groupTree) {
-        if(!groupTree.hasName()) {
-            groupTree.setName(token);
-        }else {
-            ProtobufParserException.check(isObjectEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
+    private void handleReservedListStatement(String token, ProtobufReservedList reservedStatement) {
+        if(isStatementEnd(token)) {
+            throw new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno());
         }
+
+        var reserved = new ProtobufReserved(tokenizer.lineno(), reservedStatement);
+        tree = reserved;
+        var index = parseIndex(token, false, false);
+        if(index.isPresent()) {
+            var value = new ProtobufReserved.Value.FieldIndex(index.get());
+            reserved.setValue(value);
+            return;
+        }
+
+        var literal = parseStringLiteral(token);
+        if(literal.isPresent()) {
+            var value = new ProtobufReserved.Value.FieldName(literal.get());
+            reserved.setValue(value);
+            return;
+        }
+
+        throw new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno());
     }
 
-    private void handleMessageTree(String token, ProtobufMessageTree messageTree) {
-        if(!messageTree.hasName()) {
-            messageTree.setName(token);
-        }else if(messageTree.children().isEmpty() && !syntacticSugar.contains(OBJECT_START)) {
+    private void handleServiceTree(ProtobufService serviceTree, String token) {
+        if(!serviceTree.hasName()) {
+            serviceTree.setName(token);
+        }else if(!serviceTree.hasBody()) {
             ProtobufParserException.check(isObjectStart(token),
                     "Unexpected token: " + token, tokenizer.lineno());
-            syntacticSugar.add(OBJECT_START);
+            var body = new ProtobufTreeBody<ProtobufServiceChild>(tokenizer.lineno(), false, serviceTree);
+            serviceTree.setBody(body);
         } else if(isObjectEnd(token)) {
             jumpOutStatement();
         } else {
-            this.statement = switch (token) {
-                case "option" -> {
-                    var optionStatement = new ProtobufOptionStatement(tokenizer.lineno());
-                    messageTree.addChild(optionStatement);
-                    yield optionStatement;
-                }
+            this.tree = switch (token) {
+                case STATEMENT_END -> new ProtobufEmptyStatement(tokenizer.lineno(), serviceTree);
+                case "option" -> new ProtobufOption(tokenizer.lineno(), serviceTree);
+                case "rpc" -> new ProtobufMethod(tokenizer.lineno(), serviceTree);
+                default -> throw new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno());
+            };
+        }
+    }
 
-                case "message" -> {
-                    var messageStatement = new ProtobufMessageTree(tokenizer.lineno(), false);
-                    messageTree.addChild(messageStatement);
-                    yield messageStatement;
-                }
-
-                case "enum" -> {
-                    var enumTree = new ProtobufEnumTree(tokenizer.lineno());
-                    messageTree.addChild(enumTree);
-                    yield enumTree;
-                }
-
-                case "extend" -> {
-                    var extendTree = new ProtobufMessageTree(tokenizer.lineno(), true);
-                    messageTree.addChild(extendTree);
-                    yield extendTree;
-                }
-
-                case "extensions" -> {
-                    var extensionsTree = new ProtobufExtensionsListStatement(tokenizer.lineno());
-                    messageTree.addChild(extensionsTree);
-                    yield extensionsTree;
-                }
-
-                case "reserved" -> {
-                    var reservedListTree = new ProtobufReservedListStatement(tokenizer.lineno());
-                    messageTree.addChild(reservedListTree);
-                    yield reservedListTree;
-                }
-
-                case STATEMENT_END -> {
-                    var emptyStatement = new ProtobufEmptyStatement(tokenizer.lineno());
-                    messageTree.addChild(emptyStatement);
-                    yield statement; // Ignore emptyStatement
-                }
-
+    private void handleEnumTree(ProtobufEnum enumTree, String token) {
+        if(!enumTree.hasName()) {
+            enumTree.setName(token);
+        }else if(!enumTree.hasBody()) {
+            ProtobufParserException.check(isObjectStart(token),
+                    "Unexpected token: " + token, tokenizer.lineno());
+            var block = new ProtobufTreeBody<ProtobufEnumChild>(tokenizer.lineno(), false, enumTree);
+            enumTree.setBody(block);
+        } else if(isObjectEnd(token)) {
+            jumpOutStatement();
+        } else {
+            this.tree = switch (token) {
+                case STATEMENT_END -> new ProtobufEmptyStatement(tokenizer.lineno(), enumTree);
+                case "extensions" -> new ProtobufExtensionsList(tokenizer.lineno(), enumTree);
+                case "option" -> new ProtobufOption(tokenizer.lineno(), enumTree);
+                case "reserved" -> new ProtobufReservedList(tokenizer.lineno(), enumTree);
                 default -> {
-                    var field = new ProtobufFieldStatement(tokenizer.lineno());
-                    var modifier = ProtobufFieldModifier.of(token);
-                    if(modifier.type() == ProtobufFieldModifier.Type.NOTHING) {
-                        ProtobufParserException.check(currentVersion() == ProtobufVersion.PROTOBUF_3,
-                                "Unexpected token: " + token, tokenizer.lineno());
-                        var reference = ProtobufTypeReference.of(token);
-                        field.setType(reference);
-                    }
-                    field.setModifier(modifier);
-                    messageTree.addChild(field);
+                    var field = new ProtobufEnumConstant(tokenizer.lineno(), enumTree);
+                    field.setModifier(ProtobufField.Modifier.nothing());
+                    field.setType(ProtobufObjectType.of(enumTree.name(), enumTree));
+                    field.setName(token);
                     yield field;
                 }
             };
         }
     }
 
-    private ProtobufVersion currentVersion() {
-        return document.syntax().orElse(ProtobufVersion.defaultVersion());
+    private void handleMessageTree(ProtobufMessage messageTree, String token) {
+        if(!messageTree.hasName()) {
+            messageTree.setName(token);
+        }else if(!messageTree.hasBody()) {
+            ProtobufParserException.check(isObjectStart(token),
+                    "Unexpected token: " + token, tokenizer.lineno());
+            var block = new ProtobufTreeBody<ProtobufMessageChild>(tokenizer.lineno(), false, messageTree);
+            messageTree.setBody(block);
+        } else if(isObjectEnd(token)) {
+            jumpOutStatement();
+        } else {
+            this.tree = switch (token) {
+                case STATEMENT_END -> new ProtobufEmptyStatement(tokenizer.lineno(), messageTree);
+                case "option" -> new ProtobufOption(tokenizer.lineno(), messageTree);
+                case "message" -> new ProtobufMessage(tokenizer.lineno(), false, messageTree);
+                case "enum" -> new ProtobufEnum(tokenizer.lineno(), messageTree);
+                case "extend" -> new ProtobufMessage(tokenizer.lineno(), true, messageTree);
+                case "extensions" -> new ProtobufExtensionsList(tokenizer.lineno(), messageTree);
+                case "reserved" -> new ProtobufReservedList(tokenizer.lineno(), messageTree);
+                default -> {
+                    var field = new ProtobufField(tokenizer.lineno(), messageTree);
+                    var modifier = ProtobufField.Modifier.of(token);
+                    if(modifier.type() == ProtobufField.Modifier.Type.NOTHING) {
+                        ProtobufParserException.check(currentVersion() == ProtobufVersion.PROTOBUF_3,
+                                "Unexpected token: " + token, tokenizer.lineno());
+                        var reference = ProtobufTypeReference.of(token);
+                        field.setType(reference);
+                    }
+                    field.setModifier(modifier);
+                    yield field;
+                }
+            };
+        }
     }
 
-    private void handleOneofTree(ProtobufOneofTree oneofTree, String token) {
+    private void handleOneofTree(ProtobufOneof oneofTree, String token) {
         if(!oneofTree.hasName()) {
             oneofTree.setName(token);
         }else {
@@ -317,174 +302,30 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleDocumentTree(ProtobufDocumentTree documentTree, String token) {
-        this.statement = switch (token) {
-            case "package" -> {
-                var packageStatement = new ProtobufPackageStatement(tokenizer.lineno());
-                documentTree.addChild(packageStatement);
-                yield packageStatement;
-            }
-
-            case "syntax" -> {
-                var syntaxStatement = new ProtobufSyntaxStatement(tokenizer.lineno());
-                documentTree.addChild(syntaxStatement);
-                yield syntaxStatement;
-            }
-
-            case "option" -> {
-                var optionStatement = new ProtobufOptionStatement(tokenizer.lineno());
-                documentTree.addChild(optionStatement);
-                yield optionStatement;
-            }
-
-            case "message" -> {
-                var messageStatement = new ProtobufMessageTree(tokenizer.lineno(), false);
-                documentTree.addChild(messageStatement);
-                yield messageStatement;
-            }
-
-            case "enum" -> {
-                var enumTree = new ProtobufEnumTree(tokenizer.lineno());
-                documentTree.addChild(enumTree);
-                yield enumTree;
-            }
-
-            case "service" -> {
-                throw new UnsupportedOperationException();
-            }
-
-            case "import" -> {
-                var importTree = new ProtobufImportStatement(tokenizer.lineno());
-                documentTree.addChild(importTree);
-                yield importTree;
-            }
-
-            case "extend" -> {
-                var extendTree = new ProtobufMessageTree(tokenizer.lineno(), true);
-                documentTree.addChild(extendTree);
-                yield extendTree;
-            }
-
-            case STATEMENT_END -> {
-                var emptyStatement = new ProtobufEmptyStatement(tokenizer.lineno());
-                documentTree.addChild(emptyStatement);
-                yield statement; // Ignore emptyStatement
-            }
-
+    private void handleDocumentTree(ProtobufDocument documentTree, String token) {
+        this.tree = switch (token) {
+            case STATEMENT_END -> new ProtobufEmptyStatement(tokenizer.lineno(), documentTree);
+            case "package" -> new ProtobufPackage(tokenizer.lineno(), documentTree);
+            case "syntax" -> new ProtobufSyntax(tokenizer.lineno(), documentTree);
+            case "option" -> new ProtobufOption(tokenizer.lineno(), documentTree);
+            case "message" -> new ProtobufMessage(tokenizer.lineno(), false, documentTree);
+            case "enum" -> new ProtobufEnum(tokenizer.lineno(), documentTree);
+            case "service" -> new ProtobufService(tokenizer.lineno(), documentTree);
+            case "import" -> new ProtobufImport(tokenizer.lineno(), documentTree);
+            case "extend" -> new ProtobufMessage(tokenizer.lineno(), true, documentTree);
             default -> throw new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno());
         };
     }
 
-    private void handleReservedStatement(ProtobufReservedStatement<?> reservedStatement, String token) {
-        switch (reservedStatement) {
-            case ProtobufReservedStatement.FieldIndex fieldIndex -> handleReservedIndexStatement(fieldIndex, token);
-            case ProtobufReservedStatement.FieldName fieldName -> handleReservedNameStatement(fieldName, token);
-        }
+    private void handleReservedStatement(ProtobufReserved reservedStatement, String token) {
+
     }
 
-    private void handleReservedIndexStatement(ProtobufReservedStatement.FieldIndex fieldIndex, String token) {
-        switch (fieldIndex) {
-            case ProtobufReservedStatement.FieldIndex.Range fieldIndexRange -> handleReservedIndexRangeStatement(fieldIndexRange, token);
-            case ProtobufReservedStatement.FieldIndex.Value fieldIndexValue -> handleReservedIndexValueStatement(fieldIndexValue, token);
-        }
+    private void handleExtensionStatement(ProtobufExtension extensionStatement, String token) {
+
     }
 
-    private void handleReservedIndexRangeStatement(ProtobufReservedStatement.FieldIndex.Range fieldIndexRange, String token) {
-        if(!fieldIndexRange.hasMin()) {
-            var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexRange.setMin(index);
-        }else if(!fieldIndexRange.hasMax()) {
-            var index = parseIndex(token, false, true)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexRange.setMax(index);
-        }else {
-            ProtobufParserException.check(isStatementEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            jumpOutStatement();
-        }
-    }
-
-    private void handleReservedIndexValueStatement(ProtobufReservedStatement.FieldIndex.Value fieldIndexValue, String token) {
-        if(!fieldIndexValue.hasValue()) {
-            var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexValue.setValue(index);
-        } else if(isRangeOperator(token)) {
-            var parent = (ProtobufReservedListStatement) fieldIndexValue.parent();
-            parent.removeChild();
-            var range = new ProtobufReservedStatement.FieldIndex.Range(fieldIndexValue.line());
-            range.setMin(fieldIndexValue.value());
-            parent.addChild(range);
-            statement = range;
-        } else {
-            ProtobufParserException.check(isStatementEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            jumpOutStatement();
-        }
-    }
-
-    private void handleReservedNameStatement(ProtobufReservedStatement.FieldName fieldName, String token) {
-        if(!fieldName.hasValue()) {
-            jumpOutStatement();
-        }else {
-            ProtobufParserException.check(isStatementEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            fieldName.setValue(token);
-        }
-    }
-
-    private void handleExtensionStatement(ProtobufExtensionStatement extensionStatement, String token) {
-        switch (extensionStatement) {
-            case ProtobufExtensionStatement.Range fieldIndexRange -> handleExtensionIndexRangeStatement(token, fieldIndexRange);
-            case ProtobufExtensionStatement.Value fieldIndexValues -> handleExtensionIndexValueStatement(token, fieldIndexValues);
-        }
-    }
-
-    private void handleExtensionIndexRangeStatement(String token, ProtobufExtensionStatement.Range fieldIndexRange) {
-        if(!fieldIndexRange.hasMin()) {
-            var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexRange.setMin(index);
-        }else if(!fieldIndexRange.hasMax()) {
-            var index = parseIndex(token, false, true)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexRange.setMax(index);
-        }else {
-            ProtobufParserException.check(isStatementEnd(token),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            jumpOutStatement();
-        }
-    }
-
-
-    private void handleExtensionIndexValueStatement(String token, ProtobufExtensionStatement.Value fieldIndexValue) {
-        if(isStatementEnd(token)) {
-            ProtobufParserException.check(fieldIndexValue.hasValue(),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            jumpOutStatement();
-            jumpOutStatement();
-        } else if(isListSeparator(token)) {
-            ProtobufParserException.check(fieldIndexValue.hasValue(),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            jumpOutStatement();
-        } else if(isRangeOperator(token)) {
-            ProtobufParserException.check(fieldIndexValue.hasValue(),
-                    "Unexpected token: " + token, tokenizer.lineno());
-            var parent = (ProtobufExtensionsListStatement) fieldIndexValue.parent();
-            parent.removeChild();
-            var range = new ProtobufExtensionStatement.Range(fieldIndexValue.line());
-            range.setMin(fieldIndexValue.value());
-            parent.addChild(range);
-            statement = range;
-        } else {
-            var index = parseIndex(token, false, false)
-                    .orElseThrow(() -> new ProtobufParserException("Invalid field index: " + token, tokenizer.lineno()));
-            fieldIndexValue.setValue(index);
-        }
-    }
-
-    private void handleImportStatement(ProtobufImportStatement importStatement, String token) {
+    private void handleImportStatement(ProtobufImport importStatement, String token) {
         if (!importStatement.hasLocation()) {
             var literal = parseStringLiteral(token)
                     .orElseThrow(() -> new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno()));
@@ -496,20 +337,21 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleFieldStatement(ProtobufFieldStatement fieldStatement, String token) {
+    private void handleFieldStatement(ProtobufField fieldStatement, String token) {
         if(!fieldStatement.hasModifier()) {
-            var modifier = ProtobufFieldModifier.of(token);
+            var modifier = ProtobufField.Modifier.of(token);
             fieldStatement.setModifier(modifier);
         }else if(!fieldStatement.hasType()) {
             fieldStatement.setType(ProtobufTypeReference.of(token));
         } else if (!fieldStatement.hasName()) {
             fieldStatement.setName(token);
-        }else if(!syntacticSugar.contains(ASSIGNMENT_OPERATOR)) {
+        }else if(!fieldStatement.hasIndex()) {
             ProtobufParserException.check(isAssignmentOperator(token),
                     "Unexpected token: " + token, tokenizer.lineno());
-            syntacticSugar.add(ASSIGNMENT_OPERATOR);
-        } else if(!fieldStatement.hasIndex()) {
+            fieldStatement.setIndex(ProtobufExpression.operator());
+        } else if(fieldStatement.index() == ProtobufExpression.operator()) {
             var index = parseIndex(token, false, false)
+                    .map(ProtobufExpression::value)
                     .orElseThrow(() -> new ProtobufParserException("Invalid index " + token, tokenizer.lineno()));
             fieldStatement.setIndex(index);
         }else {
@@ -519,17 +361,17 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleOptionStatement(ProtobufOptionStatement optionStatement, String token) {
+    private void handleOptionStatement(ProtobufOption optionStatement, String token) {
         if(!optionStatement.hasName()) {
             optionStatement.setName(token);
-        }else if(!syntacticSugar.contains(ASSIGNMENT_OPERATOR)) {
+        }else if(!optionStatement.hasValue()) {
             ProtobufParserException.check(isAssignmentOperator(token),
                     "Unexpected token: " + token, tokenizer.lineno());
-            syntacticSugar.add(ASSIGNMENT_OPERATOR);
-        } else if(!optionStatement.hasValue()) {
+            optionStatement.setValue(op);
+        } else if(optionStatement.value() == ASSIGNMENT_VALUE) {
             var literalValue = parseStringLiteral(token);
             if(literalValue.isPresent()) {
-                var literalOption = new ProtobufOptionValue.Literal(literalValue.get());
+                var literalOption = new ProtobufOption.Value.Literal(literalValue.get());
                 optionStatement.setValue(literalOption);
             }else {
                 if(isObjectStart(token)) {
@@ -538,15 +380,15 @@ public final class ProtobufParser {
                 }else {
                     var indexValue = parseIndex(token, true, false);
                     if(indexValue.isPresent()) {
-                        var intOption = new ProtobufOptionValue.Int(indexValue.get());
+                        var intOption = new ProtobufOption.Value.Int(indexValue.get());
                         optionStatement.setValue(intOption);
                     } else {
                         var boolValue = parseBool(token);
                         if(boolValue.isPresent()) {
-                            var boolOption = new ProtobufOptionValue.Bool(boolValue.get());
+                            var boolOption = new ProtobufOption.Value.Bool(boolValue.get());
                             optionStatement.setValue(boolOption);
                         }else {
-                            var enumOption = new ProtobufOptionValue.Enum(token);
+                            var enumOption = new ProtobufOption.Value.Enum(token);
                             optionStatement.setValue(enumOption);
                         }
                     }
@@ -559,13 +401,15 @@ public final class ProtobufParser {
         }
     }
 
-    private void handleSyntaxStatement(ProtobufSyntaxStatement syntaxStatement, String token) {
+    private void handleSyntaxStatement(ProtobufSyntax syntaxStatement, String token) {
         if(!syntacticSugar.contains(ASSIGNMENT_OPERATOR)) {
             ProtobufParserException.check(isAssignmentOperator(token),
                     "Unexpected token: " + token, tokenizer.lineno());
             syntacticSugar.add(ASSIGNMENT_OPERATOR);
         }else if (!syntaxStatement.hasVersion()) {
-            var version = ProtobufVersion.of(token)
+            var literal = parseStringLiteral(token)
+                    .orElseThrow(() -> new ProtobufParserException("Unexpected token: " + token, tokenizer.lineno()));
+            var version = ProtobufVersion.of(literal)
                             .orElseThrow(() -> new ProtobufParserException("Unknown Protobuf version: " + token, tokenizer.lineno()));
             syntaxStatement.setVersion(version);
         } else {
@@ -575,7 +419,7 @@ public final class ProtobufParser {
         }
     }
 
-    private void handlePackageStatement(ProtobufPackageStatement packageStatement, String token) {
+    private void handlePackageStatement(ProtobufPackage packageStatement, String token) {
         if (!packageStatement.hasName()) {
             packageStatement.setName(token);
         } else {
@@ -586,8 +430,7 @@ public final class ProtobufParser {
     }
 
     private void jumpOutStatement() {
-        this.statement = statement.parent();
-        syntacticSugar.clear();
+        this.tree = tree.parent().owner();
     }
 
     private Optional<String> parseStringLiteral(String token) {
@@ -626,6 +469,10 @@ public final class ProtobufParser {
         return !instruction.isBlank()
                 && !Character.isDigit(instruction.charAt(0))
                 && instruction.chars().mapToObj(entry -> (char) entry).noneMatch(SYMBOLS::contains);
+    }
+
+    private ProtobufVersion currentVersion() {
+        return document.syntax().orElse(ProtobufVersion.defaultVersion());
     }
 
     private String nextToken() {

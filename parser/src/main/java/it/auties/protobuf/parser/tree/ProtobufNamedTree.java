@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.tree;
 
 public sealed interface ProtobufNamedTree
         extends ProtobufTree
-        permits ProtobufNamedBlock, ProtobufFieldStatement {
+        permits ProtobufEnum, ProtobufField, ProtobufMessage, ProtobufMethod, ProtobufOneof, ProtobufService {
     String name();
     boolean hasName();
     void setName(String name);

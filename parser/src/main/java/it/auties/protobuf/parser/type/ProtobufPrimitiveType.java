@@ -8,7 +8,7 @@ import java.util.Objects;
 public final class ProtobufPrimitiveType implements ProtobufTypeReference {
     private final ProtobufType protobufType;
 
-    public static ProtobufPrimitiveType attributed(ProtobufType protobufType) {
+    public static ProtobufPrimitiveType of(ProtobufType protobufType) {
         Objects.requireNonNull(protobufType, "protobufType cannot be null");
         return new ProtobufPrimitiveType(protobufType);
     }

@@ -11,10 +11,10 @@ public sealed interface ProtobufTypeReference
     static ProtobufTypeReference of(String type){
         var protobufType = ProtobufType.of(type);
         return switch (protobufType) {
-            case UNKNOWN -> ProtobufObjectType.unattributed(type);
-            case MAP -> ProtobufMapType.unattributed();
-            case GROUP -> ProtobufGroupType.unattributed(type);
-            default -> ProtobufPrimitiveType.attributed(protobufType);
+            case UNKNOWN -> ProtobufObjectType.of(type);
+            case MAP -> ProtobufMapType.of();
+            case GROUP -> ProtobufGroupType.of(type);
+            default -> ProtobufPrimitiveType.of(protobufType);
         };
     }
 }

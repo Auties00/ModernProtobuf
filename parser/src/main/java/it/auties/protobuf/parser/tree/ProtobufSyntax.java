@@ -4,13 +4,16 @@ import it.auties.protobuf.model.ProtobufVersion;
 
 import java.util.Objects;
 
-public final class ProtobufSyntaxStatement
+public final class ProtobufSyntax
         extends ProtobufStatement
-        implements ProtobufDocumentChildTree {
+        implements ProtobufDocumentChild {
     private ProtobufVersion version;
 
-    public ProtobufSyntaxStatement(int line) {
-        super(line);
+    public ProtobufSyntax(int line, ProtobufDocument parent) {
+        super(line, parent.body());
+        Objects.requireNonNull(parent, "parent cannot be null");
+        parent.body()
+                .addChild(this);
     }
 
     public ProtobufVersion version() {
@@ -37,7 +40,7 @@ public final class ProtobufSyntaxStatement
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || obj instanceof ProtobufSyntaxStatement that
+        return this == obj || obj instanceof ProtobufSyntax that
                 && Objects.equals(this.version(), that.version());
     }
 

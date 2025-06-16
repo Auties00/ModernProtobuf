@@ -1,27 +1,27 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufBlock;
-import it.auties.protobuf.parser.tree.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.ProtobufMessageTree;
-import it.auties.protobuf.parser.tree.ProtobufNamedBlock;
+import it.auties.protobuf.parser.tree.ProtobufEnum;
+import it.auties.protobuf.parser.tree.ProtobufTree;
 
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufObjectType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufNamedBlock<?> declaration;
+    private ProtobufTree declaration;
 
-    public static ProtobufObjectType unattributed(String typeName){
-        return new ProtobufObjectType(Objects.requireNonNull(typeName), null);
+    public static ProtobufObjectType of(String typeName) {
+        Objects.requireNonNull(typeName, "typeName cannot be null");
+        return new ProtobufObjectType(typeName, null);
     }
 
-    public static ProtobufObjectType attributed(String typeName, ProtobufMessageTree typeDeclaration){
-        return new ProtobufObjectType(Objects.requireNonNull(typeName), Objects.requireNonNull(typeDeclaration));
+    public static ProtobufObjectType of(String typeName, ProtobufTree typeDeclaration){
+        Objects.requireNonNull(typeName, "typeName cannot be null");
+        return new ProtobufObjectType(typeName, typeDeclaration);
     }
 
-    private ProtobufObjectType(String name, ProtobufMessageTree declaration){
+    private ProtobufObjectType(String name, ProtobufTree declaration){
         this.name = name;
         this.declaration = declaration;
     }
@@ -32,7 +32,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
             return ProtobufType.UNKNOWN;
         }
 
-        return declaration instanceof ProtobufEnumTree ? ProtobufType.ENUM : ProtobufType.MESSAGE;
+        return declaration instanceof ProtobufEnum ? ProtobufType.ENUM : ProtobufType.MESSAGE;
     }
 
     @Override
@@ -45,7 +45,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return name();
     }
 
-    public Optional<ProtobufNamedBlock<?>> declaration() {
+    public Optional<ProtobufTree> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -54,7 +54,7 @@ public final class ProtobufObjectType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufNamedBlock<?> statement) {
+    public void setDeclaration(ProtobufTree statement) {
         this.declaration = statement;
     }
 }

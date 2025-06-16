@@ -1,24 +1,25 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufGroupTree;
+import it.auties.protobuf.parser.tree.ProtobufGroupField;
 
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufGroupType implements ProtobufTypeReference {
     private final String name;
-    private ProtobufGroupTree declaration;
+    private ProtobufGroupField declaration;
 
-    public static ProtobufGroupType unattributed(String typeName){
-        return new ProtobufGroupType(Objects.requireNonNull(typeName), null);
+    public static ProtobufGroupType of(String typeName){
+        Objects.requireNonNull(typeName, "typeName cannot be null");
+        return new ProtobufGroupType(typeName, null);
     }
 
-    public static ProtobufGroupType attributed(String typeName, ProtobufGroupTree typeDeclaration){
-        return new ProtobufGroupType(Objects.requireNonNull(typeName), Objects.requireNonNull(typeDeclaration));
+    public static ProtobufGroupType of(String typeName, ProtobufGroupField typeDeclaration){
+        return new ProtobufGroupType(typeName, Objects.requireNonNull(typeDeclaration));
     }
 
-    private ProtobufGroupType(String name, ProtobufGroupTree declaration){
+    private ProtobufGroupType(String name, ProtobufGroupField declaration){
         this.name = name;
         this.declaration = declaration;
     }
@@ -42,7 +43,7 @@ public final class ProtobufGroupType implements ProtobufTypeReference {
         return "group";
     }
 
-    public Optional<ProtobufGroupTree> declaration() {
+    public Optional<ProtobufGroupField> declaration() {
         return Optional.ofNullable(declaration);
     }
 
@@ -51,7 +52,7 @@ public final class ProtobufGroupType implements ProtobufTypeReference {
         return declaration != null;
     }
 
-    public void attribute(ProtobufGroupTree statement) {
+    public void attribute(ProtobufGroupField statement) {
         this.declaration = statement;
     }
 }

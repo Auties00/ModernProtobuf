@@ -8,9 +8,9 @@ import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration.ConfigOption;
 import com.github.javaparser.printer.configuration.imports.IntelliJImportOrderingStrategy;
 import it.auties.protobuf.parser.tree.ProtobufTree;
-import it.auties.protobuf.parser.tree.ProtobufDocumentTree;
-import it.auties.protobuf.parser.tree.ProtobufEnumTree;
-import it.auties.protobuf.parser.tree.ProtobufMessageTree;
+import it.auties.protobuf.parser.tree.ProtobufDocument;
+import it.auties.protobuf.parser.tree.ProtobufEnum;
+import it.auties.protobuf.parser.tree.ProtobufMessage;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,7 +22,7 @@ import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public record ProtobufSchemaCreator(ProtobufDocumentTree document, File directory) {
+public record ProtobufSchemaCreator(ProtobufDocument document, File directory) {
     public void generate(List<CompilationUnit> classPool, boolean mutable, boolean nullable) {
         var results = document.children()
                 .stream()
@@ -33,12 +33,12 @@ public record ProtobufSchemaCreator(ProtobufDocumentTree document, File director
 
     public CompilationUnit generate(ProtobufTree object, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
         Objects.requireNonNull(directory, "Cannot generate files without a target directory");
-        if (object instanceof ProtobufMessageTree msg) {
+        if (object instanceof ProtobufMessage msg) {
             var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
             return schema.generate();
         }
 
-        if (object instanceof ProtobufEnumTree enm) {
+        if (object instanceof ProtobufEnum enm) {
             var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
             return schema.generate();
         }
@@ -84,12 +84,12 @@ public record ProtobufSchemaCreator(ProtobufDocumentTree document, File director
     }
 
     private Optional<CompilationUnit> update(ProtobufTree statement, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
-        if (statement instanceof ProtobufMessageTree msg) {
+        if (statement instanceof ProtobufMessage msg) {
             var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
             return schema.update();
         }
 
-        if (statement instanceof ProtobufEnumTree enm) {
+        if (statement instanceof ProtobufEnum enm) {
             var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
             return schema.update();
         }

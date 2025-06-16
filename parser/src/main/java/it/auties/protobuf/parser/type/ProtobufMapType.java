@@ -2,7 +2,6 @@ package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
 
-import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufMapType implements ProtobufTypeReference {
@@ -15,12 +14,12 @@ public final class ProtobufMapType implements ProtobufTypeReference {
         this.value = value;
     }
 
-    public static ProtobufTypeReference unattributed() {
+    public static ProtobufTypeReference of() {
         return new ProtobufMapType(null, null);
     }
 
-    public static ProtobufTypeReference attributed(ProtobufTypeReference keyType, ProtobufTypeReference valueType) {
-        return new ProtobufMapType(Objects.requireNonNull(keyType), Objects.requireNonNull(valueType));
+    public static ProtobufTypeReference of(ProtobufTypeReference keyType, ProtobufTypeReference valueType) {
+        return new ProtobufMapType(keyType, valueType);
     }
 
     public Optional<ProtobufTypeReference> keyType() {
