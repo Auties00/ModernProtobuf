@@ -13,8 +13,7 @@ public class ExtensionsTest {
     public void testValid() throws URISyntaxException, IOException {
         var source = ClassLoader.getSystemClassLoader().getResource("extensions_valid.proto");
         Objects.requireNonNull(source);
-        var parser = new ProtobufParser();
-        var document = parser.parseOnly(Path.of(source.toURI()));
+        var document = ProtobufParser.parseOnly(Path.of(source.toURI()));
         System.out.println(document);
     }
 
@@ -23,39 +22,37 @@ public class ExtensionsTest {
         var source = ClassLoader.getSystemClassLoader().getResource("extensions_duplicate.proto");
         Objects.requireNonNull(source);
         Assertions.assertThrows(ProtobufParserException.class, () -> {
-            var parser = new ProtobufParser();
-            var document = parser.parseOnly(Path.of(source.toURI()));
+            var document = ProtobufParser.parseOnly(Path.of(source.toURI()));
             System.out.println(document);
         });
     }
 
     @Test
     public void testIllegal() {
-        var parser = new ProtobufParser();
         {
             var illegalIndexSource = ClassLoader.getSystemClassLoader().getResource("extensions_illegal_index.proto");
             Objects.requireNonNull(illegalIndexSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalIndexSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalIndexSource.toURI())));
             var illegalNameSource = ClassLoader.getSystemClassLoader().getResource("extensions_illegal_value.proto");
             Objects.requireNonNull(illegalNameSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNameSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalNameSource.toURI())));
             var illegalNoMinSource = ClassLoader.getSystemClassLoader().getResource("extensions_illegal_no_min.proto");
             Objects.requireNonNull(illegalNoMinSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNoMinSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalNoMinSource.toURI())));
             var illegalNoMaxSource = ClassLoader.getSystemClassLoader().getResource("extensions_illegal_no_max.proto");
             Objects.requireNonNull(illegalNoMaxSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNoMaxSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalNoMaxSource.toURI())));
         }
         {
             var illegalIndexSource = ClassLoader.getSystemClassLoader().getResource("extend_illegal_field.proto");
             Objects.requireNonNull(illegalIndexSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalIndexSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalIndexSource.toURI())));
             var illegalNameSource = ClassLoader.getSystemClassLoader().getResource("extend_illegal_field1.proto");
             Objects.requireNonNull(illegalNameSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNameSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalNameSource.toURI())));
             var illegalNoMinSource = ClassLoader.getSystemClassLoader().getResource("extend_illegal_no_fields.proto");
             Objects.requireNonNull(illegalNoMinSource);
-            Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(illegalNoMinSource.toURI())));
+            Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(illegalNoMinSource.toURI())));
         }
     }
 }

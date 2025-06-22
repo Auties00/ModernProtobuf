@@ -1,43 +1,84 @@
 package it.auties.protobuf.parser.tree;
 
-public sealed interface ProtobufExpression {
-    static ProtobufExpression none() {
-        return None.INSTANCE;
+import it.auties.protobuf.parser.type.ProtobufMessageOrEnumType;
+
+public final class ProtobufExpression implements ProtobufTree {
+    private final int line;
+    private Value value;
+    private ProtobufTree parent;
+
+    public ProtobufExpression(int line) {
+        this.line = line;
     }
 
-    static ProtobufExpression operator() {
-        return Operator.INSTANCE;
+    @Override
+    public int line() {
+        return line;
     }
 
-    static <T> ProtobufExpression value(T value) {
-        return new Value<>(value);
+    public Value value() {
+        return value;
     }
 
-    final class None implements ProtobufExpression {
-        private static final None INSTANCE = new None();
+    public boolean hasValue() {
+        return value != null;
+    }
 
-        private None() {
+    public void setValue(Value value) {
+        this.value = value;
+    }
 
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return hasValue();
+    }
+
+    @Override
+    public String toString() {
+        return value == null ? "[missing]" : value.toString();
+    }
+
+    public sealed interface Value {
+        record Literal(String value) implements Value {
+            @Override
+            public String toString() {
+                return "\"" + value + "\"";
+            }
         }
-    }
 
-    final class Operator implements ProtobufExpression {
-        private static final Operator INSTANCE = new Operator();
-
-        private Operator() {
-
-        }
-    }
-
-    final class Value<T> implements ProtobufExpression {
-        private final T value;
-
-        private Value(T value) {
-            this.value = value;
+        record Number(int value) implements Value {
+            @Override
+            public String toString() {
+                return String.valueOf(value);
+            }
         }
 
-        public T value() {
-            return value;
+        record Bool(boolean value) implements Value {
+            @Override
+            public String toString() {
+                return String.valueOf(value);
+            }
+        }
+
+        record EnumConstant(ProtobufMessageOrEnumType type, String value) implements Value {
+            @Override
+            public String toString() {
+                return value;
+            }
         }
     }
 }

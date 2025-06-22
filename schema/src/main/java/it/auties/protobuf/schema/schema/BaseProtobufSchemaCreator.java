@@ -14,7 +14,7 @@ import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.ProtobufEnum;
 import it.auties.protobuf.parser.tree.ProtobufMessage;
-import it.auties.protobuf.parser.tree.ProtobufTreeBody;
+import it.auties.protobuf.parser.tree.ProtobufBody;
 import it.auties.protobuf.parser.tree.ProtobufField;
 import it.auties.protobuf.parser.tree.ProtobufReserved;
 import it.auties.protobuf.schema.util.LogProvider;
@@ -257,7 +257,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
         return new CompilationUnitResult(compilationUnit, false);
     }
 
-    private boolean hasFields(ProtobufTreeBody<?> statement) {
+    private boolean hasFields(ProtobufBody<?> statement) {
         return statement instanceof ProtobufMessage messageTree && messageTree.children()
                 .stream()
                 .anyMatch(entry -> entry instanceof ProtobufField
@@ -272,7 +272,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufTreeBody<?> statement, ProtobufField.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufBody<?> statement, ProtobufField.Modifier.Type modifier) {
         return statement.children()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessage messageStatement && hasFieldsWithModifier(messageStatement, modifier))
@@ -284,7 +284,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
         return hasFieldsWithType(protoStatement, types);
     }
 
-    private boolean hasFieldsWithType(ProtobufTreeBody<?> statement, ProtobufType... types) {
+    private boolean hasFieldsWithType(ProtobufBody<?> statement, ProtobufType... types) {
         var typesSet = Set.of(types);
         return statement.children()
                 .stream()
@@ -294,7 +294,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
     }
 
     void addReservedAnnotation(TypeDeclaration<?> ctEnum) {
-        if(!(protoStatement instanceof ProtobufTreeBody<?> protobufReservable)){
+        if(!(protoStatement instanceof ProtobufBody<?> protobufReservable)){
             return;
         }
 

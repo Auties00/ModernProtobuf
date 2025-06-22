@@ -11,8 +11,7 @@ public class ProtoVersionFieldTest {
     public void testProto2() throws URISyntaxException, IOException {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("proto2.proto");
         Objects.requireNonNull(proto2Source);
-        var parser = new ProtobufParser();
-        var document = parser.parseOnly(Path.of(proto2Source.toURI()));
+        var document = ProtobufParser.parseOnly(Path.of(proto2Source.toURI()));
         System.out.println(document);
     }
 
@@ -20,8 +19,7 @@ public class ProtoVersionFieldTest {
     public void testProto3() throws URISyntaxException, IOException {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("proto3.proto");
         Objects.requireNonNull(proto2Source);
-        var parser = new ProtobufParser();
-        var document = parser.parseOnly(Path.of(proto2Source.toURI()));
+        var document = ProtobufParser.parseOnly(Path.of(proto2Source.toURI()));
         System.out.println(document);
     }
 }

@@ -13,7 +13,6 @@ public class UnexpectedTokensTest {
     public void testIllegalTokenAfterMessageDefinition() throws URISyntaxException, IOException {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("unexpected_tokens.proto");
         Objects.requireNonNull(proto2Source);
-        var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(proto2Source.toURI())));
     }
 }

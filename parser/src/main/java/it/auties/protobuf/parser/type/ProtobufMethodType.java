@@ -12,4 +12,12 @@ public final class ProtobufMethodType {
         this.type = type;
         this.stream = stream;
     }
+
+    public ProtobufTypeReference type() {
+        return type;
+    }
+
+    public boolean stream() {
+        return stream;
+    }
 }

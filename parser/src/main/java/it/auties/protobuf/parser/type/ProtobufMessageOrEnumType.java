@@ -7,21 +7,21 @@ import it.auties.protobuf.parser.tree.ProtobufTree;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class ProtobufObjectType implements ProtobufTypeReference {
+public final class ProtobufMessageOrEnumType implements ProtobufTypeReference {
     private final String name;
     private ProtobufTree declaration;
 
-    public static ProtobufObjectType of(String typeName) {
+    public static ProtobufMessageOrEnumType of(String typeName) {
         Objects.requireNonNull(typeName, "typeName cannot be null");
-        return new ProtobufObjectType(typeName, null);
+        return new ProtobufMessageOrEnumType(typeName, null);
     }
 
-    public static ProtobufObjectType of(String typeName, ProtobufTree typeDeclaration){
+    public static ProtobufMessageOrEnumType of(String typeName, ProtobufTree typeDeclaration){
         Objects.requireNonNull(typeName, "typeName cannot be null");
-        return new ProtobufObjectType(typeName, typeDeclaration);
+        return new ProtobufMessageOrEnumType(typeName, typeDeclaration);
     }
 
-    private ProtobufObjectType(String name, ProtobufTree declaration){
+    private ProtobufMessageOrEnumType(String name, ProtobufTree declaration){
         this.name = name;
         this.declaration = declaration;
     }

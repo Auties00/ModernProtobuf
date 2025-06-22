@@ -1,72 +1,39 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufOption
-        extends ProtobufStatement
-        implements ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild {
+        implements ProtobufStatement,
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild {
+    private final int line;
     private String name;
     private ProtobufField definition;
-    private Value value;
+    private ProtobufExpression value;
+    private ProtobufTree parent;
 
-    public ProtobufOption(int line, ProtobufDocument parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
-    }
-    
-    public ProtobufOption(int line, ProtobufMessage parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    public ProtobufOption(int line) {
+        this.line = line;
     }
 
-    public ProtobufOption(int line, ProtobufEnum parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public int line() {
+        return line;
     }
 
-    public ProtobufOption(int line, ProtobufOneof parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public ProtobufTree parent() {
+        return parent;
     }
 
-    public ProtobufOption(int line, ProtobufService parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public boolean hasParent() {
+        return parent != null;
     }
 
-    public ProtobufOption(int line, ProtobufMethod parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
     }
 
     @Override
@@ -100,7 +67,7 @@ public final class ProtobufOption
         this.definition = definition;
     }
 
-    public Object value() {
+    public ProtobufExpression value() {
         return value;
     }
 
@@ -108,7 +75,13 @@ public final class ProtobufOption
         return value != null;
     }
 
-    public void setValue(Value value) {
+    public void setValue(ProtobufExpression value) {
+        if(value != null) {
+            if(value.hasParent()) {
+                throw new IllegalStateException("Index is already owned by another tree");
+            }
+            value.setParent(this);
+        }
         this.value = value;
     }
 
@@ -144,48 +117,5 @@ public final class ProtobufOption
         builder.append(";");
 
         return builder.toString();
-    }
-
-    public sealed interface Value {
-        record Literal(String value) implements Value {
-            @Override
-            public String toString() {
-                return '"' + value + '"';
-            }
-        }
-
-        record Int(int value) implements Value {
-            @Override
-            public String toString() {
-                return String.valueOf(value);
-            }
-        }
-
-        record Bool(boolean value) implements Value {
-            @Override
-            public String toString() {
-                return String.valueOf(value);
-            }
-        }
-
-        record Enum(String value) implements Value {
-            @Override
-            public String toString() {
-                return String.valueOf(value);
-            }
-        }
-
-        record Object(Map<String, Value> values) implements Value {
-            @Override
-            public Map<String, Value> values() {
-                return Collections.unmodifiableMap(values);
-            }
-
-            // TODO: Stringify
-            @Override
-            public String toString() {
-                return "todo";
-            }
-        }
     }
 }

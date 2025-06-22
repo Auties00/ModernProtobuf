@@ -1,22 +1,39 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.model.ProtobufVersion;
-
 import java.util.Objects;
 
 public final class ProtobufSyntax
-        extends ProtobufStatement
-        implements ProtobufDocumentChild {
-    private ProtobufVersion version;
+        implements ProtobufStatement,
+                   ProtobufDocumentChild {
+    private final int line;
+    private ProtobufExpression version;
+    private ProtobufTree parent;
 
-    public ProtobufSyntax(int line, ProtobufDocument parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
+    public ProtobufSyntax(int line) {
+        this.line = line;
     }
 
-    public ProtobufVersion version() {
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    public ProtobufExpression version() {
         return version;
     }
 
@@ -24,13 +41,20 @@ public final class ProtobufSyntax
         return version != null;
     }
 
-    public void setVersion(ProtobufVersion version) {
+    public void setVersion(ProtobufExpression version) {
+        if(version != null) {
+            if(version.hasParent()) {
+                throw new IllegalStateException("Index is already owned by another tree");
+            }
+            version.setParent(this);
+        }
         this.version = version;
     }
 
     @Override
     public String toString() {
-        return "syntax = " + (version == null ? "<missing>" : version.versionCode()) + ";";
+        var version = Objects.requireNonNullElse(this.version, "[missing]");
+        return "syntax = " + version + ";";
     }
 
     @Override

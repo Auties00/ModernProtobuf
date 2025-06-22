@@ -2,80 +2,63 @@ package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.Objects;
-import java.util.SequencedCollection;
+import java.util.*;
 
 public sealed class ProtobufField
-        extends ProtobufStatement
-        implements ProtobufIndexedTree, ProtobufOptionableStatement,
-                    ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
+                   ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
         permits ProtobufEnumConstant, ProtobufGroupField {
+    protected final int line;
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
-    protected ProtobufExpression<Integer> index;
+    protected ProtobufExpression index;
     protected final SequencedCollection<ProtobufOption> options;
+    protected ProtobufTree.WithBody<?> parent;
 
-    protected ProtobufField(int line, ProtobufTreeBody<?> parent) {
-        super(line, parent);
-        this.index = ProtobufExpression.none();
+    public ProtobufField(int line) {
+        this.line = line;
         this.options = new LinkedList<>();
     }
 
-    public ProtobufField(int line, ProtobufMessage parent) {
-        this(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public int line() {
+        return line;
     }
 
-    public ProtobufField(int line, ProtobufOneof parent) {
-        this(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufField(int line, ProtobufGroupField parent) {
-        this(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
+    @Override
     public String name() {
         return name;
     }
 
+    @Override
     public boolean hasName() {
         return name != null;
     }
 
+    @Override
     public void setName(String name) {
         this.name = name;
     }
 
-    public ProtobufExpression<Integer> index() {
+    @Override
+    public ProtobufExpression index() {
         return index;
     }
 
+    @Override
     public boolean hasIndex() {
         return index != null;
     }
 
-    public void setIndex(ProtobufExpression<Integer>  index) {
-        Objects.requireNonNull(index, "index cannot be null");
+    @Override
+    public void setIndex(ProtobufExpression index) {
+        if(index != null) {
+            if(index.hasParent()) {
+                throw new IllegalStateException("Index is already owned by another tree");
+            }
+            index.setParent(this);
+        }
         this.index = index;
     }
 
@@ -104,6 +87,36 @@ public sealed class ProtobufField
     }
 
     @Override
+    public SequencedCollection<ProtobufOption> options() {
+        return Collections.unmodifiableSequencedCollection(options);
+    }
+
+    @Override
+    public void addOption(ProtobufOption option) {
+        options.add(option);
+    }
+
+    @Override
+    public boolean removeOption(ProtobufOption option) {
+        return options.remove(option);
+    }
+
+    @Override
+    public ProtobufTree.WithBody<?> parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree.WithBody<?> parent) {
+        this.parent = parent;
+    }
+
+    @Override
     public boolean isAttributed() {
         return hasIndex() && hasName() && hasModifier() && hasType();
     }
@@ -125,24 +138,9 @@ public sealed class ProtobufField
         builder.append("=");
         builder.append(" ");
         builder.append(index);
-        writeOptions(builder);
+        // writeOptions(builder);
         builder.append(";");
         return builder.toString();
-    }
-
-    @Override
-    public SequencedCollection<ProtobufOption> options() {
-        return Collections.unmodifiableSequencedCollection(options);
-    }
-
-    @Override
-    public void addOption(ProtobufOption option) {
-        options.add(option);
-    }
-
-    @Override
-    public boolean removeOption(ProtobufOption option) {
-        return options.remove(option);
     }
 
     public static final class Modifier {

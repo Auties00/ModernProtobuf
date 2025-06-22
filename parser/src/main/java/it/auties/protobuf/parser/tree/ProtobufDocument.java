@@ -1,16 +1,19 @@
 package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.parser.tree.ProtobufExpression.Value.Literal;
 
 import java.nio.file.Path;
 import java.util.Optional;
 
-public final class ProtobufDocument implements ProtobufTree {
+public final class ProtobufDocument
+        implements ProtobufTree, ProtobufTree.WithBody<ProtobufDocumentChild> {
     private final Path location;
-    private final ProtobufTreeBody<ProtobufDocumentChild> body;
+    private final ProtobufBody<ProtobufDocumentChild> body;
     public ProtobufDocument(Path location) {
         this.location = location;
-        this.body = new ProtobufTreeBody<>(0, true, null);
+        this.body = new ProtobufBody<>(0);
+        body.setOwner(this);
     }
 
     @Override
@@ -27,17 +30,40 @@ public final class ProtobufDocument implements ProtobufTree {
         return location;
     }
 
-    public ProtobufTreeBody<ProtobufDocumentChild> body() {
+    @Override
+    public ProtobufBody<ProtobufDocumentChild> body() {
         return body;
     }
 
+    @Override
+    public boolean hasBody() {
+        return true;
+    }
+
+    @Override
+    public void setBody(ProtobufBody<ProtobufDocumentChild> body) {
+        throw new UnsupportedOperationException("Cannot set the body of a document");
+    }
+
+    public String qualifiedPath() {
+        return packageName()
+                .map(packageName -> packageName.replaceAll("\\.", "/") + "/" + location.getFileName().toString())
+                .orElse(location.getFileName().toString());
+    }
+
     public Optional<ProtobufVersion> syntax() {
-        return body.children()
-                .stream()
-                .filter(statement -> statement instanceof ProtobufSyntax)
-                .map(statement -> (ProtobufSyntax) statement)
-                .map(ProtobufSyntax::version)
-                .findFirst();
+        for(var child : body.children()){
+            if (!(child instanceof ProtobufSyntax syntax) || !syntax.hasVersion()) {
+                continue;
+            }
+
+            if(!(syntax.version().value() instanceof Literal(var value))) {
+                continue;
+            }
+
+            return ProtobufVersion.of(value);
+        }
+        return Optional.empty();
     }
 
     public Optional<String> packageName() {

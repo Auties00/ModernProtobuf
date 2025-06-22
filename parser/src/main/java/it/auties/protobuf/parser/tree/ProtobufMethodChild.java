@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
 public sealed interface ProtobufMethodChild
-        extends ProtobufTree
+        extends ProtobufStatement
         permits ProtobufEmptyStatement, ProtobufOption {
 
 }

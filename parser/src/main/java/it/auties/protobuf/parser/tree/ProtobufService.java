@@ -3,17 +3,35 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufService
-        extends ProtobufStatement
-        implements ProtobufNamedTree,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufServiceChild>,
                    ProtobufDocumentChild {
+    private final int line;
     private String name;
-    private ProtobufTreeBody<ProtobufServiceChild> body;
-    
-    public ProtobufService(int line, ProtobufDocument parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
+    private ProtobufBody<ProtobufServiceChild> body;
+    private ProtobufTree parent;
+
+    public ProtobufService(int line) {
+        this.line = line;
+    }
+
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
     }
 
     @Override
@@ -31,10 +49,15 @@ public final class ProtobufService
             builder.append("{");
             builder.append("\n");
 
-            body.children().forEach(statement -> {
-                builder.append(statement);
+            if(body.children().isEmpty()) {
                 builder.append("\n");
-            });
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
 
             builder.append("}");
         }
@@ -62,15 +85,24 @@ public final class ProtobufService
         this.name = name;
     }
 
-    public ProtobufTreeBody<ProtobufServiceChild> body() {
+    @Override
+    public ProtobufBody<ProtobufServiceChild> body() {
         return body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufServiceChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufServiceChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
     }
 }

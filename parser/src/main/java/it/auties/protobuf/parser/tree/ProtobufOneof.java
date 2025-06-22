@@ -4,39 +4,39 @@ import java.util.Locale;
 import java.util.Objects;
 
 public final class ProtobufOneof
-        extends ProtobufStatement
-        implements ProtobufNamedTree,
-        ProtobufMessageChild, ProtobufGroupChild {
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>,
+                   ProtobufMessageChild, ProtobufGroupChild {
+    private final int line;
     private String name;
-    private ProtobufTreeBody<ProtobufOneofChild> body;
-   
-    public ProtobufOneof(int line, ProtobufMessage parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    private ProtobufBody<ProtobufOneofChild> body;
+    private ProtobufTree parent;
+
+    public ProtobufOneof(int line) {
+        this.line = line;
     }
 
-    public ProtobufOneof(int line, ProtobufGroupField parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
     }
 
     public String className() {
         return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Seal";
-    }
-
-    @Override
-    public String toString() {
-        return "oneof " + name + super.toString();
     }
 
     @Override
@@ -59,15 +59,55 @@ public final class ProtobufOneof
         this.name = name;
     }
 
-    public ProtobufTreeBody<ProtobufOneofChild> body() {
+    @Override
+    public ProtobufBody<ProtobufOneofChild> body() {
         return body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufOneofChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufOneofChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
+    }
+
+    @Override
+    public String toString() {
+        var builder = new StringBuilder();
+
+        builder.append("oneof");
+        builder.append(" ");
+
+        var name = Objects.requireNonNullElse(this.name, "[missing]");
+        builder.append(name);
+        builder.append(" ");
+
+        if(body != null) {
+            builder.append("{");
+            builder.append("\n");
+
+            if(body.children().isEmpty()) {
+                builder.append("\n");
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
+
+            builder.append("}");
+        }
+
+        return builder.toString();
     }
 }

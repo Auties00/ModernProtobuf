@@ -26,12 +26,20 @@ public final class ProtobufMapType implements ProtobufTypeReference {
         return Optional.ofNullable(key);
     }
 
+    public boolean hasKeyType() {
+        return key != null;
+    }
+
     public void setKeyType(ProtobufTypeReference key) {
         this.key = key;
     }
 
     public Optional<ProtobufTypeReference> valueType() {
         return Optional.ofNullable(value);
+    }
+
+    public boolean hasValueType() {
+        return value != null;
     }
 
     public void setValueType(ProtobufTypeReference value) {

@@ -706,7 +706,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
 
         }
     }

@@ -1,18 +1,36 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.Objects;
-
-public final class ProtobufReserved extends ProtobufStatement {
+public final class ProtobufReserved
+        implements ProtobufStatement {
+    private final int line;
     private Value value;
+    private ProtobufTree parent;
 
-    public ProtobufReserved(int line, ProtobufReservedList parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
+    public ProtobufReserved(int line) {
+        this.line = line;
     }
 
-    public Value<T> value() {
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    public Value value() {
         return value;
     }
 
@@ -20,7 +38,7 @@ public final class ProtobufReserved extends ProtobufStatement {
         return value != null;
     }
 
-    public void setValue(Value<T> value) {
+    public void setValue(Value value) {
         this.value = value;
     }
 
@@ -31,9 +49,8 @@ public final class ProtobufReserved extends ProtobufStatement {
 
     public sealed interface Value {
         record FieldIndexRange(int min, int max) implements Value {
-            public boolean hasValue(Integer entry) {
-                return entry != null
-                       && entry >= min
+            public boolean hasValue(int entry) {
+                return entry >= min
                        && entry <= max;
             }
 
@@ -44,8 +61,8 @@ public final class ProtobufReserved extends ProtobufStatement {
         }
 
         record FieldIndex(int value) implements Value {
-            public boolean hasValue(Integer entry) {
-                return entry != null && entry.equals(value);
+            public boolean hasValue(int entry) {
+                return value == entry;
             }
 
             @Override

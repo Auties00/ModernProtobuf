@@ -1,47 +1,41 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.*;
 import java.util.stream.Collectors;
 
 public final class ProtobufReservedList
-        extends ProtobufStatement
-        implements ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
-    private final ProtobufTreeBody<ProtobufReserved<?>> body;
-  
-    public ProtobufReservedList(int line, ProtobufMessage parent) {
-        super(line, parent.body());
-        this.body = new ProtobufTreeBody<>(line, true, this);
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+        implements ProtobufStatement,
+        ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
+    private final int line;
+    private final ProtobufBody<ProtobufReserved> body;
+    private ProtobufTree parent;
+
+    public ProtobufReservedList(int line) {
+        this.line = line;
+        this.body = new ProtobufBody<>(line);
+        body.setOwner(this);
     }
 
-    public ProtobufReservedList(int line, ProtobufEnum parent) {
-        super(line, parent.body());
-        this.body = new ProtobufTreeBody<>(line, true, this);
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public int line() {
+        return line;
     }
 
-    public ProtobufReservedList(int line, ProtobufGroupField parent) {
-        super(line, parent.body());
-        this.body = new ProtobufTreeBody<>(line, true, this);
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public ProtobufTree parent() {
+        return parent;
     }
 
-    public ProtobufTreeBody<ProtobufReserved<?>> body() {
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    public ProtobufBody<ProtobufReserved> body() {
         return body;
     }
 

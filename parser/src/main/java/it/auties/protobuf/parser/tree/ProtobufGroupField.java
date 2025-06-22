@@ -7,48 +7,32 @@ import java.util.Objects;
 
 public final class ProtobufGroupField
         extends ProtobufField
-        implements ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild {
-    private ProtobufTreeBody<ProtobufGroupChild> body;
+        implements ProtobufTree.WithBody<ProtobufGroupChild>,
+                   ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild {
+    private ProtobufBody<ProtobufGroupChild> body;
 
-    public ProtobufGroupField(int line, ProtobufGroupField parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    public ProtobufGroupField(int line) {
+        super(line);
     }
 
-    public ProtobufGroupField(int line, ProtobufMessage parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufGroupField(int line, ProtobufOneof parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufTreeBody<ProtobufGroupChild> body() {
+    @Override
+    public ProtobufBody<ProtobufGroupChild> body() {
         return body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufGroupChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufGroupChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
     }
 
@@ -74,16 +58,21 @@ public final class ProtobufGroupField
         builder.append(index);
         builder.append(" ");
 
-        writeOptions(builder);
+        // writeOptions(builder);
 
         if(body != null) {
             builder.append("{");
             builder.append("\n");
 
-            body.children().forEach(statement -> {
-                builder.append(statement);
+            if(body.children().isEmpty()) {
                 builder.append("\n");
-            });
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
 
             builder.append("}");
         }

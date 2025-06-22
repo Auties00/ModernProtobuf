@@ -13,8 +13,7 @@ public class ImportTest {
     public void testNamedImport() throws URISyntaxException, IOException {
         var importedSource = ClassLoader.getSystemClassLoader().getResource("import");
         Objects.requireNonNull(importedSource);
-        var parser = new ProtobufParser();
-        var documents = parser.parse(Path.of(importedSource.toURI()));
+        var documents = ProtobufParser.parse(Path.of(importedSource.toURI()));
         for(var document : documents) {
             System.out.println(document);
         }
@@ -24,8 +23,7 @@ public class ImportTest {
     public void testBuiltinImport() throws URISyntaxException, IOException {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("builtin.proto");
         Objects.requireNonNull(proto2Source);
-        var parser = new ProtobufParser();
-        var document = parser.parseOnly(Path.of(proto2Source.toURI()));
+        var document = ProtobufParser.parseOnly(Path.of(proto2Source.toURI()));
         System.out.println(document);
     }
 
@@ -33,7 +31,6 @@ public class ImportTest {
     public void testInvalidImport() {
         var proto2Source = ClassLoader.getSystemClassLoader().getResource("invalid_import.proto");
         Objects.requireNonNull(proto2Source);
-        var parser = new ProtobufParser();
-        Assertions.assertThrows(ProtobufParserException.class, () -> parser.parseOnly(Path.of(proto2Source.toURI())));
+        Assertions.assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(Path.of(proto2Source.toURI())));
     }
 }

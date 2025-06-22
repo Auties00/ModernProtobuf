@@ -35,7 +35,7 @@ public final class ProtobufGroupType implements ProtobufTypeReference {
             return name;
         }
 
-        return declaration.qualifiedName();
+        return declaration.name();
     }
 
     @Override

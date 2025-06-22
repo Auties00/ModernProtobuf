@@ -16,9 +16,11 @@ import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.tree.ProtobufField;
-import it.auties.protobuf.parser.type.ProtobufObjectType;
+import it.auties.protobuf.parser.tree.ProtobufEnum;
+import it.auties.protobuf.parser.tree.ProtobufMessage;
+import it.auties.protobuf.parser.tree.ProtobufOneof;
+import it.auties.protobuf.parser.type.ProtobufMessageOrEnumType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import it.auties.protobuf.schema.util.AstUtils;
 
@@ -383,7 +385,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
             return new MessageType(new MessageFieldType(fieldType, accessorType), wrapperRecord, null);
         }
 
-        var fieldType = (ProtobufObjectType) fieldStatementType;
+        var fieldType = (ProtobufMessageOrEnumType) fieldStatementType;
         var fieldTypeName = fieldType.declaration()
                 .map(ProtobufNamedBlock::qualifiedName)
                 .orElseThrow();
@@ -414,7 +416,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private MessageFieldType getMessageFieldType(ProtobufTypeReference type, boolean required, boolean repeated) {
-        if (!(type instanceof ProtobufObjectType messageType)) {
+        if (!(type instanceof ProtobufMessageOrEnumType messageType)) {
             var fieldType = getJavaType(type, required, repeated, mutable);
             var accessorType = getJavaType(type, required, repeated, repeated);
             return new MessageFieldType(fieldType, accessorType);

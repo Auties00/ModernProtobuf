@@ -1,15 +1,33 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.Objects;
-
-public final class ProtobufExtension extends ProtobufStatement {
+public final class ProtobufExtension
+        implements ProtobufStatement {
+    private final int line;
     private Value value;
+    private ProtobufTree parent;
 
-    public ProtobufExtension(int line, ProtobufExtensionsList parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
+    public ProtobufExtension(int line) {
+        this.line = line;
+    }
+
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
     }
 
     public Value value() {
@@ -41,14 +59,15 @@ public final class ProtobufExtension extends ProtobufStatement {
             }
         }
 
-        record FieldName(String value) implements Value {
-            public boolean hasValue(String entry) {
-                return value != null && value.equals(entry);
+        record FieldIndexRange(int min, int max) implements Value {
+            public boolean hasValue(int entry) {
+                return entry >= min
+                       && entry <= max;
             }
 
             @Override
             public String toString() {
-                return value;
+                return "%s to %s".formatted(min, max == Integer.MAX_VALUE ? "max" : max);
             }
         }
     }

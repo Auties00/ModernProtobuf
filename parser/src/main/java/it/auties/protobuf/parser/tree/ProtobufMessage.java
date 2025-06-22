@@ -3,41 +3,22 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufMessage
-        extends ProtobufStatement
-        implements ProtobufNamedTree,
-                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>,
+                   ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
+    private final int line;
     private String name;
-    private ProtobufTreeBody<ProtobufMessageChild> body;
+    private ProtobufBody<ProtobufMessageChild> body;
     private final boolean extension;
+    private ProtobufTree parent;
 
-    public ProtobufMessage(int line, boolean extension, ProtobufDocument parent) {
-        super(line, parent.body());
-        this.extension = extension;
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
+    public ProtobufMessage(int line, boolean extension) {
+        this.line = line;
+        this.extension = extension;;
     }
 
-    public ProtobufMessage(int line, boolean extension, ProtobufGroupField parent) {
-        super(line, parent.body());
-        this.extension = extension;
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufMessage(int line, boolean extension, ProtobufMessage parent) {
-        super(line, parent.body());
-        this.extension = extension;
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    @Override
+    public int line() {
+        return line;
     }
 
     public boolean isExtension() {
@@ -45,10 +26,25 @@ public final class ProtobufMessage
     }
 
     @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    @Override
     public String toString() {
         var builder = new StringBuilder();
 
-        builder.append("message ");
+        builder.append(extension ? "extend" : "message");
         builder.append(" ");
 
         var name = Objects.requireNonNullElse(this.name, "[missing]");
@@ -59,10 +55,15 @@ public final class ProtobufMessage
             builder.append("{");
             builder.append("\n");
 
-            body.children().forEach(statement -> {
-                builder.append(statement);
+            if(body.children().isEmpty()) {
                 builder.append("\n");
-            });
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
 
             builder.append("}");
         }
@@ -90,15 +91,24 @@ public final class ProtobufMessage
         this.name = name;
     }
 
-    public ProtobufTreeBody<ProtobufMessageChild> body() {
+    @Override
+    public ProtobufBody<ProtobufMessageChild> body() {
         return body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufMessageChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufMessageChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
     }
 }

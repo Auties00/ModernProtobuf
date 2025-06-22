@@ -5,5 +5,4 @@ module it.auties.protobuf.parser {
     exports it.auties.protobuf.parser;
     exports it.auties.protobuf.parser.type;
     exports it.auties.protobuf.parser.tree;
-    exports it.auties.protobuf.parser.block;
 }

@@ -3,68 +3,20 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufEnum
-        extends ProtobufStatement
-        implements ProtobufNamedTree,
-        ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>,
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
+    private final int line;
     private String name;
-    private ProtobufTreeBody<ProtobufEnumChild> body;
+    private ProtobufBody<ProtobufEnumChild> body;
+    private ProtobufTree parent;
 
-    public ProtobufEnum(int line, ProtobufDocument parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufEnum(int line, ProtobufMessage parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
-    }
-
-    public ProtobufEnum(int line, ProtobufGroupField parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    public ProtobufEnum(int line) {
+        this.line = line;
     }
 
     @Override
-    public String toString() {
-        var builder = new StringBuilder();
-
-        builder.append("enum");
-        builder.append(" ");
-
-        var name = Objects.requireNonNullElse(this.name, "[missing]");
-        builder.append(name);
-        builder.append(" ");
-
-        if(body != null) {
-            builder.append("{");
-            builder.append("\n");
-
-            body.children().forEach(statement -> {
-                builder.append(statement);
-                builder.append("\n");
-            });
-
-            builder.append("}");
-        }
-
-        return builder.toString();
-    }
-
-    @Override
-    public boolean isAttributed() {
-        return body.isAttributed();
+    public int line() {
+        return line;
     }
 
     @Override
@@ -82,15 +34,75 @@ public final class ProtobufEnum
         this.name = name;
     }
 
-    public ProtobufTreeBody<ProtobufEnumChild> body() {
+    @Override
+    public ProtobufBody<ProtobufEnumChild> body() {
         return body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufEnumChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufEnumChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return body.isAttributed();
+    }
+
+    @Override
+    public String toString() {
+        var builder = new StringBuilder();
+
+        builder.append("enum");
+        builder.append(" ");
+
+        var name = Objects.requireNonNullElse(this.name, "[missing]");
+        builder.append(name);
+        builder.append(" ");
+
+        if(body != null) {
+            builder.append("{");
+            builder.append("\n");
+
+            if(body.children().isEmpty()) {
+                builder.append("\n");
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
+
+            builder.append("}");
+        }
+
+        return builder.toString();
     }
 }

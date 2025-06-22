@@ -5,21 +5,37 @@ import it.auties.protobuf.parser.type.ProtobufMethodType;
 import java.util.Objects;
 
 public final class ProtobufMethod
-        extends ProtobufStatement
-        implements ProtobufServiceChild, ProtobufNamedTree {
+        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMethodChild>,
+                   ProtobufServiceChild, ProtobufTree.WithName {
+    private final int line;
     private String name;
     private ProtobufMethodType inputType;
     private ProtobufMethodType outputType;
-    private ProtobufTreeBody<ProtobufMethodChild> body;
+    private ProtobufBody<ProtobufMethodChild> body;
+    private ProtobufTree parent;
 
-    public ProtobufMethod(int line, ProtobufService parent) {
-        super(line, parent.body());
-        Objects.requireNonNull(parent, "parent cannot be null");
-        if(!parent.hasBody()) {
-            throw new IllegalArgumentException("parent must have a body");
-        }
-        parent.body()
-                .addChild(this);
+    public ProtobufMethod(int line) {
+        this.line = line;
+    }
+
+    @Override
+    public int line() {
+        return line;
+    }
+
+    @Override
+    public ProtobufTree parent() {
+        return parent;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return parent != null;
+    }
+
+    @Override
+    public void setParent(ProtobufTree parent) {
+        this.parent = parent;
     }
 
     @Override
@@ -37,14 +53,23 @@ public final class ProtobufMethod
         this.name = name;
     }
 
-    public ProtobufTreeBody<ProtobufMethodChild> body() {
+    @Override
+    public ProtobufBody<ProtobufMethodChild> body() {
         return body;
     }
 
-    public void setBody(ProtobufTreeBody<ProtobufMethodChild> body) {
+    @Override
+    public void setBody(ProtobufBody<ProtobufMethodChild> body) {
+        if(body != null) {
+            if(body.hasOwner()) {
+                throw new IllegalStateException("Body is already owned by another tree");
+            }
+            body.setOwner(this);
+        }
         this.body = body;
     }
 
+    @Override
     public boolean hasBody() {
         return body != null;
     }
@@ -104,10 +129,15 @@ public final class ProtobufMethod
             builder.append(" {");
             builder.append("\n");
 
-            body.children().forEach(statement -> {
-                builder.append(statement);
+            if(body.children().isEmpty()) {
                 builder.append("\n");
-            });
+            } else {
+                body.children().forEach(statement -> {
+                    builder.append("    ");
+                    builder.append(statement);
+                    builder.append("\n");
+                });
+            }
 
             builder.append("};");
         }else {
