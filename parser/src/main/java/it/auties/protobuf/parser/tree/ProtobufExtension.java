@@ -1,33 +1,12 @@
 package it.auties.protobuf.parser.tree;
 
 public final class ProtobufExtension
+        extends ProtobufMutableStatement
         implements ProtobufStatement {
-    private final int line;
     private Value value;
-    private ProtobufTree parent;
 
     public ProtobufExtension(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     public Value value() {

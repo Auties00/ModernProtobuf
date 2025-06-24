@@ -5,37 +5,16 @@ import it.auties.protobuf.parser.type.ProtobufMethodType;
 import java.util.Objects;
 
 public final class ProtobufMethod
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMethodChild>,
                    ProtobufServiceChild, ProtobufTree.WithName {
-    private final int line;
     private String name;
     private ProtobufMethodType inputType;
     private ProtobufMethodType outputType;
     private ProtobufBody<ProtobufMethodChild> body;
-    private ProtobufTree parent;
 
     public ProtobufMethod(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     @Override
@@ -58,7 +37,6 @@ public final class ProtobufMethod
         return body;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufMethodChild> body) {
         if(body != null) {
             if(body.hasOwner()) {

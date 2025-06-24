@@ -5,25 +5,19 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import java.util.*;
 
 public sealed class ProtobufField
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
                    ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
         permits ProtobufEnumConstant, ProtobufGroupField {
-    protected final int line;
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
     protected ProtobufExpression index;
     protected final SequencedCollection<ProtobufOption> options;
-    protected ProtobufTree.WithBody<?> parent;
 
     public ProtobufField(int line) {
-        this.line = line;
+        super(line);
         this.options = new LinkedList<>();
-    }
-
-    @Override
-    public int line() {
-        return line;
     }
 
     @Override
@@ -94,26 +88,6 @@ public sealed class ProtobufField
     @Override
     public void addOption(ProtobufOption option) {
         options.add(option);
-    }
-
-    @Override
-    public boolean removeOption(ProtobufOption option) {
-        return options.remove(option);
-    }
-
-    @Override
-    public ProtobufTree.WithBody<?> parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree.WithBody<?> parent) {
-        this.parent = parent;
     }
 
     @Override

@@ -4,35 +4,14 @@ import java.util.Locale;
 import java.util.Objects;
 
 public final class ProtobufOneof
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>,
                    ProtobufMessageChild, ProtobufGroupChild {
-    private final int line;
     private String name;
     private ProtobufBody<ProtobufOneofChild> body;
-    private ProtobufTree parent;
 
     public ProtobufOneof(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     public String className() {
@@ -69,7 +48,6 @@ public final class ProtobufOneof
         return body != null;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufOneofChild> body) {
         if(body != null) {
             if(body.hasOwner()) {

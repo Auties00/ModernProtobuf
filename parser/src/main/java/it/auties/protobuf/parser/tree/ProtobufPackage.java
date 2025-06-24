@@ -3,34 +3,13 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufPackage
+        extends ProtobufMutableStatement
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private final int line;
     private String name;
-    private ProtobufTree parent;
 
     public ProtobufPackage(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     public String name() {

@@ -3,41 +3,16 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufMessage
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>,
                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
-    private final int line;
     private String name;
     private ProtobufBody<ProtobufMessageChild> body;
     private final boolean extension;
-    private ProtobufTree parent;
 
     public ProtobufMessage(int line, boolean extension) {
-        this.line = line;
-        this.extension = extension;;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    public boolean isExtension() {
-        return extension;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
+        this.extension = extension;
     }
 
     @Override
@@ -101,7 +76,6 @@ public final class ProtobufMessage
         return body != null;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufMessageChild> body) {
         if(body != null) {
             if(body.hasOwner()) {

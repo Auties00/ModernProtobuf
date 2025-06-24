@@ -127,13 +127,14 @@ public final class ProtobufParser {
         while (!queue.isEmpty()) {
             var tree = queue.removeFirst();
             switch (tree) {
-                case ProtobufDocument protobufDocument -> {
-                    for (var child : protobufDocument.body().children()) {
+                case ProtobufTree.WithBody<?> body -> {
+                    for (var child : body.body().children()) {
                         if(!child.isAttributed()) {
                             queue.add(child);
                         }
                     }
                 }
+
                 case ProtobufExpression protobufExpression -> {
                     if (protobufExpression.value() instanceof ProtobufExpression.Value.EnumConstant enumConstant) {
                         // FIXME: Check if enum exists
@@ -142,13 +143,10 @@ public final class ProtobufParser {
                         throw new ProtobufParserException("Expected value in expression", protobufExpression.line());
                     }
                 }
+
                 case ProtobufStatement protobufStatement -> {
                     switch (protobufStatement) {
                         case ProtobufEmptyStatement emptyStatement -> {
-
-                        }
-
-                        case ProtobufEnum protobufEnum -> {
 
                         }
 
@@ -156,27 +154,11 @@ public final class ProtobufParser {
 
                         }
 
-                        case ProtobufExtensionsList protobufExtensionsList -> {
-
-                        }
-
                         case ProtobufField protobufField -> {
-
+                            attributeType(document, protobufField, (ProtobufMessageOrEnumType) protobufField.type());
                         }
 
                         case ProtobufImport protobufImport -> {
-
-                        }
-
-                        case ProtobufMessage protobufMessage -> {
-
-                        }
-
-                        case ProtobufMethod protobufMethod -> {
-
-                        }
-
-                        case ProtobufOneof protobufOneof -> {
 
                         }
 
@@ -192,24 +174,17 @@ public final class ProtobufParser {
 
                         }
 
-                        case ProtobufReservedList protobufReservedList -> {
-
-                        }
-
-                        case ProtobufService protobufService -> {
-
-                        }
-
                         case ProtobufSyntax protobufSyntax -> {
 
                         }
+                        default -> throw new IllegalStateException("Unexpected value: " + protobufStatement);
                     }
                 }
             }
         }
     }
 
-    private void attributeType(ProtobufDocument document, ProtobufField typedFieldTree, ProtobufMessageOrEnumType fieldType) {
+    private static void attributeType(ProtobufDocument document, ProtobufField typedFieldTree, ProtobufMessageOrEnumType fieldType) {
         if (fieldType.isAttributed()) {
             return;
         }
@@ -225,7 +200,7 @@ public final class ProtobufParser {
             innerType = parent.body()
                     .getDirectChildByNameAndType(types[0], ProtobufTree.WithBody.class)
                     .orElse(null);
-            parent = parent.parent();
+            parent = parent.parent() instanceof ProtobufTree.WithBody<?> validParent ? validParent : null;
         }
 
         if(innerType != null) { // Found a match in the parent scope
@@ -271,7 +246,7 @@ public final class ProtobufParser {
         fieldType.setDeclaration(innerType);
     }
 
-    private ProtobufParserException throwUnattributableType(ProtobufField typedFieldTree) {
+    private static ProtobufParserException throwUnattributableType(ProtobufField typedFieldTree) {
         return new ProtobufParserException(
                 "Cannot resolve type %s in field %s inside %s",
                 typedFieldTree.line(),
@@ -385,7 +360,8 @@ public final class ProtobufParser {
         }
 
         var statement = new ProtobufExtension(line);
-        statement.setParent(extensionsTree);
+        extensionsTree.body()
+                .addChild(statement);
         var index = parseIndex(token, false, false);
         if(index.isPresent()) {
             var value = new ProtobufExtension.Value.FieldIndex(index.get());
@@ -403,7 +379,8 @@ public final class ProtobufParser {
         }
 
         var statement = new ProtobufReserved(line);
-        statement.setParent(reservedTree);
+        reservedTree.body()
+                .addChild(statement);
         var index = parseIndex(token, false, false);
         if(index.isPresent()) {
             var value = new ProtobufReserved.Value.FieldIndex(index.get());

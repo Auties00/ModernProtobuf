@@ -3,34 +3,13 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufSyntax
+        extends ProtobufMutableStatement
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private final int line;
     private ProtobufExpression version;
-    private ProtobufTree parent;
 
     public ProtobufSyntax(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     public ProtobufExpression version() {
@@ -65,7 +44,7 @@ public final class ProtobufSyntax
     @Override
     public boolean equals(Object obj) {
         return this == obj || obj instanceof ProtobufSyntax that
-                && Objects.equals(this.version(), that.version());
+                              && Objects.equals(this.version(), that.version());
     }
 
     @Override

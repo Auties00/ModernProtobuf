@@ -3,20 +3,14 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufEnum
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>,
                    ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
-    private final int line;
     private String name;
     private ProtobufBody<ProtobufEnumChild> body;
-    private ProtobufTree parent;
 
     public ProtobufEnum(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
+        super(line);
     }
 
     @Override
@@ -44,7 +38,6 @@ public final class ProtobufEnum
         return body != null;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufEnumChild> body) {
         if(body != null) {
             if(body.hasOwner()) {
@@ -53,21 +46,6 @@ public final class ProtobufEnum
             body.setOwner(this);
         }
         this.body = body;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
     }
 
     @Override

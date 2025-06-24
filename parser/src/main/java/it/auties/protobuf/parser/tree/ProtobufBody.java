@@ -35,8 +35,8 @@ public final class ProtobufBody<CHILD extends ProtobufStatement> {
 
     public void addChild(CHILD statement){
         children.add(statement);
-        if(owner != null) {
-            statement.setParent(owner);
+        if(statement instanceof ProtobufMutableStatement mutableTree && owner != null) {
+            mutableTree.setParent(owner);
         }
     }
 

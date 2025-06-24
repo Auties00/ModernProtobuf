@@ -25,7 +25,6 @@ public final class ProtobufGroupField
         return body != null;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufGroupChild> body) {
         if(body != null) {
             if(body.hasOwner()) {

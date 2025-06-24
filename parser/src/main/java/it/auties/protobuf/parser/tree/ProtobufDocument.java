@@ -41,8 +41,13 @@ public final class ProtobufDocument
     }
 
     @Override
-    public void setBody(ProtobufBody<ProtobufDocumentChild> body) {
-        throw new UnsupportedOperationException("Cannot set the body of a document");
+    public ProtobufTree parent() {
+        return null;
+    }
+
+    @Override
+    public boolean hasParent() {
+        return false;
     }
 
     public String qualifiedPath() {

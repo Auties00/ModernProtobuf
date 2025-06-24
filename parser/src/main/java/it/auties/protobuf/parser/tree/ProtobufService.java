@@ -3,35 +3,14 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufService
+        extends ProtobufMutableStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufServiceChild>,
                    ProtobufDocumentChild {
-    private final int line;
     private String name;
     private ProtobufBody<ProtobufServiceChild> body;
-    private ProtobufTree parent;
 
     public ProtobufService(int line) {
-        this.line = line;
-    }
-
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+        super(line);
     }
 
     @Override
@@ -95,7 +74,6 @@ public final class ProtobufService
         return body != null;
     }
 
-    @Override
     public void setBody(ProtobufBody<ProtobufServiceChild> body) {
         if(body != null) {
             if(body.hasOwner()) {

@@ -3,21 +3,15 @@ package it.auties.protobuf.parser.tree;
 import java.util.stream.Collectors;
 
 public final class ProtobufExtensionsList
-        implements ProtobufStatement,
+        extends ProtobufMutableStatement
+        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufExtension>,
                    ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
-    private final int line;
     private final ProtobufBody<ProtobufExtension> body;
-    private ProtobufTree parent;
 
     public ProtobufExtensionsList(int line) {
-        this.line = line;
+        super(line);
         this.body = new ProtobufBody<>(line);
         body.setOwner(this);
-    }
-
-    @Override
-    public int line() {
-        return line;
     }
 
     public ProtobufBody<ProtobufExtension> body() {
@@ -25,18 +19,12 @@ public final class ProtobufExtensionsList
     }
 
     @Override
-    public ProtobufTree parent() {
-        return parent;
+    public boolean hasBody() {
+        return body != null;
     }
 
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
+    public void setBody(ProtobufBody<ProtobufExtension> body) {
+        throw new UnsupportedOperationException("Cannot set the body of a extensions list");
     }
 
     @Override

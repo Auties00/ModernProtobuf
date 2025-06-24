@@ -4,43 +4,23 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class ProtobufOption
+        extends ProtobufMutableStatement
         implements ProtobufStatement,
                    ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild {
-    private final int line;
     private String name;
     private ProtobufField definition;
     private ProtobufExpression value;
-    private ProtobufTree parent;
 
     public ProtobufOption(int line) {
-        this.line = line;
+        super(line);
     }
 
-    @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
-    }
 
     @Override
     public boolean isAttributed() {
         return hasName()
-                && hasDefinition()
-                && hasValue();
+               && hasDefinition()
+               && hasValue();
     }
 
     public String name() {
@@ -88,8 +68,8 @@ public final class ProtobufOption
     @Override
     public boolean equals(Object obj) {
         return obj instanceof ProtobufOption that
-                && Objects.equals(this.name(), that.name())
-                && Objects.equals(this.value(), that.value());
+               && Objects.equals(this.name(), that.name())
+               && Objects.equals(this.value(), that.value());
     }
 
     @Override

@@ -3,40 +3,24 @@ package it.auties.protobuf.parser.tree;
 import java.util.stream.Collectors;
 
 public final class ProtobufReservedList
-        implements ProtobufStatement,
-        ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
-    private final int line;
+        extends ProtobufMutableStatement
+        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufReserved>,
+                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
     private final ProtobufBody<ProtobufReserved> body;
-    private ProtobufTree parent;
 
     public ProtobufReservedList(int line) {
-        this.line = line;
+        super(line);
         this.body = new ProtobufBody<>(line);
-        body.setOwner(this);
     }
 
     @Override
-    public int line() {
-        return line;
-    }
-
-    @Override
-    public ProtobufTree parent() {
-        return parent;
-    }
-
-    @Override
-    public boolean hasParent() {
-        return parent != null;
-    }
-
-    @Override
-    public void setParent(ProtobufTree parent) {
-        this.parent = parent;
-    }
-
     public ProtobufBody<ProtobufReserved> body() {
         return body;
+    }
+
+    @Override
+    public boolean hasBody() {
+        return body != null;
     }
 
     @Override
