@@ -1,17 +1,17 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufGroupType;
+import it.auties.protobuf.parser.type.ProtobufGroupTypeReference;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Objects;
 
-public final class ProtobufGroupField
-        extends ProtobufField
+public final class ProtobufGroupFieldStatement
+        extends ProtobufFieldStatement
         implements ProtobufTree.WithBody<ProtobufGroupChild>,
                    ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild {
     private ProtobufBody<ProtobufGroupChild> body;
 
-    public ProtobufGroupField(int line) {
+    public ProtobufGroupFieldStatement(int line) {
         super(line);
     }
 
@@ -81,7 +81,7 @@ public final class ProtobufGroupField
 
     @Override
     public ProtobufTypeReference type() {
-        return ProtobufGroupType.of(name, this);
+        return new ProtobufGroupTypeReference(name, this);
     }
 
     @Override

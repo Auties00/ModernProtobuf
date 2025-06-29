@@ -2,14 +2,14 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufImport
-        extends ProtobufMutableStatement
+public final class ProtobufImportStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
     private String location;
-    private ProtobufDocument document;
+    private ProtobufDocumentTree document;
 
-    public ProtobufImport(int line) {
+    public ProtobufImportStatement(int line) {
         super(line);
     }
 
@@ -25,7 +25,7 @@ public final class ProtobufImport
         this.location = location;
     }
 
-    public ProtobufDocument document() {
+    public ProtobufDocumentTree document() {
         return document;
     }
 
@@ -33,7 +33,7 @@ public final class ProtobufImport
         return document != null;
     }
 
-    public void setDocument(ProtobufDocument document) {
+    public void setDocument(ProtobufDocumentTree document) {
         this.document = document;
     }
 
@@ -49,7 +49,7 @@ public final class ProtobufImport
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || obj instanceof ProtobufImport that
+        return this == obj || obj instanceof ProtobufImportStatement that
                 && Objects.equals(this.location(), that.location());
     }
 

@@ -3,7 +3,7 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufEnumConstant
-        extends ProtobufField
+        extends ProtobufFieldStatement
         implements ProtobufEnumChild {
     public ProtobufEnumConstant(int line) {
         super(line);
@@ -17,7 +17,7 @@ public final class ProtobufEnumConstant
         builder.append(" = ");
         var index = Objects.requireNonNull(this.index, "[missing]");
         builder.append(index);
-        // writeOptions(builder);
+        writeOptions(builder);
         builder.append(";");
         return builder.toString();
     }

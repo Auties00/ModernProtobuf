@@ -12,8 +12,8 @@ import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.parser.tree.ProtobufEnumChild;
 import it.auties.protobuf.parser.tree.ProtobufEnumConstant;
-import it.auties.protobuf.parser.tree.ProtobufEnum;
-import it.auties.protobuf.parser.tree.ProtobufField;
+import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
+import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.nio.file.Path;
@@ -22,8 +22,8 @@ import java.util.Optional;
 
 import static com.github.javaparser.StaticJavaParser.parseType;
 
-final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnum> {
-    EnumSchemaCreator(String packageName, ProtobufEnum protoStatement, List<CompilationUnit> classPool, Path output) {
+final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStatement> {
+    EnumSchemaCreator(String packageName, ProtobufEnumStatement protoStatement, List<CompilationUnit> classPool, Path output) {
         super(packageName, protoStatement, false, classPool, output);
     }
 
@@ -68,7 +68,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnum> {
         }
     }
 
-    private void createEnumConstant(EnumDeclaration ctEnum, ProtobufField statement) {
+    private void createEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         var existing = getEnumConstant(ctEnum, statement);
         if(existing.isPresent()){
             return;
@@ -78,14 +78,14 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnum> {
         name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index())));
     }
 
-    private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufField statement) {
+    private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         return ctEnum.getEntries()
                 .stream()
                 .filter(entry -> getEnumConstant(statement, entry))
                 .findFirst();
     }
 
-    private boolean getEnumConstant(ProtobufField statement, EnumConstantDeclaration entry) {
+    private boolean getEnumConstant(ProtobufFieldStatement statement, EnumConstantDeclaration entry) {
         if (entry.getArguments().isEmpty()) {
             return false;
         }

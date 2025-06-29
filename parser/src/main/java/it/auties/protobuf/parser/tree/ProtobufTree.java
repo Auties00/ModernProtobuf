@@ -3,7 +3,8 @@ package it.auties.protobuf.parser.tree;
 import java.util.SequencedCollection;
 
 public sealed interface ProtobufTree
-        permits ProtobufDocument, ProtobufExpression, ProtobufStatement, ProtobufTree.WithBody, ProtobufTree.WithIndex, ProtobufTree.WithName, ProtobufTree.WithOptions {
+        permits ProtobufDocumentTree, ProtobufStatement, ProtobufExpression,
+                ProtobufTree.WithBody, ProtobufTree.WithIndex, ProtobufTree.WithName, ProtobufTree.WithOptions {
     int line();
     boolean isAttributed();
     ProtobufTree parent();
@@ -11,15 +12,15 @@ public sealed interface ProtobufTree
 
     sealed interface WithIndex
             extends ProtobufTree
-            permits ProtobufField {
-        ProtobufExpression index();
+            permits ProtobufFieldStatement {
+        ProtobufIntegerExpression index();
         boolean hasIndex();
-        void setIndex(ProtobufExpression index);
+        void setIndex(ProtobufIntegerExpression index);
     }
 
     sealed interface WithName
             extends ProtobufTree
-            permits ProtobufEnum, ProtobufField, ProtobufMessage, ProtobufMethod, ProtobufOneof, ProtobufService {
+            permits ProtobufEnumStatement, ProtobufFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement {
         String name();
         boolean hasName();
         void setName(String name);
@@ -27,14 +28,15 @@ public sealed interface ProtobufTree
 
     sealed interface WithOptions
             extends ProtobufTree
-            permits ProtobufField {
-        SequencedCollection<ProtobufOption> options();
-        void addOption(ProtobufOption option);
+            permits ProtobufFieldStatement {
+        SequencedCollection<ProtobufExpression> options();
+        void addOption(String name, ProtobufExpression value);
+        boolean removeOption(String name);
     }
 
     sealed interface WithBody<T extends ProtobufStatement>
             extends ProtobufTree
-            permits ProtobufDocument, ProtobufEnum, ProtobufExtensionsList, ProtobufGroupField, ProtobufMessage, ProtobufMethod, ProtobufOneof, ProtobufReservedList, ProtobufService {
+            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement {
         ProtobufBody<T> body();
         boolean hasBody();
     }

@@ -1,8 +1,8 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.exception.ProtobufException;
-import it.auties.protobuf.parser.tree.ProtobufOption;
-import it.auties.protobuf.parser.type.ProtobufPrimitiveType;
+import it.auties.protobuf.parser.tree.ProtobufOptionStatement;
+import it.auties.protobuf.parser.type.ProtobufPrimitiveTypeReference;
 
 import java.nio.file.Path;
 
@@ -29,7 +29,7 @@ public class ProtobufParserException extends ProtobufException {
         return withPath;
     }
 
-    public static ProtobufParserException invalidOption(ProtobufOption option, ProtobufPrimitiveType primitiveType) {
+    public static ProtobufParserException invalidOption(ProtobufOptionStatement option, ProtobufPrimitiveTypeReference primitiveType) {
         return new ProtobufParserException("Invalid value " + option.value() + " for type " + primitiveType.protobufType().name().toLowerCase() + " in option " + option.name());
     }
 

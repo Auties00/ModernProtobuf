@@ -2,28 +2,23 @@ package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
 
-import java.util.Optional;
-
-public final class ProtobufMapType implements ProtobufTypeReference {
+public final class ProtobufMapTypeReference implements ProtobufTypeReference {
     private static final String NAME = "map";
 
     private ProtobufTypeReference key;
     private ProtobufTypeReference value;
-    private ProtobufMapType(ProtobufTypeReference key, ProtobufTypeReference value) {
+
+    public ProtobufMapTypeReference() {
+
+    }
+
+    public ProtobufMapTypeReference(ProtobufTypeReference key, ProtobufTypeReference value) {
         this.key = key;
         this.value = value;
     }
 
-    public static ProtobufTypeReference of() {
-        return new ProtobufMapType(null, null);
-    }
-
-    public static ProtobufTypeReference of(ProtobufTypeReference keyType, ProtobufTypeReference valueType) {
-        return new ProtobufMapType(keyType, valueType);
-    }
-
-    public Optional<ProtobufTypeReference> keyType() {
-        return Optional.ofNullable(key);
+    public ProtobufTypeReference keyType() {
+        return key;
     }
 
     public boolean hasKeyType() {
@@ -34,8 +29,8 @@ public final class ProtobufMapType implements ProtobufTypeReference {
         this.key = key;
     }
 
-    public Optional<ProtobufTypeReference> valueType() {
-        return Optional.ofNullable(value);
+    public ProtobufTypeReference valueType() {
+        return value;
     }
 
     public boolean hasValueType() {

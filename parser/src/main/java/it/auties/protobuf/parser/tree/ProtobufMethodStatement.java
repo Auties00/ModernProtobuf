@@ -1,19 +1,19 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufMethodType;
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Objects;
 
-public final class ProtobufMethod
-        extends ProtobufMutableStatement
+public final class ProtobufMethodStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMethodChild>,
                    ProtobufServiceChild, ProtobufTree.WithName {
     private String name;
-    private ProtobufMethodType inputType;
-    private ProtobufMethodType outputType;
+    private Type inputType;
+    private Type outputType;
     private ProtobufBody<ProtobufMethodChild> body;
 
-    public ProtobufMethod(int line) {
+    public ProtobufMethodStatement(int line) {
         super(line);
     }
 
@@ -52,7 +52,7 @@ public final class ProtobufMethod
         return body != null;
     }
 
-    public ProtobufMethodType inputType() {
+    public Type inputType() {
         return inputType;
     }
 
@@ -60,11 +60,11 @@ public final class ProtobufMethod
         return inputType != null;
     }
 
-    public void setInputType(ProtobufMethodType inputType) {
+    public void setInputType(Type inputType) {
         this.inputType = inputType;
     }
 
-    public ProtobufMethodType outputType() {
+    public Type outputType() {
         return outputType;
     }
 
@@ -72,7 +72,7 @@ public final class ProtobufMethod
         return outputType != null;
     }
 
-    public void setOutputType(ProtobufMethodType outputType) {
+    public void setOutputType(Type outputType) {
         this.outputType = outputType;
     }
 
@@ -123,5 +123,9 @@ public final class ProtobufMethod
         }
 
         return builder.toString();
+    }
+
+    public record Type(ProtobufTypeReference value, boolean stream) {
+
     }
 }

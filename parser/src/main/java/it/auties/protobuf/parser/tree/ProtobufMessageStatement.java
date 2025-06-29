@@ -2,15 +2,15 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufMessage
-        extends ProtobufMutableStatement
+public final class ProtobufMessageStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>,
                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
     private String name;
     private ProtobufBody<ProtobufMessageChild> body;
     private final boolean extension;
 
-    public ProtobufMessage(int line, boolean extension) {
+    public ProtobufMessageStatement(int line, boolean extension) {
         super(line);
         this.extension = extension;
     }

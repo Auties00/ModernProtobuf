@@ -2,17 +2,17 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufSyntax
-        extends ProtobufMutableStatement
+public final class ProtobufSyntaxStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private ProtobufExpression version;
+    private ProtobufLiteralExpression version;
 
-    public ProtobufSyntax(int line) {
+    public ProtobufSyntaxStatement(int line) {
         super(line);
     }
 
-    public ProtobufExpression version() {
+    public ProtobufLiteralExpression version() {
         return version;
     }
 
@@ -20,7 +20,7 @@ public final class ProtobufSyntax
         return version != null;
     }
 
-    public void setVersion(ProtobufExpression version) {
+    public void setVersion(ProtobufLiteralExpression version) {
         if(version != null) {
             if(version.hasParent()) {
                 throw new IllegalStateException("Index is already owned by another tree");
@@ -43,7 +43,7 @@ public final class ProtobufSyntax
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || obj instanceof ProtobufSyntax that
+        return this == obj || obj instanceof ProtobufSyntaxStatement that
                               && Objects.equals(this.version(), that.version());
     }
 

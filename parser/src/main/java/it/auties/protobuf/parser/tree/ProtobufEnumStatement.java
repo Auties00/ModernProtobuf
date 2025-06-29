@@ -2,14 +2,14 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufEnum
-        extends ProtobufMutableStatement
+public final class ProtobufEnumStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>,
                    ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
     private String name;
     private ProtobufBody<ProtobufEnumChild> body;
 
-    public ProtobufEnum(int line) {
+    public ProtobufEnumStatement(int line) {
         super(line);
     }
 
@@ -40,7 +40,7 @@ public final class ProtobufEnum
 
     public void setBody(ProtobufBody<ProtobufEnumChild> body) {
         if(body != null) {
-            if(body.hasOwner()) {
+            if(body.hasOwner() && body.owner() != this) {
                 throw new IllegalStateException("Body is already owned by another tree");
             }
             body.setOwner(this);

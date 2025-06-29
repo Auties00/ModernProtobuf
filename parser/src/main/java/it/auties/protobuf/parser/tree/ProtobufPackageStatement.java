@@ -2,13 +2,13 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufPackage
-        extends ProtobufMutableStatement
+public final class ProtobufPackageStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
     private String name;
 
-    public ProtobufPackage(int line) {
+    public ProtobufPackageStatement(int line) {
         super(line);
     }
 
@@ -36,7 +36,7 @@ public final class ProtobufPackage
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || obj instanceof ProtobufPackage that
+        return this == obj || obj instanceof ProtobufPackageStatement that
                 && Objects.equals(this.name(), that.name());
     }
 

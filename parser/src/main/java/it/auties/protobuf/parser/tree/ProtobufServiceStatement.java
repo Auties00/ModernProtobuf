@@ -2,14 +2,14 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufService
-        extends ProtobufMutableStatement
+public final class ProtobufServiceStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufServiceChild>,
                    ProtobufDocumentChild {
     private String name;
     private ProtobufBody<ProtobufServiceChild> body;
 
-    public ProtobufService(int line) {
+    public ProtobufServiceStatement(int line) {
         super(line);
     }
 
@@ -17,7 +17,7 @@ public final class ProtobufService
     public String toString() {
         var builder = new StringBuilder();
 
-        builder.append("service ");
+        builder.append("service");
         builder.append(" ");
 
         var name = Objects.requireNonNullElse(this.name, "[missing]");

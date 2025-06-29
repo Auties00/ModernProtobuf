@@ -7,6 +7,8 @@ import java.io.StreamTokenizer;
 public final class ProtobufTokenizer {
     private static final char STRING_LITERAL_DELIMITER = '"';
     private static final String STRING_LITERAL = "\"";
+    private static final String STRING_LITERAL_ALIAS_CHAR = "'";
+    private static final String MAX_KEYWORD = "max";
 
     private final StreamTokenizer tokenizer;
 
@@ -40,6 +42,48 @@ public final class ProtobufTokenizer {
             case STRING_LITERAL_DELIMITER -> STRING_LITERAL + tokenizer.sval + STRING_LITERAL;
             case StreamTokenizer.TT_NUMBER -> String.valueOf((int) tokenizer.nval);
             default -> String.valueOf((char) token);
+        };
+    }
+
+    public String nextString(String token) {
+        if ((token.startsWith(STRING_LITERAL) && token.endsWith(STRING_LITERAL)) || (token.startsWith(STRING_LITERAL_ALIAS_CHAR) && token.endsWith(STRING_LITERAL_ALIAS_CHAR))) {
+            return token.substring(1, token.length() - 1);
+        } else {
+            return null;
+        }
+    }
+
+    public Integer nextInt(boolean allowMax) throws IOException {
+        try {
+            var token = nextToken();
+            if(token == null) {
+                return null;
+            }
+
+            if(token.equalsIgnoreCase(MAX_KEYWORD)) {
+                return allowMax ? Integer.MAX_VALUE : null;
+            }
+
+            var value = 0;
+            for(var i = 0; i < token.length(); i++) {
+                var c = token.charAt(i);
+                if (c < '0' || c > '9') {
+                    return null;
+                }
+                value *= 10;
+                value += token.charAt(i) - '0';
+            }
+            return value;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    public Boolean nextBool() throws IOException {
+        return switch (nextToken()) {
+            case "true" -> true;
+            case "false" -> false;
+            default -> null;
         };
     }
 

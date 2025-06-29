@@ -3,21 +3,22 @@ package it.auties.protobuf.parser.tree;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-public sealed class ProtobufField
-        extends ProtobufMutableStatement
+public sealed class ProtobufFieldStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
                    ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
-        permits ProtobufEnumConstant, ProtobufGroupField {
+        permits ProtobufEnumConstant, ProtobufGroupFieldStatement {
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
-    protected ProtobufExpression index;
-    protected final SequencedCollection<ProtobufOption> options;
+    protected ProtobufIntegerExpression index;
+    protected final SequencedMap<String, ProtobufExpression> options;
 
-    public ProtobufField(int line) {
+    public ProtobufFieldStatement(int line) {
         super(line);
-        this.options = new LinkedList<>();
+        this.options = new LinkedHashMap<>();
     }
 
     @Override
@@ -36,7 +37,7 @@ public sealed class ProtobufField
     }
 
     @Override
-    public ProtobufExpression index() {
+    public ProtobufIntegerExpression index() {
         return index;
     }
 
@@ -46,7 +47,7 @@ public sealed class ProtobufField
     }
 
     @Override
-    public void setIndex(ProtobufExpression index) {
+    public void setIndex(ProtobufIntegerExpression index) {
         if(index != null) {
             if(index.hasParent()) {
                 throw new IllegalStateException("Index is already owned by another tree");
@@ -81,18 +82,38 @@ public sealed class ProtobufField
     }
 
     @Override
-    public SequencedCollection<ProtobufOption> options() {
-        return Collections.unmodifiableSequencedCollection(options);
+    public SequencedCollection<ProtobufExpression> options() {
+        return options.sequencedValues();
     }
 
     @Override
-    public void addOption(ProtobufOption option) {
-        options.add(option);
+    public void addOption(String name, ProtobufExpression value) {
+        options.put(name, value);
+    }
+
+    @Override
+    public boolean removeOption(String name) {
+        return options.remove(name) != null;
     }
 
     @Override
     public boolean isAttributed() {
         return hasIndex() && hasName() && hasModifier() && hasType();
+    }
+
+    void writeOptions(StringBuilder builder) {
+        var options = this.options.sequencedEntrySet();
+        if (options.isEmpty()) {
+            return;
+        }
+
+        builder.append(" ");
+        builder.append("[");
+        var optionsToString = options.stream()
+                .map(entry -> entry.getKey() + " = " + entry.getValue())
+                .collect(Collectors.joining(", "));
+        builder.append(optionsToString);
+        builder.append("]");
     }
 
     @Override

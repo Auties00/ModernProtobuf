@@ -34,10 +34,30 @@ public final class ProtobufBody<CHILD extends ProtobufStatement> {
     }
 
     public void addChild(CHILD statement){
+        if(owner == null) {
+            throw new IllegalStateException("This body is not owned by any tree");
+        }
+
         children.add(statement);
-        if(statement instanceof ProtobufMutableStatement mutableTree && owner != null) {
+        if(statement instanceof ProtobufStatementImpl mutableTree) {
             mutableTree.setParent(owner);
         }
+    }
+
+    public boolean removeChild(CHILD statement){
+        if(owner == null) {
+            throw new IllegalStateException("This body is not owned by any tree");
+        }
+
+        if(statement.parent() != owner) {
+            return false;
+        }
+
+        var result = children.remove(statement);
+        if(result && statement instanceof ProtobufStatementImpl mutableTree) {
+            mutableTree.setParent(null);
+        }
+        return result;
     }
 
     public Optional<? extends ProtobufTree.WithName> getDirectChildByName(String name){
@@ -58,7 +78,7 @@ public final class ProtobufBody<CHILD extends ProtobufStatement> {
         }
 
         return children.stream()
-                .filter(entry -> entry.getClass().isAssignableFrom(clazz) && Objects.equals(((ProtobufTree.WithName) entry).name(), name))
+                .filter(entry -> clazz.isAssignableFrom(entry.getClass()) && entry instanceof ProtobufTree.WithName withName && Objects.equals(withName.name(), name))
                 .map(clazz::cast)
                 .findFirst();
     }
@@ -93,8 +113,7 @@ public final class ProtobufBody<CHILD extends ProtobufStatement> {
     private static boolean hasIndex(int index, ProtobufStatement child) {
         return child instanceof ProtobufTree.WithIndex indexedTree
                && indexedTree.hasIndex()
-               && indexedTree.index().value() instanceof ProtobufExpression.Value.Number(var value)
-               && value == index;
+               && indexedTree.index().value() == index;
     }
 
     public boolean hasName(String name) {

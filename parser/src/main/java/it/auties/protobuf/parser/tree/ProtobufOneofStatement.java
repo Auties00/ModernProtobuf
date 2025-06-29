@@ -3,14 +3,14 @@ package it.auties.protobuf.parser.tree;
 import java.util.Locale;
 import java.util.Objects;
 
-public final class ProtobufOneof
-        extends ProtobufMutableStatement
+public final class ProtobufOneofStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>,
                    ProtobufMessageChild, ProtobufGroupChild {
     private String name;
     private ProtobufBody<ProtobufOneofChild> body;
 
-    public ProtobufOneof(int line) {
+    public ProtobufOneofStatement(int line) {
         super(line);
     }
 

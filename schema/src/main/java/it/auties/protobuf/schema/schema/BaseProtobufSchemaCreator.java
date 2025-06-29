@@ -12,11 +12,7 @@ import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufEnum;
-import it.auties.protobuf.parser.tree.ProtobufMessage;
-import it.auties.protobuf.parser.tree.ProtobufBody;
-import it.auties.protobuf.parser.tree.ProtobufField;
-import it.auties.protobuf.parser.tree.ProtobufReserved;
+import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -218,11 +214,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
             compilationUnit.setPackageDeclaration(packageName);
         }
 
-        if(protoStatement instanceof ProtobufMessage || protoStatement.getAnyChildByType(ProtobufMessage.class).isPresent()) {
+        if(protoStatement instanceof ProtobufMessageStatement || protoStatement.getAnyChildByType(ProtobufMessageStatement.class).isPresent()) {
             compilationUnit.addImport(it.auties.protobuf.annotation.ProtobufMessage.class.getName());
         }
 
-        if(protoStatement instanceof ProtobufEnum || protoStatement.getAnyChildByType(ProtobufEnum.class).isPresent()){
+        if(protoStatement instanceof ProtobufEnumStatement || protoStatement.getAnyChildByType(ProtobufEnumStatement.class).isPresent()){
             compilationUnit.addImport(it.auties.protobuf.annotation.ProtobufEnum.class.getName());
             compilationUnit.addImport(ProtobufEnumIndex.class.getName());
         }
@@ -246,11 +242,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
             }
         }
 
-        if(hasFieldsWithModifier(ProtobufField.Modifier.Type.REQUIRED)){
+        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
 
-        if(hasFieldsWithModifier(ProtobufField.Modifier.Type.REPEATED)){
+        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type.REPEATED)){
             compilationUnit.addImport(List.class.getName());
         }
 
@@ -258,25 +254,25 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
     }
 
     private boolean hasFields(ProtobufBody<?> statement) {
-        return statement instanceof ProtobufMessage messageTree && messageTree.children()
+        return statement instanceof ProtobufMessageStatement messageTree && messageTree.children()
                 .stream()
-                .anyMatch(entry -> entry instanceof ProtobufField
-                        || (entry instanceof ProtobufMessage nestedMessageTree && hasFields(nestedMessageTree)));
+                .anyMatch(entry -> entry instanceof ProtobufFieldStatement
+                        || (entry instanceof ProtobufMessageStatement nestedMessageTree && hasFields(nestedMessageTree)));
     }
 
     record CompilationUnitResult(CompilationUnit compilationUnit, boolean existing){
 
     }
 
-    private boolean hasFieldsWithModifier(ProtobufField.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type modifier) {
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufBody<?> statement, ProtobufField.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufBody<?> statement, ProtobufFieldStatement.Modifier.Type modifier) {
         return statement.children()
                 .stream()
-                .anyMatch(entry -> (entry instanceof ProtobufMessage messageStatement && hasFieldsWithModifier(messageStatement, modifier))
-                        || (entry instanceof ProtobufField fieldStatement && fieldStatement.modifier().type() == modifier));
+                .anyMatch(entry -> (entry instanceof ProtobufMessageStatement messageStatement && hasFieldsWithModifier(messageStatement, modifier))
+                        || (entry instanceof ProtobufFieldStatement fieldStatement && fieldStatement.modifier().type() == modifier));
 
     }
 
@@ -288,8 +284,8 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
         var typesSet = Set.of(types);
         return statement.children()
                 .stream()
-                .anyMatch(entry -> (entry instanceof ProtobufMessage messageStatement && hasFieldsWithType(messageStatement, types))
-                        || (entry instanceof ProtobufField fieldStatement && typesSet.contains(fieldStatement.type().protobufType())));
+                .anyMatch(entry -> (entry instanceof ProtobufMessageStatement messageStatement && hasFieldsWithType(messageStatement, types))
+                        || (entry instanceof ProtobufFieldStatement fieldStatement && typesSet.contains(fieldStatement.type().protobufType())));
 
     }
 
@@ -300,14 +296,14 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
 
         var reserved = protobufReservable.children()
                 .stream()
-                .filter(entry -> entry instanceof ProtobufReserved)
-                .map(entry -> (ProtobufReserved<?>) entry)
+                .filter(entry -> entry instanceof ProtobufReservedExpression)
+                .map(entry -> (ProtobufReservedExpression<?>) entry)
                 .collect(Collectors.groupingBy(this::getReservedType));
 
         var annotation = getOrAddAnnotation(ctEnum, it.auties.protobuf.annotation.ProtobufEnum.class);
         var indexes = reserved.get(ReservedType.FIELD_INDEX_VALUE)
                 .stream()
-                .map(entry -> (ProtobufReserved.FieldIndex.Value) entry)
+                .map(entry -> (ProtobufReservedExpression.FieldIndex.Value) entry)
                 .map(entry -> new IntegerLiteralExpr(String.valueOf(entry.value())))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
         if(!indexes.isEmpty()){
@@ -316,7 +312,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
 
         var names = reserved.get(ReservedType.FIELD_NAME_VALUE)
                 .stream()
-                .map(entry -> (ProtobufReserved.FieldName) entry)
+                .map(entry -> (ProtobufReservedExpression.FieldName) entry)
                 .map(entry -> new StringLiteralExpr(entry.value()))
                 .collect(Collectors.toCollection(NodeList<Expression>::new));
         if(!names.isEmpty()){
@@ -325,7 +321,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
 
         var ranges = reserved.get(ReservedType.FIELD_NAME_VALUE)
                 .stream()
-                .map(entry -> (ProtobufReserved.FieldIndex.Range) entry)
+                .map(entry -> (ProtobufReservedExpression.FieldIndex.Range) entry)
                 .map(entry -> {
                     var range = new NormalAnnotationExpr();
                     range.setName(ProtobufReservedRange.class.getSimpleName());
@@ -339,13 +335,13 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufNamedBlock<?>>
         }
     }
 
-    private ReservedType getReservedType(ProtobufReserved<?> entry) {
+    private ReservedType getReservedType(ProtobufReservedExpression<?> entry) {
         return switch (entry) {
-            case ProtobufReserved.FieldIndex fieldIndex -> switch (fieldIndex) {
-                case ProtobufReserved.FieldIndex.Range ignored -> ReservedType.FIELD_INDEX_RANGE;
-                case ProtobufReserved.FieldIndex.Value ignored -> ReservedType.FIELD_INDEX_VALUE;
+            case ProtobufReservedExpression.FieldIndex fieldIndex -> switch (fieldIndex) {
+                case ProtobufReservedExpression.FieldIndex.Range ignored -> ReservedType.FIELD_INDEX_RANGE;
+                case ProtobufReservedExpression.FieldIndex.Value ignored -> ReservedType.FIELD_INDEX_VALUE;
             };
-            case ProtobufReserved.FieldName ignored -> ReservedType.FIELD_NAME_VALUE;
+            case ProtobufReservedExpression.FieldName ignored -> ReservedType.FIELD_NAME_VALUE;
         };
     }
 
