@@ -13,7 +13,7 @@ public sealed class ProtobufFieldStatement
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
-    protected ProtobufIntegerExpression index;
+    protected Integer index;
     protected final SequencedMap<String, ProtobufExpression> options;
 
     public ProtobufFieldStatement(int line) {
@@ -37,7 +37,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public ProtobufIntegerExpression index() {
+    public Integer index() {
         return index;
     }
 
@@ -47,13 +47,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public void setIndex(ProtobufIntegerExpression index) {
-        if(index != null) {
-            if(index.hasParent()) {
-                throw new IllegalStateException("Index is already owned by another tree");
-            }
-            index.setParent(this);
-        }
+    public void setIndex(Integer index) {
         this.index = index;
     }
 

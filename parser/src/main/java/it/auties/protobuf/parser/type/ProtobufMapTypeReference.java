@@ -3,7 +3,6 @@ package it.auties.protobuf.parser.type;
 import it.auties.protobuf.model.ProtobufType;
 
 public final class ProtobufMapTypeReference implements ProtobufTypeReference {
-    private static final String NAME = "map";
 
     private ProtobufTypeReference key;
     private ProtobufTypeReference value;
@@ -48,7 +47,7 @@ public final class ProtobufMapTypeReference implements ProtobufTypeReference {
 
     @Override
     public String name() {
-        return NAME;
+        return "map";
     }
 
     @Override
@@ -58,6 +57,6 @@ public final class ProtobufMapTypeReference implements ProtobufTypeReference {
 
     @Override
     public String toString() {
-        return "%s<%s, %s>".formatted(NAME, key, value);
+        return "map<%s, %s>".formatted(key, value);
     }
 }

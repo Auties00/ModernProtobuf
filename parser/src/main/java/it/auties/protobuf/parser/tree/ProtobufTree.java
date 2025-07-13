@@ -13,9 +13,9 @@ public sealed interface ProtobufTree
     sealed interface WithIndex
             extends ProtobufTree
             permits ProtobufFieldStatement {
-        ProtobufIntegerExpression index();
+        Integer index();
         boolean hasIndex();
-        void setIndex(ProtobufIntegerExpression index);
+        void setIndex(Integer index);
     }
 
     sealed interface WithName

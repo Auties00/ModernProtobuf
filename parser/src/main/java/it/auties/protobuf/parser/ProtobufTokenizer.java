@@ -31,7 +31,7 @@ public final class ProtobufTokenizer {
         tokenizer.quoteChar(STRING_LITERAL_DELIMITER);
     }
 
-    public String nextToken() throws IOException {
+    public String nextNullableToken() throws IOException {
         var token = tokenizer.nextToken();
         if (token == StreamTokenizer.TT_EOF) {
             return null;
@@ -45,49 +45,163 @@ public final class ProtobufTokenizer {
         };
     }
 
-    public String nextString(String token) {
-        if ((token.startsWith(STRING_LITERAL) && token.endsWith(STRING_LITERAL)) || (token.startsWith(STRING_LITERAL_ALIAS_CHAR) && token.endsWith(STRING_LITERAL_ALIAS_CHAR))) {
-            return token.substring(1, token.length() - 1);
-        } else {
-            return null;
+    public String nextRequiredToken() throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
+
+        return token;
     }
 
-    public Integer nextInt(boolean allowMax) throws IOException {
+    public String nextNullableLiteral() throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            return null;
+        }
+
+        return parseLiteral(token);
+    }
+
+    public String nextRequiredLiteral() throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
+        }
+
+        return parseLiteral(token);
+    }
+
+    private static String parseLiteral(String token) {
+        if ((!token.startsWith(STRING_LITERAL) || !token.endsWith(STRING_LITERAL))
+                && (!token.startsWith(STRING_LITERAL_ALIAS_CHAR) || !token.endsWith(STRING_LITERAL_ALIAS_CHAR))) {
+            return null;
+        }
+
+        return token.substring(1, token.length() - 1);
+    }
+
+    public Integer nextNullableInt(boolean allowMax) throws IOException {
         try {
-            var token = nextToken();
+            var token = nextNullableToken();
             if(token == null) {
                 return null;
             }
 
-            if(token.equalsIgnoreCase(MAX_KEYWORD)) {
-                return allowMax ? Integer.MAX_VALUE : null;
-            }
-
-            var value = 0;
-            for(var i = 0; i < token.length(); i++) {
-                var c = token.charAt(i);
-                if (c < '0' || c > '9') {
-                    return null;
-                }
-                value *= 10;
-                value += token.charAt(i) - '0';
-            }
-            return value;
+            return parseInt(token, allowMax);
         } catch (NumberFormatException ex) {
             return null;
         }
     }
 
-    public Boolean nextBool() throws IOException {
-        return switch (nextToken()) {
+    public Integer nextRequiredInt(boolean allowMax) throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
+        }
+
+        return parseInt(token, allowMax);
+    }
+
+    private static Integer parseInt(String token, boolean allowMax) {
+        if(token.equalsIgnoreCase(MAX_KEYWORD)) {
+            return allowMax ? Integer.MAX_VALUE : null;
+        }
+
+        var value = 0;
+        for(var i = 0; i < token.length(); i++) {
+            var c = token.charAt(i);
+            if (c < '0' || c > '9') {
+                return null;
+            }
+            value *= 10;
+            value += token.charAt(i) - '0';
+        }
+        return value;
+    }
+
+    public Boolean nextNullableBool() throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            return null;
+        }
+
+        return parseBool(token);
+    }
+
+    public Boolean nextRequiredBool() throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
+        }
+
+        return parseBool(token);
+    }
+
+    private static Boolean parseBool(String token) {
+        return switch (token) {
             case "true" -> true;
             case "false" -> false;
             default -> null;
         };
     }
 
+    public ParsedToken nextNullableParsedToken(boolean allowMax) throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            return null;
+        }
+
+        return parseToken(token, allowMax);
+    }
+
+    public ParsedToken nextRequiredParsedToken(boolean allowMax) throws IOException {
+        var token = nextNullableToken();
+        if(token == null) {
+            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
+        }
+
+        return parseToken(token, allowMax);
+    }
+
+    private static ParsedToken parseToken(String token, boolean allowMax) {
+        var literal = parseLiteral(token);
+        if(literal != null) {
+            return new ParsedToken.Literal(literal);
+        }
+
+        var integer = parseInt(token, allowMax);
+        if(integer != null) {
+            return new ParsedToken.Int(integer);
+        }
+
+        var bool = parseBool(token);
+        if(bool != null) {
+            return new ParsedToken.Bool(bool);
+        }
+
+        return new ParsedToken.Raw(token);
+    }
+
     public int line() {
         return tokenizer.lineno();
+    }
+
+    public sealed interface ParsedToken {
+        record Literal(String value) implements ParsedToken{
+
+        }
+
+        record Int(int value) implements ParsedToken {
+
+        }
+
+        record Bool(boolean value) implements ParsedToken {
+
+        }
+
+        record Raw(String value) implements ParsedToken {
+
+        }
     }
 }

@@ -6,7 +6,7 @@ public final class ProtobufRangeExpression
     private Integer min;
     private Integer max;
 
-    private ProtobufRangeExpression(int line) {
+    public ProtobufRangeExpression(int line) {
         super(line);
     }
 

@@ -6,13 +6,13 @@ public final class ProtobufSyntaxStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private ProtobufLiteralExpression version;
+    private Integer version;
 
     public ProtobufSyntaxStatement(int line) {
         super(line);
     }
 
-    public ProtobufLiteralExpression version() {
+    public Integer version() {
         return version;
     }
 
@@ -20,13 +20,7 @@ public final class ProtobufSyntaxStatement
         return version != null;
     }
 
-    public void setVersion(ProtobufLiteralExpression version) {
-        if(version != null) {
-            if(version.hasParent()) {
-                throw new IllegalStateException("Index is already owned by another tree");
-            }
-            version.setParent(this);
-        }
+    public void setVersion(Integer version) {
         this.version = version;
     }
 
