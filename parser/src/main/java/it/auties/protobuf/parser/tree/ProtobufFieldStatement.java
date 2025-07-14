@@ -9,7 +9,7 @@ public sealed class ProtobufFieldStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
                    ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
-        permits ProtobufEnumConstant, ProtobufGroupFieldStatement {
+        permits ProtobufEnumConstant, ProtobufGroupFieldStatement, ProtobufOneofFieldStatement {
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;

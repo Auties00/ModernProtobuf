@@ -4,7 +4,7 @@ package it.auties.protobuf.parser.tree;
 // ProtobufStatement can't provide non-public methods as it's an interface
 sealed abstract class ProtobufStatementImpl
         implements ProtobufStatement
-        permits ProtobufEmptyStatement, ProtobufEnumStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufImportStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufServiceStatement, ProtobufSyntaxStatement {
+        permits ProtobufEmptyStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufImportStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufStatementWithBodyImpl, ProtobufSyntaxStatement {
     final int line;
     ProtobufTree.WithBody<?> parent;
 

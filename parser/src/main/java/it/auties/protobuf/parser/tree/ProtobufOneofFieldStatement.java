@@ -1,44 +1,49 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufGroupTypeReference;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
-
 import java.util.*;
 import java.util.stream.Stream;
 
-public final class ProtobufGroupFieldStatement
+public final class ProtobufOneofFieldStatement
         extends ProtobufFieldStatement
-        implements ProtobufTree.WithBody<ProtobufGroupChild>,
-                   ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild {
-    private final List<ProtobufGroupChild> children;
-    public ProtobufGroupFieldStatement(int line) {
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>,
+                   ProtobufMessageChild, ProtobufGroupChild {
+    private String name;
+    private final List<ProtobufOneofChild> children;
+
+    public ProtobufOneofFieldStatement(int line) {
         super(line);
         this.children = new ArrayList<>();
+    }
+
+    public String className() {
+        return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Seal";
+    }
+
+    @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public boolean hasName() {
+        return name != null;
+    }
+
+    @Override
+    public void setName(String name) {
+        this.name = name;
     }
 
     @Override
     public String toString() {
         var builder = new StringBuilder();
 
-        if(modifier != null && modifier.type() != Modifier.Type.NOTHING) {
-            builder.append(modifier);
-            builder.append(" ");
-        }
-
-        builder.append("group");
+        builder.append("oneof");
         builder.append(" ");
 
         var name = Objects.requireNonNullElse(this.name, "[missing]");
         builder.append(name);
         builder.append(" ");
-
-        var index = Objects.requireNonNullElse(this.index, "[missing]");
-        builder.append("=");
-        builder.append(" ");
-        builder.append(index);
-        builder.append(" ");
-
-        writeOptions(builder);
 
         builder.append("{");
         builder.append("\n");
@@ -59,22 +64,12 @@ public final class ProtobufGroupFieldStatement
     }
 
     @Override
-    public ProtobufTypeReference type() {
-        return new ProtobufGroupTypeReference(this);
-    }
-
-    @Override
-    public void setType(ProtobufTypeReference type) {
-        throw new UnsupportedOperationException("Cannot set the type of a group field");
-    }
-
-    @Override
-    public SequencedCollection<ProtobufGroupChild> children() {
+    public SequencedCollection<ProtobufOneofChild> children() {
         return Collections.unmodifiableList(children);
     }
 
     @Override
-    public void addChild(ProtobufGroupChild statement) {
+    public void addChild(ProtobufOneofChild statement) {
         children.add(statement);
         if(statement instanceof ProtobufStatementImpl mutableTree) {
             mutableTree.setParent(this);
@@ -82,7 +77,7 @@ public final class ProtobufGroupFieldStatement
     }
 
     @Override
-    public boolean removeChild(ProtobufGroupChild statement) {
+    public boolean removeChild(ProtobufOneofChild statement) {
         var result = children.remove(statement);
         if(result && statement instanceof ProtobufStatementImpl mutableTree) {
             mutableTree.setParent(null);

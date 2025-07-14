@@ -5,13 +5,12 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import java.util.Objects;
 
 public final class ProtobufMethodStatement
-        extends ProtobufStatementImpl
+        extends ProtobufStatementWithBodyImpl<ProtobufMethodChild>
         implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMethodChild>,
                    ProtobufServiceChild, ProtobufTree.WithName {
     private String name;
     private Type inputType;
     private Type outputType;
-    private ProtobufBody<ProtobufMethodChild> body;
 
     public ProtobufMethodStatement(int line) {
         super(line);
@@ -30,26 +29,6 @@ public final class ProtobufMethodStatement
     @Override
     public void setName(String name) {
         this.name = name;
-    }
-
-    @Override
-    public ProtobufBody<ProtobufMethodChild> body() {
-        return body;
-    }
-
-    public void setBody(ProtobufBody<ProtobufMethodChild> body) {
-        if(body != null) {
-            if(body.hasOwner()) {
-                throw new IllegalStateException("Body is already owned by another tree");
-            }
-            body.setOwner(this);
-        }
-        this.body = body;
-    }
-
-    @Override
-    public boolean hasBody() {
-        return body != null;
     }
 
     public Type inputType() {
@@ -103,23 +82,19 @@ public final class ProtobufMethodStatement
         builder.append(outputType);
         builder.append(")");
 
-        if(body != null) {
+        if (children.isEmpty()) {
+            builder.append(";");
+        } else {
             builder.append(" {");
             builder.append("\n");
 
-            if(body.children().isEmpty()) {
+            children.forEach(statement -> {
+                builder.append("    ");
+                builder.append(statement);
                 builder.append("\n");
-            } else {
-                body.children().forEach(statement -> {
-                    builder.append("    ");
-                    builder.append(statement);
-                    builder.append("\n");
-                });
-            }
+            });
 
             builder.append("};");
-        }else {
-            builder.append(";");
         }
 
         return builder.toString();

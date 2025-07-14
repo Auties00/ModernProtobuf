@@ -19,7 +19,7 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
 import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
-import it.auties.protobuf.parser.tree.ProtobufOneofStatement;
+import it.auties.protobuf.parser.tree.ProtobufOneofFieldStatement;
 import it.auties.protobuf.parser.type.ProtobufMessageOrEnumTypeReference;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import it.auties.protobuf.schema.util.AstUtils;
@@ -252,7 +252,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 addNestedMessage(ctClass, messageStatement);
             }else if(statement instanceof ProtobufEnumStatement enumStatement){
                 addNestedEnum(ctClass, enumStatement);
-            }else if (statement instanceof ProtobufOneofStatement oneOfStatement){
+            }else if (statement instanceof ProtobufOneofFieldStatement oneOfStatement){
                 addOneOfStatement(ctClass, oneOfStatement);
             }
         }
@@ -306,7 +306,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 addNestedMessage(ctRecord, messageStatement);
             }else if(statement instanceof ProtobufEnumStatement enumStatement){
                 addNestedEnum(ctRecord, enumStatement);
-            }else if (statement instanceof ProtobufOneofStatement oneOfStatement){
+            }else if (statement instanceof ProtobufOneofFieldStatement oneOfStatement){
                 addOneOfStatement(ctRecord, oneOfStatement);
             }
         }
@@ -514,7 +514,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         allMembers.add(member);
     }
 
-    private void addOneOfStatement(TypeDeclaration<?> typeDeclaration, ProtobufOneofStatement oneOfStatement) {
+    private void addOneOfStatement(TypeDeclaration<?> typeDeclaration, ProtobufOneofFieldStatement oneOfStatement) {
         var ctInterface = createOneOfInterface(typeDeclaration, oneOfStatement);
         var ctMethod = createOneOfMethod(typeDeclaration, oneOfStatement, ctInterface);
         var ctMethodBody = new BlockStmt();
@@ -574,7 +574,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         ctInterface.setPermittedTypes(permittedTypes);
     }
 
-    private MethodDeclaration createOneOfMethod(TypeDeclaration<?> typeDeclaration, ProtobufOneofStatement oneOfStatement, ClassOrInterfaceDeclaration ctInterface) {
+    private MethodDeclaration createOneOfMethod(TypeDeclaration<?> typeDeclaration, ProtobufOneofFieldStatement oneOfStatement, ClassOrInterfaceDeclaration ctInterface) {
         var existing = getMethod(typeDeclaration, AstUtils.toJavaName(oneOfStatement.name()));
         if(existing.isPresent()) {
             return existing.get();
@@ -588,7 +588,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         return ctMethod;
     }
 
-    private ClassOrInterfaceDeclaration createOneOfInterface(TypeDeclaration<?> scope, ProtobufOneofStatement oneOfStatement) {
+    private ClassOrInterfaceDeclaration createOneOfInterface(TypeDeclaration<?> scope, ProtobufOneofFieldStatement oneOfStatement) {
         var result = getTypeMember(scope, oneOfStatement.className());
         if (result.isPresent()) {
             return (ClassOrInterfaceDeclaration) result.get();

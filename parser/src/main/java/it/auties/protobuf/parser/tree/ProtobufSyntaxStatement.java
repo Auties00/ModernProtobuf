@@ -6,13 +6,13 @@ public final class ProtobufSyntaxStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private Integer version;
+    private String version;
 
     public ProtobufSyntaxStatement(int line) {
         super(line);
     }
 
-    public Integer version() {
+    public String version() {
         return version;
     }
 
@@ -20,7 +20,7 @@ public final class ProtobufSyntaxStatement
         return version != null;
     }
 
-    public void setVersion(Integer version) {
+    public void setVersion(String version) {
         this.version = version;
     }
 

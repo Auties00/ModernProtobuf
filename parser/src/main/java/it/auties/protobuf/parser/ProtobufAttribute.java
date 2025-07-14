@@ -88,7 +88,7 @@ public final class ProtobufAttribute {
     }
 
     private static void attributeImports(ProtobufDocumentTree document, Map<String, ProtobufDocumentTree> canonicalPathToDocumentMap) {
-        for(var child : document.body().children()) {
+        for(var child : document.children()) {
             if(child instanceof ProtobufImportStatement importStatement && !importStatement.isAttributed()) {
                 var imported = canonicalPathToDocumentMap.get(importStatement.location());
                 ProtobufParserException.check(imported != null,
@@ -104,7 +104,7 @@ public final class ProtobufAttribute {
         while (!queue.isEmpty()) {
             var tree = queue.removeFirst();
             switch (tree) {
-                case ProtobufTree.WithBody<?> body -> queue.addAll(body.body().children());
+                case ProtobufTree.WithBody<?> body -> queue.addAll(body.children());
 
                 case ProtobufExpression protobufExpression -> {
                     switch (protobufExpression) {
@@ -212,8 +212,7 @@ public final class ProtobufAttribute {
                     // Only the first result should be considered because of shadowing (i.e. if a name is reused in an inner scope, the inner scope should override the outer scope)
                     ProtobufTree.WithBody<?> resolvedType = null;
                     while (parent != null && resolvedType == null) {
-                        resolvedType = parent.body()
-                                .getDirectChildByNameAndType(types[0], ProtobufTree.WithBody.class)
+                        resolvedType = parent.getDirectChildByNameAndType(types[0], ProtobufTree.WithBody.class)
                                 .orElse(null);
                         parent = parent.parent() instanceof ProtobufTree.WithBody<?> validParent ? validParent : null;
                     }
@@ -221,12 +220,11 @@ public final class ProtobufAttribute {
                     if (resolvedType != null) { // Found a match in the parent scope
                         // Try to resolve the type reference in the matched scope
                         for (var index = 1; index < types.length; index++) {
-                            resolvedType = resolvedType.body()
-                                    .getDirectChildByNameAndType(types[index], ProtobufTree.WithBody.class)
+                            resolvedType = resolvedType.getDirectChildByNameAndType(types[index], ProtobufTree.WithBody.class)
                                     .orElseThrow(() -> throwUnattributableType(typedFieldTree));
                         }
                     } else { // No match found in the parent scope, try to resolve the type reference through imports
-                        for (var statement : document.body().children()) {
+                        for (var statement : document.children()) {
                             if (!(statement instanceof ProtobufImportStatement importStatement)) {
                                 continue;
                             }
@@ -242,8 +240,7 @@ public final class ProtobufAttribute {
                             var simpleImportName = simpleName.split(TYPE_SELECTOR_SPLITTER);
                             resolvedType = imported;
                             for (var i = 0; i < simpleImportName.length && resolvedType != null; i++) {
-                                resolvedType = resolvedType.body()
-                                        .getDirectChildByNameAndType(simpleImportName[i], ProtobufTree.WithBody.class)
+                                resolvedType = resolvedType.getDirectChildByNameAndType(simpleImportName[i], ProtobufTree.WithBody.class)
                                         .orElse(null);
                             }
                             if (resolvedType != null) {

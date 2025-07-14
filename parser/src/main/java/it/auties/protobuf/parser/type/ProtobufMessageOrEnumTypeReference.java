@@ -14,8 +14,9 @@ public final class ProtobufMessageOrEnumTypeReference implements ProtobufTypeRef
         this.name = Objects.requireNonNull(name, "name cannot be null");
     }
 
-    public ProtobufMessageOrEnumTypeReference(String name, ProtobufTree declaration){
-        this.name = Objects.requireNonNull(name, "name cannot be null");
+    public ProtobufMessageOrEnumTypeReference(ProtobufTree.WithName declaration) {
+        Objects.requireNonNull(declaration, "declaration cannot be null");
+        this.name = declaration.name();
         this.declaration = declaration;
     }
 

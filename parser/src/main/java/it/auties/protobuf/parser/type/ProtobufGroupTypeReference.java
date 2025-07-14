@@ -13,8 +13,9 @@ public final class ProtobufGroupTypeReference implements ProtobufTypeReference {
         this.name = Objects.requireNonNull(name, "name cannot be null");
     }
 
-    public ProtobufGroupTypeReference(String name, ProtobufGroupFieldStatement declaration){
-        this.name = Objects.requireNonNull(name, "name cannot be null");
+    public ProtobufGroupTypeReference(ProtobufGroupFieldStatement declaration) {
+        Objects.requireNonNull(declaration, "declaration cannot be null");
+        this.name = declaration.name();
         this.declaration = declaration;
     }
 

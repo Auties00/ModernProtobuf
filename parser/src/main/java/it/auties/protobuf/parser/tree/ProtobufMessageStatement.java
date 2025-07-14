@@ -3,11 +3,10 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 
 public final class ProtobufMessageStatement
-        extends ProtobufStatementImpl
+        extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>,
                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
     private String name;
-    private ProtobufBody<ProtobufMessageChild> body;
     private final boolean extension;
 
     public ProtobufMessageStatement(int line, boolean extension) {
@@ -26,29 +25,22 @@ public final class ProtobufMessageStatement
         builder.append(name);
         builder.append(" ");
 
-        if(body != null) {
-            builder.append("{");
+        builder.append("{");
+        builder.append("\n");
+
+        if(children.isEmpty()) {
             builder.append("\n");
-
-            if(body.children().isEmpty()) {
+        } else {
+            children.forEach(statement -> {
+                builder.append("    ");
+                builder.append(statement);
                 builder.append("\n");
-            } else {
-                body.children().forEach(statement -> {
-                    builder.append("    ");
-                    builder.append(statement);
-                    builder.append("\n");
-                });
-            }
-
-            builder.append("}");
+            });
         }
 
-        return builder.toString();
-    }
+        builder.append("}");
 
-    @Override
-    public boolean isAttributed() {
-        return body.isAttributed();
+        return builder.toString();
     }
 
     @Override
@@ -64,25 +56,5 @@ public final class ProtobufMessageStatement
     @Override
     public void setName(String name) {
         this.name = name;
-    }
-
-    @Override
-    public ProtobufBody<ProtobufMessageChild> body() {
-        return body;
-    }
-
-    @Override
-    public boolean hasBody() {
-        return body != null;
-    }
-
-    public void setBody(ProtobufBody<ProtobufMessageChild> body) {
-        if(body != null) {
-            if(body.hasOwner()) {
-                throw new IllegalStateException("Body is already owned by another tree");
-            }
-            body.setOwner(this);
-        }
-        this.body = body;
     }
 }
