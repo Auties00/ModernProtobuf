@@ -3,14 +3,14 @@ package it.auties.protobuf.parser.tree;
 public final class ProtobufRangeExpression
         extends ProtobufExpressionImpl
         implements ProtobufExpression, ProtobufExtensionsChild, ProtobufReservedChild {
-    private Integer min;
-    private Integer max;
+    private Long min;
+    private Long max;
 
     public ProtobufRangeExpression(int line) {
         super(line);
     }
 
-    public Integer min() {
+    public Long min() {
         return min;
     }
 
@@ -18,11 +18,11 @@ public final class ProtobufRangeExpression
         return max != null;
     }
 
-    public void setMin(Integer value) {
+    public void setMin(Long value) {
         this.min = value;
     }
 
-    public Integer max() {
+    public Long max() {
         return max;
     }
 
@@ -30,7 +30,7 @@ public final class ProtobufRangeExpression
         return max != null;
     }
 
-    public void setMax(Integer max) {
+    public void setMax(Long max) {
         this.max = max;
     }
 

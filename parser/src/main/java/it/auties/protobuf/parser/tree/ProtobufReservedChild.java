@@ -2,5 +2,5 @@ package it.auties.protobuf.parser.tree;
 
 public sealed interface ProtobufReservedChild
         extends ProtobufExpression
-        permits ProtobufLiteralExpression, ProtobufIntegerExpression, ProtobufRangeExpression {
+        permits ProtobufIntegerExpression, ProtobufLiteralExpression, ProtobufRangeExpression {
 }

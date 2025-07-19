@@ -13,7 +13,7 @@ public sealed class ProtobufFieldStatement
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
-    protected Integer index;
+    protected Long index;
     protected final SequencedMap<String, ProtobufExpression> options;
 
     public ProtobufFieldStatement(int line) {
@@ -37,7 +37,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public Integer index() {
+    public Long index() {
         return index;
     }
 
@@ -47,7 +47,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public void setIndex(Integer index) {
+    public void setIndex(Long index) {
         this.index = index;
     }
 
@@ -76,8 +76,8 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public SequencedCollection<ProtobufExpression> options() {
-        return options.sequencedValues();
+    public SequencedMap<String, ProtobufExpression> options() {
+        return Collections.unmodifiableSequencedMap(options);
     }
 
     @Override

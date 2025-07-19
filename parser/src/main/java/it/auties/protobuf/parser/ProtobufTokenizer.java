@@ -9,6 +9,8 @@ public final class ProtobufTokenizer {
     private static final String STRING_LITERAL = "\"";
     private static final String STRING_LITERAL_ALIAS_CHAR = "'";
     private static final String MAX_KEYWORD = "max";
+    private static final long MIN_FIELD_INDEX = 1;
+    private static final long MAX_FIELD_INDEX = 536_870_911; // 2^29 - 1
 
     private final StreamTokenizer tokenizer;
 
@@ -81,61 +83,57 @@ public final class ProtobufTokenizer {
         return token.substring(1, token.length() - 1);
     }
 
-    public Integer nextNullableInt(boolean allowMax) throws IOException {
+    public Long nextNullableIndex(boolean allowMax) throws IOException {
         try {
             var token = nextNullableToken();
             if(token == null) {
                 return null;
             }
 
-            return parseInt(token, allowMax);
+            return parseIndex(token, allowMax);
         } catch (NumberFormatException ex) {
             return null;
         }
     }
 
-    public Integer nextRequiredInt(boolean allowMax) throws IOException {
+    public Long nextRequiredIndex(boolean allowMax) throws IOException {
         var token = nextNullableToken();
         if(token == null) {
             throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
 
-        return parseInt(token, allowMax);
+        return parseIndex(token, allowMax);
     }
 
-    private static Integer parseInt(String token, boolean allowMax) {
+    private static Long parseIndex(String token, boolean allowMax) {
         if(token.equalsIgnoreCase(MAX_KEYWORD)) {
-            return allowMax ? Integer.MAX_VALUE : null;
+            return allowMax ? Long.MAX_VALUE : null;
         }
 
-        var value = 0;
+        var value = 0L;
         for(var i = 0; i < token.length(); i++) {
-            var c = token.charAt(i);
-            if (c < '0' || c > '9') {
+            var charAt = token.charAt(i);
+            if (charAt < '0' || charAt > '9') {
                 return null;
             }
-            value *= 10;
-            value += token.charAt(i) - '0';
-        }
-        return value;
-    }
 
-    public Boolean nextNullableBool() throws IOException {
-        var token = nextNullableToken();
-        if(token == null) {
+            var valueTimesTen = value * 10L;
+            if (((value | 10L) >>> 31 != 0) && valueTimesTen / 10 != value) {
+                return null;
+            }
+
+            var digit = token.charAt(i) - '0';
+            var r = valueTimesTen + digit;
+            if (((valueTimesTen ^ r) & (digit ^ r)) < 0) {
+                return null;
+            }
+
+            value = r;
+        }
+        if(value < MIN_FIELD_INDEX || value > MAX_FIELD_INDEX) {
             return null;
         }
-
-        return parseBool(token);
-    }
-
-    public Boolean nextRequiredBool() throws IOException {
-        var token = nextNullableToken();
-        if(token == null) {
-            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
-        }
-
-        return parseBool(token);
+        return value;
     }
 
     private static Boolean parseBool(String token) {
@@ -146,41 +144,113 @@ public final class ProtobufTokenizer {
         };
     }
 
-    public ParsedToken nextNullableParsedToken(boolean allowMax) throws IOException {
+
+    public ParsedToken nextNullableParsedToken() throws IOException {
         var token = nextNullableToken();
         if(token == null) {
             return null;
         }
 
-        return parseToken(token, allowMax);
+        return parseToken(token);
     }
 
-    public ParsedToken nextRequiredParsedToken(boolean allowMax) throws IOException {
+    public ParsedToken nextRequiredParsedToken() throws IOException {
         var token = nextNullableToken();
         if(token == null) {
             throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
 
-        return parseToken(token, allowMax);
+        return parseToken(token);
     }
 
-    private static ParsedToken parseToken(String token, boolean allowMax) {
+    private static ParsedToken parseToken(String token) {
         var literal = parseLiteral(token);
         if(literal != null) {
             return new ParsedToken.Literal(literal);
         }
 
-        var integer = parseInt(token, allowMax);
-        if(integer != null) {
-            return new ParsedToken.Int(integer);
+        var number = parseTokenAsNumber(token);
+        if(number != null) {
+            return number;
         }
 
         var bool = parseBool(token);
         if(bool != null) {
-            return new ParsedToken.Bool(bool);
+            return new ParsedToken.Boolean(bool);
         }
 
         return new ParsedToken.Raw(token);
+    }
+
+    private static ParsedToken parseTokenAsNumber(String token) {
+        var length = token.length();
+        if(length == 0) {
+            return null;
+        }
+
+        int start;
+        boolean negative;
+        switch (token.charAt(0)) {
+            case '+' -> {
+                start = 1;
+                negative = false;
+            }
+            case '-' -> {
+                start = 1;
+                negative = true;
+            }
+            default -> {
+                start = 0;
+                negative = false;
+            }
+        }
+
+        var whole = 0L;
+        while (start < length) {
+            var charAt = token.charAt(start++);
+            if(charAt == '.') {
+                break;
+            }else if (charAt < '0' || charAt > '9') {
+                return null;
+            }
+
+            var valueTimesTen = whole * 10L;
+            if (((whole | 10L) >>> 31 != 0) && valueTimesTen / 10 != whole) {
+                return null;
+            }
+
+            var digit = charAt - '0';
+            whole = valueTimesTen + digit;
+            if (((valueTimesTen ^ whole) & (digit ^ whole)) < 0) {
+                return null;
+            }
+        }
+
+        var fraction = 0L;
+        while (start < length) {
+            var charAt = token.charAt(start++);
+            if (charAt < '0' || charAt > '9') {
+                return null;
+            }
+
+            var valueTimesTen = fraction * 10L;
+            if (((fraction | 10L) >>> 31 != 0) && valueTimesTen / 10 != fraction) {
+                return null;
+            }
+
+            var digit = charAt - '0';
+            fraction = valueTimesTen + digit;
+            if (((valueTimesTen ^ fraction) & (digit ^ fraction)) < 0) {
+                return null;
+            }
+        }
+
+        if(fraction == 0) {
+            return new ParsedToken.Number.Integer(negative ? -whole : whole);
+        }else {
+            // TODO
+            throw new UnsupportedOperationException();
+        }
     }
 
     public int line() {
@@ -192,11 +262,25 @@ public final class ProtobufTokenizer {
 
         }
 
-        record Int(int value) implements ParsedToken {
+        sealed interface Number extends ParsedToken {
+            boolean isValidIndex();
 
+            record Integer(long value) implements Number {
+                @Override
+                public boolean isValidIndex() {
+                    return value >= MIN_FIELD_INDEX && value <= MAX_FIELD_INDEX;
+                }
+            }
+
+            record FloatingPoint(double value) implements Number {
+                @Override
+                public boolean isValidIndex() {
+                    return false;
+                }
+            }
         }
 
-        record Bool(boolean value) implements ParsedToken {
+        record Boolean(boolean value) implements ParsedToken {
 
         }
 

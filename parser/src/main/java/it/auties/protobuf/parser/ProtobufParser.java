@@ -30,22 +30,23 @@ public final class ProtobufParser {
         throw new UnsupportedOperationException();
     }
 
-    public static Set<ProtobufDocumentTree> parse(Path path) throws IOException {
+    public static Map<String, ProtobufDocumentTree> parse(Path path) throws IOException {
+        Objects.requireNonNull(path, "Path must not be null");
         if (!Files.isDirectory(path)) {
-            return Set.of(parseOnly(path));
+            return Map.of(path.getFileName().toString(), parseOnly(path));
         }
 
         try(var walker = Files.walk(path)) {
             var files = walker.filter(Files::isRegularFile).toList();
-            var results = new HashSet<ProtobufDocumentTree>();
+            var results = new HashMap<String, ProtobufDocumentTree>();
             for(var file : files) {
                 var parsed = doParse(file, Files.newBufferedReader(file));
-                if(!results.add(parsed)) {
+                if(results.put(file.getFileName().toString(), parsed) != null) {
                     throw new ProtobufParserException("Duplicate file: " + file);
                 }
             }
-            ProtobufAttribute.attribute(results);
-            return results;
+            ProtobufAttribute.attribute(results.values());
+            return Collections.unmodifiableMap(results);
         }
     }
 
@@ -292,7 +293,7 @@ public final class ProtobufParser {
         var operator = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
-        var index = tokenizer.nextRequiredInt(false);
+        var index = tokenizer.nextRequiredIndex(false);
         child.setIndex(index);
 
         var optionsOrBodyOrEndToken = tokenizer.nextRequiredToken();
@@ -431,7 +432,7 @@ public final class ProtobufParser {
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
 
-        var index = tokenizer.nextRequiredInt(false);
+        var index = tokenizer.nextRequiredIndex(false);
         statement.setIndex(index);
 
         var optionsOrEndToken = tokenizer.nextRequiredToken();
@@ -449,10 +450,10 @@ public final class ProtobufParser {
         var statement = new ProtobufExtensionsStatement(tokenizer.line());
 
         while(true) {
-            var value = tokenizer.nextRequiredInt(false);
+            var value = tokenizer.nextRequiredIndex(false);
             var operator = tokenizer.nextRequiredToken();
             if(isRangeOperator(operator)) {
-                var end = tokenizer.nextRequiredInt(true);
+                var end = tokenizer.nextRequiredIndex(true);
                 var expression = new ProtobufRangeExpression(tokenizer.line());
                 expression.setMin(value);
                 expression.setMax(end);
@@ -482,7 +483,7 @@ public final class ProtobufParser {
 
         bodyLoop: {
             while(true) {
-                var value = tokenizer.nextRequiredParsedToken(false);
+                var value = tokenizer.nextRequiredParsedToken();
                 switch (value) {
                     case ProtobufTokenizer.ParsedToken.Literal literal -> {
                         var expression = new ProtobufLiteralExpression(tokenizer.line());
@@ -496,10 +497,10 @@ public final class ProtobufParser {
                         }
                     }
 
-                    case ProtobufTokenizer.ParsedToken.Int integer -> {
+                    case ProtobufTokenizer.ParsedToken.Number.Integer integer -> {
                         var operator = tokenizer.nextRequiredToken();
                         if(isRangeOperator(operator)) {
-                            var end = tokenizer.nextRequiredInt(true);
+                            var end = tokenizer.nextRequiredIndex(true);
                             var expression = new ProtobufRangeExpression(tokenizer.line());
                             expression.setMin(integer.value());
                             expression.setMax(end);
@@ -628,22 +629,31 @@ public final class ProtobufParser {
 
     private static ProtobufExpression readExpression(ProtobufTokenizer tokenizer) throws IOException {
         var line = tokenizer.line();
-        return switch (tokenizer.nextRequiredParsedToken(false)) {
-            case ProtobufTokenizer.ParsedToken.Bool bool -> {
+        return switch (tokenizer.nextRequiredParsedToken()) {
+            case ProtobufTokenizer.ParsedToken.Boolean bool -> {
                 var expression = new ProtobufBoolExpression(line);
                 expression.setValue(bool.value());
                 yield expression;
             }
-            case ProtobufTokenizer.ParsedToken.Int anInt -> {
+
+            case ProtobufTokenizer.ParsedToken.Number.Integer integer -> {
                 var expression = new ProtobufIntegerExpression(line);
-                expression.setValue(anInt.value());
+                expression.setValue(integer.value());
                 yield expression;
             }
+
+            case ProtobufTokenizer.ParsedToken.Number.FloatingPoint floatingPoint -> {
+                var expression = new ProtobufFloatingPointExpression(line);
+                expression.setValue(floatingPoint.value());
+                yield expression;
+            }
+
             case ProtobufTokenizer.ParsedToken.Literal literal -> {
                 var expression = new ProtobufLiteralExpression(line);
                 expression.setValue(literal.value());
                 yield expression;
             }
+
             case ProtobufTokenizer.ParsedToken.Raw raw
                     when isNullExpression(raw.value()) -> new ProtobufNullExpression(line);
             case ProtobufTokenizer.ParsedToken.Raw raw
@@ -651,7 +661,7 @@ public final class ProtobufParser {
                 var expression = new ProtobufMessageValueExpression(line);
                 loop: {
                     while (true) {
-                        var keyToken = tokenizer.nextRequiredParsedToken(false);
+                        var keyToken = tokenizer.nextRequiredParsedToken();
                         switch (keyToken) {
                             case ProtobufTokenizer.ParsedToken.Raw(var value)
                                     when isBodyEnd(value) -> {

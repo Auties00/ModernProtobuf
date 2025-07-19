@@ -2,6 +2,7 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Optional;
 import java.util.SequencedCollection;
+import java.util.SequencedMap;
 import java.util.stream.Stream;
 
 public sealed interface ProtobufTree
@@ -15,9 +16,9 @@ public sealed interface ProtobufTree
     sealed interface WithIndex
             extends ProtobufTree
             permits ProtobufFieldStatement {
-        Integer index();
+        Long index();
         boolean hasIndex();
-        void setIndex(Integer index);
+        void setIndex(Long index);
     }
 
     sealed interface WithName
@@ -31,7 +32,7 @@ public sealed interface ProtobufTree
     sealed interface WithOptions
             extends ProtobufTree
             permits ProtobufFieldStatement {
-        SequencedCollection<ProtobufExpression> options();
+        SequencedMap<String, ProtobufExpression> options();
         void addOption(String name, ProtobufExpression value);
         boolean removeOption(String name);
     }
@@ -45,9 +46,9 @@ public sealed interface ProtobufTree
 
         <V extends ProtobufTree> Optional<? extends V> getDirectChildByType(Class<V> clazz);
         Optional<? extends WithName> getDirectChildByName(String name);
-        Optional<? extends WithIndex> getDirectChildByIndex(int index);
+        Optional<? extends WithIndex> getDirectChildByIndex(long index);
         <V extends ProtobufTree> Optional<? extends V> getDirectChildByNameAndType(String name, Class<V> clazz);
-        <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(int index, Class<V> clazz);
+        <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz);
 
         <V extends ProtobufTree> Stream<? extends V> getAnyChildrenByType(Class<V> clazz);
         // No getAnyChildrenByIndexAndType

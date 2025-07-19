@@ -109,7 +109,7 @@ public final class ProtobufDocumentTree
     }
 
     @Override
-    public Optional<? extends WithIndex> getDirectChildByIndex(int index) {
+    public Optional<? extends WithIndex> getDirectChildByIndex(long index) {
         return Optional.empty(); // No direct child with an index exists in a document
     }
 
@@ -119,7 +119,7 @@ public final class ProtobufDocumentTree
     }
 
     @Override
-    public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(int index, Class<V> clazz) {
+    public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz) {
         return Optional.empty(); // No direct child with an index exists in a document
     }
 

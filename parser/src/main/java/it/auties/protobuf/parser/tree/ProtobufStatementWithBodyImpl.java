@@ -70,11 +70,11 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
     }
 
     @Override
-    public Optional<? extends ProtobufTree.WithIndex> getDirectChildByIndex(int index){
+    public Optional<? extends ProtobufTree.WithIndex> getDirectChildByIndex(long index){
         return getDirectChildByIndex(children, index);
     }
 
-    static Optional<WithIndex> getDirectChildByIndex(Collection<? extends ProtobufTree> children, int index) {
+    static Optional<WithIndex> getDirectChildByIndex(Collection<? extends ProtobufTree> children, long index) {
         return children.stream()
                 .filter(entry -> entry instanceof WithIndex withIndex
                         && withIndex.hasIndex()
@@ -102,11 +102,11 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
     }
 
     @Override
-    public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(int index, Class<V> clazz) {
+    public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz) {
         return getDirectChildByIndexAndType(children, index, clazz);
     }
 
-    static <V extends ProtobufTree> Optional<V> getDirectChildByIndexAndType(Collection<? extends ProtobufTree> children, int index, Class<V> clazz) {
+    static <V extends ProtobufTree> Optional<V> getDirectChildByIndexAndType(Collection<? extends ProtobufTree> children, long index, Class<V> clazz) {
         return children.stream()
                 .filter(entry -> clazz.isAssignableFrom(entry.getClass())
                         && entry instanceof WithIndex withIndex

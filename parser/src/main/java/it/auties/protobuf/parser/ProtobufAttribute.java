@@ -7,24 +7,53 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class ProtobufAttribute {
-    private static final Set<ProtobufDocumentTree> BUILT_INS;
     private static final String TYPE_SELECTOR = ".";
     private static final String TYPE_SELECTOR_SPLITTER = "\\.";
+
+    private static final Collection<ProtobufDocumentTree> BUILT_IN_TYPES;
+    private static final Map<String, Map<String, ProtobufFieldStatement>> BUILT_IN_OPTIONS;
 
     static {
         try {
             var builtInTypesDirectory = ClassLoader.getSystemClassLoader().getResource("google/protobuf/");
             if(builtInTypesDirectory == null) {
-                throw new ProtobufParserException("Missing built-in .proto");
+                throw new ProtobufParserException("Parser initialization failed: missing built-in .proto documents");
             }
 
             var builtInTypesPath = Path.of(builtInTypesDirectory.toURI());
-            BUILT_INS = ProtobufParser.parse(builtInTypesPath);
+            var resolved = ProtobufParser.parse(builtInTypesPath);
+            BUILT_IN_TYPES = resolved.values();
+
+            var descriptorDocument = resolved.get("descriptor.proto");
+            if(descriptorDocument == null) {
+                throw new ProtobufParserException("Parser initialization failed: missing descriptor.proto");
+            }
+
+            BUILT_IN_OPTIONS = getOptionsForDescriptor(descriptorDocument);
         }catch (IOException | URISyntaxException exception) {
             throw new ProtobufParserException("Missing built-in .proto");
         }
+    }
+
+    private static Map<String, Map<String, ProtobufFieldStatement>> getOptionsForDescriptor(ProtobufDocumentTree descriptorDocument) {
+        return descriptorDocument.children()
+                .stream()
+                .filter(child -> child instanceof ProtobufMessageStatement messageStatement && messageStatement.name().endsWith("Options"))
+                .map(child -> (ProtobufMessageStatement) child)
+                .collect(Collectors.toUnmodifiableMap(ProtobufMessageStatement::name, ProtobufAttribute::getOptionsForDescriptor));
+    }
+
+    private static Map<String, ProtobufFieldStatement> getOptionsForDescriptor(ProtobufMessageStatement statement) {
+        return statement.children()
+                .stream()
+                .filter(child -> child instanceof ProtobufFieldStatement fieldStatement
+                        && !Objects.equals(fieldStatement.name(), "uninterpreted_options"))
+                .map(child -> (ProtobufFieldStatement) child)
+                .collect(Collectors.toUnmodifiableMap(ProtobufFieldStatement::name, Function.identity()));
     }
 
     private ProtobufAttribute() {
@@ -45,8 +74,8 @@ public final class ProtobufAttribute {
 
     private static void attributeImports(ProtobufDocumentTree document) {
         var canonicalPathToDocumentMap = buildImportsMap(document);
-        if(BUILT_INS != null) {
-            for(var builtIn : BUILT_INS) {
+        if(BUILT_IN_TYPES != null) {
+            for(var builtIn : BUILT_IN_TYPES) {
                 canonicalPathToDocumentMap.put(document.qualifiedPath(), builtIn);
             }
         }
@@ -55,8 +84,8 @@ public final class ProtobufAttribute {
 
     private static void attributeImports(Collection<ProtobufDocumentTree> documents) {
         var canonicalPathToDocumentMap = buildImportsMap(documents);
-        if(BUILT_INS != null) {
-            for(var document : BUILT_INS) {
+        if(BUILT_IN_TYPES != null) {
+            for(var document : BUILT_IN_TYPES) {
                 canonicalPathToDocumentMap.put(document.qualifiedPath(), document);
             }
         }
@@ -67,8 +96,8 @@ public final class ProtobufAttribute {
 
     private static Map<String, ProtobufDocumentTree> buildImportsMap(ProtobufDocumentTree document) {
         var mapSize = 1;
-        if(BUILT_INS != null) {
-            mapSize += BUILT_INS.size();
+        if(BUILT_IN_TYPES != null) {
+            mapSize += BUILT_IN_TYPES.size();
         }
         Map<String, ProtobufDocumentTree> canonicalPathToDocumentMap = HashMap.newHashMap(mapSize);
         canonicalPathToDocumentMap.put(document.qualifiedPath(), document);
@@ -77,8 +106,8 @@ public final class ProtobufAttribute {
 
     private static Map<String, ProtobufDocumentTree> buildImportsMap(Collection<ProtobufDocumentTree> documents) {
         var mapSize = documents.size();
-        if(BUILT_INS != null) {
-            mapSize += BUILT_INS.size();
+        if(BUILT_IN_TYPES != null) {
+            mapSize += BUILT_IN_TYPES.size();
         }
         Map<String, ProtobufDocumentTree> canonicalPathToDocumentMap = HashMap.newHashMap(mapSize);
         for(var document : documents) {
@@ -105,84 +134,146 @@ public final class ProtobufAttribute {
             var tree = queue.removeFirst();
             switch (tree) {
                 case ProtobufTree.WithBody<?> body -> queue.addAll(body.children());
+                case ProtobufStatement protobufStatement -> attributeStatement(document, protobufStatement);
+                case ProtobufExpression ignored -> throw new InternalError("Expressions should be attributed in-place");
+            }
+        }
+    }
 
-                case ProtobufExpression protobufExpression -> {
-                    switch (protobufExpression) {
-                        case ProtobufBoolExpression protobufBoolExpression -> {
-
-                        }
-
-                        case ProtobufEnumConstantExpression protobufEnumConstantExpression -> {
-
-                        }
-
-                        case ProtobufIntegerExpression protobufIntegerExpression -> {
-
-                        }
-
-                        case ProtobufLiteralExpression protobufLiteralExpression -> {
-
-                        }
-
-                        case ProtobufNullExpression protobufNullExpression -> {
-
-                        }
-
-                        case ProtobufRangeExpression protobufRangeExpression -> {
-
-                        }
-
-                        case ProtobufReservedChild protobufReservedChild -> {
-
-                        }
-
-                        case ProtobufMessageValueExpression protobufMessageValueExpression -> {
-
-                        }
-                    }
+    private static void attributeStatement(ProtobufDocumentTree document, ProtobufStatement protobufStatement) {
+        switch (protobufStatement) {
+            case ProtobufEmptyStatement emptyStatement -> {
+                if(!emptyStatement.isAttributed()) {
+                    throw new InternalError("Empty statement should already be attributed");
                 }
+            }
 
-                case ProtobufStatement protobufStatement -> {
-                    switch (protobufStatement) {
-                        case ProtobufEmptyStatement ignored -> {
-                            // Nothing to check
-                        }
+            case ProtobufExtensionsStatement protobufExtension -> {
 
-                        case ProtobufExtensionsStatement protobufExtension -> {
+            }
 
-                        }
+            case ProtobufFieldStatement protobufField -> {
+                attributeType(document, protobufField);
+                protobufField.options()
+                        .forEach((optionName, optionValue) -> attributeFieldOption(protobufField, optionName, optionValue));
+            }
 
-                        case ProtobufFieldStatement protobufField -> {
-                            attributeType(document, protobufField);
-                        }
+            case ProtobufImportStatement protobufImport -> {
+                if(!protobufImport.isAttributed()) {
+                    throw new InternalError("Import statement should already be attributed");
+                }
+            }
 
-                        case ProtobufImportStatement protobufImport -> {
-                            if(!protobufImport.hasDocument()) {
-                                throw new InternalError("Import statement should already be attributed");
-                            }
-                        }
+            case ProtobufOptionStatement protobufOption -> {
 
-                        case ProtobufOptionStatement protobufOption -> queue.add(protobufOption.value());
+            }
 
-                        case ProtobufPackageStatement ignored -> {
-                            // Nothing to check
-                        }
+            case ProtobufPackageStatement ignored -> {
+                // Nothing to check
+            }
 
-                        case ProtobufReservedStatement protobufReserved -> {
+            case ProtobufReservedStatement protobufReserved -> {
 
-                        }
+            }
 
-                        case ProtobufSyntaxStatement protobufSyntax -> {
-                            if(!protobufSyntax.hasVersion()) {
-                                throw new InternalError("Syntax statement should already be attributed");
-                            }
-                        }
+            case ProtobufSyntaxStatement protobufSyntax -> {
+                if(!protobufSyntax.hasVersion()) {
+                    throw new InternalError("Syntax statement should already be attributed");
+                }
+            }
 
-                        default -> throw new IllegalStateException("Unexpected value: " + protobufStatement);
+            default -> throw new IllegalStateException("Unexpected value: " + protobufStatement);
+        }
+    }
+
+    private static void attributeFieldOption(ProtobufFieldStatement protobufField, String optionName, ProtobufExpression optionValue) {
+        var fieldOptions = BUILT_IN_OPTIONS.get("FieldOptions");
+        if(fieldOptions == null) {
+            throw new ProtobufParserException("Cannot validate statement options: missing FieldOptions message");
+        }
+
+        var definition = fieldOptions.get(optionName);
+        if(definition == null) {
+            throw new ProtobufParserException("Invalid option \"" + optionName
+                    + "\" for field \"" + protobufField.name()
+                    + "\" inside " + ((ProtobufTree.WithName) protobufField.parent()).name());
+        }
+
+        switch (definition.type().protobufType()) {
+            case UNKNOWN, MAP, GROUP -> throwOnOption(protobufField, optionName, definition, "unknown option type");
+            case MESSAGE -> {
+
+            }
+            case ENUM -> {
+                var enumType = (ProtobufMessageOrEnumTypeReference) definition.type();
+                if(!(enumType.declaration() instanceof ProtobufEnumStatement enumDeclaration)) {
+                    throwOnOption(protobufField, optionName, definition, "invalid enum declaration");
+                }else {
+                    var enumConstantDefinition = enumDeclaration.getDirectChildByNameAndType(optionName, ProtobufEnumConstant.class);
+                    if(enumConstantDefinition.isEmpty()) {
+                        throwOnOption(protobufField, optionName, definition, "expected valid enum constant");
                     }
                 }
             }
+            case FLOAT -> {
+                if(!(optionValue instanceof ProtobufNumberExpression numberExpression)
+                        || numberExpression.value().floatValue() != numberExpression.value().doubleValue()) {
+                    throwOnOption(protobufField, optionName, definition, "expected float");
+                }
+            }
+            case DOUBLE -> {
+                if(!(optionValue instanceof ProtobufNumberExpression)) {
+                    throwOnOption(protobufField, optionName, definition, "expected double");
+                }
+            }
+            case BOOL -> {
+                if(!(optionValue instanceof ProtobufBoolExpression)) {
+                    throwOnOption(protobufField, optionName, definition, "expected bool");
+                }
+            }
+            case STRING -> {
+                if(!(optionValue instanceof ProtobufLiteralExpression)) {
+                    throwOnOption(protobufField, optionName, definition, "expected string literal");
+                }
+            }
+            case BYTES -> {
+                if(!(optionValue instanceof ProtobufLiteralExpression)) {
+                    throwOnOption(protobufField, optionName, definition, "expected bytes");
+                }
+            }
+            case INT32, SINT32, FIXED32, SFIXED32 -> {
+                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                        || numberExpression.value().intValue() != numberExpression.value()) {
+                    throwOnOption(protobufField, optionName, definition, "expected int");
+                }
+            }
+            case INT64, SINT64, FIXED64, SFIXED64 -> {
+                if(!(optionValue instanceof ProtobufIntegerExpression)) {
+                    throwOnOption(protobufField, optionName, definition, "expected long");
+                }
+            }
+            case UINT32 -> {
+                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                        || numberExpression.value().intValue() != numberExpression.value()
+                        || numberExpression.value().intValue() < 0) {
+                    throwOnOption(protobufField, optionName, definition, "expected unsigned int");
+                }
+            }
+            case UINT64 -> {
+                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                        || numberExpression.value() < 0) {
+                    throwOnOption(protobufField, optionName, definition, "expected unsigned long");
+                }
+            }
         }
+    }
+
+    private static void throwOnOption(ProtobufFieldStatement optionParent, String optionName, ProtobufFieldStatement optionDefinition, String errorMessage) {
+        throw new ProtobufParserException("Invalid option \"" + optionName
+            + "\" for field \"" + optionParent.name()
+            + "\" inside " + ((ProtobufTree.WithName) optionParent.parent()).name()
+            + " defined by " + ((ProtobufTree.WithName) optionDefinition.parent()).name()
+            + ": " + errorMessage);
     }
 
     private static void attributeType(ProtobufDocumentTree document, ProtobufFieldStatement typedFieldTree) {

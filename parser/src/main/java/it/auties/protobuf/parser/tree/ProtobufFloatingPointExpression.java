@@ -1,20 +1,20 @@
 package it.auties.protobuf.parser.tree;
 
-public final class ProtobufIntegerExpression
+public final class ProtobufFloatingPointExpression
         extends ProtobufExpressionImpl
-        implements ProtobufNumberExpression, ProtobufExtensionsChild, ProtobufReservedChild  {
-    private Long value;
+        implements ProtobufNumberExpression {
+    private Double value;
 
-    public ProtobufIntegerExpression(int line) {
+    public ProtobufFloatingPointExpression(int line) {
         super(line);
     }
 
     @Override
-    public Long value() {
+    public Double value() {
         return value;
     }
 
-    public void setValue(Long value) {
+    public void setValue(Double value) {
         this.value = value;
     }
 
