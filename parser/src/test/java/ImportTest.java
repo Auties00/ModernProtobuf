@@ -14,7 +14,7 @@ public class ImportTest {
         var importedSource = ClassLoader.getSystemClassLoader().getResource("import");
         Objects.requireNonNull(importedSource);
         var documents = ProtobufParser.parse(Path.of(importedSource.toURI()));
-        for(var document : documents) {
+        for(var document : documents.values()) {
             System.out.println(document);
         }
     }
