@@ -10,6 +10,10 @@
     <artifactId>protobuf-serialization-plugin</artifactId>
     <packaging>jar</packaging>
 
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>A modern implementation of protoc to generate java sources from protobuf schemas</description>
+    <url>https://github.com/Auties00/ModernProtobuf</url>
+
     <build>
         <plugins>
             <plugin>

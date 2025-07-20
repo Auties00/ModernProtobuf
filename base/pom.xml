@@ -9,6 +9,10 @@
 
     <artifactId>protobuf-base</artifactId>
 
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>A modern implementation of protoc to generate java sources from protobuf schemas</description>
+    <url>https://github.com/Auties00/ModernProtobuf</url>
+
     <properties>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>

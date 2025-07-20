@@ -14,6 +14,10 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
     </properties>
 
+    <name>${project.groupId}:${project.artifactId}</name>
+    <description>A modern implementation of protoc to generate java sources from protobuf schemas</description>
+    <url>https://github.com/Auties00/ModernProtobuf</url>
+
     <build>
         <plugins>
             <plugin>
