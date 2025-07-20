@@ -5,8 +5,8 @@ import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
 import it.auties.protobuf.serialization.model.object.ProtobufBuilderElement;
 import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 import it.auties.protobuf.serialization.writer.ClassWriter;
+import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.ElementKind;

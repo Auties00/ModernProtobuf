@@ -92,7 +92,13 @@ public final class ProtobufGroupFieldStatement
 
     @Override
     public <V extends ProtobufTree> Optional<? extends V> getDirectChildByType(Class<V> clazz) {
-        return ProtobufStatementWithBodyImpl.getDirectChildByType(children, clazz);
+        return ProtobufStatementWithBodyImpl.getDirectChildrenByType(children, clazz)
+                .findFirst();
+    }
+
+    @Override
+    public <V extends ProtobufTree> Stream<? extends V> getDirectChildrenByType(Class<V> clazz) {
+        return ProtobufStatementWithBodyImpl.getDirectChildrenByType(children, clazz);
     }
 
     @Override
@@ -113,6 +119,12 @@ public final class ProtobufGroupFieldStatement
     @Override
     public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz) {
         return ProtobufStatementWithBodyImpl.getDirectChildByIndexAndType(children, index, clazz);
+    }
+
+    @Override
+    public <V extends ProtobufTree> Optional<? extends V> getAnyChildByType(Class<V> clazz) {
+        return ProtobufStatementWithBodyImpl.getAnyChildrenByType(children, clazz)
+                .findFirst();
     }
 
     @Override

@@ -14,7 +14,10 @@ import javax.annotation.processing.Filer;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 public class ProtobufRawGroupSpecGenerator extends ProtobufClassGenerator {
     public ProtobufRawGroupSpecGenerator(Filer filer) {

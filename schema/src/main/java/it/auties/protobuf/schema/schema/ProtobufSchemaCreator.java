@@ -7,10 +7,10 @@ import com.github.javaparser.printer.configuration.DefaultConfigurationOption;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration.ConfigOption;
 import com.github.javaparser.printer.configuration.imports.IntelliJImportOrderingStrategy;
-import it.auties.protobuf.parser.tree.ProtobufTree;
 import it.auties.protobuf.parser.tree.ProtobufDocumentTree;
 import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
+import it.auties.protobuf.parser.tree.ProtobufTree;
 
 import java.io.File;
 import java.io.IOException;

@@ -38,18 +38,23 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
 
     @Override
     public <V extends ProtobufTree> Optional<? extends V> getDirectChildByType(Class<V> clazz) {
-        return getDirectChildByType(children, clazz);
+        return getDirectChildrenByType(children, clazz)
+                .findFirst();
     }
 
-    static <V extends ProtobufTree> Optional<V> getDirectChildByType(Collection<? extends ProtobufTree> children, Class<V> clazz) {
+    @Override
+    public <V extends ProtobufTree> Stream<? extends V> getDirectChildrenByType(Class<V> clazz) {
+        return getDirectChildrenByType(children, clazz);
+    }
+
+    static <V extends ProtobufTree> Stream<? extends V> getDirectChildrenByType(Collection<? extends ProtobufTree> children, Class<V> clazz) {
         if (clazz == null) {
-            return Optional.empty();
+            return Stream.empty();
         }
 
         return children.stream()
                 .filter(entry -> clazz.isAssignableFrom(entry.getClass()))
-                .map(clazz::cast)
-                .findFirst();
+                .map(clazz::cast);
     }
 
     @Override
@@ -104,6 +109,12 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
     @Override
     public <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz) {
         return getDirectChildByIndexAndType(children, index, clazz);
+    }
+
+    @Override
+    public <V extends ProtobufTree> Optional<? extends V> getAnyChildByType(Class<V> clazz) {
+        return getAnyChildrenByType(clazz)
+                .findFirst();
     }
 
     static <V extends ProtobufTree> Optional<V> getDirectChildByIndexAndType(Collection<? extends ProtobufTree> children, long index, Class<V> clazz) {

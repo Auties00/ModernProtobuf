@@ -8,13 +8,13 @@ import java.util.Objects;
 
 public final class ProtobufMessageOrEnumTypeReference implements ProtobufTypeReference {
     private final String name;
-    private ProtobufTree declaration;
+    private ProtobufTree.WithBodyAndName<?> declaration;
 
     public ProtobufMessageOrEnumTypeReference(String name){
         this.name = Objects.requireNonNull(name, "name cannot be null");
     }
 
-    public ProtobufMessageOrEnumTypeReference(ProtobufTree.WithName declaration) {
+    public ProtobufMessageOrEnumTypeReference(ProtobufTree.WithBodyAndName<?> declaration) {
         Objects.requireNonNull(declaration, "declaration cannot be null");
         this.name = declaration.name();
         this.declaration = declaration;
@@ -39,7 +39,7 @@ public final class ProtobufMessageOrEnumTypeReference implements ProtobufTypeRef
         return name();
     }
 
-    public ProtobufTree declaration() {
+    public ProtobufTree.WithBodyAndName<?> declaration() {
         return declaration;
     }
 
@@ -47,7 +47,7 @@ public final class ProtobufMessageOrEnumTypeReference implements ProtobufTypeRef
         return declaration != null;
     }
 
-    public void setDeclaration(ProtobufTree statement) {
+    public void setDeclaration(ProtobufTree.WithBodyAndName<?> statement) {
         this.declaration = statement;
     }
 

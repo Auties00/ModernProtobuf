@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.tree;
 
 public final class ProtobufRangeExpression
         extends ProtobufExpressionImpl
-        implements ProtobufExpression, ProtobufExtensionsChild, ProtobufReservedChild {
+        implements ProtobufExpression, ProtobufExtensionsExpression, ProtobufReservedExpression {
     private Long min;
     private Long max;
 

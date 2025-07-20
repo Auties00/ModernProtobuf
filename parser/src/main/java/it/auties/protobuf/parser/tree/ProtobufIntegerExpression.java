@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.tree;
 
 public final class ProtobufIntegerExpression
         extends ProtobufExpressionImpl
-        implements ProtobufNumberExpression, ProtobufExtensionsChild, ProtobufReservedChild  {
+        implements ProtobufNumberExpression, ProtobufExtensionsExpression, ProtobufReservedExpression {
     private Long value;
 
     public ProtobufIntegerExpression(int line) {

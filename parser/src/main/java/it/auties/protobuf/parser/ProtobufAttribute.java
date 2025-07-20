@@ -301,9 +301,9 @@ public final class ProtobufAttribute {
 
                     // Look for the type definition starting from the field's parent
                     // Only the first result should be considered because of shadowing (i.e. if a name is reused in an inner scope, the inner scope should override the outer scope)
-                    ProtobufTree.WithBody<?> resolvedType = null;
+                    ProtobufTree.WithBodyAndName<?> resolvedType = null;
                     while (parent != null && resolvedType == null) {
-                        resolvedType = parent.getDirectChildByNameAndType(types[0], ProtobufTree.WithBody.class)
+                        resolvedType = parent.getDirectChildByNameAndType(types[0], ProtobufTree.WithBodyAndName.class)
                                 .orElse(null);
                         parent = parent.parent() instanceof ProtobufTree.WithBody<?> validParent ? validParent : null;
                     }
@@ -311,7 +311,7 @@ public final class ProtobufAttribute {
                     if (resolvedType != null) { // Found a match in the parent scope
                         // Try to resolve the type reference in the matched scope
                         for (var index = 1; index < types.length; index++) {
-                            resolvedType = resolvedType.getDirectChildByNameAndType(types[index], ProtobufTree.WithBody.class)
+                            resolvedType = resolvedType.getDirectChildByNameAndType(types[index], ProtobufTree.WithBodyAndName.class)
                                     .orElseThrow(() -> throwUnattributableType(typedFieldTree));
                         }
                     } else { // No match found in the parent scope, try to resolve the type reference through imports
@@ -325,13 +325,18 @@ public final class ProtobufAttribute {
                                 continue;
                             }
 
-                            var simpleName = imported.packageName()
+                            var importedTypeName = imported.packageName()
                                     .map(packageName -> accessed.startsWith(packageName + TYPE_SELECTOR) ? accessed.substring(packageName.length() + 1) : null)
-                                    .orElse(accessed);
-                            var simpleImportName = simpleName.split(TYPE_SELECTOR_SPLITTER);
-                            resolvedType = imported;
-                            for (var i = 0; i < simpleImportName.length && resolvedType != null; i++) {
-                                resolvedType = resolvedType.getDirectChildByNameAndType(simpleImportName[i], ProtobufTree.WithBody.class)
+                                    .orElse(accessed)
+                                    .split(TYPE_SELECTOR_SPLITTER);
+                            if(importedTypeName.length == 0) {
+                                continue;
+                            }
+
+                            resolvedType = imported.getDirectChildByNameAndType(importedTypeName[0], ProtobufTree.WithBodyAndName.class)
+                                    .orElse(null);
+                            for (var i = 1; i < importedTypeName.length && resolvedType != null; i++) {
+                                resolvedType = resolvedType.getDirectChildByNameAndType(importedTypeName[i], ProtobufTree.WithBodyAndName.class)
                                         .orElse(null);
                             }
                             if (resolvedType != null) {

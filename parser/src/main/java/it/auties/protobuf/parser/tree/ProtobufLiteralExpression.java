@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.tree;
 
 public final class ProtobufLiteralExpression
         extends ProtobufExpressionImpl
-        implements ProtobufExpression, ProtobufReservedChild {
+        implements ProtobufExpression, ProtobufReservedExpression {
     private String value;
 
     public ProtobufLiteralExpression(int line) {

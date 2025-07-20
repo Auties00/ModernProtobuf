@@ -16,10 +16,7 @@ import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
-import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
-import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
-import it.auties.protobuf.parser.tree.ProtobufOneofFieldStatement;
+import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufMessageOrEnumTypeReference;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import it.auties.protobuf.schema.util.AstUtils;
@@ -246,14 +243,14 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
     private void addClassMembers(ClassOrInterfaceDeclaration ctClass) {
         for(var statement : protoStatement.children()){
-            if(statement instanceof ProtobufFieldStatement fieldStatement){
-                addClassField(fieldStatement, ctClass, false);
-            }else if(statement instanceof ProtobufMessageStatement messageStatement){
-                addNestedMessage(ctClass, messageStatement);
-            }else if(statement instanceof ProtobufEnumStatement enumStatement){
-                addNestedEnum(ctClass, enumStatement);
-            }else if (statement instanceof ProtobufOneofFieldStatement oneOfStatement){
-                addOneOfStatement(ctClass, oneOfStatement);
+            switch (statement) {
+                case ProtobufFieldStatement fieldStatement -> addClassField(fieldStatement, ctClass, false);
+                case ProtobufMessageStatement messageStatement -> addNestedMessage(ctClass, messageStatement);
+                case ProtobufEnumStatement enumStatement -> addNestedEnum(ctClass, enumStatement);
+                case ProtobufEmptyStatement ignored -> {}
+                case ProtobufExtensionsStatement ignored -> {}
+                case ProtobufOptionStatement ignored -> {}
+                case ProtobufReservedStatement ignored -> {}
             }
         }
     }
@@ -300,14 +297,14 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
 
     private void addRecordMembers(RecordDeclaration ctRecord) {
         for(var statement : protoStatement.children()){
-            if(statement instanceof ProtobufFieldStatement fieldStatement){
-                addRecordParameter(fieldStatement, ctRecord, false);
-            }else if(statement instanceof ProtobufMessageStatement messageStatement){
-                addNestedMessage(ctRecord, messageStatement);
-            }else if(statement instanceof ProtobufEnumStatement enumStatement){
-                addNestedEnum(ctRecord, enumStatement);
-            }else if (statement instanceof ProtobufOneofFieldStatement oneOfStatement){
-                addOneOfStatement(ctRecord, oneOfStatement);
+            switch (statement) {
+                case ProtobufFieldStatement fieldStatement -> addRecordParameter(fieldStatement, ctRecord, false);
+                case ProtobufMessageStatement messageStatement -> addNestedMessage(ctRecord, messageStatement);
+                case ProtobufEnumStatement enumStatement -> addNestedEnum(ctRecord, enumStatement);
+                case ProtobufEmptyStatement ignored -> {}
+                case ProtobufExtensionsStatement ignored -> {}
+                case ProtobufOptionStatement ignored -> {}
+                case ProtobufReservedStatement ignored -> {}
             }
         }
     }
@@ -386,9 +383,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         }
 
         var fieldType = (ProtobufMessageOrEnumTypeReference) fieldStatementType;
-        var fieldTypeName = fieldType.declaration()
-                .map(ProtobufNamedBlock::qualifiedName)
-                .orElseThrow();
+        var fieldTypeName = fieldType.declaration().qualifiedName();
         var wrapperQuery = getTypeDeclaration(fieldTypeName, QueryType.ANY);
         wrapperQuery.ifPresent(queryResult -> queryResult.result().addModifier(Keyword.FINAL));
         var recordType = wrapperQuery.map(QueryResult::result)
@@ -422,9 +417,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
             return new MessageFieldType(fieldType, accessorType);
         }
 
-        var objectType = messageType.declaration()
-                .map(ProtobufNamedBlock::qualifiedName)
-                .orElseThrow();
+        var objectType = messageType.declaration().qualifiedName();
         var accessorType = nullable || required ? objectType : "%s<%s>".formatted(Optional.class.getSimpleName(), objectType);
         var fieldType = mutable ? objectType : accessorType;
         return new MessageFieldType(fieldType, accessorType);

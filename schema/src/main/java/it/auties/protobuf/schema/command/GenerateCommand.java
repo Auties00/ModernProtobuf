@@ -83,8 +83,7 @@ public class GenerateCommand implements Callable<Integer>, LogProvider {
 
     private ProtobufDocumentTree generateAST() throws IOException {
         log.log(Level.INFO, "Generating AST for protobuf file...");
-        var parser = new ProtobufParser();
-        var document = parser.parseOnly(protobuf.toPath());
+        var document = ProtobufParser.parseOnly(protobuf.toPath());
         log.log(Level.INFO, "Generated AST successfully");
         return document;
     }

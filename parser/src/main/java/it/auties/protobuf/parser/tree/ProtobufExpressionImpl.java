@@ -1,7 +1,8 @@
 package it.auties.protobuf.parser.tree;
 
 sealed abstract class ProtobufExpressionImpl
-        implements ProtobufExpression permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufNumberExpression, ProtobufNumberExpression.Double, ProtobufFloatingPointExpression, ProtobufIntegerExpression, ProtobufIntegerExpression, ProtobufRangeExpression {
+        implements ProtobufExpression
+        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufFloatingPointExpression, ProtobufIntegerExpression, ProtobufRangeExpression {
     final int line;
     ProtobufStatement parent;
 

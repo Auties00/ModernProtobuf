@@ -1,12 +1,16 @@
 package it.auties.protobuf.serialization.model.object;
 
-import it.auties.protobuf.annotation.*;
+import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.annotation.ProtobufSerializer;
 import it.auties.protobuf.serialization.model.converter.ProtobufConverterMethod;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.Reserved;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import java.util.*;
 
 public class ProtobufObjectElement {

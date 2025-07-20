@@ -2,8 +2,8 @@ package it.auties.protobuf.serialization.model.property;
 
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterDeserializer;
 import it.auties.protobuf.serialization.model.converter.ProtobufConverterElement;
+import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterDeserializer;
 import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterSerializer;
 
 import javax.lang.model.element.TypeElement;

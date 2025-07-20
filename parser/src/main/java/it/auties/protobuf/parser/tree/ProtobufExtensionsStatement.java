@@ -10,18 +10,18 @@ public final class ProtobufExtensionsStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
-    private final List<ProtobufExtensionsChild> expressions;
+    private final List<ProtobufExtensionsExpression> expressions;
 
     public ProtobufExtensionsStatement(int line) {
         super(line);
         this.expressions = new ArrayList<>();
     }
 
-    public SequencedCollection<ProtobufExtensionsChild> expressions() {
+    public SequencedCollection<ProtobufExtensionsExpression> expressions() {
         return Collections.unmodifiableSequencedCollection(expressions);
     }
 
-    public void addExpression(ProtobufExtensionsChild expression) {
+    public void addExpression(ProtobufExtensionsExpression expression) {
         if(expression != null) {
             if(expression.hasParent()) {
                 throw new IllegalStateException("Expression is already owned by another tree");
@@ -33,7 +33,7 @@ public final class ProtobufExtensionsStatement
         }
     }
 
-    public void removeExpression(ProtobufExtensionsChild expression) {
+    public void removeExpression(ProtobufExtensionsExpression expression) {
         var result = expressions.remove(expression);
         if(result) {
             if(expression.parent() != this) {

@@ -3,14 +3,19 @@ package it.auties.protobuf.parser;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.*;
+import it.auties.protobuf.parser.type.ProtobufMapTypeReference;
+import it.auties.protobuf.parser.type.ProtobufMessageOrEnumTypeReference;
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 public final class ProtobufParser {
     private static final String STATEMENT_END = ";";

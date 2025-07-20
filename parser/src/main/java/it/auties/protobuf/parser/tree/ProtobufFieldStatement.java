@@ -2,7 +2,10 @@ package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.SequencedMap;
 import java.util.stream.Collectors;
 
 public sealed class ProtobufFieldStatement
