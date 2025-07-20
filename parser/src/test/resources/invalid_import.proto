@@ -1,5 +1,0 @@
-import "whatever.proto";
-
-message Import {
-  optional Whatever whatever = 1;
-}

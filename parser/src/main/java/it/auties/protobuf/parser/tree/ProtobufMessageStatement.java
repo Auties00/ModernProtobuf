@@ -43,6 +43,10 @@ public final class ProtobufMessageStatement
         return builder.toString();
     }
 
+    public boolean isExtension() {
+        return extension;
+    }
+
     @Override
     public String name() {
         return name;

@@ -1,3 +1,0 @@
-message UnexpectedTokens {
-    required string hello = 1;
-} 23

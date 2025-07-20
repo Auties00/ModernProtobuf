@@ -1,7 +1,0 @@
-enum Message {
-  option allow_alias = true;
-  option abc = true;
-
-  VALUE = 1;
-  ANOTHER = 1;
-}

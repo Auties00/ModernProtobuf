@@ -9,6 +9,7 @@ public final class ProtobufTokenizer {
     private static final String STRING_LITERAL = "\"";
     private static final String STRING_LITERAL_ALIAS_CHAR = "'";
     private static final String MAX_KEYWORD = "max";
+    private static final long MIN_FIELD_INDEX_WITH_ZERO = 0;
     private static final long MIN_FIELD_INDEX = 1;
     private static final long MAX_FIELD_INDEX = 536_870_911; // 2^29 - 1
 
@@ -71,7 +72,12 @@ public final class ProtobufTokenizer {
             throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
 
-        return parseLiteral(token);
+        var literal = parseLiteral(token);
+        if(literal == null) {
+            throw new ProtobufParserException("Unexpected token " + token, tokenizer.lineno());
+        }
+
+        return literal;
     }
 
     private static String parseLiteral(String token) {
@@ -83,29 +89,34 @@ public final class ProtobufTokenizer {
         return token.substring(1, token.length() - 1);
     }
 
-    public Long nextNullableIndex(boolean allowMax) throws IOException {
+    public Long nextNullableIndex(boolean allowZero, boolean allowMax) throws IOException {
         try {
             var token = nextNullableToken();
             if(token == null) {
                 return null;
             }
 
-            return parseIndex(token, allowMax);
+            return parseIndex(token, allowZero, allowMax);
         } catch (NumberFormatException ex) {
             return null;
         }
     }
 
-    public Long nextRequiredIndex(boolean allowMax) throws IOException {
+    public Long nextRequiredIndex(boolean allowZero, boolean allowMax) throws IOException {
         var token = nextNullableToken();
         if(token == null) {
             throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
 
-        return parseIndex(token, allowMax);
+        var index = parseIndex(token, allowZero, allowMax);
+        if(index == null) {
+            throw new ProtobufParserException("Unexpected token " + token, tokenizer.lineno());
+        }
+
+        return index;
     }
 
-    private static Long parseIndex(String token, boolean allowMax) {
+    private static Long parseIndex(String token, boolean allowZero, boolean allowMax) {
         if(token.equalsIgnoreCase(MAX_KEYWORD)) {
             return allowMax ? Long.MAX_VALUE : null;
         }
@@ -130,9 +141,11 @@ public final class ProtobufTokenizer {
 
             value = r;
         }
-        if(value < MIN_FIELD_INDEX || value > MAX_FIELD_INDEX) {
+
+        if(value < (allowZero ? MIN_FIELD_INDEX_WITH_ZERO : MIN_FIELD_INDEX) || value > MAX_FIELD_INDEX) {
             return null;
         }
+
         return value;
     }
 

@@ -12,10 +12,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public final class ProtobufParser {
     private static final String STATEMENT_END = ";";
@@ -56,23 +53,49 @@ public final class ProtobufParser {
     }
 
     public static ProtobufDocumentTree parseOnly(String input) {
+        return parseOnly(input, (Collection<ProtobufDocumentTree>) null);
+    }
+
+    public static ProtobufDocumentTree parseOnly(String input, ProtobufDocumentTree... documentTrees) {
+        return parseOnly(input, Arrays.asList(documentTrees));
+    }
+
+    public static ProtobufDocumentTree parseOnly(String input, Collection<? extends ProtobufDocumentTree> documents) {
         try {
+            var results = new ArrayList<ProtobufDocumentTree>();
+            if(documents != null) {
+                results.addAll(documents);
+            }
             var result = doParse(null, new StringReader(input));
-            ProtobufAttribute.attribute(result);
+            results.add(result);
+            ProtobufAttribute.attribute(results);
+            return result;
+        }catch (IOException exception) {
+            throw new InternalError(exception);
+        }
+    }
+
+    public static ProtobufDocumentTree parseOnly(Path input) {
+        return parseOnly(input, (Collection<ProtobufDocumentTree>) null);
+    }
+
+    public static ProtobufDocumentTree parseOnly(Path input, ProtobufDocumentTree... documentTrees) {
+        return parseOnly(input, Arrays.asList(documentTrees));
+    }
+
+    public static ProtobufDocumentTree parseOnly(Path input, Collection<? extends ProtobufDocumentTree> documents) {
+        try {
+            var results = new ArrayList<ProtobufDocumentTree>();
+            if(documents != null) {
+                results.addAll(documents);
+            }
+            var result = doParse(null, Files.newBufferedReader(input));
+            results.add(result);
+            ProtobufAttribute.attribute(results);
             return result;
         }catch (IOException exception) {
             throw new InternalError("Unexpected exception", exception);
         }
-    }
-
-    public static ProtobufDocumentTree parseOnly(Path path) throws IOException {
-        if (!Files.isRegularFile(path)) {
-            throw new IllegalArgumentException("Expected file");
-        }
-
-        var result = doParse(path, Files.newBufferedReader(path));
-        ProtobufAttribute.attribute(result);
-        return result;
     }
 
     private static ProtobufDocumentTree doParse(Path location, Reader input) throws IOException {
@@ -87,11 +110,11 @@ public final class ProtobufParser {
                         document.addChild(statement);
                     }
                     case "package" -> {
-                        var statement = parsePackage(tokenizer);
+                        var statement = parsePackage(document, tokenizer);
                         document.addChild(statement);
                     }
                     case "syntax" -> {
-                        var statement = parseSyntax(tokenizer);
+                        var statement = parseSyntax(document, tokenizer);
                         document.addChild(statement);
                     }
                     case "option" -> {
@@ -123,7 +146,7 @@ public final class ProtobufParser {
             }
             return document;
         } catch (ProtobufParserException syntaxException) {
-            var withPath = new ProtobufParserException(syntaxException.getMessage() + " while parsing " + location);
+            var withPath = new ProtobufParserException(syntaxException.getMessage() + " while parsing " + (location == null ? "input" : location.getFileName()));
             withPath.setStackTrace(syntaxException.getStackTrace());
             throw withPath;
         }
@@ -133,7 +156,10 @@ public final class ProtobufParser {
         return new ProtobufEmptyStatement(tokenizer.line());
     }
 
-    private static ProtobufPackageStatement parsePackage(ProtobufTokenizer tokenizer) throws IOException {
+    private static ProtobufPackageStatement parsePackage(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
+        ProtobufParserException.check(document.packageName().isEmpty(),
+                "Package can only be set once",
+                tokenizer.line());
         var statement = new ProtobufPackageStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isLegalTypeReference(name),
@@ -145,12 +171,17 @@ public final class ProtobufParser {
         return statement;
     }
 
-    private static ProtobufSyntaxStatement parseSyntax(ProtobufTokenizer tokenizer) throws IOException {
+    private static ProtobufSyntaxStatement parseSyntax(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
+        ProtobufParserException.check(document.children().isEmpty(),
+                "Syntax should be the first statement",
+                tokenizer.line());
         var statement = new ProtobufSyntaxStatement(tokenizer.line());
         var assignment = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isAssignmentOperator(assignment),
                 "Unexpected token " + assignment, tokenizer.line());
-        var version = tokenizer.nextRequiredLiteral();
+        var versionCode = tokenizer.nextRequiredLiteral();
+        var version = ProtobufVersion.of(versionCode)
+                .orElseThrow(() -> new ProtobufParserException("Unknown protobuf version: \"" + versionCode + "\""));
         statement.setVersion(version);
         var end = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isStatementEnd(end),
@@ -176,6 +207,12 @@ public final class ProtobufParser {
     }
 
     private static ProtobufMessageStatement parseMessage(boolean extension, ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
+        if(extension) {
+            var version = document.syntax()
+                    .orElse(ProtobufVersion.defaultVersion());
+            ProtobufParserException.check(version != ProtobufVersion.PROTOBUF_3, // TODO: In proto3 extensions are supported for options
+                    "Extensions are only supported in proto3 for options", tokenizer.line());
+        }
         var statement = new ProtobufMessageStatement(tokenizer.line(), extension);
         var name = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isLegalName(name),
@@ -228,25 +265,29 @@ public final class ProtobufParser {
         return statement;
     }
 
-    private static ProtobufFieldStatement parseField(ProtobufDocumentTree document, boolean allowModifier, ProtobufTokenizer tokenizer, String token) throws IOException {
+    private static ProtobufFieldStatement parseField(ProtobufDocumentTree document, boolean parseModifier, ProtobufTokenizer tokenizer, String token) throws IOException {
         ProtobufFieldStatement.Modifier modifier;
         ProtobufTypeReference reference;
-        if(allowModifier) {
-            modifier = ProtobufFieldStatement.Modifier.of(token);
-           if(modifier.type() == ProtobufFieldStatement.Modifier.Type.NOTHING) {
+        if(parseModifier) {
+            modifier = ProtobufFieldStatement.Modifier.of(token)
+                    .orElse(ProtobufFieldStatement.Modifier.NONE);
+           if(modifier == ProtobufFieldStatement.Modifier.NONE) {
+               reference = ProtobufTypeReference.of(token);
                var version = document.syntax()
                        .orElse(ProtobufVersion.defaultVersion());
-               ProtobufParserException.check(version == ProtobufVersion.PROTOBUF_3,
+               ProtobufParserException.check(version == ProtobufVersion.PROTOBUF_3 || reference.protobufType() == ProtobufType.MAP,
                        "Unexpected token " + token, tokenizer.line());
-               reference = ProtobufTypeReference.of(token);
            }else {
                var type = tokenizer.nextRequiredToken();
                ProtobufParserException.check(isLegalTypeReference(type),
                        "Unexpected token " + type, tokenizer.line());
                reference = ProtobufTypeReference.of(type);
+               ProtobufParserException.check(reference.protobufType() != ProtobufType.MAP,
+                       "Map fields cannot have a modifier",
+                       tokenizer.line());
            }
        }else {
-           modifier = ProtobufFieldStatement.Modifier.nothing();
+           modifier = ProtobufFieldStatement.Modifier.NONE;
            reference = ProtobufTypeReference.of(token);
        }
 
@@ -298,7 +339,7 @@ public final class ProtobufParser {
         var operator = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
-        var index = tokenizer.nextRequiredIndex(false);
+        var index = tokenizer.nextRequiredIndex(false, false);
         child.setIndex(index);
 
         var optionsOrBodyOrEndToken = tokenizer.nextRequiredToken();
@@ -428,16 +469,16 @@ public final class ProtobufParser {
         return statement;
     }
 
-    private static ProtobufEnumConstant parseEnumConstant(String token, ProtobufTokenizer tokenizer) throws IOException {
-        var statement = new ProtobufEnumConstant(tokenizer.line());
-        statement.setModifier(ProtobufFieldStatement.Modifier.nothing());
+    private static ProtobufEnumConstantStatement parseEnumConstant(String token, ProtobufTokenizer tokenizer) throws IOException {
+        var statement = new ProtobufEnumConstantStatement(tokenizer.line());
+        statement.setModifier(ProtobufFieldStatement.Modifier.NONE);
         statement.setName(token);
 
         var operator = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
 
-        var index = tokenizer.nextRequiredIndex(false);
+        var index = tokenizer.nextRequiredIndex(true, false);
         statement.setIndex(index);
 
         var optionsOrEndToken = tokenizer.nextRequiredToken();
@@ -455,10 +496,10 @@ public final class ProtobufParser {
         var statement = new ProtobufExtensionsStatement(tokenizer.line());
 
         while(true) {
-            var value = tokenizer.nextRequiredIndex(false);
+            var value = tokenizer.nextRequiredIndex(true, false);
             var operator = tokenizer.nextRequiredToken();
             if(isRangeOperator(operator)) {
-                var end = tokenizer.nextRequiredIndex(true);
+                var end = tokenizer.nextRequiredIndex(true, true);
                 var expression = new ProtobufRangeExpression(tokenizer.line());
                 expression.setMin(value);
                 expression.setMax(end);
@@ -505,7 +546,7 @@ public final class ProtobufParser {
                     case ProtobufTokenizer.ParsedToken.Number.Integer integer -> {
                         var operator = tokenizer.nextRequiredToken();
                         if(isRangeOperator(operator)) {
-                            var end = tokenizer.nextRequiredIndex(true);
+                            var end = tokenizer.nextRequiredIndex(true, true);
                             var expression = new ProtobufRangeExpression(tokenizer.line());
                             expression.setMin(integer.value());
                             expression.setMax(end);
@@ -622,13 +663,28 @@ public final class ProtobufParser {
 
     private static ProtobufImportStatement parseImport(ProtobufTokenizer tokenizer) throws IOException {
         var importStatement = new ProtobufImportStatement(tokenizer.line());
-        var literal = tokenizer.nextRequiredLiteral();
-        ProtobufParserException.check(literal != null,
-                "Unexpected token " + literal, tokenizer.line());
-        importStatement.setLocation(literal);
-        var end = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isStatementEnd(end),
-                "Unexpected token " + end, tokenizer.line());
+        switch (tokenizer.nextRequiredParsedToken()) {
+            case ProtobufTokenizer.ParsedToken.Literal literal -> {
+                importStatement.setModifier(ProtobufImportStatement.Modifier.NONE);
+                importStatement.setLocation(literal.value());
+                var end = tokenizer.nextRequiredToken();
+                ProtobufParserException.check(isStatementEnd(end),
+                        "Unexpected token " + end, tokenizer.line());
+            }
+            case ProtobufTokenizer.ParsedToken.Raw raw -> {
+                var modifier = ProtobufImportStatement.Modifier.of(raw.value())
+                        .orElseThrow(() -> new ProtobufParserException("Unexpected token " + raw.value(), tokenizer.line()));
+                importStatement.setModifier(modifier);
+                var location = tokenizer.nextRequiredLiteral();
+                importStatement.setLocation(location);
+                var end = tokenizer.nextRequiredToken();
+                ProtobufParserException.check(isStatementEnd(end),
+                        "Unexpected token " + end, tokenizer.line());
+            }
+            case ProtobufTokenizer.ParsedToken.Boolean bool -> throw new ProtobufParserException("Unexpected token " + bool.value(), tokenizer.line());
+            case ProtobufTokenizer.ParsedToken.Number.Integer number -> throw new ProtobufParserException("Unexpected token " + number.value(), tokenizer.line());
+            case ProtobufTokenizer.ParsedToken.Number.FloatingPoint number -> throw new ProtobufParserException("Unexpected token " + number.value(), tokenizer.line());
+        }
         return importStatement;
     }
 

@@ -1,3 +1,0 @@
-message Wrapper {
-  optional int32 !@ = 1;
-}

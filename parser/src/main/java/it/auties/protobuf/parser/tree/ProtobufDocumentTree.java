@@ -15,6 +15,10 @@ public final class ProtobufDocumentTree
         this.children = new ArrayList<>();
     }
 
+    public ProtobufDocumentTree() {
+        this(null);
+    }
+
     @Override
     public int line() {
         return 0;
@@ -26,8 +30,8 @@ public final class ProtobufDocumentTree
                 .allMatch(ProtobufTree::isAttributed);
     }
 
-    public Path location() {
-        return location;
+    public Optional<Path> location() {
+        return Optional.ofNullable(location);
     }
 
     @Override
@@ -41,29 +45,27 @@ public final class ProtobufDocumentTree
     }
 
     public String qualifiedPath() {
-        return packageName()
-                .map(packageName -> packageName.replaceAll("\\.", "/") + "/" + location.getFileName().toString())
-                .orElse(location.getFileName().toString());
+        var result = new StringBuilder();
+        packageName().ifPresent(value -> {
+            result.append(value.replaceAll("\\.", "/"));
+        });
+        location().ifPresent(value -> {
+            if(!result.isEmpty()) {
+                result.append('/');
+            }
+            result.append(value.getFileName());
+        });
+        return result.toString();
     }
 
     public Optional<ProtobufVersion> syntax() {
-        for(var child : children()){
-            if (!(child instanceof ProtobufSyntaxStatement syntax) || !syntax.hasVersion()) {
-                continue;
-            }
-
-            return ProtobufVersion.of(syntax.version());
-        }
-        return Optional.empty();
+        return getDirectChildByType(ProtobufSyntaxStatement.class)
+                .map(ProtobufSyntaxStatement::version);
     }
 
     public Optional<String> packageName() {
-        return children()
-                .stream()
-                .filter(statement -> statement instanceof ProtobufPackageStatement)
-                .map(statement -> (ProtobufPackageStatement) statement)
-                .map(ProtobufPackageStatement::name)
-                .findFirst();
+        return getDirectChildByType(ProtobufPackageStatement.class)
+                .map(ProtobufPackageStatement::name);
     }
 
     @Override

@@ -30,4 +30,9 @@ public enum ProtobufVersion {
     public String versionCode() {
         return this.versionCode;
     }
+
+    @Override
+    public String toString() {
+        return versionCode();
+    }
 }

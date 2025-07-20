@@ -1,3 +1,0 @@
-enum Message {
-  VALUE = 1 [abc = 1];
-}

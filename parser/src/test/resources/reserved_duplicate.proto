@@ -1,5 +1,0 @@
-enum Example {
-  reserved 3 to 4, 3;
-  ABC = 0;
-  DEF = 1;
-}

@@ -20,7 +20,7 @@ public final class ProtobufGroupFieldStatement
     public String toString() {
         var builder = new StringBuilder();
 
-        if(modifier != null && modifier.type() != Modifier.Type.NOTHING) {
+        if(modifier != null && modifier != Modifier.NONE) {
             builder.append(modifier);
             builder.append(" ");
         }

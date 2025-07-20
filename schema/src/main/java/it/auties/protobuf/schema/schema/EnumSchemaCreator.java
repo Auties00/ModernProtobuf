@@ -11,7 +11,7 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 import it.auties.protobuf.parser.tree.ProtobufEnumChild;
-import it.auties.protobuf.parser.tree.ProtobufEnumConstant;
+import it.auties.protobuf.parser.tree.ProtobufEnumConstantStatement;
 import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
 import it.auties.protobuf.schema.util.AstUtils;
@@ -62,7 +62,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
 
     private void createEnumConstants(EnumDeclaration ctEnum) {
         for (ProtobufEnumChild statement : protoStatement.children()) {
-            if(statement instanceof ProtobufEnumConstant enumConstantStatement) {
+            if(statement instanceof ProtobufEnumConstantStatement enumConstantStatement) {
                 createEnumConstant(ctEnum, enumConstantStatement);
             }
         }

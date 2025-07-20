@@ -1,3 +1,0 @@
-message Example {
-  extensions 3 to 4, 3;
-}

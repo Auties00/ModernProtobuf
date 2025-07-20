@@ -187,6 +187,10 @@ public final class ProtobufAttribute {
     }
 
     private static void attributeFieldOption(ProtobufFieldStatement protobufField, String optionName, ProtobufExpression optionValue) {
+        if(BUILT_IN_OPTIONS == null) {
+            return; // Options validation cannot happen during the bootstrap phase
+        }
+
         var fieldOptions = BUILT_IN_OPTIONS.get("FieldOptions");
         if(fieldOptions == null) {
             throw new ProtobufParserException("Cannot validate statement options: missing FieldOptions message");
@@ -209,7 +213,7 @@ public final class ProtobufAttribute {
                 if(!(enumType.declaration() instanceof ProtobufEnumStatement enumDeclaration)) {
                     throwOnOption(protobufField, optionName, definition, "invalid enum declaration");
                 }else {
-                    var enumConstantDefinition = enumDeclaration.getDirectChildByNameAndType(optionName, ProtobufEnumConstant.class);
+                    var enumConstantDefinition = enumDeclaration.getDirectChildByNameAndType(optionName, ProtobufEnumConstantStatement.class);
                     if(enumConstantDefinition.isEmpty()) {
                         throwOnOption(protobufField, optionName, definition, "expected valid enum constant");
                     }

@@ -1,6 +1,0 @@
-enum Example {
-  reserved 10;
-  reserved "GHI";
-  ABC = 0;
-  DEF = 1;
-}

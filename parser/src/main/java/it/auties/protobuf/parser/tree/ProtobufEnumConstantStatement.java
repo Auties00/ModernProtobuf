@@ -2,10 +2,10 @@ package it.auties.protobuf.parser.tree;
 
 import java.util.Objects;
 
-public final class ProtobufEnumConstant
+public final class ProtobufEnumConstantStatement
         extends ProtobufFieldStatement
         implements ProtobufEnumChild {
-    public ProtobufEnumConstant(int line) {
+    public ProtobufEnumConstantStatement(int line) {
         super(line);
     }
 

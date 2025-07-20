@@ -1,3 +1,0 @@
-message ImportedMessage {
-    optional string message = 1;
-}

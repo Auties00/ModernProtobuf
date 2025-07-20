@@ -1,5 +1,0 @@
-syntax = "proto3";
-
-message Message {
-  optional uint32 field = 1 [default = 12];
-}

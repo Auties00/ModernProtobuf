@@ -1,18 +1,20 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.model.ProtobufVersion;
+
 import java.util.Objects;
 
 public final class ProtobufSyntaxStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
                    ProtobufDocumentChild {
-    private String version;
+    private ProtobufVersion version;
 
     public ProtobufSyntaxStatement(int line) {
         super(line);
     }
 
-    public String version() {
+    public ProtobufVersion version() {
         return version;
     }
 
@@ -20,14 +22,14 @@ public final class ProtobufSyntaxStatement
         return version != null;
     }
 
-    public void setVersion(String version) {
+    public void setVersion(ProtobufVersion version) {
         this.version = version;
     }
 
     @Override
     public String toString() {
         var version = Objects.requireNonNullElse(this.version, "[missing]");
-        return "syntax = " + version + ";";
+        return "syntax = \"" + version + "\";";
     }
 
     @Override
