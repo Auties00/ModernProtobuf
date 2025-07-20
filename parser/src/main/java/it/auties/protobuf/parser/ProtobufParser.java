@@ -606,30 +606,62 @@ public final class ProtobufParser {
         return statement;
     }
 
+    // rpc Fetch (Request) returns (Response);
     private static ProtobufMethodStatement parseMethod(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMethodStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isLegalName(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
-        var objectStart = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isBodyStart(objectStart),
-                "Unexpected token " + objectStart, tokenizer.line());
-        String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
-            switch (token) {
-                case STATEMENT_END -> {
-                    var child = parseEmpty(tokenizer);
-                    statement.addChild(child);
+        var inputType = parseMethodType(tokenizer);
+        statement.setInputType(inputType);
+        var returnsToken = tokenizer.nextRequiredToken();
+        ProtobufParserException.check(Objects.equals(returnsToken, "returns"),
+                "Unexpected token: " + returnsToken, tokenizer.line());
+        var outputType = parseMethodType(tokenizer);
+        statement.setOutputType(outputType);
+        var objectStartOrStatementEnd = tokenizer.nextRequiredToken();
+        if(isBodyStart(objectStartOrStatementEnd)){
+            String token;
+            while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+                switch (token) {
+                    case STATEMENT_END -> {
+                        var child = parseEmpty(tokenizer);
+                        statement.addChild(child);
+                    }
+                    case "option" -> {
+                        var child = parseOption(tokenizer);
+                        statement.addChild(child);
+                    }
+                    default -> throw new ProtobufParserException("Unexpected token " + token, tokenizer.line());
                 }
-                case "option" -> {
-                    var child = parseOption(tokenizer);
-                    statement.addChild(child);
-                }
-                default -> throw new ProtobufParserException("Unexpected token " + token, tokenizer.line());
             }
+        }else if(!isStatementEnd(objectStartOrStatementEnd)) {
+            throw new ProtobufParserException("Unexpected token: " + objectStartOrStatementEnd, tokenizer.line());
         }
         return statement;
+    }
+
+    private static ProtobufMethodStatement.Type parseMethodType(ProtobufTokenizer tokenizer) throws IOException {
+        var typeStart = tokenizer.nextRequiredToken();
+        ProtobufParserException.check(Objects.equals(typeStart, "("),
+                "Unexpected token: " + typeStart, tokenizer.line());
+        var typeOrModifier = tokenizer.nextRequiredToken();
+        ProtobufTypeReference typeReference;
+        boolean stream;
+        if(Objects.equals(typeOrModifier, "stream")) {
+            typeReference = ProtobufTypeReference.of(tokenizer.nextRequiredToken());
+            stream = true;
+        }else {
+            typeReference = ProtobufTypeReference.of(typeOrModifier);
+            stream = false;
+        }
+        ProtobufParserException.check(typeReference instanceof ProtobufMessageOrEnumTypeReference,
+                "Unexpected type, only messages can be used: " + typeReference.name(), tokenizer.line());
+        var typeEnd = tokenizer.nextRequiredToken();
+        ProtobufParserException.check(Objects.equals(typeEnd, ")"),
+                "Unexpected token: " + typeEnd, tokenizer.line());
+        return new ProtobufMethodStatement.Type(typeReference, stream);
     }
 
     private static ProtobufOneofFieldStatement parseOneof(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {

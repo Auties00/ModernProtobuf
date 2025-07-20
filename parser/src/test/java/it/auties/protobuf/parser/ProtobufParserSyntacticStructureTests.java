@@ -103,11 +103,10 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
         var document = ProtobufParser.parseOnly(proto, other);
-        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class);
-        assertTrue(importStatement.isPresent());
-        assertSame(ProtobufImportStatement.Modifier.NONE, importStatement.get().modifier());
-        assertEquals("other.proto", importStatement.get().location());
-        assertSame(other, importStatement.get().document());
+        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class).orElseThrow();
+        assertSame(ProtobufImportStatement.Modifier.NONE, importStatement.modifier());
+        assertEquals("other.proto", importStatement.location());
+        assertSame(other, importStatement.document());
     }
 
     @Test
@@ -117,11 +116,10 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
         var document = ProtobufParser.parseOnly(proto, other);
-        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class);
-        assertTrue(importStatement.isPresent());
-        assertSame(ProtobufImportStatement.Modifier.PUBLIC, importStatement.get().modifier());
-        assertEquals("other.proto", importStatement.get().location());
-        assertSame(other, importStatement.get().document());
+        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class).orElseThrow();
+        assertSame(ProtobufImportStatement.Modifier.PUBLIC, importStatement.modifier());
+        assertEquals("other.proto", importStatement.location());
+        assertSame(other, importStatement.document());
     }
 
     @Test
@@ -131,11 +129,10 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
         var document = ProtobufParser.parseOnly(proto, other);
-        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class);
-        assertTrue(importStatement.isPresent());
-        assertSame(ProtobufImportStatement.Modifier.WEAK, importStatement.get().modifier());
-        assertEquals("other.proto", importStatement.get().location());
-        assertSame(other, importStatement.get().document());
+        var importStatement = document.getDirectChildByType(ProtobufImportStatement.class).orElseThrow();
+        assertSame(ProtobufImportStatement.Modifier.WEAK, importStatement.modifier());
+        assertEquals("other.proto", importStatement.location());
+        assertSame(other, importStatement.document());
     }
 
     @Test
@@ -169,11 +166,10 @@ public class ProtobufParserSyntacticStructureTests {
                 option java_package = "com.example.foo";
                 """;
         var document = ProtobufParser.parseOnly(proto);
-        var option = document.getDirectChildByType(ProtobufOptionStatement.class);
-        assertTrue(option.isPresent());
-        assertEquals("java_package", option.get().name());
-        assertTrue(option.get().value() instanceof ProtobufLiteralExpression);
-        assertEquals("com.example.foo", ((ProtobufLiteralExpression) option.get().value()).value());
+        var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertEquals("java_package", option.name());
+        assertTrue(option.value() instanceof ProtobufLiteralExpression);
+        assertEquals("com.example.foo", ((ProtobufLiteralExpression) option.value()).value());
     }
 
     @Test
@@ -182,11 +178,10 @@ public class ProtobufParserSyntacticStructureTests {
             option java_multiple_files = true;
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var option = document.getDirectChildByType(ProtobufOptionStatement.class);
-        assertTrue(option.isPresent());
-        assertEquals("java_multiple_files", option.get().name());
-        assertTrue(option.get().value() instanceof ProtobufBoolExpression);
-        assertSame(true, ((ProtobufBoolExpression) option.get().value()).value());
+        var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertEquals("java_multiple_files", option.name());
+        assertTrue(option.value() instanceof ProtobufBoolExpression);
+        assertSame(true, ((ProtobufBoolExpression) option.value()).value());
     }
 
     @Test
@@ -195,11 +190,10 @@ public class ProtobufParserSyntacticStructureTests {
             option java_multiple_files = false;
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var option = document.getDirectChildByType(ProtobufOptionStatement.class);
-        assertTrue(option.isPresent());
-        assertEquals("java_multiple_files", option.get().name());
-        assertTrue(option.get().value() instanceof ProtobufBoolExpression);
-        assertSame(false, ((ProtobufBoolExpression) option.get().value()).value());
+        var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertEquals("java_multiple_files", option.name());
+        assertTrue(option.value() instanceof ProtobufBoolExpression);
+        assertSame(false, ((ProtobufBoolExpression) option.value()).value());
     }
 
     @Test
@@ -208,11 +202,10 @@ public class ProtobufParserSyntacticStructureTests {
             option optimize_for = SPEED;
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var option = document.getDirectChildByType(ProtobufOptionStatement.class);
-        assertTrue(option.isPresent());
-        assertEquals("optimize_for", option.get().name());
-        assertTrue(option.get().value() instanceof ProtobufEnumConstantExpression);
-        assertEquals("SPEED", ((ProtobufEnumConstantExpression) option.get().value()).name());
+        var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertEquals("optimize_for", option.name());
+        assertTrue(option.value() instanceof ProtobufEnumConstantExpression);
+        assertEquals("SPEED", ((ProtobufEnumConstantExpression) option.value()).name());
     }
 
     // There are no standard int, float or message file level options to test
@@ -264,9 +257,8 @@ public class ProtobufParserSyntacticStructureTests {
             message MyMessage {}
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var message = document.getDirectChildByType(ProtobufMessageStatement.class);
-        assertTrue(message.isPresent());
-        assertEquals("MyMessage", message.get().name());
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        assertEquals("MyMessage", message.name());
     }
 
     @Test
@@ -278,24 +270,22 @@ public class ProtobufParserSyntacticStructureTests {
             }
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var message = document.getDirectChildByType(ProtobufMessageStatement.class);
-        assertTrue(message.isPresent());
-        assertEquals("M", message.get().name());
-        assertSame(2, message.get().children().size());
-        var firstField = message.get().getDirectChildByIndexAndType(1, ProtobufFieldStatement.class);
-        assertTrue(firstField.isPresent());
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, firstField.get().modifier());
-        assertTrue(firstField.get().type() instanceof ProtobufPrimitiveTypeReference);
-        assertSame(ProtobufType.INT32, firstField.get().type().protobufType());
-        assertEquals("id", firstField.get().name());
-        assertEquals((Long) 1L, firstField.get().index());
-        var secondField = message.get().getDirectChildByIndexAndType(2, ProtobufFieldStatement.class);
-        assertTrue(secondField.isPresent());
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, secondField.get().modifier());
-        assertTrue(secondField.get().type() instanceof ProtobufPrimitiveTypeReference);
-        assertSame(ProtobufType.STRING, secondField.get().type().protobufType());
-        assertEquals("name", secondField.get().name());
-        assertEquals((Long) 2L, secondField.get().index());
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class)
+                        .orElseThrow();
+        assertEquals("M", message.name());
+        assertSame(2, message.children().size());
+        var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
+        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, firstField.modifier());
+        assertTrue(firstField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertSame(ProtobufType.INT32, firstField.type().protobufType());
+        assertEquals("id", firstField.name());
+        assertEquals((Long) 1L, firstField.index());
+        var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
+        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, secondField.modifier());
+        assertTrue(secondField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertSame(ProtobufType.STRING, secondField.type().protobufType());
+        assertEquals("name", secondField.name());
+        assertEquals((Long) 2L, secondField.index());
     }
 
     @Test
@@ -309,24 +299,21 @@ public class ProtobufParserSyntacticStructureTests {
             }
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var message = document.getDirectChildByType(ProtobufMessageStatement.class);
-        assertTrue(message.isPresent());
-        assertEquals("M", message.get().name());
-        assertSame(2, message.get().children().size());
-        var firstField = message.get().getDirectChildByIndexAndType(1, ProtobufFieldStatement.class);
-        assertTrue(firstField.isPresent());
-        assertEquals(ProtobufFieldStatement.Modifier.NONE, firstField.get().modifier());
-        assertTrue(firstField.get().type() instanceof ProtobufPrimitiveTypeReference);
-        assertSame(ProtobufType.INT32, firstField.get().type().protobufType());
-        assertEquals("id", firstField.get().name());
-        assertEquals((Long) 1L, firstField.get().index());
-        var secondField = message.get().getDirectChildByIndexAndType(2, ProtobufFieldStatement.class);
-        assertTrue(secondField.isPresent());
-        assertEquals(ProtobufFieldStatement.Modifier.NONE, secondField.get().modifier());
-        assertTrue(secondField.get().type() instanceof ProtobufPrimitiveTypeReference);
-        assertSame(ProtobufType.STRING, secondField.get().type().protobufType());
-        assertEquals("name", secondField.get().name());
-        assertEquals((Long) 2L, secondField.get().index());
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        assertEquals("M", message.name());
+        assertSame(2, message.children().size());
+        var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
+        assertEquals(ProtobufFieldStatement.Modifier.NONE, firstField.modifier());
+        assertTrue(firstField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertSame(ProtobufType.INT32, firstField.type().protobufType());
+        assertEquals("id", firstField.name());
+        assertEquals((Long) 1L, firstField.index());
+        var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
+        assertEquals(ProtobufFieldStatement.Modifier.NONE, secondField.modifier());
+        assertTrue(secondField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertSame(ProtobufType.STRING, secondField.type().protobufType());
+        assertEquals("name", secondField.name());
+        assertEquals((Long) 2L, secondField.index());
     }
 
     @Test
@@ -337,12 +324,10 @@ public class ProtobufParserSyntacticStructureTests {
             }
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class);
-        assertTrue(message.isPresent());
-        assertSame(1, message.get().children().size());
-        var nestedMessage = message.get().getDirectChildByNameAndType("N", ProtobufMessageStatement.class);
-        assertTrue(nestedMessage.isPresent());
-        assertSame(0, nestedMessage.get().children().size());
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertSame(1, message.children().size());
+        var nestedMessage = message.getDirectChildByNameAndType("N", ProtobufMessageStatement.class).orElseThrow();
+        assertSame(0, nestedMessage.children().size());
     }
 
     @Test
@@ -353,15 +338,12 @@ public class ProtobufParserSyntacticStructureTests {
             }
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class);
-        assertTrue(message.isPresent());
-        assertSame(1, message.get().children().size());
-        var nestedEnum = message.get().getDirectChildByNameAndType("E", ProtobufEnumStatement.class);
-        assertTrue(nestedEnum.isPresent());
-        assertSame(1, nestedEnum.get().children().size());
-        var enumConstant = nestedEnum.get().getDirectChildByIndexAndType(0, ProtobufEnumConstantStatement.class);
-        assertTrue(enumConstant.isPresent());
-        assertEquals("A", enumConstant.get().name());
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertSame(1, message.children().size());
+        var nestedEnum = message.getDirectChildByNameAndType("E", ProtobufEnumStatement.class).orElseThrow();
+        assertSame(1, nestedEnum.children().size());
+        var enumConstant = nestedEnum.getDirectChildByIndexAndType(0, ProtobufEnumConstantStatement.class).orElseThrow();
+        assertEquals("A", enumConstant.name());
     }
 
     @Test
@@ -465,16 +447,15 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var document = ProtobufParser.parseOnly(proto);
         var enumStmt = document.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
-        var opt = enumStmt.getDirectChildByType(ProtobufOptionStatement.class);
-        assertTrue(opt.isPresent());
-        assertTrue(opt.get().value() instanceof ProtobufBoolExpression);
-        assertSame(true, ((ProtobufBoolExpression) opt.get().value()).value());
+        var opt = enumStmt.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertTrue(opt.value() instanceof ProtobufBoolExpression);
+        assertSame(true, ((ProtobufBoolExpression) opt.value()).value());
         var constant = enumStmt.getDirectChildByNameAndType("A", ProtobufEnumConstantStatement.class).orElseThrow();
         assertEquals(Long.valueOf(0), constant.index());
     }
 
     @Test
-    public void testServices() {
+    public void testService() {
         String proto = """
             service S {
               rpc Fetch (Request) returns (Response);
@@ -486,7 +467,45 @@ public class ProtobufParserSyntacticStructureTests {
         var method = service.getDirectChildByType(ProtobufMethodStatement.class).orElseThrow();
         assertEquals("Fetch", method.name());
         assertEquals("Request", method.inputType().value().name());
+        assertFalse(method.inputType().stream());
         assertEquals("Response", method.outputType().value().name());
+        assertFalse(method.outputType().stream());
+    }
+
+    @Test
+    public void testServiceWithStreamResponse() {
+        String proto = """
+            service S {
+              rpc Fetch (Request) returns (stream Response);
+            }
+            """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        assertEquals("S", service.name());
+        var method = service.getDirectChildByType(ProtobufMethodStatement.class).orElseThrow();
+        assertEquals("Fetch", method.name());
+        assertEquals("Request", method.inputType().value().name());
+        assertFalse(method.inputType().stream());
+        assertEquals("Response", method.outputType().value().name());
+        assertTrue(method.outputType().stream());
+    }
+
+    @Test
+    public void testServiceWithStreamRequest() {
+        String proto = """
+            service S {
+              rpc Fetch (stream Request) returns (Response);
+            }
+            """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        assertEquals("S", service.name());
+        var method = service.getDirectChildByType(ProtobufMethodStatement.class).orElseThrow();
+        assertEquals("Fetch", method.name());
+        assertEquals("Request", method.inputType().value().name());
+        assertTrue(method.inputType().stream());
+        assertEquals("Response", method.outputType().value().name());
+        assertFalse(method.outputType().stream());
     }
 
     @Test
@@ -502,7 +521,7 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var document = ProtobufParser.parseOnly(proto);
         var extend = document.getDirectChildrenByType(ProtobufMessageStatement.class)
-                .filter(ProtobufMessageStatement::isExtension)
+                .filter(ProtobufMessageStatement::extension)
                 .findFirst()
                 .orElseThrow();
         assertEquals("MessageType", extend.name());

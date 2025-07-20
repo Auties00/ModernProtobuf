@@ -43,7 +43,7 @@ public final class ProtobufMessageStatement
         return builder.toString();
     }
 
-    public boolean isExtension() {
+    public boolean extension() {
         return extension;
     }
 
