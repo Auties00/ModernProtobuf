@@ -2,9 +2,9 @@ package it.auties.protobuf.parser.tree;
 
 sealed abstract class ProtobufExpressionImpl
         implements ProtobufExpression
-        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufFloatingPointExpression, ProtobufIntegerExpression, ProtobufRangeExpression {
+        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufFloatingPointExpression, ProtobufIntegerExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufOptionExpression, ProtobufRangeExpression {
     final int line;
-    ProtobufStatement parent;
+    ProtobufTree parent;
 
     ProtobufExpressionImpl(int line) {
         this.line = line;
@@ -16,7 +16,7 @@ sealed abstract class ProtobufExpressionImpl
     }
 
     @Override
-    public ProtobufStatement parent() {
+    public ProtobufTree parent() {
         return parent;
     }
 
@@ -25,7 +25,7 @@ sealed abstract class ProtobufExpressionImpl
         return parent != null;
     }
 
-    void setParent(ProtobufStatement parent) {
+    void setParent(ProtobufTree parent) {
         this.parent = parent;
     }
 }

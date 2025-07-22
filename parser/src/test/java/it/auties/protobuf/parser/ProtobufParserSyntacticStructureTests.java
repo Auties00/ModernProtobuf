@@ -167,7 +167,7 @@ public class ProtobufParserSyntacticStructureTests {
                 """;
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
-        assertEquals("java_package", option.name());
+        assertEquals("java_package", option.name().toString());
         assertTrue(option.value() instanceof ProtobufLiteralExpression);
         assertEquals("com.example.foo", ((ProtobufLiteralExpression) option.value()).value());
     }
@@ -179,7 +179,7 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
-        assertEquals("java_multiple_files", option.name());
+        assertEquals("java_multiple_files", option.name().toString());
         assertTrue(option.value() instanceof ProtobufBoolExpression);
         assertSame(true, ((ProtobufBoolExpression) option.value()).value());
     }
@@ -191,7 +191,7 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
-        assertEquals("java_multiple_files", option.name());
+        assertEquals("java_multiple_files", option.name().toString());
         assertTrue(option.value() instanceof ProtobufBoolExpression);
         assertSame(false, ((ProtobufBoolExpression) option.value()).value());
     }
@@ -203,7 +203,7 @@ public class ProtobufParserSyntacticStructureTests {
             """;
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
-        assertEquals("optimize_for", option.name());
+        assertEquals("optimize_for", option.name().toString());
         assertTrue(option.value() instanceof ProtobufEnumConstantExpression);
         assertEquals("SPEED", ((ProtobufEnumConstantExpression) option.value()).name());
     }
@@ -520,11 +520,10 @@ public class ProtobufParserSyntacticStructureTests {
             }
             """;
         var document = ProtobufParser.parseOnly(proto);
-        var extend = document.getDirectChildrenByType(ProtobufMessageStatement.class)
-                .filter(ProtobufMessageStatement::extension)
+        var extend = document.getDirectChildrenByType(ProtobufExtendStatement.class)
                 .findFirst()
                 .orElseThrow();
-        assertEquals("MessageType", extend.name());
+        assertEquals("MessageType", extend.declaration().name());
         var field = extend.getDirectChildByNameAndType("ext_field", ProtobufFieldStatement.class).orElseThrow();
         assertSame(ProtobufType.STRING, field.type().protobufType());
         assertEquals(Long.valueOf(100), field.index());

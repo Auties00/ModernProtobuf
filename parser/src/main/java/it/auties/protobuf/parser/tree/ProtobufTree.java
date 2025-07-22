@@ -49,14 +49,15 @@ public sealed interface ProtobufTree
     sealed interface WithOptions
             extends ProtobufTree
             permits ProtobufFieldStatement {
-        SequencedMap<String, ProtobufExpression> options();
-        void addOption(String name, ProtobufExpression value);
+        SequencedCollection<ProtobufOptionExpression> options();
+        Optional<ProtobufOptionExpression> getOption(String name);
+        void addOption(ProtobufOptionExpression value);
         boolean removeOption(String name);
     }
 
     sealed interface WithBody<T extends ProtobufStatement>
             extends ProtobufTree
-            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofFieldStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl, WithBodyAndName {
+            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofFieldStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl, WithBodyAndName {
         SequencedCollection<T> children();
         void addChild(T statement);
         boolean removeChild(T statement);

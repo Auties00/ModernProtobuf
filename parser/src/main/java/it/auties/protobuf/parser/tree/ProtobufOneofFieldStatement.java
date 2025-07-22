@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 public final class ProtobufOneofFieldStatement
         extends ProtobufFieldStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>, ProtobufTree.WithBodyAndName<ProtobufOneofChild>,
-                   ProtobufMessageChild, ProtobufGroupChild {
+                   ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild {
     private String name;
     private final List<ProtobufOneofChild> children;
 

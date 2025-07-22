@@ -3,9 +3,7 @@ package it.auties.protobuf.parser;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.ProtobufMapTypeReference;
-import it.auties.protobuf.parser.type.ProtobufMessageOrEnumTypeReference;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.type.*;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -27,6 +25,9 @@ public final class ProtobufParser {
     private static final String TYPE_PARAMETERS_END = ">";
     private static final String NULL = "null";
     private static final String KEY_VALUE_SEPARATOR = ":";
+    private static final String PARENS_START = "(";
+    private static final String PARENS_END = ")";
+    private static final String STREAM = "stream";
 
     private ProtobufParser() {
         throw new UnsupportedOperationException();
@@ -118,11 +119,11 @@ public final class ProtobufParser {
                         document.addChild(statement);
                     }
                     case "option" -> {
-                        var statement = parseOption(tokenizer);
+                        var statement = parseOption(tokenizer, OptionParser.STATEMENT);
                         document.addChild(statement);
                     }
                     case "message" -> {
-                        var statement = parseMessage(false, document, tokenizer);
+                        var statement = parseMessage(document, tokenizer);
                         document.addChild(statement);
                     }
                     case "enum" -> {
@@ -138,7 +139,7 @@ public final class ProtobufParser {
                         document.addChild(statement);
                     }
                     case "extend" -> {
-                        var statement = parseMessage(true, document, tokenizer);
+                        var statement = parseExtend(document, tokenizer);
                         document.addChild(statement);
                     }
                     default -> throw new ProtobufParserException("Unexpected token " + token, tokenizer.line());
@@ -189,31 +190,67 @@ public final class ProtobufParser {
         return statement;
     }
 
-    private static ProtobufOptionStatement parseOption(ProtobufTokenizer tokenizer) throws IOException {
-        var statement = new ProtobufOptionStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
-                "Unexpected token: " + name, tokenizer.line());
-        statement.setName(name);
-        var assignment = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isAssignmentOperator(assignment),
-                "Unexpected token " + assignment, tokenizer.line());
-        var expression = readExpression(tokenizer);
-        statement.setValue(expression);
-        var end = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isStatementEnd(end),
-                "Unexpected token " + end, tokenizer.line());
-        return statement;
+    private static <T> T parseOption(ProtobufTokenizer tokenizer, OptionParser<T> parser) throws IOException {
+        var nameOrParensStart = tokenizer.nextRequiredToken();
+        
+        String name;
+        boolean extension;
+        if(isParensStart(nameOrParensStart)) {
+            name = tokenizer.nextRequiredToken();
+            var parensEnd = tokenizer.nextRequiredToken();
+            ProtobufParserException.check(isParensEnd(parensEnd),
+                    "Unexpected token " + parensEnd, tokenizer.line());
+            extension = true;
+        }else {
+           name = nameOrParensStart;
+           extension = false;
+        }
+
+        List<String> membersAccessed;
+        var membersAccessedOrAssignment = tokenizer.nextRequiredToken();
+        if(isAssignmentOperator(membersAccessedOrAssignment)) {
+            membersAccessed = List.of();
+        }else if(membersAccessedOrAssignment.charAt(0) == '.') {
+            var accessed = membersAccessedOrAssignment.substring(1);
+            ProtobufParserException.check(isLegalTypeReference(accessed),
+                    "Unexpected token " + accessed, tokenizer.line());
+            membersAccessed = Arrays.asList(accessed.split("\\."));
+            var assignment = tokenizer.nextRequiredToken();
+            ProtobufParserException.check(isAssignmentOperator(assignment),
+                    "Unexpected token " + assignment, tokenizer.line());
+        }else{
+            throw new ProtobufParserException("Unexpected token " + membersAccessedOrAssignment, tokenizer.line());
+        }
+        var optionName = new ProtobufOptionName(name, extension, membersAccessed);
+        var optionValue = readExpression(tokenizer);
+        return parser.parse(tokenizer, optionName, optionValue);
+    }
+    
+    private interface OptionParser<T> {
+         OptionParser<ProtobufOptionStatement> STATEMENT = (tokenizer, name, value) -> {
+             var end = tokenizer.nextRequiredToken();
+             ProtobufParserException.check(isStatementEnd(end),
+                     "Unexpected token " + end, tokenizer.line());
+             var statement = new ProtobufOptionStatement(tokenizer.line());
+             statement.setName(name);
+             statement.setValue(value);
+             return statement;
+         };
+
+        OptionParser<ProtobufOptionExpression> EXPRESSION = (tokenizer, name, value) -> {
+            var expression = new ProtobufOptionExpression(tokenizer.line());
+            expression.setName(name);
+            expression.setValue(value);
+            return expression;
+        };
+
+        T parse(ProtobufTokenizer tokenizer, ProtobufOptionName name, ProtobufExpression value) throws IOException;
+
+
     }
 
-    private static ProtobufMessageStatement parseMessage(boolean extension, ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
-        if(extension) {
-            var version = document.syntax()
-                    .orElse(ProtobufVersion.defaultVersion());
-            ProtobufParserException.check(version != ProtobufVersion.PROTOBUF_3, // TODO: In proto3 extensions are supported for options
-                    "Extensions are only supported in proto3 for options", tokenizer.line());
-        }
-        var statement = new ProtobufMessageStatement(tokenizer.line(), extension);
+    private static ProtobufMessageStatement parseMessage(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
+        var statement = new ProtobufMessageStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isLegalName(name),
                 "Unexpected token: " + name, tokenizer.line());
@@ -229,11 +266,11 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "option" -> {
-                    var child = parseOption(tokenizer);
+                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
                     statement.addChild(child);
                 }
                 case "message" -> {
-                    var child = parseMessage(false, document, tokenizer);
+                    var child = parseMessage(document, tokenizer);
                     statement.addChild(child);
                 }
                 case "enum" -> {
@@ -241,7 +278,65 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "extend" -> {
-                    var child = parseMessage(true, document, tokenizer);
+                    var child = parseExtend(document, tokenizer);
+                    statement.addChild(child);
+                }
+                case "extensions" -> {
+                    var child = parseExtensions(tokenizer);
+                    statement.addChild(child);
+                }
+                case "reserved"  -> {
+                    var child = parseReserved(tokenizer);
+                    statement.addChild(child);
+                }
+                case "oneof" -> {
+                    var child = parseOneof(document, tokenizer);
+                    statement.addChild(child);
+                }
+                default -> {
+                    var child = parseField(document, true, tokenizer, token);
+                    statement.addChild(child);
+                }
+            }
+        }
+        return statement;
+    }
+
+    private static ProtobufExtendStatement parseExtend(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
+        var version = document.syntax()
+                .orElse(ProtobufVersion.defaultVersion());
+        ProtobufParserException.check(version != ProtobufVersion.PROTOBUF_3, // TODO: In proto3 extensions are supported for options
+                "Extensions are only supported in proto3 for options", tokenizer.line());
+        var statement = new ProtobufExtendStatement(tokenizer.line());
+        var qualifiedName = tokenizer.nextRequiredToken();
+        ProtobufParserException.check(isLegalTypeReference(qualifiedName),
+                "Unexpected token: " + qualifiedName, tokenizer.line());
+        var reference = new ProtobufUnresolvedTypeReference(qualifiedName);
+        statement.setDeclaration(reference);
+        var objectStart = tokenizer.nextRequiredToken();
+        ProtobufParserException.check(isBodyStart(objectStart),
+                "Unexpected token " + objectStart, tokenizer.line());
+        String token;
+        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+            switch (token) {
+                case STATEMENT_END -> {
+                    var child = parseEmpty(tokenizer);
+                    statement.addChild(child);
+                }
+                case "option" -> {
+                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
+                    statement.addChild(child);
+                }
+                case "message" -> {
+                    var child = parseMessage(document, tokenizer);
+                    statement.addChild(child);
+                }
+                case "enum" -> {
+                    var child = parseEnum(tokenizer);
+                    statement.addChild(child);
+                }
+                case "extend" -> {
+                    var child = parseExtend(document, tokenizer);
                     statement.addChild(child);
                 }
                 case "extensions" -> {
@@ -342,13 +437,8 @@ public final class ProtobufParser {
         var index = tokenizer.nextRequiredIndex(false, false);
         child.setIndex(index);
 
-        var optionsOrBodyOrEndToken = tokenizer.nextRequiredToken();
-        if(isArrayStart(optionsOrBodyOrEndToken)) {
-            parseFieldOptions(tokenizer, child);
-            optionsOrBodyOrEndToken = tokenizer.nextRequiredToken();
-        }
-
-        if(child instanceof ProtobufGroupFieldStatement groupStatement && isBodyStart(optionsOrBodyOrEndToken)) {
+        var bodyStartOrStatementEndToken = parseFieldOptions(tokenizer, child);
+        if(child instanceof ProtobufGroupFieldStatement groupStatement && isBodyStart(bodyStartOrStatementEndToken)) {
             String groupToken;
             while(!isBodyEnd(groupToken = tokenizer.nextRequiredToken())) {
                 switch (groupToken) {
@@ -358,7 +448,7 @@ public final class ProtobufParser {
                     }
 
                     case "message" -> {
-                        var groupChild = parseMessage(false, document, tokenizer);
+                        var groupChild = parseMessage(document, tokenizer);
                         groupStatement.addChild(groupChild);
                     }
 
@@ -368,7 +458,7 @@ public final class ProtobufParser {
                     }
 
                     case "extend" -> {
-                        var groupChild = parseMessage(true, document, tokenizer);
+                        var groupChild = parseExtend(document, tokenizer);
                         groupStatement.addChild(groupChild);
                     }
 
@@ -394,43 +484,31 @@ public final class ProtobufParser {
                 }
             }
             return child;
-        } else if(isStatementEnd(optionsOrBodyOrEndToken)) {
+        } else if(isStatementEnd(bodyStartOrStatementEndToken)) {
             return child;
         }else {
-            throw new ProtobufParserException("Unexpected token " + optionsOrBodyOrEndToken, tokenizer.line());
+            throw new ProtobufParserException("Unexpected token " + bodyStartOrStatementEndToken, tokenizer.line());
         }
     }
 
-    private static void parseFieldOptions(ProtobufTokenizer tokenizer, ProtobufFieldStatement child) throws IOException {
-        var optionNameOrEnd = tokenizer.nextRequiredToken();
-        if (isArrayEnd(optionNameOrEnd)) {
-            return;
+    private static String parseFieldOptions(ProtobufTokenizer tokenizer, ProtobufFieldStatement child) throws IOException {
+        var maybeOptionStart = tokenizer.nextRequiredToken();
+        if(!isArrayStart(maybeOptionStart)) {
+            return maybeOptionStart;
         }
 
-        while (true) {
-            if (!isLegalName(optionNameOrEnd)) {
-                throw new ProtobufParserException("Unexpected token " + optionNameOrEnd, tokenizer.line());
-            }
+        String optionSeparatorOrOptionEnd;
+        do {
+            var expression = parseOption(tokenizer, OptionParser.EXPRESSION);
+            child.addOption(expression);
+        }while (isArraySeparator(optionSeparatorOrOptionEnd = tokenizer.nextRequiredToken()));
 
-            var optionOperator = tokenizer.nextRequiredToken();
-            ProtobufParserException.check(isAssignmentOperator(optionOperator),
-                    "Unexpected token " + optionOperator, tokenizer.line());
+        ProtobufParserException.check(isArrayEnd(optionSeparatorOrOptionEnd),
+                "Unexpected token " + optionSeparatorOrOptionEnd, tokenizer.line());
 
-            var optionValue = readExpression(tokenizer);
-            child.addOption(optionNameOrEnd, optionValue);
-
-            var optionSeparator = tokenizer.nextRequiredToken();
-            if(isArrayEnd(optionSeparator)) {
-                break;
-            }else if(isArraySeparator(optionSeparator)) {
-                optionNameOrEnd = tokenizer.nextRequiredToken();
-            } else {
-                throw new ProtobufParserException("Unexpected token " + optionSeparator, tokenizer.line());
-            }
-        }
+        return tokenizer.nextRequiredToken();
     }
 
-    //  ProtobufEmptyStatement, ProtobufEnumConstant, ProtobufExtensionsStatement, ProtobufOptionStatement, ProtobufReservedStatement
     private static ProtobufEnumStatement parseEnum(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufEnumStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
@@ -448,7 +526,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "option" -> {
-                    var child = parseOption(tokenizer);
+                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
                     statement.addChild(child);
                 }
                 case "extensions" -> {
@@ -461,7 +539,7 @@ public final class ProtobufParser {
                 }
                 default -> {
                     var child = parseEnumConstant(token, tokenizer);
-                    child.setType(new ProtobufMessageOrEnumTypeReference(statement));
+                    child.setType(new ProtobufEnumTypeReference(statement));
                     statement.addChild(child);
                 }
             }
@@ -481,14 +559,10 @@ public final class ProtobufParser {
         var index = tokenizer.nextRequiredIndex(true, false);
         statement.setIndex(index);
 
-        var optionsOrEndToken = tokenizer.nextRequiredToken();
-        if(isArrayStart(optionsOrEndToken)) {
-            parseFieldOptions(tokenizer, statement);
-            optionsOrEndToken = tokenizer.nextRequiredToken();
-        }
+        var statementEndToken = parseFieldOptions(tokenizer, statement);
 
-        ProtobufParserException.check(isStatementEnd(optionsOrEndToken),
-                "Unexpected token " + optionsOrEndToken, tokenizer.line());
+        ProtobufParserException.check(isStatementEnd(statementEndToken),
+                "Unexpected token " + statementEndToken, tokenizer.line());
         return statement;
     }
 
@@ -593,7 +667,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "option" -> {
-                    var child = parseOption(tokenizer);
+                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
                     statement.addChild(child);
                 }
                 case "rpc" -> {
@@ -606,7 +680,6 @@ public final class ProtobufParser {
         return statement;
     }
 
-    // rpc Fetch (Request) returns (Response);
     private static ProtobufMethodStatement parseMethod(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMethodStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
@@ -630,7 +703,7 @@ public final class ProtobufParser {
                         statement.addChild(child);
                     }
                     case "option" -> {
-                        var child = parseOption(tokenizer);
+                        var child = parseOption(tokenizer, OptionParser.STATEMENT);
                         statement.addChild(child);
                     }
                     default -> throw new ProtobufParserException("Unexpected token " + token, tokenizer.line());
@@ -644,22 +717,22 @@ public final class ProtobufParser {
 
     private static ProtobufMethodStatement.Type parseMethodType(ProtobufTokenizer tokenizer) throws IOException {
         var typeStart = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(Objects.equals(typeStart, "("),
+        ProtobufParserException.check(isParensStart(typeStart),
                 "Unexpected token: " + typeStart, tokenizer.line());
         var typeOrModifier = tokenizer.nextRequiredToken();
         ProtobufTypeReference typeReference;
         boolean stream;
-        if(Objects.equals(typeOrModifier, "stream")) {
+        if(isStreamModifier(typeOrModifier)) {
             typeReference = ProtobufTypeReference.of(tokenizer.nextRequiredToken());
             stream = true;
         }else {
             typeReference = ProtobufTypeReference.of(typeOrModifier);
             stream = false;
         }
-        ProtobufParserException.check(typeReference instanceof ProtobufMessageOrEnumTypeReference,
+        ProtobufParserException.check(typeReference instanceof ProtobufUnresolvedTypeReference,
                 "Unexpected type, only messages can be used: " + typeReference.name(), tokenizer.line());
         var typeEnd = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(Objects.equals(typeEnd, ")"),
+        ProtobufParserException.check(isParensEnd(typeEnd),
                 "Unexpected token: " + typeEnd, tokenizer.line());
         return new ProtobufMethodStatement.Type(typeReference, stream);
     }
@@ -681,7 +754,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "option" -> {
-                    var child = parseOption(tokenizer);
+                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
                     statement.addChild(child);
                 }
                 default -> {
@@ -880,5 +953,17 @@ public final class ProtobufParser {
 
     private static boolean isNullExpression(String token) {
         return Objects.equals(token, NULL);
+    }
+
+    private static boolean isParensStart(String typeStart) {
+        return Objects.equals(typeStart, PARENS_START);
+    }
+
+    private static boolean isParensEnd(String typeEnd) {
+        return Objects.equals(typeEnd, PARENS_END);
+    }
+
+    private static boolean isStreamModifier(String typeOrModifier) {
+        return Objects.equals(typeOrModifier, STREAM);
     }
 }

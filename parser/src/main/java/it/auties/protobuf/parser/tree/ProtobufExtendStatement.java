@@ -1,14 +1,16 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
+
 import java.util.Objects;
 
-public final class ProtobufMessageStatement
+public final class ProtobufExtendStatement
         extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>, ProtobufTree.WithBodyAndName<ProtobufMessageChild>,
+        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMessageChild>,
                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild, ProtobufExtendChild {
-    private String name;
+    private ProtobufTypeReference declaration;
 
-    public ProtobufMessageStatement(int line) {
+    public ProtobufExtendStatement(int line) {
         super(line);
     }
 
@@ -16,10 +18,10 @@ public final class ProtobufMessageStatement
     public String toString() {
         var builder = new StringBuilder();
 
-        builder.append("message");
+        builder.append("extend");
         builder.append(" ");
 
-        var name = Objects.requireNonNullElse(this.name, "[missing]");
+        var name = Objects.requireNonNullElse(declaration.name(), "[missing]");
         builder.append(name);
         builder.append(" ");
 
@@ -41,18 +43,15 @@ public final class ProtobufMessageStatement
         return builder.toString();
     }
 
-    @Override
-    public String name() {
-        return name;
+    public ProtobufTypeReference declaration() {
+        return declaration;
     }
 
-    @Override
-    public boolean hasName() {
-        return name != null;
+    public boolean hasDeclaration() {
+        return declaration != null;
     }
 
-    @Override
-    public void setName(String name) {
-        this.name = name;
+    public void setDeclaration(ProtobufTypeReference declaration) {
+        this.declaration = declaration;
     }
 }

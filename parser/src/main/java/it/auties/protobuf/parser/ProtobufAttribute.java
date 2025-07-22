@@ -154,8 +154,9 @@ public final class ProtobufAttribute {
 
             case ProtobufFieldStatement protobufField -> {
                 attributeType(document, protobufField);
-                protobufField.options()
-                        .forEach((optionName, optionValue) -> attributeFieldOption(protobufField, optionName, optionValue));
+                for(var option : protobufField.options() ) {
+                    attributeFieldOption(protobufField, option);
+                }
             }
 
             case ProtobufImportStatement protobufImport -> {
@@ -186,7 +187,7 @@ public final class ProtobufAttribute {
         }
     }
 
-    private static void attributeFieldOption(ProtobufFieldStatement protobufField, String optionName, ProtobufExpression optionValue) {
+    private static void attributeFieldOption(ProtobufFieldStatement protobufField, ProtobufOptionExpression option) {
         if(BUILT_IN_OPTIONS == null) {
             return; // Options validation cannot happen during the bootstrap phase
         }
@@ -196,6 +197,7 @@ public final class ProtobufAttribute {
             throw new ProtobufParserException("Cannot validate statement options: missing FieldOptions message");
         }
 
+        var optionName = option.name().toString();
         var definition = fieldOptions.get(optionName);
         if(definition == null) {
             throw new ProtobufParserException("Invalid option \"" + optionName
@@ -209,62 +211,54 @@ public final class ProtobufAttribute {
 
             }
             case ENUM -> {
-                var enumType = (ProtobufMessageOrEnumTypeReference) definition.type();
-                if(!(enumType.declaration() instanceof ProtobufEnumStatement enumDeclaration)) {
-                    throwOnOption(protobufField, optionName, definition, "invalid enum declaration");
-                }else {
-                    var enumConstantDefinition = enumDeclaration.getDirectChildByNameAndType(optionName, ProtobufEnumConstantStatement.class);
-                    if(enumConstantDefinition.isEmpty()) {
-                        throwOnOption(protobufField, optionName, definition, "expected valid enum constant");
-                    }
-                }
+
             }
             case FLOAT -> {
-                if(!(optionValue instanceof ProtobufNumberExpression numberExpression)
+                if(!(option.value() instanceof ProtobufNumberExpression numberExpression)
                         || numberExpression.value().floatValue() != numberExpression.value().doubleValue()) {
                     throwOnOption(protobufField, optionName, definition, "expected float");
                 }
             }
             case DOUBLE -> {
-                if(!(optionValue instanceof ProtobufNumberExpression)) {
+                if(!(option.value() instanceof ProtobufNumberExpression)) {
                     throwOnOption(protobufField, optionName, definition, "expected double");
                 }
             }
             case BOOL -> {
-                if(!(optionValue instanceof ProtobufBoolExpression)) {
+                if(!(option.value() instanceof ProtobufBoolExpression)) {
                     throwOnOption(protobufField, optionName, definition, "expected bool");
                 }
             }
             case STRING -> {
-                if(!(optionValue instanceof ProtobufLiteralExpression)) {
+                if(!(option.value() instanceof ProtobufLiteralExpression)) {
                     throwOnOption(protobufField, optionName, definition, "expected string literal");
                 }
             }
             case BYTES -> {
-                if(!(optionValue instanceof ProtobufLiteralExpression)) {
+                if(!(option.value() instanceof ProtobufLiteralExpression)) {
                     throwOnOption(protobufField, optionName, definition, "expected bytes");
                 }
             }
             case INT32, SINT32, FIXED32, SFIXED32 -> {
-                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
                         || numberExpression.value().intValue() != numberExpression.value()) {
                     throwOnOption(protobufField, optionName, definition, "expected int");
                 }
             }
             case INT64, SINT64, FIXED64, SFIXED64 -> {
-                if(!(optionValue instanceof ProtobufIntegerExpression)) {
+                if(!(option.value() instanceof ProtobufIntegerExpression)) {
                     throwOnOption(protobufField, optionName, definition, "expected long");
                 }
             }
             case UINT32 -> {
-                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
                         || numberExpression.value().intValue() != numberExpression.value()
                         || numberExpression.value().intValue() < 0) {
                     throwOnOption(protobufField, optionName, definition, "expected unsigned int");
                 }
             }
             case UINT64 -> {
-                if(!(optionValue instanceof ProtobufIntegerExpression numberExpression)
+                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
                         || numberExpression.value() < 0) {
                     throwOnOption(protobufField, optionName, definition, "expected unsigned long");
                 }
@@ -284,82 +278,69 @@ public final class ProtobufAttribute {
         var typeReferences = new LinkedList<ProtobufTypeReference>();
         typeReferences.add(typedFieldTree.type());
         while (!typeReferences.isEmpty()) {
-            switch (typeReferences.removeFirst()) {
-                case ProtobufGroupTypeReference protobufGroupType -> {
-                    if(!protobufGroupType.isAttributed()) {
-                        throw throwUnattributableType(typedFieldTree);
+            var typeReference = typeReferences.removeFirst();
+            if(typeReference.isAttributed()) {
+                continue;
+            }
+
+            if(!(typeReference instanceof ProtobufUnresolvedTypeReference(String name))) {
+                throw throwUnattributableType(typedFieldTree);
+            }
+
+            var types = name.split(TYPE_SELECTOR_SPLITTER);
+            var parent = typedFieldTree.parent();
+
+            // Look for the type definition starting from the field's parent
+            // Only the first result should be considered because of shadowing (i.e. if a name is reused in an inner scope, the inner scope should override the outer scope)
+            ProtobufTree.WithBodyAndName<?> resolvedType = null;
+            while (parent != null && resolvedType == null) {
+                resolvedType = parent.getDirectChildByNameAndType(types[0], ProtobufTree.WithBodyAndName.class)
+                        .orElse(null);
+                parent = parent.parent() instanceof ProtobufTree.WithBody<?> validParent ? validParent : null;
+            }
+
+            if (resolvedType != null) { // Found a match in the parent scope
+                // Try to resolve the type reference in the matched scope
+                for (var index = 1; index < types.length; index++) {
+                    resolvedType = resolvedType.getDirectChildByNameAndType(types[index], ProtobufTree.WithBodyAndName.class)
+                            .orElseThrow(() -> throwUnattributableType(typedFieldTree));
+                }
+            } else { // No match found in the parent scope, try to resolve the type reference through imports
+                for (var statement : document.children()) {
+                    if (!(statement instanceof ProtobufImportStatement importStatement)) {
+                        continue;
                     }
-                }
 
-                case ProtobufMapTypeReference protobufMapType -> {
-                    var keyType = protobufMapType.keyType();
-                    typeReferences.add(keyType);
-                    var valueType = protobufMapType.valueType();
-                    typeReferences.add(valueType);
-                }
+                    var imported = importStatement.document();
+                    if (imported == null) {
+                        continue;
+                    }
 
-                case ProtobufMessageOrEnumTypeReference fieldType -> {
-                    var accessed = fieldType.name();
-                    var types = accessed.split(TYPE_SELECTOR_SPLITTER);
-                    var parent = typedFieldTree.parent();
+                    var importedTypeName = imported.packageName()
+                            .map(packageName -> name.startsWith(packageName + TYPE_SELECTOR) ? name.substring(packageName.length() + 1) : null)
+                            .orElse(name)
+                            .split(TYPE_SELECTOR_SPLITTER);
+                    if (importedTypeName.length == 0) {
+                        continue;
+                    }
 
-                    // Look for the type definition starting from the field's parent
-                    // Only the first result should be considered because of shadowing (i.e. if a name is reused in an inner scope, the inner scope should override the outer scope)
-                    ProtobufTree.WithBodyAndName<?> resolvedType = null;
-                    while (parent != null && resolvedType == null) {
-                        resolvedType = parent.getDirectChildByNameAndType(types[0], ProtobufTree.WithBodyAndName.class)
+                    resolvedType = imported.getDirectChildByNameAndType(importedTypeName[0], ProtobufTree.WithBodyAndName.class)
+                            .orElse(null);
+                    for (var i = 1; i < importedTypeName.length && resolvedType != null; i++) {
+                        resolvedType = resolvedType.getDirectChildByNameAndType(importedTypeName[i], ProtobufTree.WithBodyAndName.class)
                                 .orElse(null);
-                        parent = parent.parent() instanceof ProtobufTree.WithBody<?> validParent ? validParent : null;
                     }
-
-                    if (resolvedType != null) { // Found a match in the parent scope
-                        // Try to resolve the type reference in the matched scope
-                        for (var index = 1; index < types.length; index++) {
-                            resolvedType = resolvedType.getDirectChildByNameAndType(types[index], ProtobufTree.WithBodyAndName.class)
-                                    .orElseThrow(() -> throwUnattributableType(typedFieldTree));
-                        }
-                    } else { // No match found in the parent scope, try to resolve the type reference through imports
-                        for (var statement : document.children()) {
-                            if (!(statement instanceof ProtobufImportStatement importStatement)) {
-                                continue;
-                            }
-
-                            var imported = importStatement.document();
-                            if (imported == null) {
-                                continue;
-                            }
-
-                            var importedTypeName = imported.packageName()
-                                    .map(packageName -> accessed.startsWith(packageName + TYPE_SELECTOR) ? accessed.substring(packageName.length() + 1) : null)
-                                    .orElse(accessed)
-                                    .split(TYPE_SELECTOR_SPLITTER);
-                            if(importedTypeName.length == 0) {
-                                continue;
-                            }
-
-                            resolvedType = imported.getDirectChildByNameAndType(importedTypeName[0], ProtobufTree.WithBodyAndName.class)
-                                    .orElse(null);
-                            for (var i = 1; i < importedTypeName.length && resolvedType != null; i++) {
-                                resolvedType = resolvedType.getDirectChildByNameAndType(importedTypeName[i], ProtobufTree.WithBodyAndName.class)
-                                        .orElse(null);
-                            }
-                            if (resolvedType != null) {
-                                break;
-                            }
-                        }
-
-                        if (resolvedType == null) {
-                            throw throwUnattributableType(typedFieldTree);
-                        }
+                    if (resolvedType != null) {
+                        break;
                     }
-
-                    fieldType.setDeclaration(resolvedType);
                 }
 
-                case ProtobufPrimitiveTypeReference ignored -> {
-                    // Nothing to do
+                if (resolvedType == null) {
+                    throw throwUnattributableType(typedFieldTree);
                 }
             }
+
+            typedFieldTree.setType(ProtobufTypeReference.of(resolvedType));
         }
     }
 

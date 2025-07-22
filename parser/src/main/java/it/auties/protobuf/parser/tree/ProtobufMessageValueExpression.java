@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.type.ProtobufMessageOrEnumTypeReference;
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -11,7 +11,7 @@ public final class ProtobufMessageValueExpression
         extends ProtobufExpressionImpl
         implements ProtobufExpression {
     private final SequencedMap<String, ProtobufExpression> data;
-    private ProtobufMessageOrEnumTypeReference type;
+    private ProtobufTypeReference type;
 
     public ProtobufMessageValueExpression(int line) {
         super(line);
@@ -30,7 +30,7 @@ public final class ProtobufMessageValueExpression
         return data.remove(key);
     }
 
-    public ProtobufMessageOrEnumTypeReference type() {
+    public ProtobufTypeReference type() {
         return type;
     }
 
@@ -38,11 +38,7 @@ public final class ProtobufMessageValueExpression
         return type != null;
     }
 
-    public void setType(ProtobufMessageOrEnumTypeReference type) {
-        if(type != null && type.hasDeclaration() && type.protobufType() != ProtobufType.MESSAGE) {
-            throw new IllegalStateException("Type isn't an enum");
-        }
-
+    public void setType(ProtobufTypeReference type) {
         this.type = type;
     }
 

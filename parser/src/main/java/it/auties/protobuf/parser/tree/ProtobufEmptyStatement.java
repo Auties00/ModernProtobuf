@@ -3,7 +3,7 @@ package it.auties.protobuf.parser.tree;
 public final class ProtobufEmptyStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
-                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufOneofChild, ProtobufMethodChild, ProtobufServiceChild {
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufOneofChild, ProtobufMethodChild, ProtobufServiceChild, ProtobufExtendChild {
     public ProtobufEmptyStatement(int line) {
         super(line);
     }

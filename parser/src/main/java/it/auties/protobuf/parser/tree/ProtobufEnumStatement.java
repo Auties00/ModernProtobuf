@@ -5,7 +5,7 @@ import java.util.Objects;
 public final class ProtobufEnumStatement
         extends ProtobufStatementWithBodyImpl<ProtobufEnumChild>
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>, ProtobufTree.WithBodyAndName<ProtobufEnumChild>,
-                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild {
     private String name;
 
     public ProtobufEnumStatement(int line) {

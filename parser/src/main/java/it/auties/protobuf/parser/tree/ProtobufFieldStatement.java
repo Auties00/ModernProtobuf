@@ -9,13 +9,13 @@ import java.util.stream.Collectors;
 public sealed class ProtobufFieldStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
-        ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild
+                   ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild
         permits ProtobufEnumConstantStatement, ProtobufGroupFieldStatement, ProtobufOneofFieldStatement {
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
     protected Long index;
-    protected final SequencedMap<String, ProtobufExpression> options;
+    protected final SequencedMap<String, ProtobufOptionExpression> options;
 
     public ProtobufFieldStatement(int line) {
         super(line);
@@ -77,18 +77,24 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public SequencedMap<String, ProtobufExpression> options() {
-        return Collections.unmodifiableSequencedMap(options);
+    public SequencedCollection<ProtobufOptionExpression> options() {
+        return options.sequencedValues();
     }
 
     @Override
-    public void addOption(String name, ProtobufExpression value) {
-        options.put(name, value);
+    public void addOption(ProtobufOptionExpression value) {
+        Objects.requireNonNull(value, "Cannot add null option");
+        options.put(value.name().toString(), value);
     }
 
     @Override
     public boolean removeOption(String name) {
         return options.remove(name) != null;
+    }
+
+    @Override
+    public Optional<ProtobufOptionExpression> getOption(String name) {
+        return Optional.ofNullable(options.get(name));
     }
 
     @Override
@@ -128,7 +134,7 @@ public sealed class ProtobufFieldStatement
         builder.append("=");
         builder.append(" ");
         builder.append(index);
-        // writeOptions(builder);
+        writeOptions(builder);
         builder.append(";");
         return builder.toString();
     }

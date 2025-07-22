@@ -3,15 +3,14 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class ProtobufOptionStatement
-        extends ProtobufStatementImpl
-        implements ProtobufStatement,
-                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild, ProtobufExtendChild {
+public final class ProtobufOptionExpression
+        extends ProtobufExpressionImpl
+        implements ProtobufExpression {
     private ProtobufOptionName name;
     private ProtobufExpression value;
     private ProtobufFieldStatement definition;
 
-    public ProtobufOptionStatement(int line) {
+    public ProtobufOptionExpression(int line) {
         super(line);
     }
 
@@ -68,7 +67,7 @@ public final class ProtobufOptionStatement
 
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof ProtobufOptionStatement that
+        return obj instanceof ProtobufOptionExpression that
                && Objects.equals(this.name(), that.name())
                && Objects.equals(this.value(), that.value());
     }
@@ -82,9 +81,6 @@ public final class ProtobufOptionStatement
     public String toString() {
         var builder = new StringBuilder();
 
-        builder.append("option");
-        builder.append(" ");
-
         var name = Objects.requireNonNullElse(this.name, "[missing]");
         builder.append(name);
 
@@ -94,8 +90,6 @@ public final class ProtobufOptionStatement
 
         var value = Objects.requireNonNullElse(this.value, "[missing]");
         builder.append(value);
-
-        builder.append(";");
 
         return builder.toString();
     }

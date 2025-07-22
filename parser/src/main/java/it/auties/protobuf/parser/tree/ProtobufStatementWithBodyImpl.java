@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
         extends ProtobufStatementImpl
         implements ProtobufTree.WithBody<CHILD>
-        permits ProtobufEnumStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufServiceStatement {
+        permits ProtobufEnumStatement, ProtobufExtendStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufServiceStatement {
     final LinkedList<CHILD> children;
 
     public ProtobufStatementWithBodyImpl(int line) {

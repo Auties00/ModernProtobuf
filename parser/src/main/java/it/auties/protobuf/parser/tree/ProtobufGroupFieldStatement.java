@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 public final class ProtobufGroupFieldStatement
         extends ProtobufFieldStatement
         implements ProtobufTree.WithBody<ProtobufGroupChild>,
-                   ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild {
+                   ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild, ProtobufExtendChild {
     private final List<ProtobufGroupChild> children;
     public ProtobufGroupFieldStatement(int line) {
         super(line);

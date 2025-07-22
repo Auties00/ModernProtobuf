@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 public final class ProtobufReservedStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
-                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
+                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufExtendChild {
     private final List<ProtobufReservedExpression> expressions;
 
     public ProtobufReservedStatement(int line) {
