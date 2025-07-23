@@ -53,21 +53,16 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
 
     @Override
     public Integer call() {
-        try {
-            log.log(Level.INFO, "Generating AST for protobuf file...");
-            var document = ProtobufParser.parseOnly(protobuf.toPath());
-            log.log(Level.INFO, "Generated AST successfully");
-            log.log(Level.INFO, "Creating AST model from existing Java classes...");
-            var classPool = AstUtils.createClassPool(input);
-            log.log(Level.INFO, "Created AST model from existing Java classes");
-            log.log(Level.INFO, "Starting update...");
-            var creator = new ProtobufSchemaCreator(document, Objects.requireNonNullElse(output, input));
-            creator.update(mutable, nullable, classPool);
-            log.log(Level.INFO, "Finished update successfully");
-            return 0;
-        } catch (IOException ex) {
-            log.log(Level.ERROR, "Cannot parse Protobuf message", ex);
-            return -1;
-        }
+        log.log(Level.INFO, "Generating AST for protobuf file...");
+        var document = ProtobufParser.parseOnly(protobuf.toPath());
+        log.log(Level.INFO, "Generated AST successfully");
+        log.log(Level.INFO, "Creating AST model from existing Java classes...");
+        var classPool = AstUtils.createClassPool(input);
+        log.log(Level.INFO, "Created AST model from existing Java classes");
+        log.log(Level.INFO, "Starting update...");
+        var creator = new ProtobufSchemaCreator(document, Objects.requireNonNullElse(output, input));
+        creator.update(mutable, nullable, classPool);
+        log.log(Level.INFO, "Finished update successfully");
+        return 0;
     }
 }

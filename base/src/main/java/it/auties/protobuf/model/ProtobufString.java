@@ -97,6 +97,10 @@ public sealed interface ProtobufString extends CharSequence {
 
         @Override
         public int length() {
+            if(decoded != null) {
+                return decoded.length();
+            }
+
             var index = offset;
             var charCount = 0;
             while (index < offset + length) {
@@ -120,6 +124,10 @@ public sealed interface ProtobufString extends CharSequence {
 
         @Override
         public char charAt(int index) {
+            if(decoded != null) {
+                return decoded.charAt(index);
+            }
+
             if (index < 0 || index >= length()) {
                 throw new StringIndexOutOfBoundsException(index);
             }
@@ -187,9 +195,11 @@ public sealed interface ProtobufString extends CharSequence {
                     byteStart += 2;
                 } else if ((b & 0xF0) == 0xE0) { // 3 bytes
                     byteStart += 3;
-                } else { // 4 bytes (surrogate pair)
+                } else if(charPos + 1 < end) { // 4 bytes (non-leading surrogate pair)
                     byteStart += 4;
-                    charPos++; // FIXME: Account for split surrogate pair
+                    charPos++;
+                }else { // 4 bytes (leading surrogate pair)
+                    throw new UnsupportedOperationException();
                 }
                 charPos++;
             }
@@ -202,9 +212,15 @@ public sealed interface ProtobufString extends CharSequence {
                     byteEnd += 2;
                 } else if ((b & 0xF0) == 0xE0) { // 3 bytes
                     byteEnd += 3;
-                } else { // 4 bytes (surrogate pair)
+                } else if(charPos + 1 < end) { // 4 bytes (non-trailing surrogate pair)
                     byteEnd += 4;
-                    charPos++; // FIXME: Account for split surrogate pair
+                    charPos++;
+                }else { // 4 bytes (trailing surrogate pair
+                    var length = byteEnd - byteStart;
+                    var array = new byte[length + 1];
+                    System.arraycopy(bytes, byteStart, array, 0, length);
+                    array[length] = 63; // How do I fill this in?
+                    return new Lazy(array, 0, array.length);
                 }
                 charPos++;
             }

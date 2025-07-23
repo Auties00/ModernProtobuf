@@ -90,7 +90,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 + valueSize;
     }
 
-    public int getFixed32PackedSize(int fieldNumber, Collection<? extends Number> values) {
+    public static int getFixed32PackedSize(int fieldNumber, Collection<? extends Number> values) {
         if(values == null){
             return 0;
         }

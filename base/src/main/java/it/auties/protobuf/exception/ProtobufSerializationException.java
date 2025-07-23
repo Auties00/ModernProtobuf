@@ -13,6 +13,7 @@ public class ProtobufSerializationException extends ProtobufException {
         return new ProtobufSerializationException("A size calculation error occurred as there is space left for the message: " + size);
     }
 
+    @SuppressWarnings("unused") // Used by ProtobufRawGroupSizeGenerator
     public static ProtobufSerializationException unknownRawGroupFieldDefinition(int index) {
         return new ProtobufSerializationException("Missing definition in groupProperties for property with index " + index);
     }

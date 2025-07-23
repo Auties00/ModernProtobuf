@@ -46,7 +46,6 @@ public class ProtobufStringTest {
     }
 
     @Test
-    @Disabled
     public void testSubsequence() {
         var wrapped = ProtobufString.wrap(TEST_STRING);
         var lazy = ProtobufString.lazy(TEST_STRING.getBytes());

@@ -241,11 +241,11 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
             }
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type.REQUIRED)){
+        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.REQUIRED)){
             compilationUnit.addImport(Objects.class.getName());
         }
 
-        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type.REPEATED)){
+        if(hasFieldsWithModifier(ProtobufFieldStatement.Modifier.REPEATED)){
             compilationUnit.addImport(List.class.getName());
         }
 
@@ -264,15 +264,15 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
 
     }
 
-    private boolean hasFieldsWithModifier(ProtobufFieldStatement.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufFieldStatement.Modifier modifier) {
         return hasFieldsWithModifier(protoStatement, modifier);
     }
 
-    private boolean hasFieldsWithModifier(ProtobufTree.WithBody<?> statement, ProtobufFieldStatement.Modifier.Type modifier) {
+    private boolean hasFieldsWithModifier(ProtobufTree.WithBody<?> statement, ProtobufFieldStatement.Modifier modifier) {
         return statement.children()
                 .stream()
                 .anyMatch(entry -> (entry instanceof ProtobufMessageStatement messageStatement && hasFieldsWithModifier(messageStatement, modifier))
-                        || (entry instanceof ProtobufFieldStatement fieldStatement && fieldStatement.modifier().type() == modifier));
+                        || (entry instanceof ProtobufFieldStatement fieldStatement && fieldStatement.modifier() == modifier));
 
     }
 

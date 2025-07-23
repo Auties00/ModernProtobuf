@@ -44,6 +44,7 @@ public class ProtobufDeserializationException extends ProtobufException {
         return new ProtobufDeserializationException("A message specified an invalid field index: " + index);
     }
 
+    @SuppressWarnings("unused") // Used by ProtobufObjectDeserializationGenerator
     public static ProtobufDeserializationException reservedIndex(int index) {
         return new ProtobufDeserializationException(index + " is marked as reserved");
     }
