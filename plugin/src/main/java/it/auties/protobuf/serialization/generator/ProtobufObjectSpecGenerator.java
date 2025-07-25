@@ -1,15 +1,14 @@
-package it.auties.protobuf.serialization.generator.clazz.object;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
-import it.auties.protobuf.serialization.generator.method.deserialization.object.ProtobufObjectDeserializationGenerator;
-import it.auties.protobuf.serialization.generator.method.deserialization.object.ProtobufObjectDeserializationOverloadGenerator;
-import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSerializationGenerator;
-import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSerializationOverloadGenerator;
-import it.auties.protobuf.serialization.generator.method.serialization.object.ProtobufObjectSizeGenerator;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.generator.method.ProtobufObjectDeserializationGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufObjectDeserializationOverloadGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufObjectSerializationGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufObjectSerializationOverloadGenerator;
+import it.auties.protobuf.serialization.generator.method.ProtobufObjectSizeGenerator;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
+import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
@@ -46,7 +45,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                if(objectElement.type() == ProtobufObjectType.ENUM) {
+                if(objectElement.type() == Type.ENUM) {
                     var objectType = objectElement.element().getSimpleName().toString();
                     classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
                     try(var staticInitBlock = classWriter.printStaticBlock()) {
@@ -77,7 +76,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
     // Get the imports to include in the compilation unit
     private List<String> getSpecImports(ProtobufObjectElement message) {
-        if(message.type() == ProtobufObjectType.ENUM) {
+        if(message.type() == Type.ENUM) {
             return List.of(
                     message.element().getQualifiedName().toString(),
                     Arrays.class.getName(),

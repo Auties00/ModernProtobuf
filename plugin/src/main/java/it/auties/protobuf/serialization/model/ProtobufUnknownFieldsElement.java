@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.model.object;
+package it.auties.protobuf.serialization.model;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.TypeMirror;

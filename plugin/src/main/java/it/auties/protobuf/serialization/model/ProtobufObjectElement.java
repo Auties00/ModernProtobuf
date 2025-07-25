@@ -1,10 +1,6 @@
-package it.auties.protobuf.serialization.model.object;
+package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.annotation.ProtobufSerializer;
-import it.auties.protobuf.serialization.model.converter.ProtobufConverterMethod;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
 import it.auties.protobuf.serialization.support.Reserved;
 
 import javax.lang.model.element.Element;
@@ -14,7 +10,7 @@ import javax.lang.model.element.VariableElement;
 import java.util.*;
 
 public class ProtobufObjectElement {
-    private final ProtobufObjectType type;
+    private final Type type;
     private final TypeElement typeElement;
     private final Map<Integer, ProtobufPropertyElement> properties;
     private final List<ProtobufBuilderElement> builders;
@@ -23,26 +19,22 @@ public class ProtobufObjectElement {
     private final ProtobufConverterMethod serializer;
     private final ProtobufConverterMethod deserializer;
     private final Set<String> reservedNames;
-    private final Set<? extends ProtobufReservedIndex> reservedIndexes;
+    private final Set<? extends ProtobufReservedIndexElement> reservedIndexes;
     private ProtobufUnknownFieldsElement unknownFieldsElement;
 
     public static ProtobufObjectElement ofEnum(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
-        return new ProtobufObjectElement(ProtobufObjectType.ENUM, typeElement, enumMetadata, null, null);
+        return new ProtobufObjectElement(Type.ENUM, typeElement, enumMetadata, null, null);
     }
 
     public static ProtobufObjectElement ofMessage(TypeElement typeElement, ProtobufConverterMethod deserializer) {
-        return new ProtobufObjectElement(ProtobufObjectType.MESSAGE, typeElement, null, null, deserializer);
+        return new ProtobufObjectElement(Type.MESSAGE, typeElement, null, null, deserializer);
     }
 
     public static ProtobufObjectElement ofGroup(TypeElement typeElement, ProtobufConverterMethod deserializer) {
-        return new ProtobufObjectElement(ProtobufObjectType.GROUP, typeElement, null, null, deserializer);
+        return new ProtobufObjectElement(Type.GROUP, typeElement, null, null, deserializer);
     }
 
-    public static ProtobufObjectElement ofSynthetic(TypeElement typeElement, ProtobufConverterMethod serializer, ProtobufConverterMethod deserializer) {
-        return new ProtobufObjectElement(ProtobufObjectType.SYNTHETIC, typeElement, null, serializer, deserializer);
-    }
-
-    private ProtobufObjectElement(ProtobufObjectType type, TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ProtobufConverterMethod serializer, ProtobufConverterMethod deserializer) {
+    private ProtobufObjectElement(Type type, TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ProtobufConverterMethod serializer, ProtobufConverterMethod deserializer) {
         this.type = type;
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
@@ -55,7 +47,7 @@ public class ProtobufObjectElement {
         this.constants = new LinkedHashMap<>();
     }
 
-    public ProtobufObjectType type() {
+    public Type type() {
         return type;
     }
 
@@ -81,12 +73,15 @@ public class ProtobufObjectElement {
 
     public Optional<ProtobufPropertyElement> addProperty(Element element, Element accessor, ProtobufPropertyType type, ProtobufProperty property) {
         var fieldName = element.getSimpleName().toString();
-        var result = new ProtobufPropertyElement(fieldName, accessor, type, property, element instanceof ExecutableElement);
-        return Optional.ofNullable(properties.put(property.index(), result));
-    }
-
-    public Optional<ProtobufPropertyElement> addProperty(ProtobufPropertyType type, ProtobufSerializer.GroupProperty property) {
-        var result = new ProtobufPropertyElement(type, property);
+        var result = new ProtobufPropertyElement(
+                property.index(),
+                fieldName,
+                accessor,
+                type,
+                property.required(),
+                property.packed(),
+                element instanceof ExecutableElement
+        );
         return Optional.ofNullable(properties.put(property.index(), result));
     }
 
@@ -123,12 +118,18 @@ public class ProtobufObjectElement {
         return reservedNames.contains(name);
     }
 
-    public Set<? extends ProtobufReservedIndex> reservedIndexes() {
+    public Set<? extends ProtobufReservedIndexElement> reservedIndexes() {
         return reservedIndexes;
     }
 
     public boolean isIndexDisallowed(int index) {
         return !reservedIndexes.stream()
                 .allMatch(entry -> entry.allows(index));
+    }
+
+    public enum Type {
+        MESSAGE,
+        ENUM,
+        GROUP
     }
 }

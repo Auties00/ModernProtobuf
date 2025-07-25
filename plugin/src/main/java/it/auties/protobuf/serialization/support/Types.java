@@ -241,10 +241,6 @@ public class Types {
         }
     }
 
-    public List<TypeElement> getMixins(ProtobufSerializer.GroupProperty groupProperty) {
-        return getMirroredTypes(groupProperty::mixins);
-    }
-
     public List<TypeElement> getMixins(ProtobufProperty property) {
         return getMirroredTypes(property::mixins);
     }
@@ -549,55 +545,6 @@ public class Types {
             @Override
             public boolean packed() {
                 return getter.packed();
-            }
-        };
-    }
-
-    public ProtobufProperty getProperty(ProtobufSerializer.GroupProperty property) {
-        return new ProtobufProperty() {
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return ProtobufProperty.class;
-            }
-
-            @Override
-            public int index() {
-                return property.index();
-            }
-
-            @Override
-            public ProtobufType type() {
-                return property.type();
-            }
-
-            @Override
-            public ProtobufType mapKeyType() {
-                return property.mapKeyType();
-            }
-
-            @Override
-            public ProtobufType mapValueType() {
-                return property.mapValueType();
-            }
-
-            @Override
-            public Class<?>[] mixins() {
-                return property.mixins();
-            }
-
-            @Override
-            public boolean required() {
-                return false;
-            }
-
-            @Override
-            public boolean ignored() {
-                return false;
-            }
-
-            @Override
-            public boolean packed() {
-                return property.packed();
             }
         };
     }

@@ -1,10 +1,10 @@
-package it.auties.protobuf.serialization.generator.method.serialization;
+package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.writer.BodyWriter;
 import it.auties.protobuf.serialization.writer.ClassWriter;
 

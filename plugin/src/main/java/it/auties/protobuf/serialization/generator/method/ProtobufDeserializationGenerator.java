@@ -1,9 +1,8 @@
-package it.auties.protobuf.serialization.generator.method.deserialization;
+package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.writer.SwitchStatementWriter;
 
 import java.util.List;

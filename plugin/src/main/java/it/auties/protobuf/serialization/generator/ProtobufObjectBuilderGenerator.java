@@ -1,10 +1,9 @@
-package it.auties.protobuf.serialization.generator.clazz.object;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
-import it.auties.protobuf.serialization.generator.clazz.ProtobufClassGenerator;
-import it.auties.protobuf.serialization.model.object.ProtobufBuilderElement;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.ProtobufBuilderElement;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.writer.ClassWriter;
 import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 

@@ -1,10 +1,9 @@
-package it.auties.protobuf.serialization.generator.method.serialization;
+package it.auties.protobuf.serialization.generator.method;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
-import it.auties.protobuf.serialization.model.converter.attributed.ProtobufAttributedConverterSerializer;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.ProtobufConverterElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.writer.BodyWriter;
 
 import javax.lang.model.element.Modifier;
@@ -166,7 +165,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         }
     }
 
-    private String getMessageMethod(int index, ProtobufAttributedConverterSerializer serializer, String propertyName) {
+    private String getMessageMethod(int index, ProtobufConverterElement.Attributed.Serializer serializer, String propertyName) {
         return "%s.writeMessage(%s, %s.%s(%s));".formatted(
                 OUTPUT_OBJECT_PARAMETER,
                 index,
@@ -192,7 +191,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
 
     // Creates the method invocation for a given serializer using a valueType argument
     // Serializers cannot be constructors, we can assume that because of PreliminaryChecks
-    private String createSerializerInvocation(ProtobufAttributedConverterSerializer serializer, String value, int groupIndex) {
+    private String createSerializerInvocation(ProtobufConverterElement.Attributed.Serializer serializer, String value, int groupIndex) {
         // If the serializer isn't static, invoke the serializer method on the valueType instance with no parameters
         // We can assume that the valueType on which the method is called will not be a message, enum or group because of PreliminaryChecks
         // class Wrapper {

@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.generator.clazz;
+package it.auties.protobuf.serialization.generator;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.TypeElement;

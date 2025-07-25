@@ -1,10 +1,8 @@
-package it.auties.protobuf.serialization.generator.method.serialization.object;
+package it.auties.protobuf.serialization.generator.method;
 
-import it.auties.protobuf.serialization.generator.method.serialization.ProtobufSizeGenerator;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectType;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType;
-import it.auties.protobuf.serialization.model.property.ProtobufPropertyType.NormalType;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
+import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.writer.ClassWriter;
 import it.auties.protobuf.serialization.writer.MethodWriter;
 
@@ -28,7 +26,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
             ifWriter.printReturn("0");
         }
 
-        if(Objects.requireNonNull(objectElement).type() == ProtobufObjectType.ENUM) {
+        if(Objects.requireNonNull(objectElement).type() == Type.ENUM) {
             writeEnumCalculator(methodWriter);
         }else {
             writeMessageCalculator(classWriter, methodWriter);
@@ -49,7 +47,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
 
     private void writeMessageCalculator(ClassWriter classWriter, MethodWriter methodWriter) {
         methodWriter.printVariableDeclaration(OUTPUT_SIZE_NAME,"0");
-        if(Objects.requireNonNull(objectElement).type() == ProtobufObjectType.GROUP) {
+        if(Objects.requireNonNull(objectElement).type() == Type.GROUP) {
             methodWriter.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(OUTPUT_SIZE_NAME, GROUP_INDEX_PARAMETER, "ProtobufWireType.WIRE_TYPE_START_OBJECT"));
             methodWriter.println("%s += ProtobufOutputStream.getFieldSize(%s, %s);".formatted(OUTPUT_SIZE_NAME, GROUP_INDEX_PARAMETER, "ProtobufWireType.WIRE_TYPE_END_OBJECT"));
         }
@@ -74,7 +72,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
                         mapType,
                         false
                 );
-                case NormalType ignored -> writeNormalSize(
+                case ProtobufPropertyType.NormalType ignored -> writeNormalSize(
                         methodWriter,
                         property
                 );
@@ -87,7 +85,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
     @Override
     protected List<String> parametersTypes() {
         var objectType = objectElement.element().getSimpleName().toString();
-        if(objectElement.type() == ProtobufObjectType.GROUP) {
+        if(objectElement.type() == Type.GROUP) {
             return List.of("int", objectType);
         }else {
             return List.of(objectType);
@@ -96,7 +94,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
 
     @Override
     protected List<String> parametersNames() {
-        if(objectElement.type() == ProtobufObjectType.GROUP) {
+        if(objectElement.type() == Type.GROUP) {
             return List.of(GROUP_INDEX_PARAMETER, INPUT_OBJECT_PARAMETER);
         }else {
             return List.of(INPUT_OBJECT_PARAMETER);

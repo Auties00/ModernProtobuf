@@ -4,8 +4,8 @@ import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufReservedRange;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.object.ProtobufReservedIndex;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufReservedIndexElement;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -26,11 +26,10 @@ public final class Reserved {
                 var group = objectElement.element().getAnnotation(ProtobufGroup.class);
                 yield group == null ? Set.of() : Set.of(group.reservedNames());
             }
-            case SYNTHETIC -> Set.of();
         };
     }
 
-    public static Set<ProtobufReservedIndex> getIndexes(ProtobufObjectElement objectElement) {
+    public static Set<ProtobufReservedIndexElement> getIndexes(ProtobufObjectElement objectElement) {
         return switch (objectElement.type()) {
             case MESSAGE -> {
                 var message = objectElement.element().getAnnotation(ProtobufMessage.class);
@@ -44,18 +43,17 @@ public final class Reserved {
                 var group = objectElement.element().getAnnotation(ProtobufGroup.class);
                 yield getReservedIndexes(group.reservedIndexes(), group.reservedRanges());
             }
-            case SYNTHETIC -> Set.of();
         };
     }
 
-    private static Set<ProtobufReservedIndex> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
-        var results = new HashSet<ProtobufReservedIndex>();
+    private static Set<ProtobufReservedIndexElement> getReservedIndexes(int[] indexes, ProtobufReservedRange[] ranges) {
+        var results = new HashSet<ProtobufReservedIndexElement>();
         for(var index : indexes) {
-            results.add(new ProtobufReservedIndex.Value(index));
+            results.add(new ProtobufReservedIndexElement.Value(index));
         }
 
         for(var range : ranges) {
-            results.add(new ProtobufReservedIndex.Range(range.min(), range.max()));
+            results.add(new ProtobufReservedIndexElement.Range(range.min(), range.max()));
         }
 
         return Collections.unmodifiableSet(results);

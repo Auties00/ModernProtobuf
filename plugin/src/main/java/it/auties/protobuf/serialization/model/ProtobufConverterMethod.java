@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.model.converter;
+package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufSerializer;
@@ -11,31 +11,25 @@ import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
-public sealed abstract class ProtobufConverterMethod {
-    public abstract Optional<ExecutableElement> element();
-    public abstract String ownerName();
-    public abstract Set<Modifier> modifiers();
-    public abstract TypeMirror returnType();
-    public abstract String name();
-    public abstract boolean parametrized();
-    public abstract List<TypeMirror> parameters();
-    public abstract <T extends Annotation> T getAnnotation(Class<T> annotation);
-    public abstract int hashCode();
-    public abstract boolean equals(Object object);
+public sealed interface ProtobufConverterMethod {
+    Optional<ExecutableElement> element();
+    String ownerName();
+    Set<Modifier> modifiers();
+    TypeMirror returnType();
+    String name();
+    boolean parametrized();
+    List<TypeMirror> parameters();
+    <T extends Annotation> T getAnnotation(Class<T> annotation);
 
-    public String toString() {
-        return ownerName() + "#" + name();
-    }
-
-    public static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized) {
+    static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized) {
         return new Element(element, parametrized);
     }
 
-    public static ProtobufConverterMethod of(String owner, Set<Modifier> modifiers, TypeMirror returnType, String name, TypeMirror... parameters) {
+    static ProtobufConverterMethod of(String owner, Set<Modifier> modifiers, TypeMirror returnType, String name, TypeMirror... parameters) {
         return new Synthetic(owner, modifiers, returnType, name, parameters);
     }
 
-    private static final class Element extends ProtobufConverterMethod {
+    final class Element implements ProtobufConverterMethod {
         private final ExecutableElement element;
         private final boolean parametrized;
 
@@ -98,9 +92,14 @@ public sealed abstract class ProtobufConverterMethod {
         public int hashCode() {
             return element.hashCode();
         }
+
+        @Override
+        public String toString() {
+            return ownerName() + "#" + name();
+        }
     }
 
-    private static final class Synthetic extends ProtobufConverterMethod {
+    final class Synthetic implements ProtobufConverterMethod {
         private final String ownerName;
         private final Set<Modifier> modifiers;
         private final String name;
@@ -177,11 +176,6 @@ public sealed abstract class ProtobufConverterMethod {
                     }
 
                     @Override
-                    public GroupProperty[] groupProperties() {
-                        return new GroupProperty[0];
-                    }
-
-                    @Override
                     public String warning() {
                         return "";
                     }
@@ -201,6 +195,11 @@ public sealed abstract class ProtobufConverterMethod {
         @Override
         public int hashCode() {
             return Objects.hash(ownerName, name);
+        }
+
+        @Override
+        public String toString() {
+            return ownerName() + "#" + name();
         }
     }
 }

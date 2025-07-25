@@ -3,7 +3,7 @@ package it.auties.protobuf.serialization.generator.method;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.annotation.ProtobufMessage;
-import it.auties.protobuf.serialization.model.object.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.writer.ClassWriter;
 import it.auties.protobuf.serialization.writer.MethodWriter;
 
@@ -20,11 +20,12 @@ public abstract class ProtobufMethodGenerator {
     private static final ConcurrentMap<String, String> SPECS_CACHE = new ConcurrentHashMap<>();
 
     public static String getSpecFromObject(TypeMirror typeMirror) {
-        if(!(typeMirror instanceof DeclaredType declaredType) || !(declaredType.asElement() instanceof TypeElement element)) {
+        if(!(typeMirror instanceof DeclaredType declaredType)
+                || !(declaredType.asElement() instanceof TypeElement element)) {
             return "";
         }
 
-        return SPECS_CACHE.computeIfAbsent(element.getQualifiedName().toString(), (owner) -> {
+        return SPECS_CACHE.computeIfAbsent(element.getQualifiedName().toString(), owner -> {
             var parent = element.getEnclosingElement();
             String packageName = null;
             var name = new StringBuilder();
