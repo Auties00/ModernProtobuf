@@ -1,11 +1,11 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
-import it.auties.protobuf.serialization.model.ProtobufReservedIndexElement;
+import it.auties.protobuf.serialization.model.ProtobufReservedElement;
 import it.auties.protobuf.serialization.writer.BodyWriter;
 import it.auties.protobuf.serialization.writer.ClassWriter;
 import it.auties.protobuf.serialization.writer.MethodWriter;
@@ -46,13 +46,13 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     @Override
     protected String returnType() {
-        return objectElement.element().getSimpleName().toString();
+        return objectElement.typeElement().getSimpleName().toString();
     }
 
     @Override
     protected List<String> parametersTypes() {
         if(objectElement.type() == Type.ENUM) {
-            return List.of("int", objectElement.element().getSimpleName().toString());
+            return List.of("int", objectElement.typeElement().getSimpleName().toString());
         } else if(objectElement.type() == Type.GROUP) {
             return List.of("int", ProtobufInputStream.class.getSimpleName());
         } else {
@@ -75,8 +75,8 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         var conditions = new ArrayList<String>();
         for(var index : objectElement.reservedIndexes()) {
             switch (index) {
-                case ProtobufReservedIndexElement.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
-                case ProtobufReservedIndexElement.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
+                case ProtobufReservedElement.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
+                case ProtobufReservedElement.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
             }
         }
         if(!conditions.isEmpty()) {
@@ -148,9 +148,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         // Return statement
         var unknownFieldsArg = objectElement.unknownFieldsElement().isEmpty() ? "" : ", " + DEFAULT_UNKNOWN_FIELDS;
         if(objectElement.deserializer().isPresent()) {
-            methodWriter.printReturn("%s.%s(%s%s)".formatted(objectElement.element().getQualifiedName(), objectElement.deserializer().get().name(), String.join(", ", argumentsList), unknownFieldsArg));
+            methodWriter.printReturn("%s.%s(%s%s)".formatted(objectElement.typeElement().getQualifiedName(), objectElement.deserializer().get().name(), String.join(", ", argumentsList), unknownFieldsArg));
         }else {
-            methodWriter.printReturn("new %s(%s%s)".formatted(objectElement.element().getQualifiedName(), String.join(", ", argumentsList), unknownFieldsArg));
+            methodWriter.printReturn("new %s(%s%s)".formatted(objectElement.typeElement().getQualifiedName(), String.join(", ", argumentsList), unknownFieldsArg));
         }
     }
 

@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufGroup;

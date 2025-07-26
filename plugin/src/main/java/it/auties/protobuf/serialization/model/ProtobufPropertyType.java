@@ -117,7 +117,6 @@ public sealed interface ProtobufPropertyType {
         private final List<ProtobufConverterElement> converters;
         private final String descriptorDefaultValue;
         private final List<TypeElement> mixins;
-        private String deserializedDefaultValue;
 
         public NormalType(ProtobufType protobufType, TypeMirror descriptorElementType, TypeMirror accessorType, String descriptorDefaultValue, List<TypeElement> mixins) {
             this.protobufType = protobufType;
@@ -161,14 +160,6 @@ public sealed interface ProtobufPropertyType {
         @Override
         public String descriptorDefaultValue() {
             return descriptorDefaultValue;
-        }
-
-        public Optional<String> deserializedDefaultValue() {
-            return Optional.ofNullable(deserializedDefaultValue);
-        }
-
-        public void setDeserializedDefaultValue(String deserializedDefaultValue) {
-            this.deserializedDefaultValue = deserializedDefaultValue;
         }
 
         @Override

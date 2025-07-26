@@ -1,11 +1,6 @@
 package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.model.ProtobufWireType;
-import it.auties.protobuf.serialization.generator.method.ProtobufObjectDeserializationGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufObjectDeserializationOverloadGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufObjectSerializationGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufObjectSerializationOverloadGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufObjectSizeGenerator;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
@@ -25,7 +20,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
     public void createClass(ProtobufObjectElement objectElement, PackageElement packageElement) throws IOException {
         // Names
-        var simpleGeneratedClassName = getGeneratedClassNameBySuffix(objectElement.element(), "Spec");
+        var simpleGeneratedClassName = getGeneratedClassNameBySuffix(objectElement.typeElement(), "Spec");
         var qualifiedGeneratedClassName = packageElement != null ? packageElement + "." + simpleGeneratedClassName : simpleGeneratedClassName;
         var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
 
@@ -46,7 +41,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
             // Declare the spec class
             try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
                 if(objectElement.type() == Type.ENUM) {
-                    var objectType = objectElement.element().getSimpleName().toString();
+                    var objectType = objectElement.typeElement().getSimpleName().toString();
                     classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
                     try(var staticInitBlock = classWriter.printStaticBlock()) {
                         for(var entry : objectElement.constants().entrySet()) {
@@ -78,7 +73,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
     private List<String> getSpecImports(ProtobufObjectElement message) {
         if(message.type() == Type.ENUM) {
             return List.of(
-                    message.element().getQualifiedName().toString(),
+                    message.typeElement().getQualifiedName().toString(),
                     Arrays.class.getName(),
                     Optional.class.getName(),
                     ProtobufOutputStream.class.getName(),
@@ -88,7 +83,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
         }
 
         var imports = new ArrayList<String>();
-        imports.add(message.element().getQualifiedName().toString());
+        imports.add(message.typeElement().getQualifiedName().toString());
         imports.add(ProtobufInputStream.class.getName());
         imports.add(ProtobufOutputStream.class.getName());
         imports.add(ProtobufWireType.class.getName());

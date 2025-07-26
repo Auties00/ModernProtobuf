@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @ProtobufMixin
-public class ProtobufMapMixin {
+public final class ProtobufMapMixin {
     @ProtobufDefaultValue
     public static <K, V> Map<K, V> newMap() {
         return new HashMap<>();
@@ -38,7 +38,7 @@ public class ProtobufMapMixin {
     }
 
     @ProtobufUnknownFields.Setter
-    public static void addUnknownField(Map<Integer, Object> map, Integer name, Object value) {
-        map.put(name, value);
+    public static void addUnknownField(Map<Long, Object> map, Long index, Object value) {
+        map.put(index, value);
     }
 }

@@ -23,7 +23,7 @@ public sealed interface ProtobufConverterElement {
                 ProtobufConverterMethod delegate,
                 TypeMirror parameterType,
                 TypeMirror returnType,
-                ProtobufDeserializer.BuilderBehaviour behaviour
+                ProtobufDeserializer.BuilderSetterMethod behaviour
         ) implements Attributed {
 
         }

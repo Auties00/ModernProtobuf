@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
@@ -84,7 +84,7 @@ public class ProtobufObjectSizeGenerator extends ProtobufSizeGenerator {
 
     @Override
     protected List<String> parametersTypes() {
-        var objectType = objectElement.element().getSimpleName().toString();
+        var objectType = objectElement.typeElement().getSimpleName().toString();
         if(objectElement.type() == Type.GROUP) {
             return List.of("int", objectType);
         }else {

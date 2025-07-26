@@ -10,11 +10,9 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
-
 @SuppressWarnings({"OptionalAssignedToNull", "OptionalUsedAsFieldOrParameterType", "unused"})
 @ProtobufMixin
-public class ProtobufOptionalMixin {
+public final class ProtobufOptionalMixin {
     @ProtobufDefaultValue
     public static <T> Optional<T> newOptional() {
         return Optional.empty();
@@ -35,22 +33,22 @@ public class ProtobufOptionalMixin {
         return OptionalDouble.empty();
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static <T> Optional<T> ofOptional(T value) {
         return Optional.ofNullable(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static OptionalInt ofOptional(Integer value) {
         return value == null ? OptionalInt.empty() : OptionalInt.of(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static OptionalLong ofOptional(Long value) {
         return value == null ? OptionalLong.empty() : OptionalLong.of(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static OptionalDouble ofOptional(Double value) {
         return value == null ? OptionalDouble.empty() : OptionalDouble.of(value);
     }

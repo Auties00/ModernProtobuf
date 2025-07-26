@@ -1,6 +1,6 @@
 package it.auties.protobuf.serialization.graph;
 
-import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
+import it.auties.protobuf.serialization.generator.ProtobufMethodGenerator;
 import it.auties.protobuf.serialization.model.ProtobufConverterMethod;
 import it.auties.protobuf.serialization.support.Types;
 
@@ -82,7 +82,7 @@ public final class ProtobufConverterGraph {
     }
 
     private List<ProtobufConverterArc> findAnyPath(TypeMirror from, TypeMirror to, Set<TypeElement> mixins) {
-        return nodes.stream()
+        return nodes.parallelStream()
                 .map(node -> findSubPath(node, to, mixins, from))
                 .filter(entry -> !entry.isEmpty())
                 .findFirst()

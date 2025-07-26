@@ -5,12 +5,7 @@ import com.sun.source.util.Trees;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.builtin.*;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.serialization.generator.ProtobufObjectBuilderGenerator;
-import it.auties.protobuf.serialization.generator.ProtobufObjectSpecGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufDeserializationGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufMethodGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufSerializationGenerator;
-import it.auties.protobuf.serialization.generator.method.ProtobufSizeGenerator;
+import it.auties.protobuf.serialization.generator.*;
 import it.auties.protobuf.serialization.graph.ProtobufConverterGraph;
 import it.auties.protobuf.serialization.model.ProtobufConverterElement;
 import it.auties.protobuf.serialization.model.ProtobufConverterMethod;
@@ -143,16 +138,17 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         TypeElement currentElement = null;
         try {
             for(var object : objects) {
-                currentElement = object.element();
-                var packageName = processingEnv.getElementUtils().getPackageOf(object.element());
+                currentElement = object.typeElement();
+                var packageName = processingEnv.getElementUtils().getPackageOf(object.typeElement());
                 var specVisitor = new ProtobufObjectSpecGenerator(processingEnv.getFiler());
                 specVisitor.createClass(object, packageName);
 
                 if (object.type() == ProtobufObjectElement.Type.MESSAGE || object.type() == ProtobufObjectElement.Type.GROUP) {
-                    var buildVisitor = new ProtobufObjectBuilderGenerator(processingEnv.getFiler());
-                    buildVisitor.createClass(object, null, packageName);
+                    var typeGenerator = new ProtobufBuilderTypeGenerator(processingEnv.getFiler());
+                    typeGenerator.createClass(packageName.getQualifiedName().toString(), object);
                     for (var builder : object.builders()) {
-                        buildVisitor.createClass(object, builder, packageName);
+                        var methodGenerator = new ProtobufBuilderMethodGenerator(processingEnv.getFiler());
+                        methodGenerator.createClass(packageName.getQualifiedName().toString(), builder);
                     }
                 }
             }
@@ -239,7 +235,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                             element.method(),
                             from,
                             element.returnType(),
-                            annotation.builderBehaviour()
+                            annotation.builderSetterMethod()
                     );
                     results.add(deserializerElement);
                     from = element.returnType();
@@ -276,8 +272,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var isGroup = typeElement.getAnnotation(ProtobufGroup.class) != null;
         var deserializer = getMessageDeserializer(typeElement)
                 .orElse(null);
-        var messageElement = isGroup ? ProtobufObjectElement.ofGroup(typeElement, deserializer) : ProtobufObjectElement.ofMessage(typeElement, deserializer);
-        var results = processObject(messageElement, messageElement.element());
+        var messageElement = isGroup ? ProtobufObjectElement.ofGroup(typeElement, deserializer, reserved) : ProtobufObjectElement.ofMessage(typeElement, deserializer, reserved);
+        var results = processObject(messageElement, messageElement.typeElement());
         if (isGroup) {
             linkGroup(typeElement.asType());
         } else {
@@ -285,7 +281,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         if (!hasPropertiesConstructor(messageElement)) {
-            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.element());
+            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.typeElement());
         }
         return results;
     }
@@ -307,7 +303,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var results = new HashSet<ProtobufObjectElement>();
 
         // Add the element being processed only if we are not processing a super class
-        if(messageElement.element() == typeElement) {
+        if(messageElement.typeElement() == typeElement) {
             results.add(messageElement);
         }
 
@@ -421,11 +417,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         var syntheticPropertyName = types.getPropertyName(executableElement.getSimpleName().toString());
-        if(messageElement.isNameDisallowed(syntheticPropertyName)) {
+        if(!messageElement.isNameAllowed(syntheticPropertyName)) {
             messages.printError("Restricted message property name: %s is not allowed as it's marked as reserved".formatted(syntheticPropertyName), executableElement);
         }
 
-        if(messageElement.isIndexDisallowed(property.index())) {
+        if(!messageElement.isIndexAllowed(property.index())) {
             messages.printError("Restricted message property index: %s is not allowed as it's marked as reserved".formatted(property.index()), executableElement);
         }
 
@@ -469,7 +465,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .stream()
                 .filter(property -> !property.synthetic())
                 .toList();
-        return message.element()
+        return message.typeElement()
                 .getEnclosedElements()
                 .stream()
                 .filter(entry -> entry.getKind() == ElementKind.CONSTRUCTOR)
@@ -646,11 +642,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         var propertyName = variableElement.getSimpleName().toString();
-        if (messageElement.isNameDisallowed(propertyName)) {
+        if (!messageElement.isNameAllowed(propertyName)) {
             messages.printError("Restricted message property name: %s is not allowed as it's marked as reserved".formatted(propertyName), variableElement);
         }
 
-        if (messageElement.isIndexDisallowed(propertyAnnotation.index())) {
+        if (!messageElement.isIndexAllowed(propertyAnnotation.index())) {
             messages.printError("Restricted message property index: %s is not allowed as it's marked as reserved".formatted(propertyAnnotation.index()), variableElement);
         }
 
@@ -876,12 +872,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         );
         createUnattributedSerializer(invoker, implementation);
         createUnattributedDeserializer(invoker, implementation);
-        if(!types.isSameType(implementation.serializedType(), implementation.descriptorElementType())) {
-            var deserializedDefaultValue = getDefaultValue(invoker, implementation.deserializedType(), mixins)
-                    .orElse("null");
-            implementation.setDeserializedDefaultValue(deserializedDefaultValue);
-        }
-
         return Optional.of(implementation);
     }
 
@@ -1015,12 +1005,6 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         createUnattributedSerializer(invoker, valueEntry);
         createUnattributedDeserializer(invoker, valueEntry);
 
-        if(!types.isSameType(valueEntry.serializedType(), valueEntry.descriptorElementType())) {
-            var deserializedDefaultValue = getDefaultValue(invoker, valueEntry.deserializedType(), mixins)
-                    .orElse("null");
-            valueEntry.setDeserializedDefaultValue(deserializedDefaultValue);
-        }
-
         // If the map type is not abstract, create the type as we would with a normal type
         var mapDefaultValue = getCollectionDefaultValue(invoker, elementType, mixins);
         if(mapDefaultValue.isEmpty()) {
@@ -1101,26 +1085,26 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private long processEnumConstants(ProtobufObjectElement messageElement) {
-        var enumTree = trees.getTree(messageElement.element());
+        var enumTree = trees.getTree(messageElement.typeElement());
         return enumTree.getMembers()
                 .stream()
                 .filter(member -> member instanceof VariableTree)
                 .map(member -> (VariableTree) member)
-                .peek(variableTree -> processEnumConstant(messageElement, messageElement.element(), variableTree))
+                .peek(variableTree -> processEnumConstant(messageElement, messageElement.typeElement(), variableTree))
                 .count();
     }
 
     private Optional<ProtobufObjectElement> createEnumElement(TypeElement enumElement) {
         var metadata = getEnumMetadata(enumElement);
         if (metadata.isEmpty()) {
-            return Optional.of(ProtobufObjectElement.ofEnum(enumElement, ProtobufEnumMetadata.javaEnum()));
+            return Optional.of(ProtobufObjectElement.ofEnum(enumElement, ProtobufEnumMetadata.javaEnum(), reserved));
         }
 
         if(metadata.get().isUnknown()) {
             return Optional.empty();
         }
 
-        var result = ProtobufObjectElement.ofEnum(enumElement, metadata.get());
+        var result = ProtobufObjectElement.ofEnum(enumElement, metadata.get(), reserved);
         return Optional.of(result);
     }
 
@@ -1251,18 +1235,18 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
         var newClassType = newClassTree.getIdentifier().toString();
         var simpleEnumName = enumElement.getSimpleName().toString();
-        if (!newClassType.equals(simpleEnumName) && !newClassType.equals(messageElement.element().getQualifiedName().toString())) {
+        if (!newClassType.equals(simpleEnumName) && !newClassType.equals(messageElement.typeElement().getQualifiedName().toString())) {
             return;
         }
 
         var variableName = enumConstantTree.getName().toString();
         if (messageElement.enumMetadata().orElseThrow().isJavaEnum()) {
             var ordinal = messageElement.constants().size();
-            if(messageElement.isIndexDisallowed(ordinal)) {
+            if(!messageElement.isIndexAllowed(ordinal)) {
                 messages.printError("Restricted message property index: %s is not allowed as it's marked as reserved".formatted(ordinal), enumElement);
             }
 
-            var error = messageElement.addConstant(ordinal, variableName);
+            var error = messageElement.addEnumConstant(ordinal, variableName);
             if (error.isEmpty()) {
                 return;
             }
@@ -1285,11 +1269,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 messages.printError("%s's index must be positive".formatted(variableName), enumElement);
             }
 
-            if(messageElement.isIndexDisallowed(value)) {
+            if(!messageElement.isIndexAllowed(value)) {
                 messages.printError("Restricted message property index: %s is not allowed as it's marked as reserved".formatted(value), enumElement);
             }
 
-            var error = messageElement.addConstant(value, variableName);
+            var error = messageElement.addEnumConstant(value, variableName);
             if (error.isEmpty()) {
                 return;
             }

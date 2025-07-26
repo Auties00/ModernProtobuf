@@ -7,17 +7,15 @@ import it.auties.protobuf.annotation.ProtobufSerializer;
 
 import java.util.concurrent.CompletableFuture;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
-
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufFutureMixin {
+public final class ProtobufFutureMixin {
     @ProtobufDefaultValue
     public static <T> CompletableFuture<T> newCompletableFuture() {
         return CompletableFuture.completedFuture(null);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static <T> CompletableFuture<T> ofNullable(T value) {
         return CompletableFuture.completedFuture(value);
     }

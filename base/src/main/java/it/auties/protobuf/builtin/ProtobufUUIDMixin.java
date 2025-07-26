@@ -7,12 +7,10 @@ import it.auties.protobuf.model.ProtobufString;
 
 import java.util.UUID;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.ADD;
-
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufUUIDMixin {
-    @ProtobufDeserializer(builderBehaviour = ADD)
+public final class ProtobufUUIDMixin {
+    @ProtobufDeserializer
     public static UUID ofNullable(ProtobufString value) {
         return value == null ? null : UUID.fromString(value.toString());
     }

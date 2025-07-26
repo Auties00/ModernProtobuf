@@ -1,7 +1,6 @@
 package it.auties.protobuf.serialization.model;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.serialization.support.Reserved;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -16,32 +15,34 @@ public class ProtobufObjectElement {
     private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
-    private final ProtobufConverterMethod serializer;
     private final ProtobufConverterMethod deserializer;
-    private final Set<String> reservedNames;
-    private final Set<? extends ProtobufReservedIndexElement> reservedIndexes;
+    private final Set<? extends ProtobufReservedElement> reservedElements;
     private ProtobufUnknownFieldsElement unknownFieldsElement;
 
-    public static ProtobufObjectElement ofEnum(TypeElement typeElement, ProtobufEnumMetadata enumMetadata) {
-        return new ProtobufObjectElement(Type.ENUM, typeElement, enumMetadata, null, null);
+    public static ProtobufObjectElement ofEnum(TypeElement typeElement, ProtobufEnumMetadata enumMetadata, Set<? extends ProtobufReservedElement> reserved) {
+        return new ProtobufObjectElement(Type.ENUM, typeElement, enumMetadata, null, reserved);
     }
 
-    public static ProtobufObjectElement ofMessage(TypeElement typeElement, ProtobufConverterMethod deserializer) {
-        return new ProtobufObjectElement(Type.MESSAGE, typeElement, null, null, deserializer);
+    public static ProtobufObjectElement ofMessage(TypeElement typeElement, ProtobufConverterMethod deserializer, Set<? extends ProtobufReservedElement> reserved) {
+        return new ProtobufObjectElement(Type.MESSAGE, typeElement, null, deserializer, reserved);
     }
 
-    public static ProtobufObjectElement ofGroup(TypeElement typeElement, ProtobufConverterMethod deserializer) {
-        return new ProtobufObjectElement(Type.GROUP, typeElement, null, null, deserializer);
+    public static ProtobufObjectElement ofGroup(TypeElement typeElement, ProtobufConverterMethod deserializer, Set<? extends ProtobufReservedElement> reserved) {
+        return new ProtobufObjectElement(Type.GROUP, typeElement, null, deserializer, reserved);
     }
 
-    private ProtobufObjectElement(Type type, TypeElement typeElement, ProtobufEnumMetadata enumMetadata, ProtobufConverterMethod serializer, ProtobufConverterMethod deserializer) {
+    private ProtobufObjectElement(
+            Type type,
+            TypeElement typeElement,
+            ProtobufEnumMetadata enumMetadata,
+            ProtobufConverterMethod deserializer,
+            Set<? extends ProtobufReservedElement> reservedElements
+    ) {
         this.type = type;
         this.typeElement = typeElement;
         this.enumMetadata = enumMetadata;
-        this.serializer = serializer;
         this.deserializer = deserializer;
-        this.reservedNames = Reserved.getNames(this);
-        this.reservedIndexes = Reserved.getIndexes(this);
+        this.reservedElements = reservedElements;
         this.builders = new ArrayList<>();
         this.properties = new LinkedHashMap<>();
         this.constants = new LinkedHashMap<>();
@@ -51,7 +52,7 @@ public class ProtobufObjectElement {
         return type;
     }
 
-    public TypeElement element() {
+    public TypeElement typeElement() {
         return typeElement;
     }
 
@@ -67,7 +68,7 @@ public class ProtobufObjectElement {
         return Collections.unmodifiableMap(constants);
     }
 
-    public Optional<String> addConstant(int fieldIndex, String fieldName) {
+    public Optional<String> addEnumConstant(int fieldIndex, String fieldName) {
         return Optional.ofNullable(constants.put(fieldIndex, fieldName));
     }
 
@@ -94,10 +95,6 @@ public class ProtobufObjectElement {
         return Collections.unmodifiableList(builders);
     }
 
-    public Optional<ProtobufConverterMethod> serializer() {
-        return Optional.ofNullable(serializer);
-    }
-
     public Optional<ProtobufConverterMethod> deserializer() {
         return Optional.ofNullable(deserializer);
     }
@@ -110,21 +107,21 @@ public class ProtobufObjectElement {
         this.unknownFieldsElement = unknownFieldsElement;
     }
 
-    public Set<String> reservedNames() {
-        return reservedNames;
+    public Set<? extends ProtobufReservedElement> reservedElements() {
+        return Collections.unmodifiableSet(reservedElements);
     }
 
-    public boolean isNameDisallowed(String name) {
-        return reservedNames.contains(name);
+    public boolean isIndexAllowed(int value) {
+        return reservedElements.stream()
+                .filter(element -> element instanceof ProtobufReservedElement.Index)
+                .allMatch(element -> ((ProtobufReservedElement.Index) element).allows(value));
     }
 
-    public Set<? extends ProtobufReservedIndexElement> reservedIndexes() {
-        return reservedIndexes;
-    }
+    public boolean isNameAllowed(String name) {
+        return reservedElements.stream()
+                .filter(element -> element instanceof ProtobufReservedElement.Name)
+                .allMatch(element -> ((ProtobufReservedElement.Name) element).allows(name));
 
-    public boolean isIndexDisallowed(int index) {
-        return !reservedIndexes.stream()
-                .allMatch(entry -> entry.allows(index));
     }
 
     public enum Type {

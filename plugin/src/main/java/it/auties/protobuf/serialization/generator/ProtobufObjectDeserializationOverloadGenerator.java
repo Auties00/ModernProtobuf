@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
@@ -42,7 +42,7 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
 
     @Override
     protected String returnType() {
-        return objectElement.element()
+        return objectElement.typeElement()
                 .getSimpleName()
                 .toString();
     }

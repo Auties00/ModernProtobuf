@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufRepeatedMixin {
+public final class ProtobufRepeatedMixin {
     @ProtobufDefaultValue
     public static <T> Collection<T> newCollection() {
         return new ArrayList<>();

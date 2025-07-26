@@ -22,18 +22,18 @@ public sealed interface ProtobufConverterMethod {
     <T extends Annotation> T getAnnotation(Class<T> annotation);
 
     static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized) {
-        return new Element(element, parametrized);
+        return new Concrete(element, parametrized);
     }
 
     static ProtobufConverterMethod of(String owner, Set<Modifier> modifiers, TypeMirror returnType, String name, TypeMirror... parameters) {
         return new Synthetic(owner, modifiers, returnType, name, parameters);
     }
 
-    final class Element implements ProtobufConverterMethod {
+    final class Concrete implements ProtobufConverterMethod {
         private final ExecutableElement element;
         private final boolean parametrized;
 
-        private Element(ExecutableElement element, boolean parametrized) {
+        private Concrete(ExecutableElement element, boolean parametrized) {
             this.element = element;
             this.parametrized = parametrized;
         }
@@ -84,7 +84,7 @@ public sealed interface ProtobufConverterMethod {
 
         @Override
         public boolean equals(Object obj) {
-            return obj instanceof Element that
+            return obj instanceof Concrete that
                     && Objects.equals(element, that.element);
         }
 
@@ -100,6 +100,31 @@ public sealed interface ProtobufConverterMethod {
     }
 
     final class Synthetic implements ProtobufConverterMethod {
+        private static final String DESERIALIZER_ANNOTATION_NAME = ProtobufDeserializer.class.getName();
+        private static final ProtobufDeserializer DESERIALIZER_ANNOTATION = new ProtobufDeserializer() {
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return ProtobufDeserializer.class;
+            }
+
+            @Override
+            public String warning() {
+                return "";
+            }
+        };
+        private static final String SERIALIZER_ANNOTATION_NAME = ProtobufSerializer.class.getName();
+        private static final ProtobufSerializer SERIALIZER_ANNOTATION = new ProtobufSerializer() {
+            @Override
+            public Class<? extends Annotation> annotationType() {
+                return ProtobufSerializer.class;
+            }
+
+            @Override
+            public String warning() {
+                return "";
+            }
+        };
+
         private final String ownerName;
         private final Set<Modifier> modifiers;
         private final String name;
@@ -150,36 +175,13 @@ public sealed interface ProtobufConverterMethod {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public <T extends Annotation> T getAnnotation(Class<T> annotation) {
-            if(annotation.getName().equals(ProtobufDeserializer.class.getName())) {
-                return (T) new ProtobufDeserializer() {
-                    @Override
-                    public Class<? extends Annotation> annotationType() {
-                        return ProtobufDeserializer.class;
-                    }
-
-                    @Override
-                    public BuilderBehaviour builderBehaviour() {
-                        return BuilderBehaviour.DISCARD;
-                    }
-
-                    @Override
-                    public String warning() {
-                        return "";
-                    }
-                };
-            }else if(annotation.getName().equals(ProtobufSerializer.class.getName())) {
-                return (T) new ProtobufSerializer() {
-                    @Override
-                    public Class<? extends Annotation> annotationType() {
-                        return ProtobufSerializer.class;
-                    }
-
-                    @Override
-                    public String warning() {
-                        return "";
-                    }
-                };
+            var annotationName = annotation.getName();
+            if(annotationName.equals(SERIALIZER_ANNOTATION_NAME)) {
+                return (T) SERIALIZER_ANNOTATION;
+            } else if(annotationName.equals(DESERIALIZER_ANNOTATION_NAME)) {
+                return (T) DESERIALIZER_ANNOTATION;
             }else {
                 return null;
             }

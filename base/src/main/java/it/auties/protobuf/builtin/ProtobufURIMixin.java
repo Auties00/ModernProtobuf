@@ -7,12 +7,10 @@ import it.auties.protobuf.model.ProtobufString;
 
 import java.net.URI;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.ADD;
-
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufURIMixin {
-    @ProtobufDeserializer(builderBehaviour = ADD)
+public final class ProtobufURIMixin {
+    @ProtobufDeserializer
     public static URI ofNullable(ProtobufString value) {
         return value == null ? null : URI.create(value.toString());
     }

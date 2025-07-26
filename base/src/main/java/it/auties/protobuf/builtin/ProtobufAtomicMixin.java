@@ -10,11 +10,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.OVERRIDE;
-
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufAtomicMixin {
+public final class ProtobufAtomicMixin {
     @ProtobufDefaultValue
     public static AtomicInteger newAtomicInt() {
         return new AtomicInteger();
@@ -35,22 +33,22 @@ public class ProtobufAtomicMixin {
         return new AtomicReference<>();
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static AtomicInteger ofAtomic(Integer value) {
         return value == null ? new AtomicInteger() : new AtomicInteger(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static AtomicLong ofAtomic(Long value) {
         return value == null ? new AtomicLong() : new AtomicLong(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static AtomicBoolean ofAtomic(Boolean value) {
         return value == null ? new AtomicBoolean() : new AtomicBoolean(value);
     }
 
-    @ProtobufDeserializer(builderBehaviour = OVERRIDE)
+    @ProtobufDeserializer
     public static <T> AtomicReference<T> ofAtomic(T value) {
         return new AtomicReference<>(value);
     }

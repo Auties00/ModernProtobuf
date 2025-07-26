@@ -7,14 +7,11 @@ import it.auties.protobuf.model.ProtobufString;
 
 import java.nio.ByteBuffer;
 
-import static it.auties.protobuf.annotation.ProtobufDeserializer.BuilderBehaviour.ADD;
-
 @SuppressWarnings("unused")
 @ProtobufMixin
-public class ProtobufLazyMixin {
+public final class ProtobufLazyMixin {
     @ProtobufDeserializer(
-            warning = "Possible implicit UTF-8 decoding from ProtobufString source to String",
-            builderBehaviour = ADD
+            warning = "Possible implicit UTF-8 decoding from ProtobufString source to String"
     )
     public static String ofAnyString(ProtobufString value) {
         return value == null ? null : value.toString();
@@ -26,8 +23,7 @@ public class ProtobufLazyMixin {
     }
 
     @ProtobufDeserializer(
-            warning = "Implicit UTF-8 decoding from ProtobufString.Lazy source to ProtobufString.Value",
-            builderBehaviour = ADD
+            warning = "Implicit UTF-8 decoding from ProtobufString.Lazy source to ProtobufString.Value"
     )
     public static ProtobufString.Value ofLazyString(ProtobufString.Lazy value) {
         if(value == null) {
@@ -39,8 +35,7 @@ public class ProtobufLazyMixin {
     }
 
     @ProtobufDeserializer(
-            warning = "Implicit memory copy from ByteBuffer to byte[]",
-            builderBehaviour = ADD
+            warning = "Implicit memory copy from ByteBuffer to byte[]"
     )
     public static byte[] ofBuffer(ByteBuffer value) {
         if(value == null) {

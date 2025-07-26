@@ -35,5 +35,10 @@
             <artifactId>protobuf-base</artifactId>
             <version>3.4.3</version>
         </dependency>
+        <dependency>
+            <groupId>com.palantir.javapoet</groupId>
+            <artifactId>javapoet</artifactId>
+            <version>0.7.0</version>
+        </dependency>
     </dependencies>
 </project>

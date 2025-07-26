@@ -1,4 +1,4 @@
-package it.auties.protobuf.serialization.generator.method;
+package it.auties.protobuf.serialization.generator;
 
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
@@ -47,7 +47,7 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
 
     @Override
     protected List<String> parametersTypes() {
-        var objectType = objectElement.element().getSimpleName().toString();
+        var objectType = objectElement.typeElement().getSimpleName().toString();
         if (objectElement.type() == Type.ENUM) {
             return List.of(objectType);
         }else if(objectElement.type() == Type.GROUP) {
