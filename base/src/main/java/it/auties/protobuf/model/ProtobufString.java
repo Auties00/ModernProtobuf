@@ -219,7 +219,7 @@ public sealed interface ProtobufString extends CharSequence {
                     var length = byteEnd - byteStart;
                     var array = new byte[length + 1];
                     System.arraycopy(bytes, byteStart, array, 0, length);
-                    array[length] = 63; // How do I fill this in?
+                    array[length] = 63; // TODO: How do I fill this in?
                     return new Lazy(array, 0, array.length);
                 }
                 charPos++;

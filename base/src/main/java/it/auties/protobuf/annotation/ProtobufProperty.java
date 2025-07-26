@@ -16,6 +16,16 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufProperty {
     /**
+     * The minimum valid index for a Protobuf property.
+     */
+    long MIN_INDEX = 1;
+
+    /**
+     * Represents the maximum allowable index for a Protobuf property.
+     */
+    long MAX_INDEX = 536_870_911; // 2^29 - 1
+
+    /**
      * Returns the index associated with the Protobuf property.
      *
      * @return the numeric index of the property

@@ -1,5 +1,8 @@
 package it.auties.protobuf.parser;
 
+import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufProperty;
+
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StreamTokenizer;
@@ -9,9 +12,6 @@ public final class ProtobufTokenizer {
     private static final String STRING_LITERAL = "\"";
     private static final String STRING_LITERAL_ALIAS_CHAR = "'";
     private static final String MAX_KEYWORD = "max";
-    private static final long MIN_FIELD_INDEX_WITH_ZERO = 0;
-    private static final long MIN_FIELD_INDEX = 1;
-    private static final long MAX_FIELD_INDEX = 536_870_911; // 2^29 - 1
 
     private final StreamTokenizer tokenizer;
 
@@ -89,26 +89,26 @@ public final class ProtobufTokenizer {
         return token.substring(1, token.length() - 1);
     }
 
-    public Long nextNullableIndex(boolean allowZero, boolean allowMax) throws IOException {
+    public Long nextNullableIndex(boolean enumeration, boolean allowMax) throws IOException {
         try {
             var token = nextNullableToken();
             if(token == null) {
                 return null;
             }
 
-            return parseIndex(token, allowZero, allowMax);
+            return parseIndex(token, enumeration, allowMax);
         } catch (NumberFormatException ex) {
             return null;
         }
     }
 
-    public Long nextRequiredIndex(boolean allowZero, boolean allowMax) throws IOException {
+    public Long nextRequiredIndex(boolean enumeration, boolean allowMax) throws IOException {
         var token = nextNullableToken();
         if(token == null) {
             throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
         }
 
-        var index = parseIndex(token, allowZero, allowMax);
+        var index = parseIndex(token, enumeration, allowMax);
         if(index == null) {
             throw new ProtobufParserException("Unexpected token " + token, tokenizer.lineno());
         }
@@ -116,9 +116,10 @@ public final class ProtobufTokenizer {
         return index;
     }
 
-    private static Long parseIndex(String token, boolean allowZero, boolean allowMax) {
+    private static Long parseIndex(String token, boolean enumeration, boolean allowMax) {
+        var max = enumeration ? ProtobufEnumIndex.MAX_VALUE : ProtobufProperty.MAX_INDEX;
         if(token.equalsIgnoreCase(MAX_KEYWORD)) {
-            return allowMax ? Long.MAX_VALUE : null;
+            return allowMax ? max : null;
         }
 
         var value = 0L;
@@ -142,7 +143,8 @@ public final class ProtobufTokenizer {
             value = r;
         }
 
-        if(value < (allowZero ? MIN_FIELD_INDEX_WITH_ZERO : MIN_FIELD_INDEX) || value > MAX_FIELD_INDEX) {
+        var min = enumeration ? ProtobufEnumIndex.MIN_VALUE : ProtobufProperty.MIN_INDEX;
+        if(value < min || value > max) {
             return null;
         }
 
@@ -276,18 +278,29 @@ public final class ProtobufTokenizer {
         }
 
         sealed interface Number extends ParsedToken {
-            boolean isValidIndex();
+            boolean isValidPropertyIndex();
+            boolean isValidEnumConstantIndex();
 
             record Integer(long value) implements Number {
                 @Override
-                public boolean isValidIndex() {
-                    return value >= MIN_FIELD_INDEX && value <= MAX_FIELD_INDEX;
+                public boolean isValidPropertyIndex() {
+                    return value >= ProtobufProperty.MIN_INDEX && value <= ProtobufProperty.MAX_INDEX;
+                }
+
+                @Override
+                public boolean isValidEnumConstantIndex() {
+                    return value >= ProtobufEnumIndex.MIN_VALUE && value <= ProtobufEnumIndex.MAX_VALUE;
                 }
             }
 
             record FloatingPoint(double value) implements Number {
                 @Override
-                public boolean isValidIndex() {
+                public boolean isValidPropertyIndex() {
+                    return false;
+                }
+
+                @Override
+                public boolean isValidEnumConstantIndex() {
                     return false;
                 }
             }

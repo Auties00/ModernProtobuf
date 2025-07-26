@@ -66,5 +66,13 @@ import java.lang.annotation.Target;
 @Target({ElementType.PARAMETER, ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufEnumIndex {
+    /**
+     * The minimum valid index for a Protobuf enum constant.
+     */
+    long MIN_VALUE = 0;
 
+    /**
+     * Represents the maximum allowable index for a Protobuf enum constant.
+     */
+    long MAX_VALUE = 2147483647; // 2^31
 }
