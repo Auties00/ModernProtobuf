@@ -14,7 +14,6 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufUnknownFields {
-
     /**
      * Returns the array of mixin classes associated with this configuration.
      * These can be used to specify using {@link Setter} how an existing data structure can be used by Protobuf
@@ -29,9 +28,9 @@ public @interface ProtobufUnknownFields {
     /**
      * This annotation can be applied to non-static methods in a type that is used as an unknown properties store
      * or to static methods in a {@link ProtobufMixin} for an existing data structure.
-     * <p>
-     * Here is an example on how to create a custom data structure:
-     * {@snippet :
+     * <h2>Usage Example:</h2>
+     * <h6>In a custom type:</h6>
+     * <pre>{@code
      * final class UnknownFeatures {
      *     private final Set<Integer> unknownFeatures;
      *
@@ -50,10 +49,9 @@ public @interface ProtobufUnknownFields {
      *         return unknownFeatures.contains(index);
      *     }
      * }
-     * }
-     * <p>
-     * Here is an example on how to extend an existing data structure in a {@link ProtobufMixin}:
-     * {@snippet :
+     * }</pre>
+     * <h6>In a {@link ProtobufMixin}:</h6>
+     * <pre>{@code
      * @ProtobufMixin
      * final class ProtobufMapMixin {
      *     @ProtobufUnknownFields.Setter
@@ -61,8 +59,8 @@ public @interface ProtobufUnknownFields {
      *         map.put(index, value);
      *     }
      * }
-     * }
-     */
+     *}</pre>
+     **/
     @Target(ElementType.METHOD)
     @Retention(RetentionPolicy.RUNTIME)
     @interface Setter {

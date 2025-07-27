@@ -9,19 +9,18 @@ import java.lang.annotation.Target;
  * This annotation can be applied to non-static methods,
  * in a type annotated with {@link ProtobufMixin}
  * or that should be interpreted as a {@link ProtobufMessage}.
- * <p>
- * Here is an example of how it can be used in a type that should be interpreted as a {@link ProtobufMessage}:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <h6>In a type interpreted as a {@link ProtobufMessage}:</h6>
+ * <pre>{@code
  * record BirthdayDate(int day, int month, int year) {
  *     @ProtobufSerializer
  *     public String formatted() {
  *         return "%s/%s/%s".formatted(day, month, year);
  *     }
  * }
- * }
- * <p>
- * Here is an example of how it can be used in a {@link ProtobufMixin}:
- * {@snippet :
+ * }</pre>
+ * <h6>In a {@link ProtobufMixin}:</h6>
+ * <pre>{@code
  * @ProtobufMixin
  * public final class ProtobufAtomicMixin {
  *     @ProtobufSerializer
@@ -29,8 +28,8 @@ import java.lang.annotation.Target;
  *         return value.get();
  *     }
  * }
- * }
- */
+ *}</pre>
+ **/
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufSerializer {

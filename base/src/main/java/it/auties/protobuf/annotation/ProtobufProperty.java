@@ -11,7 +11,12 @@ import java.lang.annotation.Target;
 /**
  * This annotation can be applied to non-static fields and method to describe a property
  * in a type annotated with {@link ProtobufMessage} or {@link ProtobufGroup}.
- */
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
+ * @ProtobufProperty(index = 1, type = ProtobufType.FIXED32)
+ * private int value;
+ * }</pre>
+ **/
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufProperty {

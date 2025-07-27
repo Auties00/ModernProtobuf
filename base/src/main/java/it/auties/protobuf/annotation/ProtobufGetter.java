@@ -7,15 +7,14 @@ import java.lang.annotation.Target;
 
 /**
  * This annotation can be applied to non-static methods to represent the getter for an existing {@link ProtobufProperty} with the same index.
- * <p>
- * Here is an example of how it can be used:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
  * @ProtobufMessage
- * public final class BoxMessage {
+ * public final class BoxedMessage {
  *     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
  *     private final ProtobufString value;
  *
- *     public BoxMessage(String value) {
+ *     public BoxedMessage(String value) {
  *         this.value = value;
  *     }
  *
@@ -24,8 +23,8 @@ import java.lang.annotation.Target;
  *         return value;
  *     }
  * }
- * }
- */
+ * }</pre>
+ **/
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufGetter {

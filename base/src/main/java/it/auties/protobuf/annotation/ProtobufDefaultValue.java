@@ -10,9 +10,9 @@ import java.lang.annotation.Target;
  * in a type annotated with {@link ProtobufMessage}, {@link ProtobufGroup} or {@link ProtobufMixin},
  * or to an enum constant, in an enum annotated with {@link ProtobufEnum},
  * to indicate the default value of a type.
- * <p>
- * Here is an example of how it can be used in a {@link ProtobufMessage}:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <h6>In a {@link ProtobufMessage}:</h6>
+ * <pre>{@code
  * @ProtobufMessage
  * public record WrapperMessage(
  *     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
@@ -25,10 +25,9 @@ import java.lang.annotation.Target;
  *         return EMPTY;
  *     }
  * }
- * }
- * <p>
- * Here is an example of how it can be used in a {@link ProtobufMixin}:
- * {@snippet :
+ * }</pre>
+ * <h6>In a {@link ProtobufMixin}:</h6>
+ * <pre>{@code
  * @ProtobufMixin
  * public final class ProtobufAtomicMixin {
  *     @ProtobufDefaultValue
@@ -36,9 +35,8 @@ import java.lang.annotation.Target;
  *         return new AtomicInteger();
  *     }
  * }
- * }
+ * }</pre>
  */
-
 @Target({ElementType.METHOD, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufDefaultValue {

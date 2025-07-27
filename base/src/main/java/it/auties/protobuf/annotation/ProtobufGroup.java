@@ -7,9 +7,8 @@ import java.lang.annotation.Target;
 
 /**
  * This annotation can be applied to a type to represent a Protobuf2 Group.
- * <p>
- * Here is an example of how it can be used:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
  * @ProtobufGroup
  * record Group(
  *     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
@@ -17,9 +16,8 @@ import java.lang.annotation.Target;
  * ) {
  *
  * }
- * }
- */
-
+ * }</pre>
+ **/
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufGroup {
@@ -32,7 +30,6 @@ public @interface ProtobufGroup {
      */
     String[] reservedNames() default {};
 
-
     /**
      * Specifies the numeric indexes that are reserved and cannot be used
      * in the context where this annotation is applied. Reserved indexes
@@ -42,7 +39,6 @@ public @interface ProtobufGroup {
      * @return an array of integers representing the reserved indexes
      */
     int[] reservedIndexes() default {};
-
 
     /**
      * Specifies the numeric ranges that are reserved and cannot be used

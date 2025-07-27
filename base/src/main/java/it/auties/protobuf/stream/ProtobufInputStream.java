@@ -24,6 +24,35 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * An abstract input stream for reading Protocol Buffer encoded data.
+ * <p>
+ * This class provides a comprehensive API for deserializing Protocol Buffer messages from various
+ * data sources including byte arrays, ByteBuffers, and InputStreams. It supports all Protocol Buffer
+ * wire types and provides both type-safe and unchecked reading methods.
+ * <p>
+ * The class implements a tag-based reading pattern where {@link #readTag()} is called first to
+ * identify the field number and wire type, followed by the appropriate read method based on the
+ * expected data type.
+ *
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
+ * try (ProtobufInputStream input = ProtobufInputStream.fromBytes(data)) {
+ *     while (input.readTag()) {
+ *         int fieldNumber = input.index();
+ *         switch (fieldNumber) {
+ *             case 1 -> input.readString();
+ *             case 2 -> input.readInt32();
+ *             default -> input.skipUnknown();
+ *         };
+ *     }
+ * }
+ * }</pre>
+ *
+ * @see ProtobufOutputStream
+ * @see AutoCloseable
+ */
+@SuppressWarnings("unused")
 public abstract class ProtobufInputStream implements AutoCloseable {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
@@ -47,7 +76,11 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     }
 
     public static ProtobufInputStream fromStream(InputStream buffer) {
-        return new Stream(buffer);
+        return new Stream(buffer, true);
+    }
+
+    public static ProtobufInputStream fromStream(InputStream buffer, boolean autoclose) {
+        return new Stream(buffer, autoclose);
     }
 
     public boolean readTag() {
@@ -415,27 +448,42 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
     }
 
-    public Object readUnknown(boolean allocate) {
+    public void skipUnknown() {
+        switch (wireType) {
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> readInt64();
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> readFixed32();
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> readFixed64();
+            case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readBytes();
+            case ProtobufWireType.WIRE_TYPE_START_OBJECT -> skipGroup();
+            default -> throw ProtobufDeserializationException.invalidWireType(wireType);
+        };
+    }
+
+    private void skipGroup() {
+        while (readTag()) {
+            skipUnknown();
+        }
+        assertGroupClosed(index);
+    }
+
+    public Object readUnknown() {
         return switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_VAR_INT -> readInt64();
             case ProtobufWireType.WIRE_TYPE_FIXED32 -> readFixed32();
             case ProtobufWireType.WIRE_TYPE_FIXED64 -> readFixed64();
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readBytes();
-            case ProtobufWireType.WIRE_TYPE_START_OBJECT -> readGroup(allocate);
+            case ProtobufWireType.WIRE_TYPE_START_OBJECT -> readGroup();
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
 
-    private Map<Integer, Object> readGroup(boolean allocate) {
-        var group = allocate ? new HashMap<Integer, Object>() : null;
-        var groupIndex = index;
+    private Map<Integer, Object> readGroup() {
+        var group = new HashMap<Integer, Object>();
         while (readTag()) {
-            var value = readUnknown(allocate);
-            if(group != null) {
-                group.put(index, value);
-            }
+            var value = readUnknown();
+            group.put(index, value);
         }
-        assertGroupClosed(groupIndex);
+        assertGroupClosed(index);
         return group;
     }
 
@@ -492,9 +540,9 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         private int bufferWritePosition;
         private int bufferLength;
 
-        private Stream(InputStream inputStream) {
+        private Stream(InputStream inputStream, boolean autoclose) {
             this.inputStream = inputStream;
-            this.autoclose = true;
+            this.autoclose = autoclose;
             this.length = -1;
             this.buffer = new byte[MAX_VAR_INT_SIZE];
         }

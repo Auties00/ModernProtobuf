@@ -10,9 +10,8 @@ import java.lang.annotation.Target;
  * in a non-abstract class or record annotated with {@link ProtobufMessage} or {@link ProtobufGroup}
  * to auto-generate a new builder class named {@link ProtobufBuilder#className()}
  * using the parameters of the annotated type.
- * <p> 
- * Here is an example of how it can be used:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
  * @ProtobufMessage
  * public record InteractiveHeader(
  *     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
@@ -48,7 +47,7 @@ import java.lang.annotation.Target;
  *         return builder.build();
  *     }
  * }
- * }
+ * }</pre>
  */
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
 @Retention(RetentionPolicy.RUNTIME)

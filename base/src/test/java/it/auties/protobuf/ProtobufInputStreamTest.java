@@ -12,7 +12,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProtobufInputStreamTest {
-
     @Test
     void testReadInt32() {
         // 300 -> varint encoding: 0xAC, 0x02
@@ -129,7 +128,7 @@ class ProtobufInputStreamTest {
         byte[] payload = new byte[]{0x0A, 0x03, 'a', 'b', 'c'};
         var in1 = ProtobufInputStream.fromBytes(payload);
         assertTrue(in1.readTag());
-        Object o1 = in1.readUnknown(true);
+        Object o1 = in1.readUnknown();
         assertTrue(o1 instanceof ByteBuffer);
         ByteBuffer buf1 = (ByteBuffer) o1;
         byte[] got1 = new byte[buf1.remaining()];
@@ -138,7 +137,7 @@ class ProtobufInputStreamTest {
 
         var in2 = ProtobufInputStream.fromBytes(payload);
         assertTrue(in2.readTag());
-        Object o2 = in2.readUnknown(false);
+        Object o2 = in2.readUnknown();
         assertTrue(o2 instanceof ByteBuffer);
         ByteBuffer buf2 = (ByteBuffer) o2;
         byte[] got2 = new byte[buf2.remaining()];

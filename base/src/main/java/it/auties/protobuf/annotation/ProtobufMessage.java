@@ -7,9 +7,8 @@ import java.lang.annotation.Target;
 
 /**
  * This annotation can be applied to a type to represent a Protobuf Message.
- * <p>
- * Here is an example of how it can be used:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
  * @ProtobufMessage
  * record Message(
  *     @ProtobufProperty(index = 1, type = ProtobufType.STRING)
@@ -17,8 +16,8 @@ import java.lang.annotation.Target;
  * ) {
  *
  * }
- * }
- */
+ * }</pre>
+ **/
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufMessage {
@@ -31,7 +30,6 @@ public @interface ProtobufMessage {
      */
     String[] reservedNames() default {};
 
-
     /**
      * Specifies the numeric indexes that are reserved and cannot be used
      * in the context where this annotation is applied. Reserved indexes
@@ -41,7 +39,6 @@ public @interface ProtobufMessage {
      * @return an array of integers representing the reserved indexes
      */
     int[] reservedIndexes() default {};
-
 
     /**
      * Specifies the numeric ranges that are reserved and cannot be used

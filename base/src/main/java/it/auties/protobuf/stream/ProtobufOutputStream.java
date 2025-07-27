@@ -10,6 +10,32 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 
+/**
+ * An abstract output stream for writing Protocol Buffer encoded data.
+ * <p>
+ * This class provides a comprehensive API for serializing Protocol Buffer messages to various
+ * output destinations, including byte arrays, ByteBuffers, and OutputStreams.
+ * </p>
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
+ * // Writing to a byte array
+ * ProtobufOutputStream<byte[]> output = ProtobufOutputStream.toBytes(1024);
+ * output.writeString(1, ProtobufString.wrap("Hello"));
+ * output.writeInt32(2, 42);
+ * output.writeBool(3, true);
+ * byte[] result = output.toOutput();
+ * }</pre>
+ *
+ * <h2>Size Calculation:</h2>
+ * <p>
+ * The class provides static utility methods for calculating the serialized size of various
+ * field types before writing, which is crucial for performance.
+ * </p>
+ *
+ * @param <OUTPUT> the type of output this stream produces (byte[], ByteBuffer, or OutputStream)
+ *
+ * @see ProtobufInputStream
+ */
 @SuppressWarnings("unused")
 public abstract class ProtobufOutputStream<OUTPUT> {
     public static int getFieldSize(int fieldNumber, int wireType) {

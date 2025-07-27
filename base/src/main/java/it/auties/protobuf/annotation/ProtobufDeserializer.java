@@ -9,9 +9,9 @@ import java.lang.annotation.Target;
  * This annotation can be applied to static methods,
  * in a type annotated with {@link ProtobufMixin}
  * or that should be interpreted as a {@link ProtobufMessage}.
- * <p>
- * Here is an example of how it can be used in a type that should be interpreted as a {@link ProtobufMessage}:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <h6>In a {@link ProtobufMessage}:</h6>
+ * <pre>{@code
  * record BirthdayDate(int day, int month, int year) {
  *     @ProtobufDeserializer
  *     static of(String date) {
@@ -34,10 +34,9 @@ import java.lang.annotation.Target;
  *         }
  *     }
  * }
- * }
- * <p>
- * Here is an example of how it can be used in a {@link ProtobufMixin}:
- * {@snippet :
+ * }</pre>
+ * <h6>In a {@link ProtobufMixin}:</h6>
+ * <pre>{@code
  * @ProtobufMixin
  * public final class ProtobufAtomicMixin {
  *     @ProtobufDeserializer
@@ -45,8 +44,8 @@ import java.lang.annotation.Target;
  *         return value == null ? new AtomicInteger() : new AtomicInteger(value);
  *     }
  * }
- *}
- */
+ *}</pre>
+ **/
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufDeserializer {

@@ -8,9 +8,9 @@ import java.lang.annotation.Target;
 /**
  * This annotation can be applied to constructor parameters, non-static fields or non-static methods to represent the index of a {@link ProtobufEnum}.
  * If no index is annotated with {@link ProtobufEnumIndex}, {@link Enum#ordinal()} will be used implicitly.
- * <p>
- * Here is an example of how it can be used on a constructor parameter:
- * {@snippet :
+ * <h2>Usage Example:</h2>
+ * <h6>In a constructor::</h6>
+ * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
  *     FIRST(0),
@@ -23,10 +23,9 @@ import java.lang.annotation.Target;
  *         this.index = index;
  *     }
  * }
- * }
- * <p>
- * Here is an example of how it can be used on a non-static field:
- * {@snippet :
+ * }</pre>
+ * <h6>In a field:</h6>
+ * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
  *     FIRST(0),
@@ -40,10 +39,9 @@ import java.lang.annotation.Target;
  *         this.index = index;
  *     }
  * }
- * }
- * <p>
- * Here is an example of how it can be used on a non-static method:
- * {@snippet :
+ *}</pre>
+ * <h6>In a method:</h6>
+ * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
  *     FIRST(0),
@@ -61,8 +59,8 @@ import java.lang.annotation.Target;
  *         return index;
  *     }
  * }
- * }
- */
+ *}</pre>
+ **/
 @Target({ElementType.PARAMETER, ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufEnumIndex {
