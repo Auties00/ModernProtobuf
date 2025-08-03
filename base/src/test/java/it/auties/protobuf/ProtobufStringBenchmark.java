@@ -54,120 +54,108 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void shortStringCharAt() {
-        var string = new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8).charAt(i);
         }
     }
     
     @Benchmark
     public void shortLazyCharAt() {
-        var string = ProtobufString.lazy(SHORT_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(SHORT_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            ProtobufString.lazy(SHORT_UTF8_BYTES).charAt(i);
         }
     }
     
     @Benchmark
     public void mediumStringCharAt() {
-        var string = new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8).charAt(i);
         }
     }
     
     @Benchmark
     public void mediumLazyCharAt() {
-        var string = ProtobufString.lazy(MEDIUM_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(MEDIUM_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            ProtobufString.lazy(MEDIUM_UTF8_BYTES).charAt(i);
         }
     }
     
     @Benchmark
     public void longStringCharAt() {
-        var string = new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8).charAt(i);
         }
     }
     
     @Benchmark
     public void longLazyCharAt() {
-        var string = ProtobufString.lazy(LONG_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(LONG_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            string.charAt(i);
+            ProtobufString.lazy(LONG_UTF8_BYTES).charAt(i);
         }
     }
     
     @Benchmark
     public void shortStringSubSequence() {
-        var string = new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                new String(SHORT_UTF8_BYTES, StandardCharsets.UTF_8).subSequence(i, j);
             }
         }
     }
     
     @Benchmark
     public void shortLazySubSequence() {
-        var string = ProtobufString.lazy(SHORT_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(SHORT_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                ProtobufString.lazy(SHORT_UTF8_BYTES).subSequence(i, j);
             }
         }
     }
     
     @Benchmark
     public void mediumStringSubSequence() {
-        var string = new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                new String(MEDIUM_UTF8_BYTES, StandardCharsets.UTF_8).subSequence(i, j);
             }
         }
     }
     
     @Benchmark
     public void mediumLazySubSequence() {
-        var string = ProtobufString.lazy(MEDIUM_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(MEDIUM_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                ProtobufString.lazy(MEDIUM_UTF8_BYTES).subSequence(i, j);
             }
         }
     }
     
     @Benchmark
     public void longStringSubSequence() {
-        var string = new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8);
-        var length = string.length();
+        var length = new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                new String(LONG_UTF8_BYTES, StandardCharsets.UTF_8).subSequence(i, j);
             }
         }
     }
     
     @Benchmark
     public void longLazySubSequence() {
-        var string = ProtobufString.lazy(LONG_UTF8_BYTES);
-        var length = string.length();
+        var length = ProtobufString.lazy(LONG_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                string.subSequence(i, j);
+                ProtobufString.lazy(LONG_UTF8_BYTES).subSequence(i, j);
             }
         }
     }

@@ -124,107 +124,12 @@ public sealed interface ProtobufString extends CharSequence {
 
         @Override
         public char charAt(int index) {
-            if(decoded != null) {
-                return decoded.charAt(index);
-            }
-
-            if (index < 0 || index >= length()) {
-                throw new StringIndexOutOfBoundsException(index);
-            }
-
-            var byteIndex = offset;
-            var charCount = 0;
-            while (byteIndex < offset + length) {
-                var b = bytes[byteIndex];
-                if ((b & 0x80) == 0) { // ASCII character (1 byte)
-                    if (charCount == index) {
-                        return (char) (b & 0x7F);
-                    }
-                    byteIndex++;
-                    charCount++;
-                } else if ((b & 0xE0) == 0xC0) { // 2 byte sequence
-                    if (charCount == index) {
-                        return (char) (((b & 0x1F) << 6) | (bytes[byteIndex + 1] & 0x3F));
-                    }
-                    byteIndex += 2;
-                    charCount++;
-                } else if ((b & 0xF0) == 0xE0) { // 3 byte sequence
-                    if (charCount == index) {
-                        return (char) (((b & 0x0F) << 12) |
-                                ((bytes[byteIndex + 1] & 0x3F) << 6) |
-                                (bytes[byteIndex + 2] & 0x3F));
-                    }
-                    byteIndex += 3;
-                    charCount++;
-                } else { // 4 byte sequence (surrogate pair)
-                    if (charCount == index) {
-                        var codePoint = ((b & 0x07) << 18) |
-                                ((bytes[byteIndex + 1] & 0x3F) << 12) |
-                                ((bytes[byteIndex + 2] & 0x3F) << 6) |
-                                (bytes[byteIndex + 3] & 0x3F);
-                        return Character.highSurrogate(codePoint);
-                    } else if (charCount == index - 1) {
-                        var codePoint = ((b & 0x07) << 18) |
-                                ((bytes[byteIndex + 1] & 0x3F) << 12) |
-                                ((bytes[byteIndex + 2] & 0x3F) << 6) |
-                                (bytes[byteIndex + 3] & 0x3F);
-                        return Character.lowSurrogate(codePoint);
-                    }
-                    byteIndex += 4;
-                    charCount += 2;
-                }
-            }
-
-            throw new InternalError("Fast charAt path failed");
+            return toString().charAt(index);
         }
 
         @Override
         public CharSequence subSequence(int start, int end) {
-            if (start < 0 || end > length() || start > end) {
-                throw new StringIndexOutOfBoundsException(
-                        String.format("start %d, end %d, length %d", start, end, length()));
-            }
-
-            var byteStart = offset;
-            var charPos = 0;
-            while (charPos < start) {
-                var b = bytes[byteStart];
-                if ((b & 0x80) == 0) { // ASCII
-                    byteStart += 1;
-                } else if ((b & 0xE0) == 0xC0) { // 2 bytes
-                    byteStart += 2;
-                } else if ((b & 0xF0) == 0xE0) { // 3 bytes
-                    byteStart += 3;
-                } else if(charPos + 1 < end) { // 4 bytes (non-leading surrogate pair)
-                    byteStart += 4;
-                    charPos++;
-                }else { // 4 bytes (leading surrogate pair)
-                    throw new UnsupportedOperationException();
-                }
-                charPos++;
-            }
-            var byteEnd = byteStart;
-            while (charPos < end) {
-                byte b = bytes[byteEnd];
-                if ((b & 0x80) == 0) { // ASCII
-                    byteEnd += 1;
-                } else if ((b & 0xE0) == 0xC0) { // 2 bytes
-                    byteEnd += 2;
-                } else if ((b & 0xF0) == 0xE0) { // 3 bytes
-                    byteEnd += 3;
-                } else if(charPos + 1 < end) { // 4 bytes (non-trailing surrogate pair)
-                    byteEnd += 4;
-                    charPos++;
-                }else { // 4 bytes (trailing surrogate pair
-                    var length = byteEnd - byteStart;
-                    var array = new byte[length + 1];
-                    System.arraycopy(bytes, byteStart, array, 0, length);
-                    array[length] = 63; // TODO: How do I fill this in?
-                    return new Lazy(array, 0, array.length);
-                }
-                charPos++;
-            }
-            return new Lazy(bytes, byteStart, byteEnd - byteStart);
+            return toString().subSequence(start, end);
         }
 
         @Override
