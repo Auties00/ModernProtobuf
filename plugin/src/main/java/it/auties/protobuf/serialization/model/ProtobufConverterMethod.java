@@ -1,14 +1,10 @@
 package it.auties.protobuf.serialization.model;
 
-import it.auties.protobuf.annotation.ProtobufDeserializer;
-import it.auties.protobuf.annotation.ProtobufSerializer;
-
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Annotation;
 import java.util.*;
 
 public sealed interface ProtobufConverterMethod {
@@ -19,10 +15,10 @@ public sealed interface ProtobufConverterMethod {
     String name();
     boolean parametrized();
     List<TypeMirror> parameters();
-    <T extends Annotation> T getAnnotation(Class<T> annotation);
+    String warning();
 
-    static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized) {
-        return new Concrete(element, parametrized);
+    static ProtobufConverterMethod of(ExecutableElement element, boolean parametrized, String warning) {
+        return new Concrete(element, parametrized, warning);
     }
 
     static ProtobufConverterMethod of(String owner, Set<Modifier> modifiers, TypeMirror returnType, String name, TypeMirror... parameters) {
@@ -32,10 +28,12 @@ public sealed interface ProtobufConverterMethod {
     final class Concrete implements ProtobufConverterMethod {
         private final ExecutableElement element;
         private final boolean parametrized;
+        private final String warning;
 
-        private Concrete(ExecutableElement element, boolean parametrized) {
+        private Concrete(ExecutableElement element, boolean parametrized, String warning) {
             this.element = element;
             this.parametrized = parametrized;
+            this.warning = warning;
         }
 
         @Override
@@ -73,13 +71,13 @@ public sealed interface ProtobufConverterMethod {
         }
 
         @Override
-        public <T extends Annotation> T getAnnotation(Class<T> annotation) {
-            return element.getAnnotation(annotation);
+        public Set<Modifier> modifiers() {
+            return element.getModifiers();
         }
 
         @Override
-        public Set<Modifier> modifiers() {
-            return element.getModifiers();
+        public String warning() {
+            return warning;
         }
 
         @Override
@@ -100,31 +98,6 @@ public sealed interface ProtobufConverterMethod {
     }
 
     final class Synthetic implements ProtobufConverterMethod {
-        private static final String DESERIALIZER_ANNOTATION_NAME = ProtobufDeserializer.class.getName();
-        private static final ProtobufDeserializer DESERIALIZER_ANNOTATION = new ProtobufDeserializer() {
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return ProtobufDeserializer.class;
-            }
-
-            @Override
-            public String warning() {
-                return "";
-            }
-        };
-        private static final String SERIALIZER_ANNOTATION_NAME = ProtobufSerializer.class.getName();
-        private static final ProtobufSerializer SERIALIZER_ANNOTATION = new ProtobufSerializer() {
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return ProtobufSerializer.class;
-            }
-
-            @Override
-            public String warning() {
-                return "";
-            }
-        };
-
         private final String ownerName;
         private final Set<Modifier> modifiers;
         private final String name;
@@ -175,19 +148,6 @@ public sealed interface ProtobufConverterMethod {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
-        public <T extends Annotation> T getAnnotation(Class<T> annotation) {
-            var annotationName = annotation.getName();
-            if(annotationName.equals(SERIALIZER_ANNOTATION_NAME)) {
-                return (T) SERIALIZER_ANNOTATION;
-            } else if(annotationName.equals(DESERIALIZER_ANNOTATION_NAME)) {
-                return (T) DESERIALIZER_ANNOTATION;
-            }else {
-                return null;
-            }
-        }
-
-        @Override
         public boolean equals(Object obj) {
             return obj instanceof Synthetic that
                     && Objects.equals(ownerName, that.ownerName)
@@ -202,6 +162,11 @@ public sealed interface ProtobufConverterMethod {
         @Override
         public String toString() {
             return ownerName() + "#" + name();
+        }
+
+        @Override
+        public String warning() {
+            return "";
         }
     }
 }

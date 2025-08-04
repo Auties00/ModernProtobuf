@@ -75,7 +75,7 @@ public class MessagePropertyGetterTest {
             return value;
         }
 
-        @ProtobufGetter(index = 2, type = ProtobufType.STRING)
+        @ProtobufProperty(index = 2, type = ProtobufType.STRING)
         public ProtobufString tag() {
             return value;
         }

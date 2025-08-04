@@ -3,16 +3,10 @@ package it.auties.protobuf.serialization;
 import com.sun.source.tree.*;
 import com.sun.source.util.Trees;
 import it.auties.protobuf.annotation.*;
-import it.auties.protobuf.builtin.*;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.generator.*;
 import it.auties.protobuf.serialization.graph.ProtobufConverterGraph;
-import it.auties.protobuf.serialization.model.ProtobufConverterElement;
-import it.auties.protobuf.serialization.model.ProtobufConverterMethod;
-import it.auties.protobuf.serialization.model.ProtobufEnumMetadata;
-import it.auties.protobuf.serialization.model.ProtobufObjectElement;
-import it.auties.protobuf.serialization.model.ProtobufUnknownFieldsElement;
-import it.auties.protobuf.serialization.model.ProtobufPropertyType;
+import it.auties.protobuf.serialization.model.*;
 import it.auties.protobuf.serialization.support.Checks;
 import it.auties.protobuf.serialization.support.Messages;
 import it.auties.protobuf.serialization.support.Types;
@@ -40,18 +34,6 @@ import java.util.stream.IntStream;
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class ProtobufJavacPlugin extends AbstractProcessor {
-    // Mirrored list of default mixins
-    private static final Class<?>[] DEFAULT_MIXINS = {
-            ProtobufAtomicMixin.class,
-            ProtobufOptionalMixin.class,
-            ProtobufUUIDMixin.class,
-            ProtobufURIMixin.class,
-            ProtobufRepeatedMixin.class,
-            ProtobufMapMixin.class,
-            ProtobufFutureMixin.class,
-            ProtobufLazyMixin.class
-    };
-
     @SuppressWarnings("unchecked")
     private static final Class<? extends Annotation>[] PARSABLE_ANNOTATIONS = new Class[]{
             ProtobufMessage.class,
@@ -148,7 +130,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                     typeGenerator.createClass(packageName.getQualifiedName().toString(), object);
                     for (var builder : object.builders()) {
                         var methodGenerator = new ProtobufBuilderMethodGenerator(processingEnv.getFiler());
-                        methodGenerator.createClass(packageName.getQualifiedName().toString(), builder);
+                        methodGenerator.createClass(packageName.getQualifiedName().toString(), object, builder);
                     }
                 }
             }
@@ -205,8 +187,9 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 for (var element : methodPath) {
-                    if(!element.warning().isEmpty()) {
-                        messages.printWarning(element.warning(), unattributedElement.invoker());
+                    var warning = element.method().warning();
+                    if(!warning.isEmpty()) {
+                        messages.printWarning(warning, unattributedElement.invoker());
                     }
                     var serializerElement = new ProtobufConverterElement.Attributed.Serializer(
                             element.method(),
@@ -226,16 +209,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 }
 
                 for (var element : methodPath) {
-                    if(!element.warning().isEmpty()) {
-                        messages.printWarning(element.warning(), unattributedElement.invoker());
+                    var warning = element.method().warning();
+                    if(!warning.isEmpty()) {
+                        messages.printWarning(warning, unattributedElement.invoker());
                     }
-                    var annotation = element.method()
-                            .getAnnotation(ProtobufDeserializer.class);
                     var deserializerElement = new ProtobufConverterElement.Attributed.Deserializer(
                             element.method(),
                             from,
-                            element.returnType(),
-                            annotation.builderSetterMethod()
+                            element.returnType()
                     );
                     results.add(deserializerElement);
                     from = element.returnType();
@@ -269,33 +250,58 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private Set<ProtobufObjectElement> processObject(TypeElement typeElement) {
-        var isGroup = typeElement.getAnnotation(ProtobufGroup.class) != null;
-        var deserializer = getMessageDeserializer(typeElement)
-                .orElse(null);
-        var messageElement = isGroup ? ProtobufObjectElement.ofGroup(typeElement, deserializer, reserved) : ProtobufObjectElement.ofMessage(typeElement, deserializer, reserved);
-        var results = processObject(messageElement, messageElement.typeElement());
-        if (isGroup) {
+        var groupAnnotation = typeElement.getAnnotation(ProtobufGroup.class);
+        if(groupAnnotation != null) {
+            var deserializer = GetObjectDeserializer(typeElement)
+                    .orElse(null);
+            var reserved = ProtobufReservedElement.of(groupAnnotation);
+            var groupElement =  ProtobufObjectElement.ofGroup(typeElement, deserializer, reserved);
+            var results = processObject(groupElement, groupElement.typeElement());
             linkGroup(typeElement.asType());
-        } else {
-            linkMessage(typeElement.asType());
+            if (!hasPropertiesConstructor(groupElement)) {
+                messages.printError("Missing protobuf constructor: a protobuf group must provide a constructor that takes as parameters only its properties, following their declaration order, and, if present, its unknown fields wrapper", groupElement.typeElement());
+            }
+            return results;
         }
 
-        if (!hasPropertiesConstructor(messageElement)) {
-            messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes only its properties, following their declaration order, and, if present, its unknown fields wrapper as parameters", messageElement.typeElement());
+        var messageAnnotation = typeElement.getAnnotation(ProtobufMessage.class);
+        if(messageAnnotation != null) {
+            var deserializer = GetObjectDeserializer(typeElement)
+                    .orElse(null);
+            var reserved = ProtobufReservedElement.of(messageAnnotation);
+            var messageElement = ProtobufObjectElement.ofMessage(typeElement, deserializer, reserved);
+            var results = processObject(messageElement, messageElement.typeElement());
+            linkMessage(typeElement.asType());
+            if (!hasPropertiesConstructor(messageElement)) {
+                messages.printError("Missing protobuf constructor: a protobuf message must provide a constructor that takes as parameters only its properties, following their declaration order, and, if present, its unknown fields wrapper", messageElement.typeElement());
+            }
+            return results;
         }
-        return results;
+
+        // An error will be printed by the preliminary checks
+        return Set.of();
     }
 
-    private Optional<ProtobufConverterMethod> getMessageDeserializer(TypeElement message) {
-        return message.getEnclosedElements()
-                .stream()
-                .filter(entry -> entry instanceof ExecutableElement method && method.getAnnotation(ProtobufDeserializer.class) != null)
-                .map(entry -> (ExecutableElement) entry)
-                .reduce((first, second) -> {
-                    messages.printError("Duplicated protobuf builder delegate: a message should provide only one method annotated with @ProtobufDeserializer", second);
-                    return first;
-                })
-                .map(method -> ProtobufConverterMethod.of(method, types.isParametrized(method)));
+    private Optional<ProtobufConverterMethod> GetObjectDeserializer(TypeElement message) {
+        ProtobufConverterMethod deserializer = null;
+        for(var element : message.getEnclosedElements()) {
+            if(!(element instanceof ExecutableElement method)) {
+                continue;
+            }
+
+            var annotation = method.getAnnotation(ProtobufDeserializer.class);
+            if(annotation == null) {
+                continue;
+            }
+
+            if(deserializer != null) {
+                messages.printError("Duplicated protobuf builder delegate: a message or group should provide only one method annotated with @ProtobufDeserializer", method);
+                continue;
+            }
+
+            deserializer = ProtobufConverterMethod.of(method, types.isParametrized(method), annotation.warning());
+        }
+        return Optional.ofNullable(deserializer);
     }
 
     private Set<ProtobufObjectElement> processObject(ProtobufObjectElement messageElement, TypeElement typeElement) {
@@ -371,7 +377,8 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // Links the method in the graph, so it can be used to resolve type dependencies later
         var from = executableElement.getParameters().getFirst().asType();
         var to = executableElement.getReturnType();
-        deserializersGraph.link(from, to, ProtobufConverterMethod.of(executableElement, types.isParametrized(executableElement)), deserializer.warning());
+        ProtobufConverterMethod method = ProtobufConverterMethod.of(executableElement, types.isParametrized(executableElement), deserializer.warning());
+        deserializersGraph.link(from, to, method);
     }
 
     // Does the actual processing on an input method if it's annotated with @ProtobufSerializer
@@ -385,71 +392,15 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         // Links the method in the graph, so it can be used to resolve type dependencies later
         var from = !executableElement.getParameters().isEmpty() ? executableElement.getParameters().getFirst().asType() : executableElement.getEnclosingElement().asType();
         var to = executableElement.getReturnType();
-        serializersGraph.link(from, to, ProtobufConverterMethod.of(executableElement, types.isParametrized(executableElement)), serializer.warning());
+        var method = ProtobufConverterMethod.of(executableElement, types.isParametrized(executableElement), serializer.warning());
+        serializersGraph.link(from, to, method);
     }
 
     private void handleMessageGetter(ProtobufObjectElement messageElement, ExecutableElement executableElement, ProtobufGetter getter) {
-        if(hasMatchedProperty(messageElement, getter)) {
-            if(getter.type() != ProtobufType.UNKNOWN) {
-                messages.printError("Invalid metadata: only elements annotated with @ProtobufGetter that represent a standalone property can specify a type", executableElement);
-            }else if(getter.packed()) {
-                messages.printError("Invalid metadata: only elements annotated with @ProtobufGetter that represent a standalone property can specify whether they are packed", executableElement);
-            }else if(isNonDefaultMixin(getter)) {
-                messages.printError("Invalid metadata: only elements annotated with @ProtobufGetter that represent a standalone property can specify mixins", executableElement);
-            }
-
+        if (hasMatchedProperty(messageElement, getter)) {
             return;
         }
-
-        var property = types.getProperty(getter);
-        if(getter.type() == ProtobufType.UNKNOWN) {
-            messages.printError("Type error: standalone property getters must specify a valid protobuf type", executableElement);
-            return;
-        }
-
-        if(getter.packed() && !checks.isValidPackedProperty(executableElement, property)) {
-            return;
-        }
-
-        var type = getPropertyType(executableElement, executableElement.getReturnType(), executableElement.getReturnType(), property);
-        if(type.isEmpty()) {
-            return;
-        }
-
-        var syntheticPropertyName = types.getPropertyName(executableElement.getSimpleName().toString());
-        if(!messageElement.isNameAllowed(syntheticPropertyName)) {
-            messages.printError("Restricted message property name: %s is not allowed as it's marked as reserved".formatted(syntheticPropertyName), executableElement);
-        }
-
-        if(!messageElement.isIndexAllowed(property.index())) {
-            messages.printError("Restricted message property index: %s is not allowed as it's marked as reserved".formatted(property.index()), executableElement);
-        }
-
-        var error = messageElement.addProperty(executableElement, executableElement, type.get(), property);
-        if (error.isPresent()) {
-            messages.printError("Duplicated message property: %s and %s with index %s".formatted(executableElement.getSimpleName(), error.get().name(), getter.index()), executableElement);
-            return;
-        }
-
-        var mixins = types.getMixins(getter);
-        linkMixins(mixins);
-    }
-
-    private boolean isNonDefaultMixin(ProtobufGetter getter) {
-        var mixins = types.getMixins(getter);
-        if(mixins.size() != DEFAULT_MIXINS.length) {
-            return true;
-        }
-
-        var mixinsIterator = mixins.iterator();
-        for (Class<?> expectedMixin : DEFAULT_MIXINS) {
-            var actualMixin = mixinsIterator.next();
-            if (!actualMixin.getQualifiedName().contentEquals(expectedMixin.getCanonicalName())) {
-                return true;
-            }
-        }
-
-        return false;
+        messages.printError("Invalid getter: there is no property with index \"" + getter.index() + "\" in \"" + messageElement.typeElement().getQualifiedName().toString() + "\"", executableElement);
     }
 
     private boolean hasMatchedProperty(ProtobufObjectElement messageElement, ProtobufGetter getter) {
@@ -537,7 +488,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         var mixins = types.getMixins(unknownFieldsAnnotation);
         var setter = findUnknownFieldsSetterInType(unknownFieldsDeclaredType);
         if(setter != null) {
-            return checkUnknownFieldsSetter(variableElement, setter, false)
+            return checkUnknownFieldsSetter(setter, false)
                     .map(setterElement -> createUnknownFieldsElement(variableElement, unknownFieldsDeclaredType, setterElement, unknownFieldsType, mixins));
         }
 
@@ -547,7 +498,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
             return Optional.empty();
         }
 
-        return checkUnknownFieldsSetter(variableElement, setterFromMixin, true)
+        return checkUnknownFieldsSetter(setterFromMixin, true)
                 .map(setterElement -> createUnknownFieldsElement(variableElement, unknownFieldsDeclaredType, setterElement, unknownFieldsType, mixins));
     }
 
@@ -580,37 +531,40 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 .orElse(null);
     }
 
-    private Optional<ExecutableElement> checkUnknownFieldsSetter(VariableElement variableElement, ExecutableElement setter, boolean fromMixin) {
+    private Optional<ExecutableElement> checkUnknownFieldsSetter(ExecutableElement setter, boolean fromMixin) {
         if(!setter.getModifiers().contains(Modifier.PUBLIC)) {
-            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter must have public visibility", variableElement);
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter must have public visibility", setter);
             return Optional.empty();
         }
 
         if(fromMixin != setter.getModifiers().contains(Modifier.STATIC)) {
-            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %s".formatted(fromMixin ? "in a mixin must be static" : "must not be static"), variableElement);
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %s".formatted(fromMixin ? "in a mixin must be static" : "must not be static"), setter);
             return Optional.empty();
         }
 
         if(setter.getParameters().size() != (fromMixin ? 3 : 2)) {
-            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %smust take only %s parameters".formatted(fromMixin ? "in a mixin" : "", fromMixin ? "three" : "two"), variableElement);
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %smust take only %s parameters".formatted(fromMixin ? "in a mixin" : "", fromMixin ? "three" : "two"), setter);
             return Optional.empty();
         }
 
-        var firstParameter = setter.getParameters().get(fromMixin ? 1 : 0);
-        var keyType = firstParameter.asType();
-        if(!types.isAssignable(keyType, Integer.class) && !types.isSameType(keyType, int.class)) {
-            messages.printError("Type error: expected int type", setter);
-            return Optional.empty();
+        var error = false;
+        var keyType = setter.getParameters()
+                .get(fromMixin ? 1 : 0)
+                .asType();
+        if(!types.isAssignable(keyType, Long.class) && !types.isSameType(keyType, long.class)) {
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %smust take as the %s parameter a long".formatted(fromMixin ? "in a mixin" : "", fromMixin ? "second" : "first"), setter);
+            error = true;
         }
 
-        var secondParameter = setter.getParameters().get(fromMixin ? 2 : 1);
-        var valueType = secondParameter.asType();
+        var valueType = setter.getParameters()
+                .get(fromMixin ? 2 : 1)
+                .asType();
         if(!types.isSameType(valueType, Object.class)) {
-            messages.printError("Type error: expected Object type", setter);
-            return Optional.empty();
+            messages.printError("Type error: methods annotated with @ProtobufUnknownFields.Setter %smust take as the %s parameter an Object".formatted(fromMixin ? "in a mixin" : "", fromMixin ? "third" : "second"), setter);
+            error = true;
         }
 
-        return Optional.of(setter);
+        return error ? Optional.empty() : Optional.of(setter);
     }
 
     private Set<ProtobufObjectElement> processMessageProperty(ProtobufObjectElement messageElement, VariableElement variableElement, ProtobufProperty propertyAnnotation) {
@@ -710,8 +664,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
 
     private void linkEnum(TypeMirror type) {
         var specName = ProtobufMethodGenerator.getSpecFromObject(type);
-        var serializer = ProtobufConverterMethod.of(specName, Set.of(Modifier.PUBLIC, Modifier.STATIC), intType, ProtobufSizeGenerator.METHOD_NAME, type);
-        serializersGraph.link(type, intType, serializer);
+        var serializer = ProtobufConverterMethod.of(specName, Set.of(Modifier.PUBLIC, Modifier.STATIC), intType, ProtobufObjectSerializationGenerator.METHOD_NAME, type);
         var deserializer = ProtobufConverterMethod.of(specName, Set.of(Modifier.PUBLIC, Modifier.STATIC), type, ProtobufDeserializationGenerator.METHOD_NAME, intType);
         deserializersGraph.link(intType, type, deserializer);
     }
@@ -1095,6 +1048,13 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private Optional<ProtobufObjectElement> createEnumElement(TypeElement enumElement) {
+        var enumAnnotation = enumElement.getAnnotation(ProtobufEnum.class);
+        if(enumAnnotation == null) {
+            // An error will be printed by the preliminary checks
+            return Optional.empty();
+        }
+
+        var reserved = ProtobufReservedElement.of(enumAnnotation);
         var metadata = getEnumMetadata(enumElement);
         if (metadata.isEmpty()) {
             return Optional.of(ProtobufObjectElement.ofEnum(enumElement, ProtobufEnumMetadata.javaEnum(), reserved));

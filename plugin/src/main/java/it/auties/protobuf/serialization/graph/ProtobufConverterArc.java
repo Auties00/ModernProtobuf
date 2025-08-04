@@ -6,8 +6,7 @@ import javax.lang.model.type.TypeMirror;
 
 public record ProtobufConverterArc(
         ProtobufConverterMethod method,
-        TypeMirror returnType,
-        String warning
+        TypeMirror returnType
 ) {
 
 }

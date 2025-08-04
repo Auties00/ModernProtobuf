@@ -96,7 +96,7 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
         for(var property : objectElement.properties()) {
             switch (property.type()) {
                 case ProtobufPropertyType.CollectionType collectionType -> writeRepeatedSerializer(writer, property.index(), property.name(), getAccessorCall(property.accessor()), collectionType, property.packed(), true, false);
-                case ProtobufPropertyType.MapType mapType -> writeMapSerializer(writer, property.index(), property.name(), getAccessorCall(property.accessor()), mapType, true, false);
+                case ProtobufPropertyType.MapType mapType -> writeMapSerializer(writer, property.index(), property.name(), getAccessorCall(property.accessor()), mapType);
                 default -> writeNormalSerializer(writer, property.index(), property.name(), getAccessorCall(property.accessor()), property.type(), true, true, false);
             }
         }

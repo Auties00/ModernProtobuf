@@ -20,14 +20,14 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <source>24</source>
+                    <target>24</target>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
                             <artifactId>protobuf-serialization-plugin</artifactId>
-                            <version>3.4.3</version>
+                            <version>4.0.0</version>
                         </annotationProcessorPath>
                         <annotationProcessorPath>
                             <groupId>org.openjdk.jmh</groupId>
@@ -35,6 +35,7 @@
                             <version>1.37</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
+                    <compilerArgs>--enable-preview</compilerArgs>
                 </configuration>
             </plugin>
         </plugins>
@@ -44,7 +45,7 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>3.4.3</version>
+            <version>4.0.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.protobuf</groupId>

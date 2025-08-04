@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
  * This annotation can be applied to constructor parameters, non-static fields or non-static methods to represent the index of a {@link ProtobufEnum}.
  * If no index is annotated with {@link ProtobufEnumIndex}, {@link Enum#ordinal()} will be used implicitly.
  * <h2>Usage Example:</h2>
- * <h6>In a constructor::</h6>
+ * <h3>In a constructor::</h3>
  * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
@@ -24,7 +24,7 @@ import java.lang.annotation.Target;
  *     }
  * }
  * }</pre>
- * <h6>In a field:</h6>
+ * <h3>In a field:</h3>
  * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
@@ -40,7 +40,7 @@ import java.lang.annotation.Target;
  *     }
  * }
  *}</pre>
- * <h6>In a method:</h6>
+ * <h3>In a method:</h3>
  * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {
@@ -67,10 +67,10 @@ public @interface ProtobufEnumIndex {
     /**
      * The minimum valid index for a Protobuf enum constant.
      */
-    long MIN_VALUE = 0;
+    int MIN_VALUE = 0;
 
     /**
      * Represents the maximum allowable index for a Protobuf enum constant.
      */
-    long MAX_VALUE = 2147483647; // 2^31
+    int MAX_VALUE = 2147483647; // 2^31
 }

@@ -20,7 +20,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "generate",
         mixinStandardHelpOptions = true,
-        version = "generate 3.4.3",
+        version = "generate 4.0.0",
         description = "Generates the java classes for a protobuf file"
 )
 public class GenerateCommand implements Callable<Integer>, LogProvider {

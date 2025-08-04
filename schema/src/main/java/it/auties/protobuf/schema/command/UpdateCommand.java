@@ -17,7 +17,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "update",
         mixinStandardHelpOptions = true,
-        version = "update 3.4.3",
+        version = "update 4.0.0",
         description = "Updates a protobuf model class using a schema"
 )
 public class UpdateCommand implements Callable<Integer>, LogProvider {

@@ -1,12 +1,10 @@
 package it.auties.protobuf.serialization.support;
 
 import it.auties.protobuf.annotation.*;
-import it.auties.protobuf.model.ProtobufType;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
-import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -38,9 +36,7 @@ import java.util.stream.Collectors;
 //  - doesn't build a type/element, which I'm assuming has no side effects
 //  it shouldn't be called, as it might be broken now or might break in the future,
 //  and should instead be reimplemented(it is what it is)
-public class Types {
-    private static final String GETTER_PREFIX = "get";
-
+public final class Types {
     private final ProcessingEnvironment processingEnv;
     private final TypeMirror booleanType;
     private final TypeMirror byteType;
@@ -246,10 +242,6 @@ public class Types {
     }
 
     public List<TypeElement> getMixins(ProtobufUnknownFields property) {
-        return getMirroredTypes(property::mixins);
-    }
-
-    public List<TypeElement> getMixins(ProtobufGetter property) {
         return getMirroredTypes(property::mixins);
     }
 
@@ -498,67 +490,5 @@ public class Types {
 
         var superClassElement = ((DeclaredType) superClass).asElement();
         return Optional.of((TypeElement) superClassElement);
-    }
-
-    public ProtobufProperty getProperty(ProtobufGetter getter) {
-        return new ProtobufProperty() {
-            @Override
-            public Class<? extends Annotation> annotationType() {
-                return ProtobufProperty.class;
-            }
-
-            @Override
-            public int index() {
-                return getter.index();
-            }
-
-            @Override
-            public ProtobufType type() {
-                return getter.type();
-            }
-
-            @Override
-            public ProtobufType mapKeyType() {
-                return ProtobufType.UNKNOWN;
-            }
-
-            @Override
-            public ProtobufType mapValueType() {
-                return ProtobufType.UNKNOWN;
-            }
-
-            @Override
-            public Class<?>[] mixins() {
-                return getter.mixins();
-            }
-
-            @Override
-            public boolean required() {
-                return false;
-            }
-
-            @Override
-            public boolean ignored() {
-                return false;
-            }
-
-            @Override
-            public boolean packed() {
-                return getter.packed();
-            }
-        };
-    }
-
-    public String getPropertyName(String string) {
-        if (!string.toLowerCase().startsWith(GETTER_PREFIX)) {
-            return string;
-        }
-
-        var start = GETTER_PREFIX.length() + 1;
-        if (string.length() <= start) {
-            return "";
-        }
-
-        return string.substring(start);
     }
 }

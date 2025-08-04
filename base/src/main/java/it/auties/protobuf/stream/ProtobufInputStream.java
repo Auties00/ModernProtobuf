@@ -57,7 +57,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     private int wireType;
-    private int index;
+    private long index;
     protected ProtobufInputStream() {
         this.wireType = -1;
         this.index = -1;
@@ -477,8 +477,8 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         };
     }
 
-    private Map<Integer, Object> readGroup() {
-        var group = new HashMap<Integer, Object>();
+    private Map<Long, Object> readGroup() {
+        var group = new HashMap<Long, Object>();
         while (readTag()) {
             var value = readUnknown();
             group.put(index, value);
@@ -487,13 +487,13 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         return group;
     }
 
-    public void assertGroupOpened(int groupIndex) {
+    public void assertGroupOpened(long groupIndex) {
         if((wireType == -1 && !readTag()) || wireType != ProtobufWireType.WIRE_TYPE_START_OBJECT || index != groupIndex) {
             throw ProtobufDeserializationException.invalidStartObject(groupIndex);
         }
     }
 
-    public void assertGroupClosed(int groupIndex) {
+    public void assertGroupClosed(long groupIndex) {
         if(wireType != ProtobufWireType.WIRE_TYPE_END_OBJECT) {
             throw ProtobufDeserializationException.malformedGroup();
         }
@@ -502,7 +502,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
     }
 
-    public int index() {
+    public long index() {
         return index;
     }
 

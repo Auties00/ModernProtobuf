@@ -42,9 +42,9 @@ public final class ProtobufMessageSpec {
      *
      * @see ProtobufInputStream#readUnknown()
      */
-    public static Map<Integer, Object> decode(ProtobufInputStream protoInputStream) {
+    public static Map<Long, Object> decode(ProtobufInputStream protoInputStream) {
         Objects.requireNonNull(protoInputStream, "The input stream cannot be null");
-        var result = new HashMap<Integer, Object>();
+        var result = new HashMap<Long, Object>();
         while (protoInputStream.readTag()) {
             var key = protoInputStream.index();
             var value = protoInputStream.readUnknown();

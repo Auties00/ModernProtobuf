@@ -4,6 +4,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.stream.ProtobufInputStream;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,7 @@ public class EmbeddedMessageTest {
         var anotherMessage = new WrapperMessage.EmbeddedMessage(ProtobufString.wrap("Hello"));
         var someMessage = new WrapperMessage(anotherMessage);
         var encoded = EmbeddedMessageTestWrapperMessageSpec.encode(someMessage);
-        var decoded = EmbeddedMessageTestWrapperMessageSpec.decode(encoded);
+        var decoded = EmbeddedMessageTestWrapperMessageSpec.decode(ProtobufInputStream.fromBytes(encoded));
         Assertions.assertNotNull(decoded.content());
         Assertions.assertEquals(anotherMessage.content(), decoded.content().content());
     }

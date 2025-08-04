@@ -21,8 +21,8 @@ public class EnumDefaultValueTest {
     public void testDecode() {
         // Create a message with a null value
         var message = new EnumDefaultValueTestMessageBuilder()
-                .constant(null)
-                .method(null)
+                .constant((Integer) null)
+                .method((Integer) null)
                 .build();
         var encoded = EnumDefaultValueTestMessageSpec.encode(message); // Encode it
         var decoded = EnumDefaultValueTestMessageSpec.decode(encoded); // Decode it, now it should contain the default value

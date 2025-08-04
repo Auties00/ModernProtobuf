@@ -1,6 +1,5 @@
 package it.auties.protobuf.serialization.model;
 
-import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.model.ProtobufType;
 
 import javax.lang.model.element.Element;
@@ -22,8 +21,7 @@ public sealed interface ProtobufConverterElement {
         record Deserializer(
                 ProtobufConverterMethod delegate,
                 TypeMirror parameterType,
-                TypeMirror returnType,
-                ProtobufDeserializer.BuilderSetterMethod behaviour
+                TypeMirror returnType
         ) implements Attributed {
 
         }

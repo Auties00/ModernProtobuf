@@ -63,7 +63,7 @@ public final class ProtobufDeserializationException extends ProtobufException {
      * @param expectedFieldIndex the expected field index corresponding to the previously opened group
      * @return a {@code ProtobufDeserializationException} with a detailed message explaining the mismatch
      */
-    public static ProtobufDeserializationException invalidEndObject(int actualFieldIndex, int expectedFieldIndex) {
+    public static ProtobufDeserializationException invalidEndObject(long actualFieldIndex, long expectedFieldIndex) {
         return new ProtobufDeserializationException("A message closed a group with index %s, but the previously opened group had index %s".formatted(actualFieldIndex, expectedFieldIndex));
     }
 
@@ -74,7 +74,7 @@ public final class ProtobufDeserializationException extends ProtobufException {
      * @param fieldIndex the index of the field where the start of the group was expected
      * @return a {@code ProtobufDeserializationException} with a predefined message identifying the problem at the specified field index
      */
-    public static ProtobufDeserializationException invalidStartObject(int fieldIndex) {
+    public static ProtobufDeserializationException invalidStartObject(long fieldIndex) {
         return new ProtobufDeserializationException("A message expected a group to open at index " + fieldIndex);
     }
 
@@ -107,7 +107,7 @@ public final class ProtobufDeserializationException extends ProtobufException {
      * @param index the invalid field index that was encountered
      * @return a {@code ProtobufDeserializationException} with a detailed message specifying the invalid index
      */
-    public static ProtobufDeserializationException invalidFieldIndex(int index) {
+    public static ProtobufDeserializationException invalidFieldIndex(long index) {
         return new ProtobufDeserializationException("A message specified an invalid field index: " + index);
     }
 

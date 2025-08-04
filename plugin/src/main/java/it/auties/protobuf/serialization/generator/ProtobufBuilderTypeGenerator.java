@@ -1,8 +1,9 @@
 package it.auties.protobuf.serialization.generator;
 
 import com.palantir.javapoet.*;
-import it.auties.protobuf.annotation.ProtobufDeserializer;
+import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
+import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 
 import javax.annotation.processing.Filer;
@@ -18,7 +19,7 @@ public class ProtobufBuilderTypeGenerator extends ProtobufClassGenerator {
 
     public void createClass(String packageName, ProtobufObjectElement objectElement) throws IOException {
         // Create a class type spec
-        var className = getGeneratedClassNameByName(objectElement.typeElement(), "Builder");
+        var className = getGeneratedClassNameBySuffix(objectElement.typeElement(), "Builder");
         var classBuilder = TypeSpec.classBuilder(className)
                 .addModifiers(Modifier.PUBLIC);
 
@@ -57,19 +58,9 @@ public class ProtobufBuilderTypeGenerator extends ProtobufClassGenerator {
             }
 
             var deserializers = property.type().deserializers();
-            var hasOverride = false;
             if (property.type() instanceof ProtobufPropertyType.NormalType) {
-                for (var i = 0; i < deserializers.size(); i++) {
+                for (var i = isGroupOrMessage(property) ? 1 : 0; i < deserializers.size(); i++) {
                     var deserializer = deserializers.get(i);
-                    if (deserializer.behaviour() == ProtobufDeserializer.BuilderSetterMethod.DISCARD) {
-                        continue;
-                    }
-
-                    if (hasOverride) {
-                        hasOverride = deserializer.behaviour() == ProtobufDeserializer.BuilderSetterMethod.OVERRIDE;
-                        continue;
-                    }
-
                     var value = property.name();
                     for (var j = i; j < deserializers.size(); j++) {
                         var override = deserializers.get(j);
@@ -87,22 +78,33 @@ public class ProtobufBuilderTypeGenerator extends ProtobufClassGenerator {
                             className
                     );
                     classBuilder.addMethod(setter);
-                    hasOverride = deserializer.behaviour() == ProtobufDeserializer.BuilderSetterMethod.OVERRIDE;
                 }
             }
-
-            if (!hasOverride) {
-                var setter = createBuilderSetter(
-                        property.name(),
-                        property.name(),
-                        property.type().descriptorElementType(),
-                        className
-                );
-                classBuilder.addMethod(setter);
-            }
+            var setter = createBuilderSetter(
+                    property.name(),
+                    property.name(),
+                    property.type().descriptorElementType(),
+                    className
+            );
+            classBuilder.addMethod(setter);
         }
 
         // Print the build method
+        var buildMethodBuilder = createBuildMethod(objectElement, invocationArgs);
+        classBuilder.addMethod(buildMethodBuilder.build());
+
+        // Create a java source file
+        var javaFile = JavaFile.builder(packageName, classBuilder.build())
+                .build();
+        javaFile.writeTo(filer);
+    }
+
+    private boolean isGroupOrMessage(ProtobufPropertyElement property) {
+        return property.type().protobufType() == ProtobufType.MESSAGE
+                || property.type().protobufType() == ProtobufType.GROUP;
+    }
+
+    private MethodSpec.Builder createBuildMethod(ProtobufObjectElement objectElement, ArrayList<String> invocationArgs) {
         var resultType = TypeName.get(objectElement.typeElement().asType());
         var buildMethodBuilder = MethodSpec.methodBuilder("build")
                 .addModifiers(Modifier.PUBLIC)
@@ -116,18 +118,12 @@ public class ProtobufBuilderTypeGenerator extends ProtobufClassGenerator {
             var methodName = builderDelegate.get().name();
             buildMethodBuilder.addStatement("return $T.$L($L$L)", resultType, methodName, invocationArgsJoined, unknownFieldsValue);
         }
-        classBuilder.addMethod(buildMethodBuilder.build());
-
-        // Create JavaFile and write to filer
-        var javaFile = JavaFile.builder(packageName, classBuilder.build())
-                .build();
-
-        javaFile.writeTo(filer);
+        return buildMethodBuilder;
     }
 
-    private static FieldSpec createField(TypeMirror property, String property1) {
-        var fieldType = TypeName.get(property);
-        return FieldSpec.builder(fieldType, property1)
+    private FieldSpec createField(TypeMirror type, String name) {
+        var typeName = TypeName.get(type);
+        return FieldSpec.builder(typeName, name)
                 .addModifiers(Modifier.PRIVATE)
                 .build();
     }

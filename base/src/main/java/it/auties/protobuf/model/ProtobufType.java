@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * and whether it supports packed encoding.
  * </p>
  *
- * <h3>Packed Encoding:</h3>
+ * <h2>Packed Encoding:</h2>
  * <p>
  * Numeric scalar types can be packed for more efficient encoding of repeated fields.
  * The {@link #isPackable()} method indicates whether a type supports this optimization.

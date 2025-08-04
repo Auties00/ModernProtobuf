@@ -52,9 +52,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
     @Override
     protected List<String> parametersTypes() {
         if(objectElement.type() == Type.ENUM) {
-            return List.of("int", objectElement.typeElement().getSimpleName().toString());
+            return List.of("Integer", objectElement.typeElement().getSimpleName().toString());
         } else if(objectElement.type() == Type.GROUP) {
-            return List.of("int", ProtobufInputStream.class.getSimpleName());
+            return List.of("long", ProtobufInputStream.class.getSimpleName());
         } else {
             return List.of(ProtobufInputStream.class.getSimpleName());
         }
@@ -73,10 +73,11 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
     private void checkPropertyIndex(BodyWriter writer, String indexField) {
         var conditions = new ArrayList<String>();
-        for(var index : objectElement.reservedIndexes()) {
+        for(var index : objectElement.reservedElements()) {
             switch (index) {
-                case ProtobufReservedElement.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
-                case ProtobufReservedElement.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
+                case ProtobufReservedElement.Index.Range range -> conditions.add("(%s >= %s && %s <= %s)".formatted(indexField, range.min(), indexField, range.max()));
+                case ProtobufReservedElement.Index.Value entry -> conditions.add("%s == %s".formatted(indexField, entry.value()));
+                case ProtobufReservedElement.Name ignored -> {} // TODO: Is this right?
             }
         }
         if(!conditions.isEmpty()) {
@@ -126,8 +127,8 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
 
                     switch (property.type()) {
                         case ProtobufPropertyType.MapType mapType -> writeMapDeserializer(switchWriter, property.index(), property.name(), mapType);
-                        case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(switchWriter, property.name(), property.index(), collectionType.valueType(), true, property.packed(), null);
-                        default -> writeDeserializer(switchWriter, property.name(), property.index(), property.type(), false, property.packed(), null);
+                        case ProtobufPropertyType.CollectionType collectionType -> writeDeserializer(switchWriter, property.name(), property.index(), collectionType.valueType(), true, property.packed());
+                        default -> writeDeserializer(switchWriter, property.name(), property.index(), property.type(), false, property.packed());
                     }
                     argumentsList.add(property.name());
                 }
@@ -158,12 +159,12 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         var unknownFieldsElement = objectElement.unknownFieldsElement()
                 .orElse(null);
         if(unknownFieldsElement == null) {
-            switchWriter.printSwitchBranch("default", "%s.readUnknown(false)".formatted(INPUT_STREAM_NAME));
+            switchWriter.printSwitchBranch("default", "%s.skipUnknown()".formatted(INPUT_STREAM_NAME));
             return;
         }
 
         var setter = unknownFieldsElement.setter();
-        var value = "%s.readUnknown(true)".formatted(INPUT_STREAM_NAME);
+        var value = "%s.readUnknown()".formatted(INPUT_STREAM_NAME);
         if(setter.getModifiers().contains(Modifier.STATIC)) {
             var setterWrapperClass = (TypeElement) setter.getEnclosingElement();
             switchWriter.printSwitchBranch("default", "%s.%s(%s, %s, %s)".formatted(setterWrapperClass.getQualifiedName(), setter.getSimpleName(), DEFAULT_UNKNOWN_FIELDS, FIELD_INDEX_VARIABLE, value));

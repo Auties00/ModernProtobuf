@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
  * or to an enum constant, in an enum annotated with {@link ProtobufEnum},
  * to indicate the default value of a type.
  * <h2>Usage Example:</h2>
- * <h6>In a {@link ProtobufMessage}:</h6>
+ * <h3>In a {@link ProtobufMessage}:</h3>
  * <pre>{@code
  * @ProtobufMessage
  * public record WrapperMessage(
@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
  *     }
  * }
  * }</pre>
- * <h6>In a {@link ProtobufMixin}:</h6>
+ * <h3>In a {@link ProtobufMixin}:</h3>
  * <pre>{@code
  * @ProtobufMixin
  * public final class ProtobufAtomicMixin {

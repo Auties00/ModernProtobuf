@@ -89,7 +89,7 @@ public final class ProtobufTokenizer {
         return token.substring(1, token.length() - 1);
     }
 
-    public Long nextNullableIndex(boolean enumeration, boolean allowMax) throws IOException {
+    public Long nextNullablePropertyIndex(boolean enumeration, boolean allowMax) throws IOException {
         try {
             var token = nextNullableToken();
             if(token == null) {

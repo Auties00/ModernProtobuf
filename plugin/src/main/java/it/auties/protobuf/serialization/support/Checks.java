@@ -8,7 +8,7 @@ import javax.lang.model.element.*;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
-public class Checks {
+public final class Checks {
     private final Types types;
     private final Messages messages;
     public Checks(Types types, Messages messages) {
@@ -148,13 +148,13 @@ public class Checks {
     private void processMessageProperty(Element property) {
         var enclosingElement = getEnclosingTypeElement(property);
         if(enclosingElement.getAnnotation(ProtobufMessage.class) == null && enclosingElement.getAnnotation(ProtobufGroup.class) == null) {
-            messages.printError("Illegal enclosing class: a field annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage or @ProtobufGroup", property);
+            messages.printError("Illegal enclosing class: a field or method annotated with @ProtobufProperty should be enclosed by a class or record annotated with @ProtobufMessage or @ProtobufGroup", property);
             return;
         }
 
         var annotation = property.getAnnotation(ProtobufProperty.class);
         if(annotation.type() == ProtobufType.UNKNOWN) {
-            messages.printError("Illegal protobuf type: a field annotated with @ProtobufProperty cannot have an UNKNOWN type", property);
+            messages.printError("Illegal protobuf type: a field or method annotated with @ProtobufProperty cannot have an UNKNOWN type", property);
             return;
         }
 

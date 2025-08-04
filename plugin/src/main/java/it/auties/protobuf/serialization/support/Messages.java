@@ -4,7 +4,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 
-public class Messages {
+public final class Messages {
     private final ProcessingEnvironment processingEnv;
     public Messages(ProcessingEnvironment processingEnv) {
         this.processingEnv = processingEnv;

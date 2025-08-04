@@ -16,7 +16,7 @@ public abstract class ProtobufDeserializationGenerator extends ProtobufMethodGen
     }
 
     protected void writeMapDeserializer(SwitchStatementWriter writer, int index, String name, ProtobufPropertyType.MapType mapType) {
-        try(var switchBranchWriter = writer.printSwitchBranch(String.valueOf(index))) {
+        try(var switchBranchWriter = writer.printSwitchBranch(index + "L")) {
             var streamName = switchBranchWriter.printVariableDeclaration("%sInputStream".formatted(name), "%s.readLengthDelimited()".formatted(INPUT_STREAM_NAME));
             var keyName = switchBranchWriter.printVariableDeclaration(getQualifiedName(mapType.keyType().accessorType()), "%sKey".formatted(name), "null");
             var valueName = switchBranchWriter.printVariableDeclaration(getQualifiedName(mapType.valueType().accessorType()), "%sValue".formatted(name), "null");
@@ -26,30 +26,22 @@ public abstract class ProtobufDeserializationGenerator extends ProtobufMethodGen
             var valueReadFunction = getConvertedValue(2, streamName, mapType.valueType(), valueReadMethod);
             try(var whileWriter = switchBranchWriter.printWhileStatement(streamName + ".readTag()")) {
                 try(var mapSwitchWriter = whileWriter.printSwitchStatement(streamName + ".index()")) {
-                    mapSwitchWriter.printSwitchBranch("1", "%s = %s".formatted(keyName, keyReadFunction));
-                    mapSwitchWriter.printSwitchBranch("2", "%s = %s".formatted(valueName, valueReadFunction));
+                    mapSwitchWriter.printSwitchBranch("1L", "%s = %s".formatted(keyName, keyReadFunction));
+                    mapSwitchWriter.printSwitchBranch("2L", "%s = %s".formatted(valueName, valueReadFunction));
                 }
             }
             switchBranchWriter.println("%s.put(%s, %s);".formatted(name, keyName, valueName));
         }
     }
 
-    protected void writeDeserializer(SwitchStatementWriter writer, String name, int index, ProtobufPropertyType type, boolean repeated, boolean packed, String mapTargetName) {
+    protected void writeDeserializer(SwitchStatementWriter writer, String name, int index, ProtobufPropertyType type, boolean repeated, boolean packed) {
         var readMethod = getDeserializerStreamMethod(type, packed);
         var readFunction = getConvertedValue(index, INPUT_STREAM_NAME, type, readMethod);
-        var readAssignment = getReadAssignment(name, repeated, packed, readFunction, mapTargetName);
-        writer.printSwitchBranch(String.valueOf(index), readAssignment);
+        var readAssignment = getReadAssignment(name, repeated, packed, readFunction);
+        writer.printSwitchBranch(index + "L", readAssignment);
     }
 
-    private String getReadAssignment(String name, boolean repeated, boolean packed, String readFunction, String mapTargetName) {
-        if(mapTargetName != null) {
-            if(repeated) {
-                return "%s.add(%s)".formatted(name, readFunction);
-            }else {
-                return "%s.put(index, %s)".formatted(mapTargetName, readFunction);
-            }
-        }
-
+    private String getReadAssignment(String name, boolean repeated, boolean packed, String readFunction) {
         if (!repeated) {
             return "%s = %s".formatted(name, readFunction);
         }

@@ -68,11 +68,7 @@ public final class ProtobufConverterGraph {
     }
 
     public void link(TypeMirror from, TypeMirror to, ProtobufConverterMethod arc) {
-        link(from, to, arc, "");
-    }
-
-    public void link(TypeMirror from, TypeMirror to, ProtobufConverterMethod arc, String warning) {
-        var node = new ProtobufConverterNode(from, to, arc, warning);
+        var node = new ProtobufConverterNode(from, to, arc);
         nodes.add(node);
     }
 
@@ -97,8 +93,8 @@ public final class ProtobufConverterGraph {
                     .element()
                     .map(element -> types.getReturnType(element, List.of(from)))
                     .orElse(node.arc().returnType());
-            var arc = new ProtobufConverterArc(node.arc(), returnType, node.warning());
             if (types.isAssignable(to, returnType, false)) {
+                var arc = new ProtobufConverterArc(node.arc(), returnType);
                 return List.of(arc);
             }
 
@@ -112,9 +108,10 @@ public final class ProtobufConverterGraph {
                 return List.of();
             }
 
+            var arc = new ProtobufConverterArc(node.arc(), returnType);
             return ProtobufConverterArcs.of(arc, nested);
         } else if (types.isAssignable(to, node.to()) && isPathLegal(node, from, to, mixins)) {
-            var arc = new ProtobufConverterArc(node.arc(), node.arc().returnType(), node.warning());
+            var arc = new ProtobufConverterArc(node.arc(), node.arc().returnType());
             return List.of(arc);
         }else if(isPathLegal(node, from, node.to(), mixins)) {
             var nested = findAnyPath(node.to(), to, mixins);
@@ -122,7 +119,7 @@ public final class ProtobufConverterGraph {
                 return List.of();
             }
 
-            var arc = new ProtobufConverterArc(node.arc(), node.arc().returnType(), node.warning());
+            var arc = new ProtobufConverterArc(node.arc(), node.arc().returnType());
             return ProtobufConverterArcs.of(arc, nested);
         }else {
             return List.of();

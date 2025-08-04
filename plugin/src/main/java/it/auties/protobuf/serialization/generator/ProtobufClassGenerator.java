@@ -9,6 +9,10 @@ public abstract class ProtobufClassGenerator {
         this.filer = filer;
     }
 
+    protected String getGeneratedClassNameBySuffix(TypeElement element, String suffix) {
+        return getGeneratedClassNameByName(element, element.getSimpleName() + suffix);
+    }
+
     protected String getGeneratedClassNameByName(TypeElement element, String className) {
         var name = new StringBuilder();
         while (element.getEnclosingElement() instanceof TypeElement parent) {

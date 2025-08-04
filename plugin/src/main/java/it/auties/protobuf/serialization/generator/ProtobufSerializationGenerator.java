@@ -37,12 +37,12 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         }
     }
 
-    protected void writeMapSerializer(BodyWriter writer, int index, String name, String accessor, ProtobufPropertyType.MapType mapType, boolean nullCheck, boolean cast) {
-        var bodyWriter = nullCheck ? writer.printIfStatement("%s != null".formatted(accessor)) : writer;
+    protected void writeMapSerializer(BodyWriter writer, int index, String name, String accessor, ProtobufPropertyType.MapType mapType) {
+        var bodyWriter = (BodyWriter) writer.printIfStatement("%s != null".formatted(accessor));
         var localVariableName = "%sEntry".formatted(name); // Prevent shadowing
         try(var forWriter = bodyWriter.printForEachStatement(localVariableName, accessor + ".entrySet()")) {
             var methodName = ProtobufSizeGenerator.getMapPropertyMethodName(name);
-            forWriter.println("%s.writeMessage(%s, %s(%s%s));".formatted(OUTPUT_OBJECT_PARAMETER, index, methodName, cast ? "(java.util.Map.Entry) " : "", localVariableName));
+            forWriter.println("%s.writeMessage(%s, %s(%s));".formatted(OUTPUT_OBJECT_PARAMETER, index, methodName, localVariableName));
             writeNormalSerializer(
                     forWriter,
                     1,
@@ -51,7 +51,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     mapType.keyType(),
                     false,
                     false,
-                    cast
+                    false
             );
             writeNormalSerializer(
                     forWriter,
@@ -61,10 +61,10 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     mapType.valueType(),
                     true,
                     true,
-                    cast
+                    false
             );
         }
-        if(nullCheck) {
+        if(true) {
             bodyWriter.close();
         }
     }

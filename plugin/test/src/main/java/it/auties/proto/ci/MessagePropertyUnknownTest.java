@@ -16,7 +16,7 @@ public class MessagePropertyUnknownTest {
                 .extended(18)
                 .build();
         var baseMessage = MessagePropertyUnknownTestSimpleMessageSpec.decode(MessagePropertyUnknownTestExtendedMessageSpec.encode(extendedMessage));
-        var unknownField = (Number) baseMessage.unknownFields().get(2);
+        var unknownField = (Number) baseMessage.unknownFields().get(2L);
         Assertions.assertEquals(unknownField.intValue(), extendedMessage.extended());
     }
 
@@ -25,7 +25,7 @@ public class MessagePropertyUnknownTest {
             @ProtobufProperty(index = 1, type = ProtobufType.STRING)
             ProtobufString value,
             @ProtobufUnknownFields
-            Map<Integer, Object> unknownFields
+            Map<Long, Object> unknownFields
     ) {
 
     }
@@ -62,18 +62,18 @@ public class MessagePropertyUnknownTest {
             UnknownFields unknownFields
     ) {
         public static class UnknownFields {
-            private final Map<Integer, Object> data;
+            private final Map<Long, Object> data;
 
             public UnknownFields() {
                 this.data = new HashMap<>();
             }
 
             @ProtobufUnknownFields.Setter
-            public void put(int key, Object value) {
+            public void put(long key, Object value) {
                 data.put(key, value);
             }
 
-            public Optional<Object> get(int key) {
+            public Optional<Object> get(long key) {
                 return Optional.ofNullable(data.get(key));
             }
         }
@@ -105,7 +105,7 @@ public class MessagePropertyUnknownTest {
             }
 
             @ProtobufUnknownFields.Setter
-            public static void put(List<Object> list, int key, Object value) {
+            public static void put(List<Object> list, long key, Object value) {
                 list.add(value);
             }
         }

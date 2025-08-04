@@ -52,7 +52,7 @@ public class ProtobufObjectDeserializationOverloadGenerator extends ProtobufDese
         if(objectElement.type() == Type.GROUP) {
             return List.of("int", "byte[]");
         }else if(objectElement.type() == Type.ENUM) {
-            return List.of("int");
+            return List.of("Integer");
         }else {
             return List.of("byte[]");
         }

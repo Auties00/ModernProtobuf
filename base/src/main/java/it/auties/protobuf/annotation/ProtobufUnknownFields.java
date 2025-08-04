@@ -29,7 +29,7 @@ public @interface ProtobufUnknownFields {
      * This annotation can be applied to non-static methods in a type that is used as an unknown properties store
      * or to static methods in a {@link ProtobufMixin} for an existing data structure.
      * <h2>Usage Example:</h2>
-     * <h6>In a custom type:</h6>
+     * <h3>In a custom type:</h3>
      * <pre>{@code
      * final class UnknownFeatures {
      *     private final Set<Integer> unknownFeatures;
@@ -50,7 +50,7 @@ public @interface ProtobufUnknownFields {
      *     }
      * }
      * }</pre>
-     * <h6>In a {@link ProtobufMixin}:</h6>
+     * <h3>In a {@link ProtobufMixin}:</h3>
      * <pre>{@code
      * @ProtobufMixin
      * final class ProtobufMapMixin {

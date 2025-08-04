@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * in a type annotated with {@link ProtobufMixin}
  * or that should be interpreted as a {@link ProtobufMessage}.
  * <h2>Usage Example:</h2>
- * <h6>In a {@link ProtobufMessage}:</h6>
+ * <h3>In a {@link ProtobufMessage}:</h3>
  * <pre>{@code
  * record BirthdayDate(int day, int month, int year) {
  *     @ProtobufDeserializer
@@ -35,7 +35,7 @@ import java.lang.annotation.Target;
  *     }
  * }
  * }</pre>
- * <h6>In a {@link ProtobufMixin}:</h6>
+ * <h3>In a {@link ProtobufMixin}:</h3>
  * <pre>{@code
  * @ProtobufMixin
  * public final class ProtobufAtomicMixin {
