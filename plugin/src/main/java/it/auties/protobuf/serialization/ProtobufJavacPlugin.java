@@ -665,6 +665,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private void linkEnum(TypeMirror type) {
         var specName = ProtobufMethodGenerator.getSpecFromObject(type);
         var serializer = ProtobufConverterMethod.of(specName, Set.of(Modifier.PUBLIC, Modifier.STATIC), intType, ProtobufObjectSerializationGenerator.METHOD_NAME, type);
+        serializersGraph.link(type, intType, serializer);
         var deserializer = ProtobufConverterMethod.of(specName, Set.of(Modifier.PUBLIC, Modifier.STATIC), type, ProtobufDeserializationGenerator.METHOD_NAME, intType);
         deserializersGraph.link(intType, type, deserializer);
     }
