@@ -5,6 +5,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
@@ -271,6 +272,17 @@ public final class Checks {
         if(executableElement.getParameters().size() != (inMixin ? 1 : 0)) {
             var message = inMixin ? "Illegal method: a method annotated with @ProtobufSerializer in a mixin must take exactly one parameter" : "Illegal method: a method annotated with @ProtobufSerializer must take no parameters";
             messages.printError(message, executableElement);
+            return;
+        }
+
+        var receiverType = executableElement.getReceiverType();
+        if(receiverType != null && receiverType.getKind() != TypeKind.NONE) {
+            messages.printError("Illegal method: a method annotated with @ProtobufSerializer cannot have a receiver type", executableElement);
+            return;
+        }
+
+        if(executableElement.isVarArgs()) {
+            messages.printError("Illegal method: a method annotated with @ProtobufSerializer cannot be varargs", executableElement);
         }
     }
 
@@ -316,6 +328,17 @@ public final class Checks {
 
         if(inMixin && !types.isAssignable(executableElement.getReturnType(), enclosingType)) {
             messages.printError("Illegal method: a method annotated with @ProtobufDeserializer must return a type assignable to its parent or be in a mixin", executableElement);
+            return;
+        }
+
+        var receiverType = executableElement.getReceiverType();
+        if(receiverType != null && receiverType.getKind() != TypeKind.NONE) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer cannot have a receiver type", executableElement);
+            return;
+        }
+
+        if(executableElement.isVarArgs()) {
+            messages.printError("Illegal method: a method annotated with @ProtobufDeserializer cannot be varargs", executableElement);
         }
     }
     

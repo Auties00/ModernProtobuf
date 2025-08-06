@@ -55,6 +55,7 @@ import java.util.Map;
 @SuppressWarnings("unused")
 public abstract class ProtobufInputStream implements AutoCloseable {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+    private static final byte[] EMPTY_BYTES = new byte[0];
 
     private int wireType;
     private long index;
@@ -388,8 +389,8 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
     private long readVarInt64Slow() {
         var result = 0L;
-        for (int shift = 0; shift < 64; shift += 7) {
-            byte b = readByte();
+        for (var shift = 0; shift < 64; shift += 7) {
+            var b = readByte();
             result |= (long) (b & 0x7F) << shift;
             if ((b & 0x80) == 0) {
                 return result;
@@ -595,60 +596,39 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             }
         }
 
-        /*
-        FIXME: Can this be optimized?
-        var result = new byte[size];
-
-            var buffered = Math.min(size, bufferLength);
-            if(buffered > 0) {
-                System.arraycopy(buffer, bufferReadPosition, result, 0, buffered);
-                bufferReadPosition += buffered;
-                bufferLength -= buffered;
-            }
-
-            var remaining = size - buffered;
-            if(remaining > 0) {
-                var totalRead = 0;
-                int currentRead;
-                while (totalRead < remaining) {
-                    currentRead = inputStream.read(result, buffered + totalRead, remaining - totalRead);
-                    if(currentRead == -1) {
-                        throw ProtobufDeserializationException.truncatedMessage();
-                    }
-                    totalRead += currentRead;
-                }
-                var position = Math.max(result.length - VAR_INT_LENGTH, 0);
-                while (position < result.length) {
-                    var bufferPosition = bufferWritePosition++;
-                    if(bufferPosition == buffer.length - 1) {
-                        bufferWritePosition = 0;
-                    }
-                    buffer[bufferPosition] = result[position++];
-                }
-            }
-
-            if(length != -1) {
-                position += size;
-            }
-
-            return result;
-         */
         private byte[] readStreamBytes(int size) throws IOException {
-            if(length != -1) {
+            if (size == 0) {
+                return EMPTY_BYTES;
+            }
+
+            if (length != -1) {
                 position += size;
             }
 
             var result = new byte[size];
-            for (int i = 0; i < size; i++) {
-                if(bufferLength > 0) {
-                    result[i] = buffer[bufferReadPosition++];
-                    bufferLength--;
-                }else {
-                    var entry = (byte) inputStream.read();
-                    result[i] = entry;
-                    buffer[bufferWritePosition++ % buffer.length] = entry;
-                }
+            var totalBytesRead = 0;
+
+            var bytesFromBuffer = Math.min(size, bufferLength);
+            if (bytesFromBuffer > 0) {
+                System.arraycopy(buffer, bufferReadPosition, result, 0, bytesFromBuffer);
+                totalBytesRead += bytesFromBuffer;
+                bufferReadPosition += bytesFromBuffer;
+                bufferLength -= bytesFromBuffer;
             }
+
+            while (totalBytesRead < size) {
+                var bytesReadFromStream = inputStream.read(result, totalBytesRead, size - totalBytesRead);
+                if (bytesReadFromStream == -1) {
+                    throw ProtobufDeserializationException.truncatedMessage();
+                }
+
+                for (var i = 0; i < bytesReadFromStream; i++) {
+                    buffer[bufferWritePosition % buffer.length] = result[totalBytesRead + i];
+                    bufferWritePosition++;
+                }
+                totalBytesRead += bytesReadFromStream;
+            }
+
             return result;
         }
 

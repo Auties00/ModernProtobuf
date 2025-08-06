@@ -314,7 +314,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         }
 
         // If this element has a valid super class, process that as well under the same element
-        types.getSuperClass(typeElement).ifPresent(superClass -> {
+        types.getDirectSuperClass(typeElement).ifPresent(superClass -> {
             var superResults = processObject(messageElement, superClass);
             results.addAll(superResults);
         });

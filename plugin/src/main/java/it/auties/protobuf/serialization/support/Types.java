@@ -8,6 +8,7 @@ import javax.lang.model.type.*;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 //  ProtobufConverterGraph requires this class to be thread-safe to optimize compilation times
 //  It turns out though that processingEnv.getTypeUtils() has operations that aren't thread-safe
@@ -29,13 +30,13 @@ import java.util.stream.Collectors;
 //  at com.sun.tools.javac.code.Types.isAssignable (Types.java:2392)
 //  at com.sun.tools.javac.code.Types.isAssignable (Types.java:2360)
 //
-//  erase might have the same problem
+//  Erase might have the same problem, but I don't have any evidence of that
 //
 //  As a general rule if a method in the Type/Element-Utils isn't:
 //  - called in the constructor
 //  - doesn't build a type/element, which I'm assuming has no side effects
 //  it shouldn't be called, as it might be broken now or might break in the future,
-//  and should instead be reimplemented(it is what it is)
+//  and should instead be reimplemented, unless it's infeasible (it is what it is)
 public final class Types {
     private final ProcessingEnvironment processingEnv;
     private final TypeMirror booleanType;
@@ -54,12 +55,8 @@ public final class Types {
     private final TypeMirror wrappedCharType;
     private final TypeMirror wrappedFloatType;
     private final TypeMirror wrappedDoubleType;
-    private final TypeMirror rawGroupType;
-    private final TypeMirror voidType;
     public Types(ProcessingEnvironment processingEnv) {
         this.processingEnv = processingEnv;
-        this.rawGroupType = getType(Map.class, Integer.class, Object.class);
-        this.voidType = processingEnv.getTypeUtils().getNoType(TypeKind.VOID);
         this.booleanType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.BOOLEAN);
         this.byteType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.BYTE);
         this.shortType = processingEnv.getTypeUtils().getPrimitiveType(TypeKind.SHORT);
@@ -78,14 +75,6 @@ public final class Types {
         this.wrappedDoubleType = getType(Double.class);
     }
 
-    public TypeMirror rawGroupType() {
-        return rawGroupType;
-    }
-
-    public TypeMirror voidType() {
-        return voidType;
-    }
-
     // Convert a Java type into an AST type mirror
     public TypeMirror getType(Class<?> type, Class<?>... params) {
         if(type == null) {
@@ -93,18 +82,7 @@ public final class Types {
         }
 
         if(type.isPrimitive()) {
-            var kind = TypeKind.valueOf(type.getName().toUpperCase(Locale.ROOT));
-            return switch (kind) {
-                case BOOLEAN -> booleanType;
-                case BYTE -> byteType;
-                case SHORT -> shortType;
-                case INT -> intType;
-                case LONG -> longType;
-                case CHAR -> charType;
-                case FLOAT -> floatType;
-                case DOUBLE -> doubleType;
-                default -> throw new IllegalStateException("Unexpected value: " + kind);
-            };
+            return getPrimitiveType(TypeKind.valueOf(type.getName().toUpperCase(Locale.ROOT)));
         }
 
         if(type.isArray()) {
@@ -114,12 +92,26 @@ public final class Types {
         var result = processingEnv.getElementUtils().getTypeElement(type.getCanonicalName());
         if(params.length == 0) {
             return erase(result.asType());
-        }else {
-            var typeArgs = Arrays.stream(params)
-                    .map(this::getType)
-                    .toArray(TypeMirror[]::new);
-            return processingEnv.getTypeUtils().getDeclaredType(result, typeArgs);
         }
+
+        var typeArgs = Arrays.stream(params)
+                .map(this::getType)
+                .toArray(TypeMirror[]::new);
+        return processingEnv.getTypeUtils().getDeclaredType(result, typeArgs);
+    }
+
+    private TypeMirror getPrimitiveType(TypeKind kind) {
+        return switch (kind) {
+            case BOOLEAN -> booleanType;
+            case BYTE -> byteType;
+            case SHORT -> shortType;
+            case INT -> intType;
+            case LONG -> longType;
+            case CHAR -> charType;
+            case FLOAT -> floatType;
+            case DOUBLE -> doubleType;
+            default -> throw new IllegalStateException("Unexpected value: " + kind);
+        };
     }
 
     public boolean isGroup(TypeMirror mirror) {
@@ -190,9 +182,9 @@ public final class Types {
             if(isSameType(rhsAncestorType, lhs, erase)) {
                 return true;
             }
-            getSuperClass(rhsAncestorType)
+            getDirectSuperClass(rhsAncestorType)
                     .ifPresent(rhsTypes::add);
-            rhsTypes.addAll(getInterfaces(rhsAncestorType));
+            rhsTypes.addAll(getAllImplementedInterfaces(rhsAncestorType));
         }
         return false;
     }
@@ -228,29 +220,12 @@ public final class Types {
                 .anyMatch(entry -> entry.getKind() == ElementKind.CONSTRUCTOR && ((ExecutableElement) entry).getParameters().isEmpty());
     }
 
-    public Optional<TypeElement> getTypeElement(TypeMirror entry) {
-        if(entry instanceof DeclaredType declaredType
-                && declaredType.asElement() instanceof TypeElement typeElement) {
-            return Optional.of(typeElement);
-        }else {
-            return Optional.empty();
-        }
-    }
-
     public List<TypeElement> getMixins(ProtobufProperty property) {
         return getMirroredTypes(property::mixins);
     }
 
     public List<TypeElement> getMixins(ProtobufUnknownFields property) {
         return getMirroredTypes(property::mixins);
-    }
-
-    public TypeElement getMirroredType(Supplier<Class<?>> supplier) {
-        try {
-            return processingEnv.getElementUtils().getTypeElement(supplier.get().getName());
-        }catch (MirroredTypeException exception) {
-            return (TypeElement) ((DeclaredType) exception.getTypeMirror()).asElement();
-        }
     }
 
     public List<TypeElement> getMirroredTypes(Supplier<Class<?>[]> supplier) {
@@ -261,8 +236,9 @@ public final class Types {
         }catch (MirroredTypesException exception) {
             return exception.getTypeMirrors()
                     .stream()
-                    .map(this::getTypeElement)
-                    .flatMap(Optional::stream)
+                    .map(entry -> entry instanceof DeclaredType declaredType
+                            && declaredType.asElement() instanceof TypeElement typeElement ? typeElement : null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
     }
@@ -293,32 +269,53 @@ public final class Types {
                 .anyMatch(entry -> entry.asType().getKind() == TypeKind.TYPEVAR || isParametrized(entry));
     }
 
-    /// NEEDS REFACTOR
+    // This method is quite complex to implement.
+    // The problem is that converters can have a generic signature.
+    // To understand if a converter with a generic signature can be used when searching for a path from type A to type B,
+    // we have to apply type resolution based on the method and its arguments.
+    // The good news is we don't have to care about receiver types, explicit type parameters or varargs as converters don't support/have a use for them.
+    // The bad news is that there is no documented way on how to do any of this,
+    // and we can't even use some parts of the compiler as they are not thread safe.
     public TypeMirror getReturnType(ExecutableElement method, List<TypeMirror> arguments) {
         var returnType = method.getReturnType();
         if(!isParametrized(returnType)) {
+            // Simple case: the return type is not parametrized
             return returnType;
         }
 
-        var typeParametersArguments = new HashMap<String, List<TypeMirror>>();
-        for (var index = 0; index < method.getParameters().size(); index++) {
-            var methodParameterUses = getTypeUses(method.getParameters().get(index).asType(), arguments.get(index));
-            methodParameterUses.forEach((key, value) -> typeParametersArguments.merge(key, value, (first, second) -> {
-                var result = new ArrayList<TypeMirror>();
-                result.addAll(first);
-                result.addAll(second);
-                return result;
-            }));
+        if((method.getReceiverType() != null && method.getReceiverType().getKind() != TypeKind.NONE) || method.isVarArgs()) {
+            // Simple case: an error will have already been issued by preliminary checks
+            return returnType;
         }
 
-        var typeParametersResolvedTypes = new HashMap<String, TypeMirror>();
-        typeParametersArguments.forEach((type, values) -> typeParametersResolvedTypes.put(type, lowerCommonBound(values)));
-        return createTypeWithGenericData(returnType, typeParametersResolvedTypes);
+        // Map each type parameter of the method to the arguments that use it
+        Map<String, Stream<TypeMirror>> typeParametersToArguments = HashMap.newHashMap(method.getParameters().size());
+        var parametersIterator = method.getParameters().iterator();
+        var argumentsIterator = arguments.iterator();
+        while (parametersIterator.hasNext() && argumentsIterator.hasNext()) {
+            var methodParameterUses = getTypeUses(parametersIterator.next().asType(), argumentsIterator.next());
+            for (var entry : methodParameterUses.entrySet()) {
+                typeParametersToArguments.merge(
+                        entry.getKey(),
+                        entry.getValue().stream(),
+                        Stream::concat
+                );
+            }
+        }
+
+        // Compute the lower common bound for each of the type parameters
+        Map<String, TypeMirror> typeParametersToLcb = HashMap.newHashMap(method.getParameters().size());
+        for(var entry : typeParametersToArguments.entrySet()) {
+            typeParametersToLcb.put(entry.getKey(), lowerCommonBound(entry.getValue()));
+        }
+
+        return getReturnType(returnType, typeParametersToLcb);
     }
 
-    private TypeMirror createTypeWithGenericData(TypeMirror type, Map<String, TypeMirror> typeParametersResolvedTypes) {
+    private TypeMirror getReturnType(TypeMirror type, Map<String, TypeMirror> typeParametersToMirrors) {
         if(type.getKind() == TypeKind.TYPEVAR) {
-            return typeParametersResolvedTypes.getOrDefault(type.toString(), type);
+            var result = typeParametersToMirrors.getOrDefault(type.toString(), type);
+            return boxOrErase(result, false);
         }
 
         if(type instanceof PrimitiveType primitiveType) {
@@ -329,25 +326,33 @@ public final class Types {
             return type;
         }
 
+        if(!(declaredType.asElement() instanceof TypeElement typeElement)) {
+            return type;
+        }
+
         var resultArguments = new TypeMirror[declaredType.getTypeArguments().size()];
         for(var index = 0; index < resultArguments.length; index++) {
             var typeArgument = declaredType.getTypeArguments().get(index);
-            resultArguments[index] = createTypeWithGenericData(typeArgument, typeParametersResolvedTypes);
+            resultArguments[index] = getReturnType(typeArgument, typeParametersToMirrors);
         }
 
-        return processingEnv.getTypeUtils().getDeclaredType((TypeElement) declaredType.asElement(), resultArguments);
+        return processingEnv.getTypeUtils()
+                .getDeclaredType(typeElement, resultArguments);
     }
 
-    // 100% this shouldn't be implemented like this
-    private TypeMirror lowerCommonBound(List<TypeMirror> types) {
+    // TODO: Can this be reimplemented with an intersection type?
+    private TypeMirror lowerCommonBound(Stream<TypeMirror> types) {
         var counter = new HashMap<TypeMirror, Integer>();
-        for(var type : types) {
+        types.forEach(type -> {
+            for (var implementedInterface : getAllImplementedInterfaces(type)) {
+                counter.compute(implementedInterface, (key, value) -> value == null ? 1 : value + 1);
+            }
             while (type != null) {
                 counter.compute(type, (key, value) -> value == null ? 1 : value + 1);
-                type = getSuperClass(type)
+                type = getDirectSuperClass(type)
                         .orElse(null);
             }
-        }
+        });
         TypeMirror bestElement = null;
         int bestCount = 0;
         for(var entry : counter.entrySet()) {
@@ -363,12 +368,13 @@ public final class Types {
         return bestElement;
     }
 
-    private Map<String, List<TypeMirror>> getTypeUses(TypeMirror methodParameterType, TypeMirror methodArgumentType) {
-        if(methodParameterType.getKind() == TypeKind.TYPEVAR) {
-            return Map.of(methodParameterType.toString(), List.of(methodArgumentType));
+    // FIXME: Polish me
+    private Map<String, List<TypeMirror>> getTypeUses(TypeMirror parameterType, TypeMirror argumentType) {
+        if(parameterType.getKind() == TypeKind.TYPEVAR) {
+            return Map.of(parameterType.toString(), List.of(argumentType));
         }
 
-        if(!(methodParameterType instanceof DeclaredType methodDeclaredParameterType)) {
+        if(!(parameterType instanceof DeclaredType methodDeclaredParameterType)) {
             return Map.of();
         }
 
@@ -378,7 +384,7 @@ public final class Types {
         for (var index = 0; index < methodParameterTypeParameters.size(); index++) {
             var methodParameterTypeParameter = methodParameterTypeParameters.get(index);
             if (methodParameterTypeParameter.getKind() == TypeKind.TYPEVAR) {
-                var type = getTypeParameter(methodArgumentType, methodParameterType, index)
+                var type = getTypeParameter(argumentType, parameterType, index)
                         .orElseThrow(() -> new IllegalStateException("Cannot determine type"));
                 uses.compute(methodParameterTypeParameter.toString(), (key, value) -> {
                     if (value == null) {
@@ -465,30 +471,54 @@ public final class Types {
     }
 
 
-    public List<? extends TypeMirror> getInterfaces(TypeMirror mirror) {
-        return mirror instanceof DeclaredType declaredType
-                && declaredType.asElement() instanceof TypeElement typeElement
-                ? typeElement.getInterfaces()
-                : List.of();
+    public Set<? extends TypeMirror> getAllImplementedInterfaces(TypeMirror typeMirror) {
+        var results = new HashSet<TypeMirror>();
+        var types = new LinkedList<TypeElement>();
+        if(typeMirror instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement typeElement) {
+            types.add(typeElement);
+        }
+        while (!types.isEmpty()) {
+            var typeElement = types.removeFirst();
+            getDirectSuperClass(typeElement)
+                    .ifPresent(types::add);
+            for(var interfaceMirror : typeElement.getInterfaces() ) {
+                results.add(interfaceMirror);
+                if(interfaceMirror instanceof DeclaredType declaredType
+                        && declaredType.asElement() instanceof TypeElement interfaceElement) {
+                    types.add(interfaceElement);
+                }
+            }
+        }
+        return results;
     }
 
-    public Optional<TypeMirror> getSuperClass(TypeMirror mirror) {
+    public Optional<TypeMirror> getDirectSuperClass(TypeMirror mirror) {
         return switch (mirror) {
             case ArrayType ignored -> Optional.of(getType(Object.class));
-            case DeclaredType declaredType when declaredType.asElement() instanceof TypeElement typeElement
-                    && typeElement.getSuperclass() != null
-                    && typeElement.getSuperclass().getKind() != TypeKind.NONE -> Optional.ofNullable(typeElement.getSuperclass());
+            case DeclaredType declaredType
+                    when declaredType.asElement() instanceof TypeElement typeElement
+                        && typeElement.getSuperclass() != null
+                        && typeElement.getSuperclass().getKind() != TypeKind.NONE
+                            -> Optional.ofNullable(typeElement.getSuperclass());
             default -> Optional.empty();
         };
     }
 
-    public Optional<TypeElement> getSuperClass(TypeElement typeElement) {
-        var superClass = typeElement.getSuperclass();
-        if(superClass == null || superClass.getKind() == TypeKind.NONE) {
+    public Optional<TypeElement> getDirectSuperClass(TypeElement typeElement) {
+        var superClassMirror = typeElement.getSuperclass();
+        if(superClassMirror == null || superClassMirror.getKind() == TypeKind.NONE) {
             return Optional.empty();
         }
 
-        var superClassElement = ((DeclaredType) superClass).asElement();
-        return Optional.of((TypeElement) superClassElement);
+        if(!(superClassMirror instanceof DeclaredType superClassType)) {
+            return Optional.empty();
+        }
+
+        if(!(superClassType instanceof TypeElement superClassElement)) {
+            return Optional.empty();
+        }
+
+        return Optional.of(superClassElement);
     }
 }
