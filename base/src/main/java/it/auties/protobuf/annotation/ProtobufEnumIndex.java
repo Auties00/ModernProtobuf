@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
  * This annotation can be applied to constructor parameters, non-static fields or non-static methods to represent the index of a {@link ProtobufEnum}.
  * If no index is annotated with {@link ProtobufEnumIndex}, {@link Enum#ordinal()} will be used implicitly.
  * <h2>Usage Example:</h2>
- * <h3>In a constructor::</h3>
+ * <h3>In a constructor:</h3>
  * <pre>{@code
  * @ProtobufEnum
  * public enum EnumType {

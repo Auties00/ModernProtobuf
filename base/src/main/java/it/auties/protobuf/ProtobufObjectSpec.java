@@ -25,14 +25,25 @@ import java.util.Objects;
  *   <li>Debugging protobuf data without access to the original .proto definition</li>
  *   <li>Generic protobuf message processing</li>
  * </ul>
+ * <p>
+ *     <font color="red">
+ *         This class is extremely slow: use it only when necessary.
+ *     </font>
+ * <p>
  */
-public final class ProtobufMessageSpec {
+public final class ProtobufObjectSpec {
     /**
      * Decodes a Protocol Buffer message from a ProtobufInputStream.
+     * This method is extremely slow: use it only when deserializing dynamic messages.
      * <p>
      * This method reads from the provided input stream and decodes all available
      * protobuf fields into a map structure. Each field is read according to its
      * wire type and stored with its field number as the key.
+     * <p>
+     * <p>
+     *     <font color="red">
+     *         This method is extremely slow: use it only when necessary.
+     *     </font>
      * <p>
      *
      * @param protoInputStream the input stream containing the encoded Protocol Buffer data

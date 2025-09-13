@@ -352,11 +352,11 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private void processObjectMethod(ProtobufObjectElement messageElement, ExecutableElement executableElement) {
         var builder = executableElement.getAnnotation(ProtobufBuilder.class);
         if(builder != null) {
-            messageElement.addBuilder(builder.className(), executableElement.getParameters(), executableElement);
+            messageElement.addBuilder(builder.name(), executableElement.getParameters(), executableElement);
             return;
         }
 
-        var getter = executableElement.getAnnotation(ProtobufGetter.class);
+        var getter = executableElement.getAnnotation(ProtobufAccessor.class);
         if(getter != null) {
             handleMessageGetter(messageElement, executableElement, getter);
             return;
@@ -396,14 +396,14 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         serializersGraph.link(from, to, method);
     }
 
-    private void handleMessageGetter(ProtobufObjectElement messageElement, ExecutableElement executableElement, ProtobufGetter getter) {
+    private void handleMessageGetter(ProtobufObjectElement messageElement, ExecutableElement executableElement, ProtobufAccessor getter) {
         if (hasMatchedProperty(messageElement, getter)) {
             return;
         }
         messages.printError("Invalid getter: there is no property with index \"" + getter.index() + "\" in \"" + messageElement.typeElement().getQualifiedName().toString() + "\"", executableElement);
     }
 
-    private boolean hasMatchedProperty(ProtobufObjectElement messageElement, ProtobufGetter getter) {
+    private boolean hasMatchedProperty(ProtobufObjectElement messageElement, ProtobufAccessor getter) {
         return messageElement.properties()
                 .stream()
                 .anyMatch(entry -> !(entry.type().descriptorElementType() instanceof ExecutableElement) && entry.index() == getter.index());
@@ -892,7 +892,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     }
 
     private boolean isProtobufGetter(ExecutableElement entry, ProtobufProperty propertyAnnotation) {
-        var annotation = entry.getAnnotation(ProtobufGetter.class);
+        var annotation = entry.getAnnotation(ProtobufAccessor.class);
         return annotation != null && annotation.index() == propertyAnnotation.index();
     }
 

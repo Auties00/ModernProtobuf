@@ -1,7 +1,5 @@
 module it.auties.protobuf.base {
-    requires transitive jdk.compiler;
-    requires jdk.unsupported;
-    requires java.desktop;
+    requires java.compiler;
 
     exports it.auties.protobuf.exception;
     exports it.auties.protobuf.annotation;

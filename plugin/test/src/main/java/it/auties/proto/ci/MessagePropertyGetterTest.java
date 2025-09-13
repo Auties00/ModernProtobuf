@@ -1,6 +1,6 @@
 package it.auties.proto.ci;
 
-import it.auties.protobuf.annotation.ProtobufGetter;
+import it.auties.protobuf.annotation.ProtobufAccessor;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufString;
@@ -36,7 +36,7 @@ public class MessagePropertyGetterTest {
             this.value = value;
         }
 
-        @ProtobufGetter(index = 1)
+        @ProtobufAccessor(index = 1)
         public ProtobufString unbox() {
             return value;
         }
@@ -70,7 +70,7 @@ public class MessagePropertyGetterTest {
             this.value = value;
         }
 
-        @ProtobufGetter(index = 1)
+        @ProtobufAccessor(index = 1)
         public ProtobufString unbox() {
             return value;
         }

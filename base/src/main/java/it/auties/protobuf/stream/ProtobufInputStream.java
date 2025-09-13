@@ -39,8 +39,7 @@ import java.util.Map;
  * <pre>{@code
  * try (ProtobufInputStream input = ProtobufInputStream.fromBytes(data)) {
  *     while (input.readTag()) {
- *         int fieldNumber = input.index();
- *         switch (fieldNumber) {
+ *         switch (input.index()) {
  *             case 1 -> input.readString();
  *             case 2 -> input.readInt32();
  *             default -> input.skipUnknown();
@@ -501,6 +500,10 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         if(index != groupIndex) {
             throw ProtobufDeserializationException.invalidEndObject(index, groupIndex);
         }
+    }
+
+    public int wireType() {
+        return wireType;
     }
 
     public long index() {

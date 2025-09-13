@@ -23,8 +23,6 @@
 // There is however a way to fix this, which is to write a compiler plugin that hooks the Javac error handling system to suppress the error if it comes from our annotation processor
 // This is not me talking about ideas: I've already coded the same thing for Reified, a previous compiler project I worked on that aimed to bring reification to Java, to allow reified generics array initialization
 // At this point though, I have to consider that I want ModernProtobuf to be a production ready idea, so I can't be shipping a java agent, annotation processor and compiler plugin that use bytecode manipulation just for developers to write String instead of ProtobufString
-// Sometimes we loose to the language designers, I'm sure that moments like this lead Google engineers to develop more than once new programming languages in house
-// One day I'll probably do the same, just not right now because I feel like I still don't know enough about type systems and I'd hate to be clowned on like Go developers when they were asked about their interesting type system choices
 
 package it.auties.protobuf.model;
 
@@ -72,18 +70,19 @@ public sealed interface ProtobufString extends CharSequence {
     byte[] encodedBytes();
     int encodedOffset();
     int encodedLength();
-    void write(int field, ProtobufOutputStream outputStream);
+    void write(long fieldIndex, ProtobufOutputStream outputStream);
 
     // A lot of string magic in here
     static final class Lazy implements ProtobufString {
         private final byte[] bytes;
         private final int offset;
         private final int length;
-        private String decoded;   // FIXME: Use stable values (Java 25)
+        private final StableValue<String> decoded;
         private Lazy(byte[] bytes, int offset, int length) {
             this.bytes = bytes;
             this.offset = offset;
             this.length = length;
+            this.decoded = StableValue.of();
         }
 
         @Override
@@ -97,8 +96,8 @@ public sealed interface ProtobufString extends CharSequence {
 
         @Override
         public int length() {
-            if(decoded != null) {
-                return decoded.length();
+            if(decoded.isSet()) {
+                return decoded.orElseThrow().length();
             }
 
             var index = offset;
@@ -134,17 +133,7 @@ public sealed interface ProtobufString extends CharSequence {
 
         @Override
         public String toString() {
-            if(decoded != null) {
-                return decoded;
-            }
-
-            synchronized (this) {
-                if(decoded != null) {
-                    return decoded;
-                }
-
-                return this.decoded = new String(bytes, offset, length, StandardCharsets.UTF_8);
-            }
+            return decoded.orElseSet(() -> new String(bytes, offset, length, StandardCharsets.UTF_8));
         }
 
         @Override
@@ -157,8 +146,8 @@ public sealed interface ProtobufString extends CharSequence {
         }
 
         @Override
-        public void write(int field, ProtobufOutputStream outputStream) {
-            outputStream.writeBytes(field, bytes, offset, length);
+        public void write(long fieldIndex, ProtobufOutputStream outputStream) {
+            outputStream.writeBytes(fieldIndex, bytes, offset, length);
         }
 
         @Override
@@ -218,8 +207,9 @@ public sealed interface ProtobufString extends CharSequence {
         }
 
         @Override
-        public void write(int field, ProtobufOutputStream outputStream) {
-            outputStream.writeBytes(field, value.getBytes());
+        public void write(long fieldIndex, ProtobufOutputStream outputStream) {
+            outputStream.writeField(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+            outputStream.writeFieldValue(value);
         }
 
         @Override

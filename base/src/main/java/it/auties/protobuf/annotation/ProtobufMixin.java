@@ -24,6 +24,10 @@ import java.lang.annotation.Target;
  *     }
  * }
  * }</pre>
+ *
+ * @see ProtobufSerializer
+ * @see ProtobufDeserializer
+ * @see ProtobufDefaultValue
  **/
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

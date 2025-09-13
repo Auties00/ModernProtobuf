@@ -1,5 +1,8 @@
 package it.auties.protobuf.annotation;
 
+import it.auties.protobuf.builtin.*;
+
+import javax.lang.model.element.Modifier;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -8,8 +11,7 @@ import java.lang.annotation.Target;
 /**
  * This annotation can be applied to static methods and constructors
  * in a non-abstract class or record annotated with {@link ProtobufMessage} or {@link ProtobufGroup}
- * to auto-generate a new builder class named {@link ProtobufBuilder#className()}
- * using the parameters of the annotated type.
+ * to auto-generate a new builder class using the parameters of the annotated type.
  * <h2>Usage Example:</h2>
  * <pre>{@code
  * @ProtobufMessage
@@ -27,7 +29,7 @@ import java.lang.annotation.Target;
  *     @ProtobufProperty(index = 6, type = ProtobufType.MESSAGE)
  *     VideoOrGifMessage attachmentVideo
  * ) {
- *     @ProtobufBuilder(className = "InteractiveHeaderSimpleBuilder")
+ *     @ProtobufBuilder
  *     static InteractiveHeader simpleBuilder(String title, String subtitle, InteractiveHeaderAttachment attachment) {
  *         var builder = new InteractiveHeaderBuilder()
  *                 .title(title)
@@ -53,10 +55,44 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufBuilder {
     /**
+     * Specifies the modifier of the builder class to be auto-generated
+     * for a static method or constructor annotated with {@code @ProtobufBuilder}.
+     *
+     * @return the modifiers of the builder class to be generated
+     */
+    Modifier[] modifiers() default {
+            Modifier.PUBLIC,
+            Modifier.FINAL
+    };
+
+    /**
      * Specifies the name of the builder class to be auto-generated
      * for a static method or constructor annotated with {@code @ProtobufBuilder}.
+     * If no name is specified, this builder will be interpreted
+     * as the default builder for the containing type.
      *
      * @return the name of the builder class to be generated
      */
-    String className();
+    String name() default "";
+
+    /**
+     * Returns the list of mixin classes associated with the builder class to be auto-generated
+     * for a static method or constructor annotated with {@code @ProtobufBuilder}.
+     * Mixins provide additional functionalities such as default value generation.
+     *
+     * @return an array of mixin classes including:
+     *         {@link ProtobufAtomicMixin}, {@link ProtobufOptionalMixin}, {@link ProtobufUUIDMixin},
+     *         {@link ProtobufURIMixin}, {@link ProtobufRepeatedMixin}, {@link ProtobufMapMixin},
+     *         {@link ProtobufFutureMixin}, and {@link ProtobufLazyMixin}
+     */
+    Class<?>[] mixins() default {
+            ProtobufAtomicMixin.class,
+            ProtobufOptionalMixin.class,
+            ProtobufUUIDMixin.class,
+            ProtobufURIMixin.class,
+            ProtobufRepeatedMixin.class,
+            ProtobufMapMixin.class,
+            ProtobufFutureMixin.class,
+            ProtobufLazyMixin.class
+    };
 }

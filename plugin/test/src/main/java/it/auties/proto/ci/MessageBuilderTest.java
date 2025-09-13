@@ -30,12 +30,12 @@ public class MessageBuilderTest {
             @ProtobufProperty(index = 1, type = STRING)
             ProtobufString content
     ) {
-        @ProtobufBuilder(className = "ConstructorWrapperMessageBuilder")
+        @ProtobufBuilder(name = "ConstructorWrapperMessageBuilder")
         public WrapperMessage(int content) {
             this(ProtobufString.wrap(String.valueOf(content)));
         }
 
-        @ProtobufBuilder(className = "StaticWrapperMessageBuilder")
+        @ProtobufBuilder(name = "StaticWrapperMessageBuilder")
         public static WrapperMessage of(int content) {
             return new WrapperMessage(ProtobufString.wrap(String.valueOf(content)));
         }

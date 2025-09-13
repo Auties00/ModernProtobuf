@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * This annotation can be applied to non-static methods to represent the getter for an existing {@link ProtobufProperty} with the same index.
+ * This annotation can be applied to non-static methods to represent the accessor for an existing {@link ProtobufProperty} with the same index.
  * <h2>Usage Example:</h2>
  * <pre>{@code
  * @ProtobufMessage
@@ -18,7 +18,7 @@ import java.lang.annotation.Target;
  *         this.value = value;
  *     }
  *
- *     @ProtobufGetter(index = 1)
+ *     @ProtobufAccessor(index = 1)
  *     public ProtobufString unbox() {
  *         return value;
  *     }
@@ -27,11 +27,11 @@ import java.lang.annotation.Target;
  **/
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ProtobufGetter {
+public @interface ProtobufAccessor {
     /**
      * Returns the index of the associated {@link ProtobufProperty}
      *
      * @return the numeric index of the associated property
      */
-    int index();
+    long index();
 }

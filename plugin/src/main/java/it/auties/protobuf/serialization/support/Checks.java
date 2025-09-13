@@ -133,7 +133,7 @@ public final class Checks {
     private void checkAnyGetters(RoundEnvironment roundEnv) {
         checkEnclosing(
                 roundEnv,
-                ProtobufGetter.class,
+                ProtobufAccessor.class,
                 "Illegal enclosing class: a method annotated with @ProtobufGetter should be enclosed by a class or record annotated with @ProtobufMessage",
                 ProtobufMessage.class
         );

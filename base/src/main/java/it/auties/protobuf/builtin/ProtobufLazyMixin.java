@@ -4,6 +4,8 @@ import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
 import it.auties.protobuf.model.ProtobufString;
+import it.auties.protobuf.model.ProtobufWireType;
+import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import java.nio.ByteBuffer;
 
@@ -18,8 +20,9 @@ public final class ProtobufLazyMixin {
     }
 
     @ProtobufSerializer
-    public static ProtobufString toValue(String value) {
-        return value == null ? null : ProtobufString.wrap(value);
+    public static void writeValue(ProtobufOutputStream<?> stream, long fieldIndex, String value) {
+        stream.writeField(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        stream.writeFieldValue(value);
     }
 
     @ProtobufDeserializer(
@@ -48,7 +51,8 @@ public final class ProtobufLazyMixin {
     }
 
     @ProtobufSerializer
-    public static ByteBuffer toValue(byte[] value) {
-        return value == null ? null : ByteBuffer.wrap(value);
+    public static void writeValue(ProtobufOutputStream<?> stream, long fieldIndex, byte[] value) {
+        stream.writeField(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        stream.writeFieldValue(value);
     }
 }
