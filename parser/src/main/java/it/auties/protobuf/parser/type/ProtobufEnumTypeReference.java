@@ -5,7 +5,7 @@ import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 
 import java.util.Objects;
 
-public record ProtobufEnumTypeReference(ProtobufEnumStatement declaration) implements ProtobufTypeReference {
+public record ProtobufEnumTypeReference(ProtobufEnumStatement declaration) implements ProtobufObjectTypeReference {
     public ProtobufEnumTypeReference {
         Objects.requireNonNull(declaration, "declaration cannot be null");
     }

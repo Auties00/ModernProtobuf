@@ -5,7 +5,7 @@ import it.auties.protobuf.parser.tree.ProtobufGroupFieldStatement;
 
 import java.util.Objects;
 
-public final class ProtobufGroupTypeReference implements ProtobufTypeReference {
+public final class ProtobufGroupTypeReference implements ProtobufObjectTypeReference {
     private final String name;
     private ProtobufGroupFieldStatement declaration;
 
@@ -47,7 +47,7 @@ public final class ProtobufGroupTypeReference implements ProtobufTypeReference {
 
     @Override
     public String toString() {
-        return "group";
+        return name();
     }
 
     @Override

@@ -1,8 +1,6 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
-import it.auties.protobuf.parser.type.ProtobufUnresolvedTypeReference;
 
 public final class ProtobufEnumConstantExpression
         extends ProtobufExpressionImpl

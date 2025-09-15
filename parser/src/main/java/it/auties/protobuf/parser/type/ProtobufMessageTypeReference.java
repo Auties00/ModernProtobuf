@@ -1,13 +1,11 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
-import it.auties.protobuf.parser.tree.ProtobufTree;
 
 import java.util.Objects;
 
-public record ProtobufMessageTypeReference(ProtobufMessageStatement declaration) implements ProtobufTypeReference {
+public record ProtobufMessageTypeReference(ProtobufMessageStatement declaration) implements ProtobufObjectTypeReference {
     public ProtobufMessageTypeReference {
         Objects.requireNonNull(declaration, "declaration cannot be null");
     }

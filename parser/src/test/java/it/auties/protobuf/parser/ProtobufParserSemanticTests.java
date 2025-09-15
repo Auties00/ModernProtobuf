@@ -1,9 +1,12 @@
 package it.auties.protobuf.parser;
 
 import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Nested;
 
-public class ProtobufParserSemanticValidationTests {
+import static org.junit.Assert.fail;
+
+@Nested
+public class ProtobufParserSemanticTests {
     // 4.1 Type Resolution and Scope
     // 4.1.1 Cross-File Imports and Public Imports
     @Test

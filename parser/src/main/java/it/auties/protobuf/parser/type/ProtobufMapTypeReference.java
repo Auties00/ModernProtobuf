@@ -2,7 +2,7 @@ package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
 
-public final class ProtobufMapTypeReference implements ProtobufTypeReference {
+public final class ProtobufMapTypeReference implements ProtobufObjectTypeReference {
 
     private ProtobufTypeReference key;
     private ProtobufTypeReference value;

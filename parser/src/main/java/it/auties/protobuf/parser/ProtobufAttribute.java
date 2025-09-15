@@ -283,7 +283,7 @@ public final class ProtobufAttribute {
                 continue;
             }
 
-            if(!(typeReference instanceof ProtobufUnresolvedTypeReference(String name))) {
+            if(!(typeReference instanceof ProtobufUnresolvedObjectTypeReference(String name))) {
                 throw throwUnattributableType(typedFieldTree);
             }
 

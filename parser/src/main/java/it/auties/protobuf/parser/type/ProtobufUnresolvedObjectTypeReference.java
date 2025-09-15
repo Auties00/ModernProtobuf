@@ -1,13 +1,11 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
-import it.auties.protobuf.parser.tree.ProtobufTree;
 
 import java.util.Objects;
 
-public record ProtobufUnresolvedTypeReference(String name) implements ProtobufTypeReference {
-    public ProtobufUnresolvedTypeReference(String name) {
+public record ProtobufUnresolvedObjectTypeReference(String name) implements ProtobufObjectTypeReference {
+    public ProtobufUnresolvedObjectTypeReference(String name) {
         this.name = Objects.requireNonNull(name, "name cannot be null");
     }
 

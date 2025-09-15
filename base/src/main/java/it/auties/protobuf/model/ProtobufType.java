@@ -1,10 +1,7 @@
 package it.auties.protobuf.model;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Enumeration representing all supported Protocol Buffer property types.
@@ -173,13 +170,6 @@ public enum ProtobufType {
      */
     SFIXED64(long.class, Long.class, true);
 
-    /**
-     * Cache for fast type lookup by name.
-     * Maps lowercase type names to their corresponding enum values.
-     */
-    private static final Map<String, ProtobufType> BY_NAME = Arrays.stream(values())
-            .collect(Collectors.toUnmodifiableMap(entry -> entry.name().toLowerCase(), Function.identity()));
-
     private final Class<?> serializedType;
     private final Class<?> deserializableType;
     private final boolean packable;
@@ -198,16 +188,33 @@ public enum ProtobufType {
     }
 
     /**
-     * Resolves a Protocol Buffer type by name.
+     * Resolves a Protocol Primitive Buffer type by name.
      * <p>
-     * The lookup is case-insensitive and returns {@link #UNKNOWN} for unrecognized names.
+     * The lookup is case-sensitive and returns {@link #UNKNOWN} for unrecognized names.
      * </p>
      *
      * @param name the type name to resolve (case-insensitive), may be null
-     * @return the corresponding ProtobufType, or {@link #UNKNOWN} if the name is null or unrecognized
+     * @return the corresponding primitive ProtobufType, or {@link #UNKNOWN} if the name is null or unrecognized
      */
-    public static ProtobufType of(String name) {
-        return name == null ? UNKNOWN : BY_NAME.getOrDefault(name.toLowerCase(), UNKNOWN);
+    public static ProtobufType ofPrimitive(String name) {
+        return switch (name) {
+          case "string" -> STRING;
+          case "bytes" -> BYTES;
+          case "bool" -> BOOL;
+          case "float" -> FLOAT;
+          case "double" -> DOUBLE;
+          case "int32" -> INT32;
+          case "int64" -> INT64;
+          case "uint32" -> UINT32;
+          case "uint64" -> UINT64;
+          case "sint32" -> SINT32;
+          case "sint64" -> SINT64;
+          case "fixed32" -> FIXED32;
+          case "fixed64" -> FIXED64;
+          case "sfixed32" -> SFIXED32;
+          case "sfixed64" -> SFIXED64;
+          case null, default -> UNKNOWN;
+        };
     }
 
     /**

@@ -163,7 +163,7 @@ public final class ProtobufParser {
                 tokenizer.line());
         var statement = new ProtobufPackageStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalTypeReference(name),
+        ProtobufParserException.check(isValidType(name),
                 "Unexpected token " + name, tokenizer.line());
         statement.setName(name);
         var end = tokenizer.nextRequiredToken();
@@ -212,7 +212,7 @@ public final class ProtobufParser {
             membersAccessed = List.of();
         }else if(membersAccessedOrAssignment.charAt(0) == '.') {
             var accessed = membersAccessedOrAssignment.substring(1);
-            ProtobufParserException.check(isLegalTypeReference(accessed),
+            ProtobufParserException.check(isValidType(accessed),
                     "Unexpected token " + accessed, tokenizer.line());
             membersAccessed = Arrays.asList(accessed.split("\\."));
             var assignment = tokenizer.nextRequiredToken();
@@ -245,14 +245,12 @@ public final class ProtobufParser {
         };
 
         T parse(ProtobufTokenizer tokenizer, ProtobufOptionName name, ProtobufExpression value) throws IOException;
-
-
     }
 
     private static ProtobufMessageStatement parseMessage(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMessageStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
+        ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var objectStart = tokenizer.nextRequiredToken();
@@ -309,9 +307,9 @@ public final class ProtobufParser {
                 "Extensions are only supported in proto3 for options", tokenizer.line());
         var statement = new ProtobufExtendStatement(tokenizer.line());
         var qualifiedName = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalTypeReference(qualifiedName),
+        ProtobufParserException.check(isValidType(qualifiedName),
                 "Unexpected token: " + qualifiedName, tokenizer.line());
-        var reference = new ProtobufUnresolvedTypeReference(qualifiedName);
+        var reference = new ProtobufUnresolvedObjectTypeReference(qualifiedName);
         statement.setDeclaration(reference);
         var objectStart = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isBodyStart(objectStart),
@@ -367,14 +365,23 @@ public final class ProtobufParser {
             modifier = ProtobufFieldStatement.Modifier.of(token)
                     .orElse(ProtobufFieldStatement.Modifier.NONE);
            if(modifier == ProtobufFieldStatement.Modifier.NONE) {
-               reference = ProtobufTypeReference.of(token);
                var version = document.syntax()
                        .orElse(ProtobufVersion.defaultVersion());
-               ProtobufParserException.check(version == ProtobufVersion.PROTOBUF_3 || reference.protobufType() == ProtobufType.MAP,
-                       "Unexpected token " + token, tokenizer.line());
+               if(token.equals("map")) {
+                   reference = new ProtobufMapTypeReference();
+               }else if(version == ProtobufVersion.PROTOBUF_3) {
+                   var primitiveType = ProtobufType.ofPrimitive(token);
+                   if (primitiveType == ProtobufType.UNKNOWN) {
+                       ProtobufParserException.check(isValidType(token),
+                               "Unexpected token " + token, tokenizer.line());
+                       reference = new ProtobufUnresolvedObjectTypeReference(token);
+                   }else {
+                       reference = new ProtobufPrimitiveTypeReference(primitiveType);
+                   }
+               }
            }else {
                var type = tokenizer.nextRequiredToken();
-               ProtobufParserException.check(isLegalTypeReference(type),
+               ProtobufParserException.check(isValidType(type),
                        "Unexpected token " + type, tokenizer.line());
                reference = ProtobufTypeReference.of(type);
                ProtobufParserException.check(reference.protobufType() != ProtobufType.MAP,
@@ -388,6 +395,9 @@ public final class ProtobufParser {
 
         ProtobufFieldStatement child;
         if(reference.protobufType() == ProtobufType.GROUP) {
+            if(document.syntax().isPresent() && document.syntax().get() == ProtobufVersion.PROTOBUF_3) {
+                throw new ProtobufParserException("Group fields are not supported in proto3", tokenizer.line());
+            }
             child = new ProtobufGroupFieldStatement(tokenizer.line());
         }else {
             child = new ProtobufFieldStatement(tokenizer.line());
@@ -402,9 +412,12 @@ public final class ProtobufParser {
             }
 
             var keyTypeToken = tokenizer.nextRequiredToken();
-            ProtobufParserException.check(isLegalName(keyTypeToken),
+            ProtobufParserException.check(isValidIdent(keyTypeToken),
                     "Unexpected token " + keyTypeToken, tokenizer.line());
             var keyType = ProtobufTypeReference.of(keyTypeToken);
+            if(keyType.protobufType() == ProtobufType.MAP || keyType.protobufType() == ProtobufType.GROUP) {
+                throw new ProtobufParserException("Unexpected token " + keyTypeToken, tokenizer.line());
+            }
             mapType.setKeyType(keyType);
 
             var separator = tokenizer.nextRequiredToken();
@@ -412,7 +425,7 @@ public final class ProtobufParser {
                     "Unexpected token " + separator, tokenizer.line());
 
             var valueTypeToken = tokenizer.nextRequiredToken();
-            ProtobufParserException.check(isLegalName(valueTypeToken),
+            ProtobufParserException.check(isValidIdent(valueTypeToken),
                     "Unexpected token " + valueTypeToken, tokenizer.line());
             var valueType = ProtobufTypeReference.of(valueTypeToken);
             mapType.setValueType(valueType);
@@ -422,10 +435,10 @@ public final class ProtobufParser {
                     "Unexpected token " + end, tokenizer.line());
 
             var childName = tokenizer.nextRequiredToken();
-            ProtobufParserException.check(isLegalName(childName),
+            ProtobufParserException.check(isValidIdent(childName),
                     "Unexpected token " + childName, tokenizer.line());
             child.setName(childName);
-        }else if(isLegalName(nameOrTypeArgs)) {
+        }else if(isValidIdent(nameOrTypeArgs)) {
             child.setName(nameOrTypeArgs);
         }else {
             throw new ProtobufParserException("Unexpected token " + nameOrTypeArgs, tokenizer.line());
@@ -512,7 +525,7 @@ public final class ProtobufParser {
     private static ProtobufEnumStatement parseEnum(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufEnumStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
+        ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var objectStart = tokenizer.nextRequiredToken();
@@ -653,7 +666,7 @@ public final class ProtobufParser {
     private static ProtobufServiceStatement parseService(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufServiceStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
+        ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var objectStart = tokenizer.nextRequiredToken();
@@ -683,7 +696,7 @@ public final class ProtobufParser {
     private static ProtobufMethodStatement parseMethod(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMethodStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
+        ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var inputType = parseMethodType(tokenizer);
@@ -729,7 +742,7 @@ public final class ProtobufParser {
             typeReference = ProtobufTypeReference.of(typeOrModifier);
             stream = false;
         }
-        ProtobufParserException.check(typeReference instanceof ProtobufUnresolvedTypeReference,
+        ProtobufParserException.check(typeReference instanceof ProtobufUnresolvedObjectTypeReference,
                 "Unexpected type, only messages can be used: " + typeReference.name(), tokenizer.line());
         var typeEnd = tokenizer.nextRequiredToken();
         ProtobufParserException.check(isParensEnd(typeEnd),
@@ -740,7 +753,7 @@ public final class ProtobufParser {
     private static ProtobufOneofFieldStatement parseOneof(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufOneofFieldStatement(tokenizer.line());
         var name = tokenizer.nextRequiredToken();
-        ProtobufParserException.check(isLegalName(name),
+        ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var objectStart = tokenizer.nextRequiredToken();
@@ -852,7 +865,7 @@ public final class ProtobufParser {
                 yield expression;
             }
             case ProtobufTokenizer.ParsedToken.Raw raw
-                    when isLegalName(raw.value()) -> {
+                    when isValidIdent(raw.value()) -> {
                 var expression = new ProtobufEnumConstantExpression(line);
                 expression.setName(raw.value());
                 yield expression;
@@ -905,44 +918,53 @@ public final class ProtobufParser {
         return Objects.equals(operator, RANGE_OPERATOR);
     }
 
-    private static boolean isLegalTypeReference(String name) {
-        var length = name.length();
+    private static boolean isValidType(String token) {
+        var length = token.length();
         if(length == 0) {
             return false;
         }
 
-        if(name.charAt(0) == '.' || name.charAt(length - 1) == '.') {
+        if(token.charAt(length - 1) == '.') {
             return false;
         }
 
-        var start = 0;
-        for(var end = 1; end < length; end++) {
-            if (name.charAt(end) != '.') {
+        int start;
+        if(token.charAt(0) == '.') {
+            if(length == 1) {
+                return false;
+            }
+            start = 1;
+        }else {
+            start = 0;
+        }
+
+        for(var end = start + 1; end < length; end++) {
+            if (token.charAt(end) != '.') {
                 continue;
             }
 
-            if(!isLegalName(name.substring(start, end))) {
+            if(!isValidIdent(token.substring(start, end))) {
                 return false;
             }
 
             start = end + 1;
         }
 
-        return true;
+        return isValidIdent(token.substring(start, length));
     }
 
-    private static boolean isLegalName(String instruction) {
-        var length = instruction.length();
+    private static boolean isValidIdent(String token, int start, int end) {
+        var length = token.length();
         if(length == 0) {
             return false;
         }
 
-        if(!Character.isLetter(instruction.charAt(0))) {
+        if(!Character.isLetter(token.charAt(0))) {
             return false;
         }
 
         for(var i = 1; i < length; i++) {
-            var entry = instruction.charAt(i);
+            var entry = token.charAt(i);
             if(!Character.isLetterOrDigit(entry) && entry != '_') {
                 return false;
             }

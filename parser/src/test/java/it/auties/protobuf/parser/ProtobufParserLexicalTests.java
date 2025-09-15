@@ -1,9 +1,12 @@
 package it.auties.protobuf.parser;
 
 import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Nested;
 
-public class ProtobufParserLexicalElementTests {
+import static org.junit.Assert.fail;
+
+@Nested
+public class ProtobufParserLexicalTests {
     // 2.1.1 Identifiers
     @Test
     public void testValidSingleWordIdentifiers() {
