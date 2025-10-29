@@ -117,6 +117,12 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
                 .findFirst();
     }
 
+    @Override
+    public <V extends WithName> Optional<? extends V> getAnyChildByNameAndType(String name, Class<V> clazz) {
+        return ProtobufStatementWithBodyImpl.getAnyChildrenByNameAndType(children, name, clazz)
+                .findFirst();
+    }
+
     static <V extends ProtobufTree> Optional<V> getDirectChildByIndexAndType(Collection<? extends ProtobufTree> children, long index, Class<V> clazz) {
         return children.stream()
                 .filter(entry -> clazz.isAssignableFrom(entry.getClass())

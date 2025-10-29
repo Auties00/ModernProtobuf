@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.parser.token.ProtobufTokenizer;
 import org.junit.Test;
 
 import java.io.IOException;

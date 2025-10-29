@@ -111,7 +111,7 @@ public sealed class ProtobufFieldStatement
         builder.append(" ");
         builder.append("[");
         var optionsToString = options.stream()
-                .map(entry -> entry.getKey() + " = " + entry.getValue())
+                .map(entry -> entry.getValue().toString())
                 .collect(Collectors.joining(", "));
         builder.append(optionsToString);
         builder.append("]");

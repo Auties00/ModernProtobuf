@@ -70,6 +70,7 @@ public sealed interface ProtobufTree
         <V extends ProtobufTree> Optional<? extends V> getDirectChildByIndexAndType(long index, Class<V> clazz);
 
         <V extends ProtobufTree> Optional<? extends V> getAnyChildByType(Class<V> clazz);
+        <V extends ProtobufTree.WithName> Optional<? extends V> getAnyChildByNameAndType(String name, Class<V> clazz);
         <V extends ProtobufTree> Stream<? extends V> getAnyChildrenByType(Class<V> clazz);
         <V extends ProtobufTree.WithName> Stream<? extends V> getAnyChildrenByNameAndType(String name, Class<V> clazz);
     }

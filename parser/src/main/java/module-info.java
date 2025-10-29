@@ -5,4 +5,7 @@ module it.auties.protobuf.parser {
     exports it.auties.protobuf.parser;
     exports it.auties.protobuf.parser.type;
     exports it.auties.protobuf.parser.tree;
+    exports it.auties.protobuf.parser.exception;
+    exports it.auties.protobuf.parser.token;
+    exports it.auties.protobuf.parser.attribute;
 }

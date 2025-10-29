@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.ProtobufParserException;
+import it.auties.protobuf.parser.exception.ProtobufParserException;
 
 import java.util.Objects;
 

@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser;
+package it.auties.protobuf.parser.exception;
 
 import it.auties.protobuf.exception.ProtobufException;
 

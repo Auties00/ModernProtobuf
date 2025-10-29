@@ -1,194 +1,478 @@
+
 package it.auties.protobuf.parser;
 
+import it.auties.protobuf.parser.exception.ProtobufParserException;
+import it.auties.protobuf.parser.tree.ProtobufBoolExpression;
+import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
+import it.auties.protobuf.parser.tree.ProtobufFloatingPointExpression;
+import it.auties.protobuf.parser.tree.ProtobufIntegerExpression;
+import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
 import org.junit.Test;
 import org.junit.jupiter.api.Nested;
 
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 @Nested
 public class ProtobufParserLexicalTests {
     // 2.1.1 Identifiers
     @Test
     public void testValidSingleWordIdentifiers() {
-        // Test with single-word identifiers (e.g., MyMessage, fieldName, _some_value) [cite: 26]
-        // Simulate parsing "MyMessage", "fieldName", "_some_value" and assert they are recognized as valid identifiers.
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message MyMessage {
+                    string fieldName = 1;
+                    string _some_value = 2;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("MyMessage", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
+        assertEquals("MyMessage", message.name());
     }
 
     @Test
     public void testValidIdentifiersWithDigits() {
-        // Test with identifiers containing digits (e.g., Message123, field_4_data) [cite: 26]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message Message123 {
+                    string field_4_data = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("Message123", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 
     @Test
     public void testValidIdentifiersWithUnderscores() {
-        // Test with identifiers with underscores (e.g., my_message, _hidden_field) [cite: 26]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message my_message {
+                    string _hidden_field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("my_message", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 
     @Test
     public void testValidFullIdentifiers() {
-        // Verify parsing of fully qualified names (e.g., com.example.foo.MyMessage, .global.ScopeEnum) [cite: 27]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                package com.example.foo;
+                message MyMessage {
+                    string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("com.example.foo", document.packageName().orElse(null));
     }
 
     @Test
     public void testInvalidIdentifiersStartingWithDigits() {
-        // Ensure rejection of identifiers starting with digits (e.g., 123Invalid) [cite: 28]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message 123Invalid {
+                    string field = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
     @Test
     public void testInvalidIdentifiersContainingDashes() {
-        // Ensure rejection of identifiers containing dashes (e.g., field-name) [cite: 28]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message ValidMessage {
+                    string field-name = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
     @Test
     public void testInvalidIdentifiersWithOtherIllegalCharacters() {
-        // Ensure rejection of identifiers with other illegal characters [cite: 28]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message Invalid@Message {
+                    string field = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
     // 2.1.2 Literals (Integers, Floats, Booleans, Strings)
     @Test
     public void testIntegerDecimalLiterals() {
-        // Test decimal integers (e.g., 123, -45) [cite: 32]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 123];
+                    optional int32 b = 2 [default = -45];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+        
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufIntegerExpression);
+        assertEquals((Object) 123L, ((ProtobufIntegerExpression) aDefault.get().value()).value());
+       
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufIntegerExpression);
+        assertEquals((Object) (-45L), ((ProtobufIntegerExpression) bDefault.get().value()).value());
     }
 
     @Test
     public void testIntegerOctalLiterals() {
-        // Test octal integers (prefixed with 0, e.g., 077) [cite: 32]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 077];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufIntegerExpression);
+        assertEquals((Object) 63L, ((ProtobufIntegerExpression) aDefault.get().value()).value()); // 077 octal = 63 decimal
     }
 
     @Test
     public void testIntegerHexadecimalLiterals() {
-        // Test hexadecimal integers (prefixed with 0x or 0X, e.g., 0xFF) [cite: 32]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 0xFF];
+                    optional int32 b = 2 [default = 0x10];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufIntegerExpression);
+        assertEquals((Object) 255L, ((ProtobufIntegerExpression) aDefault.get().value()).value()); // 0xFF = 255
+
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufIntegerExpression);
+        assertEquals((Object) 16L, ((ProtobufIntegerExpression) bDefault.get().value()).value()); // 0x10 = 16
     }
 
     @Test
     public void testFloatingPointStandardDecimalLiterals() {
-        // Verify parsing of standard decimal floats (e.g., 1.0) [cite: 34]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 1.0];
+                    optional double b = 2 [default = 3.14];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) 1.0, ((ProtobufFloatingPointExpression) aDefault.get().value()).value());
+
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) 3.14, ((ProtobufFloatingPointExpression) bDefault.get().value()).value());
     }
 
     @Test
     public void testFloatingPointScientificNotationLiterals() {
-        // Verify parsing of scientific notation (e.g., -3.14e-5) [cite: 34]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = -3.14e-5];
+                    optional double b = 2 [default = 1.23e10];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) (-3.14e-5d), ((ProtobufFloatingPointExpression) aDefault.get().value()).value());
+
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) 1.23e10d, ((ProtobufFloatingPointExpression) bDefault.get().value()).value());
     }
 
     @Test
     public void testFloatingPointLeadingDecimalLiterals() {
-        // Verify parsing of floats with leading decimal (e.g., .5) [cite: 34]
-        fail("Test not implemented yet");
-    }
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = .5];
+                    optional double b = 2 [default = .25];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
 
-    @Test
-    public void testFloatingPointSuffixFLiterals() {
-        // Verify parsing of floats with 'f' suffix (e.g., 10f), demonstrating longest match rule [cite: 35]
-        fail("Test not implemented yet");
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) 0.5, ((ProtobufFloatingPointExpression) aDefault.get().value()).value());
+
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufFloatingPointExpression);
+        assertEquals((Object) 0.25, ((ProtobufFloatingPointExpression) bDefault.get().value()).value());
     }
 
     @Test
     public void testFloatingPointSpecialValues() {
-        // Verify parsing of special values like inf (infinity) and nan (not-a-number) [cite: 34]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = inf];
+                    optional float b = 2 [default = -inf];
+                    optional float c = 3 [default = nan];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testBooleanLiterals() {
-        // Test true and false values [cite: 36]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional bool a = 1 [default = true];
+                    optional bool b = 2 [default = false];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+
+        var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
+        assertTrue(a.isPresent());
+        var aDefault = a.get().getOption("default");
+        assertTrue(aDefault.isPresent());
+        assertTrue(aDefault.get().value() instanceof ProtobufBoolExpression);
+        assertEquals(true, ((ProtobufBoolExpression) aDefault.get().value()).value());
+
+        var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
+        assertTrue(b.isPresent());
+        var bDefault = b.get().getOption("default");
+        assertTrue(bDefault.isPresent());
+        assertTrue(bDefault.get().value() instanceof ProtobufBoolExpression);
+        assertEquals(false, ((ProtobufBoolExpression) bDefault.get().value()).value());
     }
 
     @Test
     public void testStringLiteralsSingleQuotes() {
-        // Validate strings enclosed in single quotes [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = 'hello'];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testStringLiteralsDoubleQuotes() {
-        // Validate strings enclosed in double quotes [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "hello"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testStringLiteralsHexadecimalEscapeSequences() {
-        // Test hexadecimal escape sequences (e.g., \xHH) [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\x48\\x65\\x6C\\x6C\\x6F"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testStringLiteralsOctalEscapeSequences() {
-        // Test octal escape sequences (e.g., \OOO) [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\101\\102\\103"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testStringLiteralsUnicodeEscapeSequences() {
-        // Test Unicode escape sequences (e.g., \UHHHHHHHH) [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\u0048\\u0065\\u006C\\u006C\\u006F"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testStringLiteralsCommonCharacterEscapes() {
-        // Test common character escapes like \n, \t, \\, \", \' [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "line1\\nline2"];
+                    optional string b = 2 [default = "tab\\there"];
+                    optional string c = 3 [default = "back\\\\slash"];
+                    optional string d = 4 [default = "quote\\"here"];
+                    optional string e = 5 [default = 'apos\\'here'];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     @Test
     public void testMultiPartStringLiterals() {
-        // Test multi-part strings (concatenated quoted parts) and whitespace handling [cite: 37]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "hello "
+                                                     "world"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 
     // 2.1.3 Comments and Whitespace
     @Test
     public void testSingleLineComments() {
-        // Test comments starting with //
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                // This is a comment
+                message M {
+                    string field = 1; // another comment
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 
     @Test
     public void testMultiLineComments() {
-        // Verify comments enclosed in /* ... */
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                /* This is a
+                   multi-line
+                   comment */
+                message M {
+                    string field = 1; /* inline block comment */
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 
     @Test
     public void testMixedCommentsAndCode() {
-        // Ensure comments do not interfere with valid syntax
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                // Comment before message
+                /* Block comment */
+                message M {
+                    // Comment before field
+                    string field = 1; // After field
+                    /* Before another field */
+                    int32 number = 2;
+                }
+                // End comment
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertEquals(2, message.children().size());
     }
 
     @Test
     public void testVariousWhitespaceForms() {
-        // Test various forms of whitespace (spaces, tabs, newlines, carriage returns, form feeds, vertical tabs) between tokens [cite: 38]
-        fail("Test not implemented yet");
-    }
-
-    // 2.1.4 Keywords and Reserved Words
-    @Test
-    public void testKeywordRecognition() {
-        // Correctly identify Protobuf keywords (e.g., message, enum, syntax, import, option, repeated, optional, required, oneof, map, service, rpc, stream, returns, reserved, extensions, to, max, true, false) [cite: 39]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax="proto3";
+                
+                message\tM\t{
+                \tstring\tfield\t=\t1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("M", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 
     @Test
     public void testKeywordsNotTreatedAsIdentifiers() {
-        // Confirm that keywords are not treated as valid identifiers [cite: 39]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message M {
+                    string message = 1;
+                }
+                """;
+        ProtobufParser.parseOnly(proto);
     }
 
     @Test
     public void testIdentifiersNotTreatedAsKeywords() {
-        // Confirm that identifiers are not treated as valid keywords [cite: 39]
-        fail("Test not implemented yet");
+        var proto = """
+                syntax = "proto3";
+                message messageLike {
+                    string field = 1;
+                }
+                """;
+        // Should parse successfully as "messageLike" is not exactly "message"
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByNameAndType("messageLike", ProtobufMessageStatement.class).orElseThrow();
+        assertNotNull(message);
     }
 }

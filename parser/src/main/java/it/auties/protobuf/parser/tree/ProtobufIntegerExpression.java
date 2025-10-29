@@ -26,4 +26,9 @@ public final class ProtobufIntegerExpression
     public boolean isAttributed() {
         return value != null;
     }
+
+    @Override
+    public String toString() {
+        return String.valueOf(value);
+    }
 }

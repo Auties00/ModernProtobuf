@@ -123,6 +123,12 @@ public final class ProtobufOneofFieldStatement
     }
 
     @Override
+    public <V extends WithName> Optional<? extends V> getAnyChildByNameAndType(String name, Class<V> clazz) {
+        return ProtobufStatementWithBodyImpl.getAnyChildrenByNameAndType(children, name, clazz)
+                .findFirst();
+    }
+
+    @Override
     public <V extends ProtobufTree> Stream<? extends V> getAnyChildrenByType(Class<V> clazz) {
         return ProtobufStatementWithBodyImpl.getAnyChildrenByType(children, clazz);
     }

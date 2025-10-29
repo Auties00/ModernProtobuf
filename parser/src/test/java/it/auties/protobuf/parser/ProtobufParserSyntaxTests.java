@@ -2,6 +2,7 @@ package it.auties.protobuf.parser;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
+import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufMapTypeReference;
 import it.auties.protobuf.parser.type.ProtobufPrimitiveTypeReference;
@@ -17,7 +18,7 @@ import static org.junit.Assert.*;
 public class ProtobufParserSyntaxTests {
     @Test
     public void testValidProto2SyntaxDeclaration() {
-        String proto = """
+        var proto = """
                 syntax = "proto2";
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -26,7 +27,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testValidProto3SyntaxDeclaration() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -35,7 +36,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMissingSyntaxDeclaration() {
-        String proto = """
+        var proto = """
                 message M {}
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -44,13 +45,13 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testIncorrectPlacementOfSyntaxDeclaration() {
-        String proto = """
+        var proto = """
                 package foo;
                 syntax = "proto3";
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
 
-        String proto1 = """
+        var proto1 = """
                 import "other.proto";
                 syntax = "proto3";
                 """;
@@ -59,10 +60,10 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidSyntaxString() {
-        String proto1 = """
+        var proto1 = """
                 syntax = "proto1";
                 """;
-        String proto4 = """
+        var proto4 = """
                 syntax = "proto4";
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto1));
@@ -71,7 +72,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testValidPackageDeclaration() {
-        String proto = """
+        var proto = """
                 package foo.bar;
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -80,7 +81,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMultiplePackageDeclarationsError() {
-        String proto = """
+        var proto = """
                 package foo;
                 package bar;
                 """;
@@ -89,10 +90,10 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testPackageNameValidity() {
-        String valid = """
+        var valid = """
                 package my_pkg.v1;
                 """;
-        String invalid = """
+        var invalid = """
                 package 1pkg.name;
                 """;
         ProtobufParser.parseOnly(valid);
@@ -101,7 +102,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testBasicImportStatement() {
-        String proto = """
+        var proto = """
                 import "other.proto";
                 """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
@@ -114,7 +115,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testPublicImportStatement() {
-        String proto = """
+        var proto = """
                 import public "other.proto";
                 """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
@@ -127,7 +128,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testWeakImportStatement() {
-        String proto = """
+        var proto = """
                 import weak "other.proto";
                 """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
@@ -140,7 +141,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidImportModifier() {
-        String proto = """
+        var proto = """
                 import weaker "other.proto";
                 """;
         var other = new ProtobufDocumentTree(Path.of("other.proto"));
@@ -149,7 +150,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidImportPaths() {
-        String proto = """
+        var proto = """
                 import "missing;
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
@@ -157,7 +158,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testUnknownImportPaths() {
-        String proto = """
+        var proto = """
                 import "other.proto";
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
@@ -165,7 +166,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStandardLiteralFileLevelOption() {
-        String proto = """
+        var proto = """
                 option java_package = "com.example.foo";
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -177,7 +178,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStandardBoolTrueFileLevelOption() {
-        String proto = """
+        var proto = """
                 option java_multiple_files = true;
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -189,7 +190,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStandardBoolFalseFileLevelOption() {
-        String proto = """
+        var proto = """
                 option java_multiple_files = false;
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -201,7 +202,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStandardEnumConstantFileLevelOption() {
-        String proto = """
+        var proto = """
                 option optimize_for = SPEED;
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -215,7 +216,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStandardFileLevelOptionWithParenthesisError() {
-        String proto = """
+        var proto = """
                 option (optimize_for) = SPEED;
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
@@ -223,7 +224,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testCustomMessageFileLevelOption() {
-        String proto = """
+        var proto = """
                 message MyOption {
                   optional bool a = 1;
                 }
@@ -234,7 +235,7 @@ public class ProtobufParserSyntaxTests {
                 }
                 """;
         var document = ProtobufParser.parseOnly(proto);
-        String proto1 = """
+        var proto1 = """
                 option (simple_option) = true;
                 option (structured_option).a = true;
                 """;
@@ -243,12 +244,12 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidFileLevelOptionNamesOrValues() {
-        String proto = """
+        var proto = """
                 option abc = 123;
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
 
-        String proto1 = """
+        var proto1 = """
                 option java_package = 123;
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto1));
@@ -256,7 +257,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEmptyMessageDefinition() {
-        String proto = """
+        var proto = """
                 message MyMessage {}
                 """;
         var document = ProtobufParser.parseOnly(proto);
@@ -266,7 +267,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testProto2MessageWithBasicScalarFields() {
-        String proto = """
+        var proto = """
                 message M {
                   optional int32 id = 1;
                   optional string name = 2;
@@ -293,7 +294,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testProto3MessageWithBasicScalarFields() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 
                 message M {
@@ -321,7 +322,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithNestedMessages() {
-        String proto = """
+        var proto = """
                 message M {
                   message N {}
                 }
@@ -335,7 +336,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithEnums() {
-        String proto = """
+        var proto = """
                 message M {
                   enum E { A = 0; }
                 }
@@ -351,7 +352,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithOneofFields() {
-        String proto = """
+        var proto = """
                 message M {
                   oneof my_union {
                     string name = 1;
@@ -377,7 +378,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithGroups() {
-        String proto = """
+        var proto = """
                 message M {
                   repeated group Result = 2 {
                     optional string name = 3;
@@ -397,7 +398,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithMapFields() {
-        String proto = """
+        var proto = """
                 message M {
                   map<string, int32> map_field = 1;
                 }
@@ -414,7 +415,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMessageWithMapFieldsAndModifierError() {
-        String proto = """
+        var proto = """
                 message M {
                   required map<string, int32> map_field = 1;
                 }
@@ -424,7 +425,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEnums() {
-        String proto = """
+        var proto = """
                 enum E {
                   UNKNOWN = 0;
                   STARTED = 1;
@@ -442,7 +443,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEnumWithOptions() {
-        String proto = """
+        var proto = """
                 enum E {
                   option deprecated = true;
                   A = 0;
@@ -459,7 +460,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testService() {
-        String proto = """
+        var proto = """
                 service S {
                   rpc Fetch (Request) returns (Response);
                 }
@@ -477,7 +478,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testServiceWithStreamResponse() {
-        String proto = """
+        var proto = """
                 service S {
                   rpc Fetch (Request) returns (stream Response);
                 }
@@ -495,7 +496,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testServiceWithStreamRequest() {
-        String proto = """
+        var proto = """
                 service S {
                   rpc Fetch (stream Request) returns (Response);
                 }
@@ -513,7 +514,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testExtendDefinition() {
-        String proto = """
+        var proto = """
                 message MessageType {
                 
                 }
@@ -534,7 +535,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testExtendDefinitionOnUnknownError() {
-        String proto = """
+        var proto = """
                 extend MessageType {
                   optional string ext_field = 100;
                 }
@@ -544,7 +545,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMissingSemicolons() {
-        String proto = """
+        var proto = """
                 syntax = "proto3"
                 message A {
                   int32 id = 1
@@ -555,7 +556,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMismatchedBraces() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   message B {
@@ -567,7 +568,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testMismatchedParentheses() {
         // Missing closing ")" after Req
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 service S {
                   rpc M (Req returns (Res)) {}
@@ -578,7 +579,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMismatchedQuotes() {
-        String proto = """
+        var proto = """
                 syntax = "proto3;
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
@@ -587,7 +588,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testInvalidKeywordsAsIdentifiers() {
         // Using the keyword "message" as a field name should fail
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message Demo {
                   int32 message = 1;
@@ -599,7 +600,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testInvalidIdentifiersInPlaceOfKeywords() {
         // Top-level "massage" instead of "message" should fail
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 massage Demo {
                   int32 id = 1;
@@ -610,7 +611,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testIncorrectFieldSyntaxMissingFieldNumber() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   int32 id;
@@ -621,7 +622,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testUnexpectedTokens() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 # this is not a valid comment in proto
                 message A { int32 id = 1; }
@@ -633,7 +634,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testDuplicateFieldNumbersError() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   int32 a = 1;
@@ -645,7 +646,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testDuplicateFieldNamesError() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   int32 x = 1;
@@ -657,7 +658,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testReservedNumberUsageError() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   reserved 5;
@@ -669,7 +670,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testReservedNameUsageError() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   reserved "foo";
@@ -682,7 +683,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testTypeMismatchesFieldDefaultValue() {
         // In proto2, default is allowed but must match the field type
-        String proto = """
+        var proto = """
                 syntax = "proto2";
                 message A {
                   int32 a = 1 [default = "abc"];
@@ -694,7 +695,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testTypeMismatchesInvalidMapKeyType() {
         // double is not a valid map key type
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   map<double, string> m = 1;
@@ -705,7 +706,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testProto2FeaturesInProto3ErrorRequiredFields() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   required int32 a = 1;
@@ -716,7 +717,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testProto2FeaturesInProto3ErrorGroupFields() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   group Foo = 1 {}
@@ -727,7 +728,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testProto2FeaturesInProto3ErrorExtensions() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   extensions 100 to 199;
@@ -738,7 +739,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidOneofDefinitionRepeatedField() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   oneof x {
@@ -751,7 +752,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testInvalidOneofDefinitionMapField() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 message A {
                   oneof x {
@@ -765,7 +766,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testEnumZeroValueViolationError() {
         // In proto3, the first enum value must be zero
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 enum E {
                   ONE = 1;
@@ -777,7 +778,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEnumAliasWithoutAllowAliasWarningOrError() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 enum E {
                   A = 1;
@@ -797,13 +798,13 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEmptyFile() {
-        String proto = "";
+        var proto = "";
         ProtobufParser.parseOnly(proto);
     }
 
     @Test
     public void testFileWithOnlyCommentsAndWhitespace() {
-        String proto = """
+        var proto = """
                 
                 // single-line comment
                 /* block
@@ -816,7 +817,7 @@ public class ProtobufParserSyntaxTests {
     @Test
     public void testBinaryDataAsInputError() {
         // Embed control chars that should not be acceptable in proto source
-        String proto = "syntax = \"proto3\";\u0000\u0001message A { int32 id = 1; }";
+        var proto = "syntax = \"proto3\";\u0000\u0001message A { int32 id = 1; }";
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
@@ -824,10 +825,10 @@ public class ProtobufParserSyntaxTests {
 
     @Test(timeout = 8000)
     public void testExtremelyLargeFilePerformance() {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         sb.append("syntax = \"proto3\";\n");
         sb.append("message Big {\n");
-        for (int i = 1; i <= 2000; i++) {
+        for (var i = 1; i <= 2000; i++) {
             sb.append("  int32 f").append(i).append(" = ").append(i).append(";\n");
         }
         sb.append("}\n");
@@ -836,17 +837,17 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testManyTopLevelMessagesEnumsServices() {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         sb.append("syntax = \"proto3\";\n");
 
-        for (int i = 1; i <= 50; i++) {
+        for (var i = 1; i <= 50; i++) {
             sb.append("message M").append(i).append(" { int32 id = 1; }\n");
         }
-        for (int i = 1; i <= 20; i++) {
+        for (var i = 1; i <= 20; i++) {
             sb.append("enum E").append(i).append(" { ZERO = 0; ONE = 1; }\n");
         }
         sb.append("service S {\n");
-        for (int i = 1; i <= 25; i++) {
+        for (var i = 1; i <= 25; i++) {
             sb.append("  rpc R").append(i).append(" (Req) returns (Res) {}\n");
         }
         sb.append("}\n");
@@ -860,14 +861,14 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testDeeplyNestedStructures() {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         sb.append("syntax = \"proto3\";\n");
-        int depth = 20;
-        for (int i = 1; i <= depth; i++) {
+        var depth = 20;
+        for (var i = 1; i <= depth; i++) {
             sb.append("message N").append(i).append(" {\n");
         }
         sb.append("  int32 leaf = 1;\n");
-        for (int i = 1; i <= depth; i++) {
+        for (var i = 1; i <= depth; i++) {
             sb.append("}\n");
         }
         ProtobufParser.parseOnly(sb.toString());
@@ -875,7 +876,7 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testExtensiveUseOfOptions() {
-        String proto = """
+        var proto = """
                 syntax = "proto3";
                 option java_package = "com.example";
                 option java_outer_classname = "Outer";

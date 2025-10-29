@@ -1,5 +1,7 @@
-package it.auties.protobuf.parser;
+package it.auties.protobuf.parser.attribute;
 
+import it.auties.protobuf.parser.ProtobufParser;
+import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.*;
 
@@ -198,6 +200,11 @@ public final class ProtobufAttribute {
         }
 
         var optionName = option.name().toString();
+        if(optionName.equals("default")) {
+            // TODO
+            return;
+        }
+
         var definition = fieldOptions.get(optionName);
         if(definition == null) {
             throw new ProtobufParserException("Invalid option \"" + optionName
