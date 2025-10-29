@@ -1,38 +1,44 @@
 package it.auties.protobuf.parser.token;
 
-import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.parser.exception.ProtobufParserException;
+import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
+import it.auties.protobuf.parser.type.ProtobufFloatingPoint.Infinity.Signum;
+import it.auties.protobuf.parser.type.ProtobufInteger;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StreamTokenizer;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 public final class ProtobufTokenizer {
     private static final char STRING_LITERAL_DELIMITER = '"';
     private static final char STRING_LITERAL_ALIAS_DELIMITER = '\'';
 
-    private static final String MAX_KEYWORD = "max";
-
     private static final String POSITIVE_INFINITY_KEYWORD = "inf";
-    private static final ProtobufToken.Number.FloatingPoint POSITIVE_INFINITY = new ProtobufToken.Number.FloatingPoint(Double.POSITIVE_INFINITY);
+    private static final ProtobufToken POSITIVE_INFINITY = new ProtobufToken.Number(new ProtobufFloatingPoint.Infinity(Signum.POSITIVE));
 
     private static final String NEGATIVE_INFINITY_TOKEN = "-inf";
-    private static final ProtobufToken.Number.FloatingPoint NEGATIVE_INFINITY = new ProtobufToken.Number.FloatingPoint(Double.NEGATIVE_INFINITY);
+    private static final ProtobufToken NEGATIVE_INFINITY = new ProtobufToken.Number(new ProtobufFloatingPoint.Infinity(Signum.NEGATIVE));
 
     private static final String NOT_A_NUMBER_TOKEN = "nan";
-    private static final ProtobufToken.Number.FloatingPoint NOT_A_NUMBER = new ProtobufToken.Number.FloatingPoint(Double.NaN);
+    private static final ProtobufToken NOT_A_NUMBER = new ProtobufToken.Number(new ProtobufFloatingPoint.NaN());
 
     private static final String TRUE_TOKEN = "true";
-    private static final ProtobufToken.Boolean TRUE = new ProtobufToken.Boolean(true);
+    private static final ProtobufToken TRUE = new ProtobufToken.Boolean(true);
 
     private static final String FALSE_TOKEN = "false";
-    private static final ProtobufToken.Boolean FALSE = new ProtobufToken.Boolean(false);
+    private static final ProtobufToken FALSE = new ProtobufToken.Boolean(false);
 
     private static final String EMPTY_TOKEN = "";
     private static final ProtobufToken EMPTY = new ProtobufToken.Raw(EMPTY_TOKEN);
 
+    private static final BigInteger OCTAL_RADIX = BigInteger.valueOf(8);
+    private static final BigInteger DECIMAL_RADIX = BigInteger.valueOf(10);
+    private static final BigInteger HEXADECIMAL_RADIX = BigInteger.valueOf(16);
+
     private final StreamTokenizer tokenizer;
+
     public ProtobufTokenizer(Reader reader) {
         this.tokenizer = new StreamTokenizer(reader);
         tokenizer.resetSyntax();
@@ -54,145 +60,31 @@ public final class ProtobufTokenizer {
         tokenizer.quoteChar(STRING_LITERAL_ALIAS_DELIMITER);
     }
 
-    public String nextNullableToken() throws IOException {
-        var token = tokenizer.nextToken();
-        if (token == StreamTokenizer.TT_EOF) {
-            return null;
-        }
+    public String nextRawToken() throws IOException {
+        return nextRawToken(true);
+    }
 
+    public String nextRawToken(boolean throwsOnEof) throws IOException {
+        var token = tokenizer.nextToken();
         return switch (token) {
+            case StreamTokenizer.TT_EOF -> {
+                if(throwsOnEof) {
+                    throw new IOException("Unexpected end of input");
+                }else {
+                    yield null;
+                }
+            }
             case StreamTokenizer.TT_WORD -> tokenizer.sval;
-            case STRING_LITERAL_DELIMITER -> parseMultiPartString(STRING_LITERAL_DELIMITER);
-            case STRING_LITERAL_ALIAS_DELIMITER -> parseMultiPartString(STRING_LITERAL_ALIAS_DELIMITER);
+            case STRING_LITERAL_DELIMITER, STRING_LITERAL_ALIAS_DELIMITER -> parseMultiPartStringToken(tokenizer.sval);
             default -> String.valueOf((char) token);
         };
     }
 
-    private String parseMultiPartString(char delimiter) throws IOException {
-        var result = new StringBuilder();
-        result.append(delimiter);
-        do {
-            result.append(tokenizer.sval);
-        }  while (isStringDelimiter(tokenizer.nextToken()));
-        tokenizer.pushBack();
-        result.append(delimiter);
-        return result.toString();
-    }
-
-    private boolean isStringDelimiter(int token) {
-        return token == STRING_LITERAL_DELIMITER || token == STRING_LITERAL_ALIAS_DELIMITER;
-    }
-
-    public String nextRequiredToken() throws IOException {
-        var token = nextNullableToken();
-        if(token == null) {
-            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
-        }
-
-        return token;
-    }
-
-    public String nextNullableLiteral() throws IOException {
-        var token = nextNullableParsedToken();
-        return token instanceof ProtobufToken.Literal(var value)
-                ? value
-                : null;
-    }
-
-    public String nextRequiredLiteral() throws IOException {
-        var token = nextRequiredParsedToken();
-        return token instanceof ProtobufToken.Literal(var value)
-                ? value
-                : null;
-    }
-
-    public Long nextNullablePropertyIndex(boolean enumeration, boolean allowMax) throws IOException {
-        try {
-            var token = nextNullableToken();
-            if(token == null) {
-                return null;
-            }
-
-            return parseIndex(token, enumeration, allowMax);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
-    public Long nextRequiredIndex(boolean enumeration, boolean allowMax) throws IOException {
-        var token = nextNullableToken();
-        if(token == null) {
-            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
-        }
-
-        var index = parseIndex(token, enumeration, allowMax);
-        if(index == null) {
-            throw new ProtobufParserException("Unexpected token " + token, tokenizer.lineno());
-        }
-
-        return index;
-    }
-
-    private static Long parseIndex(String token, boolean enumeration, boolean allowMax) {
-        var max = enumeration ? ProtobufEnumIndex.MAX_VALUE : ProtobufProperty.MAX_INDEX;
-        if(token.equalsIgnoreCase(MAX_KEYWORD)) {
-            return allowMax ? max : null;
-        }
-
-        var value = 0L;
-        for(var i = 0; i < token.length(); i++) {
-            var charAt = token.charAt(i);
-            if (charAt < '0' || charAt > '9') {
-                return null;
-            }
-
-            var valueTimesTen = value * 10L;
-            if (((value | 10L) >>> 31 != 0) && valueTimesTen / 10 != value) {
-                return null;
-            }
-
-            var digit = token.charAt(i) - '0';
-            var r = valueTimesTen + digit;
-            if (((valueTimesTen ^ r) & (digit ^ r)) < 0) {
-                return null;
-            }
-
-            value = r;
-        }
-
-        var min = enumeration ? ProtobufEnumIndex.MIN_VALUE : ProtobufProperty.MIN_INDEX;
-        if(value < min || value > max) {
-            return null;
-        }
-
-        return value;
-    }
-
-
-    public ProtobufToken nextNullableParsedToken() throws IOException {
-        var token = tokenizer.nextToken();
-        return switch (token) {
-            case StreamTokenizer.TT_EOL -> null;
-            case StreamTokenizer.TT_WORD -> parseToken(tokenizer.sval);
-            case STRING_LITERAL_DELIMITER, STRING_LITERAL_ALIAS_DELIMITER -> parseMultiPartString(tokenizer.sval);
-            default -> new ProtobufToken.Raw(String.valueOf((char) token));
-        };
-    }
-
-    public ProtobufToken nextRequiredParsedToken() throws IOException {
-        var token = nextNullableParsedToken();
-        if(token == null) {
-            throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
-        }
-
-        return token;
-    }
-
-    private ProtobufToken parseMultiPartString(String head) throws IOException {
+    private String parseMultiPartStringToken(String head) throws IOException {
         var token = tokenizer.nextToken();
         if(!isStringDelimiter(token)) {
             tokenizer.pushBack();
-            return new ProtobufToken.Literal(head);
+            return head;
         }else {
             var result = new StringBuilder();
             result.append(head);
@@ -200,12 +92,26 @@ public final class ProtobufTokenizer {
                 result.append(tokenizer.sval);
             } while (isStringDelimiter((tokenizer.nextToken())));
             tokenizer.pushBack();
-            return new ProtobufToken.Literal(result.toString());
+            return result.toString();
         }
     }
 
-    // FIXME: Not ready
-    private static ProtobufToken parseToken(String token) {
+    private boolean isStringDelimiter(int token) {
+        return token == STRING_LITERAL_DELIMITER || token == STRING_LITERAL_ALIAS_DELIMITER;
+    }
+
+    public ProtobufToken nextToken() throws IOException {
+        var token = tokenizer.nextToken();
+        return switch (token) {
+            case StreamTokenizer.TT_EOL -> throw new ProtobufParserException("Unexpected end of input", tokenizer.lineno());
+            case StreamTokenizer.TT_WORD -> parseWord(tokenizer.sval);
+            case STRING_LITERAL_DELIMITER -> new ProtobufToken.Literal(parseMultiPartStringToken(tokenizer.sval), STRING_LITERAL_DELIMITER);
+            case STRING_LITERAL_ALIAS_DELIMITER -> new ProtobufToken.Literal(parseMultiPartStringToken(tokenizer.sval), STRING_LITERAL_ALIAS_DELIMITER);
+            default -> new ProtobufToken.Raw(String.valueOf((char) token));
+        };
+    }
+
+    private static ProtobufToken parseWord(String token) {
         return switch (token) {
             case EMPTY_TOKEN -> EMPTY;
             case TRUE_TOKEN -> TRUE;
@@ -213,196 +119,174 @@ public final class ProtobufTokenizer {
             case POSITIVE_INFINITY_KEYWORD -> POSITIVE_INFINITY;
             case NEGATIVE_INFINITY_TOKEN -> NEGATIVE_INFINITY;
             case NOT_A_NUMBER_TOKEN -> NOT_A_NUMBER;
+            default -> parseBigNumber(token);
+        };
+    }
+
+    @SuppressWarnings("NumberEquality")
+    private static ProtobufToken parseBigNumber(String token) {
+        var length = token.length();
+
+        int start;
+        boolean isDecimal;
+        boolean isNegative;
+        switch (token.charAt(0)) {
+            case '+' -> {
+                start = 1;
+                isDecimal = false;
+                isNegative = false;
+            }
+            case '-' -> {
+                start = 1;
+                isDecimal = false;
+                isNegative = true;
+            }
+            case '.' -> {
+                start = 1;
+                isDecimal = true;
+                isNegative = false;
+            }
             default -> {
-                var length = token.length();
+                start = 0;
+                isDecimal = false;
+                isNegative = false;
+            }
+        }
 
-                int start;
-                boolean decimal;
-                boolean negative;
-                switch (token.charAt(0)) {
-                    case '+' -> {
-                        start = 1;
-                        decimal = false;
-                        negative = false;
-                    }
-                    case '-' -> {
-                        start = 1;
-                        decimal = false;
-                        negative = true;
-                    }
-                    case '.' -> {
-                        start = 1;
-                        decimal = true;
-                        negative = false;
-                    }
-                    default -> {
-                        start = 0;
-                        decimal = false;
-                        negative = false;
-                    }
-                }
+        BigInteger radix;
+        if (start < length && token.charAt(start) == '0' && start + 1 < length) {
+            char nextChar = token.charAt(start + 1);
+            if (nextChar == 'x' || nextChar == 'X') {
+                radix = HEXADECIMAL_RADIX;
+                start += 2;
+            } else if (nextChar >= '0' && nextChar <= '7') {
+                radix = OCTAL_RADIX;
+                start += 1;
+            }else {
+                radix = DECIMAL_RADIX;
+            }
+        }else {
+            radix = DECIMAL_RADIX;
+        }
 
-                int radix;
-                if (start < length && token.charAt(start) == '0' && start + 1 < length) {
-                    char nextChar = token.charAt(start + 1);
-                    if (nextChar == 'x' || nextChar == 'X') {
-                        radix = 16;
-                        start += 2;
-                    } else if (nextChar >= '0' && nextChar <= '7') {
-                        radix = 8;
-                        start += 1;
-                    }else {
-                        radix = 10;
-                    }
-                }else {
-                    radix = 10;
-                }
-
-                var whole = 0L;
-                var scientificNotation = false;
-                if(!decimal) {
-                    wholeLoop: {
-                        char character;
-                        int digit;
-                        while (start < length) {
-                            character = token.charAt(start++);
-                            switch (radix) {
-                                case 8 -> {
-                                    if (character >= '0' && character <= '7') {
-                                        digit = character - '0';
-                                    } else {
-                                        yield new ProtobufToken.Raw(token);
-                                    }
-                                }
-                                case 10 -> {
-                                    if (character >= '0' && character <= '9') {
-                                        digit = character - '0';
-                                    }else if(character == '.') {
-                                        decimal = true;
-                                        break wholeLoop;
-                                    } else if(character == 'e' || character == 'E') {
-                                        decimal = true;
-                                        scientificNotation = true;
-                                        break wholeLoop;
-                                    } else {
-                                        yield new ProtobufToken.Raw(token);
-                                    }
-                                }
-                                case 16 -> {
-                                    if (character >= '0' && character <= '9') {
-                                        digit = character - '0';
-                                    } else if (character >= 'a' && character <= 'f') {
-                                        digit = character - 'a' + 10;
-                                    } else if (character >= 'A' && character <= 'F') {
-                                        digit = character - 'A' + 10;
-                                    } else {
-                                        yield new ProtobufToken.Raw(token);
-                                    }
-                                }
-                                default -> throw new InternalError("Unexpected radix " + radix);
-                            }
-
-                            var valueTimesRadix = whole * radix;
-                            if (((whole | radix) >>> 31 != 0) && valueTimesRadix / radix != whole) {
-                                yield new ProtobufToken.Raw(token);
-                            }
-
-                            whole = valueTimesRadix + digit;
-                            if (((valueTimesRadix ^ whole) & (digit ^ whole)) < 0) {
-                                yield new ProtobufToken.Raw(token);
-                            }
-                        }
-                    }
-                }
-
-                var fraction = 0L;
-                var divisor = 1.0;
-                var divisorDigits = 0;
-                if(!scientificNotation) {
-                    char character;
-                    while (start < length) {
-                        character = token.charAt(start++);
-                        if (character == 'e' || character == 'E') {
-                            scientificNotation = true;
-                            break;
-                        }
-
-                        if (character < '0' || character > '9') {
-                            yield new ProtobufToken.Raw(token);
-                        }
-
-                        var valueTimesTen = fraction * 10L;
-                        if (((fraction | 10L) >>> 31 != 0) && valueTimesTen / 10 != fraction) {
-                            yield new ProtobufToken.Raw(token);
-                        }
-
-                        var digit = character - '0';
-                        fraction = valueTimesTen + digit;
-                        if (((valueTimesTen ^ fraction) & (digit ^ fraction)) < 0) {
-                            yield new ProtobufToken.Raw(token);
-                        }
-
-                        divisor *= 10.0;
-                        divisorDigits++;
-                    }
-                }
-
-                var exponent = 0;
-                boolean negativeExponent;
-                if(scientificNotation) {
-                    if (start >= length) {
-                        yield new ProtobufToken.Raw(token);
-                    }
-
-                    switch (token.charAt(start)) {
-                        case '+' -> {
-                            negativeExponent = false;
-                            if(++start >= length) {
-                                yield new ProtobufToken.Raw(token);
-                            }
-                        }
-                        case '-' -> {
-                            negativeExponent = true;
-                            if(++start >= length) {
-                                yield new ProtobufToken.Raw(token);
-                            }
-                        }
-                        default -> negativeExponent = false;
-                    }
-
-                    while (start < length) {
-                        char charAt = token.charAt(start++);
-                        if (charAt < '0' || charAt > '9') {
-                            yield new ProtobufToken.Raw(token);
-                        }
-
-                        exponent = exponent * 10 + (charAt - '0');
-                        if (exponent > Double.MAX_EXPONENT) {
-                            yield new ProtobufToken.Raw(token);
-                        }
-                    }
-                }else {
-                    negativeExponent = false;
-                }
-
-                if (!decimal) {
-                    yield new ProtobufToken.Number.Integer(negative ? -whole : whole);
-                } else {
-                    double decimalValue;
-                    if (!scientificNotation) {
-                        decimalValue = whole + (fraction / divisor);
-                    } else {
-                        decimalValue = whole * divisor + fraction;
-                        if (negativeExponent) {
-                            decimalValue /= Math.powExact(10L, exponent + divisorDigits);
+        var whole = BigInteger.ZERO;
+        var isScientificNotation = false;
+        if(!isDecimal) {
+            wholeLoop: {
+                char character;
+                int digit;
+                while (start < length) {
+                    character = token.charAt(start++);
+                    if (radix == OCTAL_RADIX) {
+                        if (character >= '0' && character <= '7') {
+                            digit = character - '0';
                         } else {
-                            decimalValue *= Math.powExact(10L, exponent - divisorDigits);
+                            return new ProtobufToken.Raw(token);
+                        }
+                    } else if (radix == DECIMAL_RADIX) {
+                        if (character >= '0' && character <= '9') {
+                            digit = character - '0';
+                        } else if (character == '.') {
+                            isDecimal = true;
+                            break wholeLoop;
+                        } else if (character == 'e' || character == 'E') {
+                            isDecimal = true;
+                            isScientificNotation = true;
+                            break wholeLoop;
+                        } else {
+                            return new ProtobufToken.Raw(token);
+                        }
+                    } else {
+                        if (character >= '0' && character <= '9') {
+                            digit = character - '0';
+                        } else if (character >= 'a' && character <= 'f') {
+                            digit = character - 'a' + 10;
+                        } else if (character >= 'A' && character <= 'F') {
+                            digit = character - 'A' + 10;
+                        } else {
+                            return new ProtobufToken.Raw(token);
                         }
                     }
-                    yield new ProtobufToken.Number.FloatingPoint(negative ? -decimalValue : decimalValue);
+
+                    whole = whole.multiply(radix)
+                            .add(BigInteger.valueOf(digit));
                 }
             }
-        };
+        }
+
+        var decimal = BigInteger.ZERO;
+        var decimalPlaces = 0;
+        if(isDecimal && !isScientificNotation) {
+            char character;
+            while (start < length) {
+                character = token.charAt(start++);
+                if (character == 'e' || character == 'E') {
+                    isScientificNotation = true;
+                    break;
+                }
+
+                if (character < '0' || character > '9') {
+                    return new ProtobufToken.Raw(token);
+                }
+
+                decimal = decimal.multiply(DECIMAL_RADIX)
+                        .add(BigInteger.valueOf(character - '0'));
+                decimalPlaces++;
+            }
+        }
+
+        var exponent = 0;
+        boolean negativeExponent;
+        if(isScientificNotation) {
+            if (start >= length) {
+                return new ProtobufToken.Raw(token);
+            }
+
+            switch (token.charAt(start)) {
+                case '+' -> {
+                    negativeExponent = false;
+                    if(++start >= length) {
+                        return new ProtobufToken.Raw(token);
+                    }
+                }
+                case '-' -> {
+                    negativeExponent = true;
+                    if(++start >= length) {
+                        return new ProtobufToken.Raw(token);
+                    }
+                }
+                default -> negativeExponent = false;
+            }
+
+            char character;
+            while (start < length) {
+                character = token.charAt(start++);
+                if (character < '0' || character > '9') {
+                    return new ProtobufToken.Raw(token);
+                }
+
+                exponent = exponent * 10 + (character - '0');
+            }
+        }else {
+            negativeExponent = false;
+        }
+
+        if (isDecimal) {
+            var unscaled = radix.pow(decimalPlaces)
+                    .multiply(whole)
+                    .add(decimal);
+            var unscaledSigned = isNegative ? unscaled.negate() : unscaled;
+            if(isScientificNotation) {
+                var effectiveScale = negativeExponent ? decimalPlaces + exponent : decimalPlaces - exponent;
+                var scaled = new BigDecimal(unscaledSigned, effectiveScale);
+                return new ProtobufToken.Number(new ProtobufFloatingPoint.Finite(scaled));
+            }else {
+                var scaled = new BigDecimal(unscaledSigned, decimalPlaces);
+                return new ProtobufToken.Number(new ProtobufFloatingPoint.Finite(scaled));
+            }
+        } else {
+            return new ProtobufToken.Number(new ProtobufInteger(isNegative ? whole.negate() : whole));
+        }
     }
 
     public int line() {

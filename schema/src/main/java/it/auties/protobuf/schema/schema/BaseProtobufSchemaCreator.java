@@ -305,7 +305,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
                         indexValues.add(entry);
                     }
 
-                    case ProtobufRangeExpression rangeExpression -> {
+                    case ProtobufIntegerRangeExpression rangeExpression -> {
                         var entry = new NormalAnnotationExpr();
                         entry.setName(ProtobufReservedRange.class.getSimpleName());
                         entry.addPair("min", new IntegerLiteralExpr(String.valueOf(rangeExpression.min())));

@@ -1,5 +1,6 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.type.ProtobufInteger;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.*;
@@ -14,7 +15,7 @@ public sealed class ProtobufFieldStatement
     protected Modifier modifier;
     protected ProtobufTypeReference type;
     protected String name;
-    protected Long index;
+    protected ProtobufInteger index;
     protected final SequencedMap<String, ProtobufOptionExpression> options;
 
     public ProtobufFieldStatement(int line) {
@@ -38,7 +39,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public Long index() {
+    public ProtobufInteger index() {
         return index;
     }
 
@@ -48,7 +49,7 @@ public sealed class ProtobufFieldStatement
     }
 
     @Override
-    public void setIndex(Long index) {
+    public void setIndex(ProtobufInteger index) {
         this.index = index;
     }
 

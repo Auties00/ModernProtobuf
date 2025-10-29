@@ -32,6 +32,7 @@ public final class ProtobufParser {
     private static final String PARENS_START = "(";
     private static final String PARENS_END = ")";
     private static final String STREAM = "stream";
+    private static final String MAX = "max";
 
     private ProtobufParser() {
         throw new UnsupportedOperationException();
@@ -108,7 +109,7 @@ public final class ProtobufParser {
             var document = new ProtobufDocumentTree(location);
             var tokenizer = new ProtobufTokenizer(input);
             String token;
-            while ((token = tokenizer.nextNullableToken()) != null) {
+            while ((token = tokenizer.nextRawToken(false)) != null) {
                 switch (token) {
                     case STATEMENT_END -> {
                         var statement = parseEmpty(tokenizer);
@@ -166,11 +167,11 @@ public final class ProtobufParser {
                 "Package can only be set once",
                 tokenizer.line());
         var statement = new ProtobufPackageStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidType(name),
                 "Unexpected token " + name, tokenizer.line());
         statement.setName(name);
-        var end = tokenizer.nextRequiredToken();
+        var end = tokenizer.nextRawToken();
         ProtobufParserException.check(isStatementEnd(end),
                 "Unexpected token " + end, tokenizer.line());
         return statement;
@@ -181,27 +182,30 @@ public final class ProtobufParser {
                 "Syntax should be the first statement",
                 tokenizer.line());
         var statement = new ProtobufSyntaxStatement(tokenizer.line());
-        var assignment = tokenizer.nextRequiredToken();
+        var assignment = tokenizer.nextRawToken();
         ProtobufParserException.check(isAssignmentOperator(assignment),
                 "Unexpected token " + assignment, tokenizer.line());
-        var versionCode = tokenizer.nextRequiredLiteral();
+        var versionCodeToken = tokenizer.nextToken();
+        if(!(versionCodeToken instanceof ProtobufToken.Literal(var versionCode, _))) {
+            throw new ProtobufParserException("Unexpected token " + versionCodeToken, tokenizer.line());
+        }
         var version = ProtobufVersion.of(versionCode)
                 .orElseThrow(() -> new ProtobufParserException("Unknown protobuf version: \"" + versionCode + "\""));
         statement.setVersion(version);
-        var end = tokenizer.nextRequiredToken();
+        var end = tokenizer.nextRawToken();
         ProtobufParserException.check(isStatementEnd(end),
                 "Unexpected token " + end, tokenizer.line());
         return statement;
     }
 
     private static <T> T parseOption(ProtobufTokenizer tokenizer, OptionParser<T> parser) throws IOException {
-        var nameOrParensStart = tokenizer.nextRequiredToken();
+        var nameOrParensStart = tokenizer.nextRawToken();
         
         String name;
         boolean extension;
         if(isParensStart(nameOrParensStart)) {
-            name = tokenizer.nextRequiredToken();
-            var parensEnd = tokenizer.nextRequiredToken();
+            name = tokenizer.nextRawToken();
+            var parensEnd = tokenizer.nextRawToken();
             ProtobufParserException.check(isParensEnd(parensEnd),
                     "Unexpected token " + parensEnd, tokenizer.line());
             extension = true;
@@ -211,7 +215,7 @@ public final class ProtobufParser {
         }
 
         List<String> membersAccessed;
-        var membersAccessedOrAssignment = tokenizer.nextRequiredToken();
+        var membersAccessedOrAssignment = tokenizer.nextRawToken();
         if(isAssignmentOperator(membersAccessedOrAssignment)) {
             membersAccessed = List.of();
         }else if(membersAccessedOrAssignment.charAt(0) == '.') {
@@ -219,7 +223,7 @@ public final class ProtobufParser {
             ProtobufParserException.check(isValidType(accessed),
                     "Unexpected token " + accessed, tokenizer.line());
             membersAccessed = Arrays.asList(accessed.split("\\."));
-            var assignment = tokenizer.nextRequiredToken();
+            var assignment = tokenizer.nextRawToken();
             ProtobufParserException.check(isAssignmentOperator(assignment),
                     "Unexpected token " + assignment, tokenizer.line());
         }else{
@@ -232,7 +236,7 @@ public final class ProtobufParser {
     
     private interface OptionParser<T> {
          OptionParser<ProtobufOptionStatement> STATEMENT = (tokenizer, name, value) -> {
-             var end = tokenizer.nextRequiredToken();
+             var end = tokenizer.nextRawToken();
              ProtobufParserException.check(isStatementEnd(end),
                      "Unexpected token " + end, tokenizer.line());
              var statement = new ProtobufOptionStatement(tokenizer.line());
@@ -253,15 +257,15 @@ public final class ProtobufParser {
 
     private static ProtobufMessageStatement parseMessage(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMessageStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
-        var objectStart = tokenizer.nextRequiredToken();
+        var objectStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isBodyStart(objectStart),
                 "Unexpected token " + objectStart, tokenizer.line());
         String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+        while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
                 case STATEMENT_END -> {
                     var child = parseEmpty(tokenizer);
@@ -288,7 +292,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "reserved"  -> {
-                    var child = parseReserved(tokenizer);
+                    var child = parseReserved(tokenizer, false);
                     statement.addChild(child);
                 }
                 case "oneof" -> {
@@ -310,16 +314,16 @@ public final class ProtobufParser {
         ProtobufParserException.check(version != ProtobufVersion.PROTOBUF_3, // TODO: In proto3 extensions are supported for options
                 "Extensions are only supported in proto3 for options", tokenizer.line());
         var statement = new ProtobufExtendStatement(tokenizer.line());
-        var qualifiedName = tokenizer.nextRequiredToken();
+        var qualifiedName = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidType(qualifiedName),
                 "Unexpected token: " + qualifiedName, tokenizer.line());
         var reference = new ProtobufUnresolvedObjectTypeReference(qualifiedName);
         statement.setDeclaration(reference);
-        var objectStart = tokenizer.nextRequiredToken();
+        var objectStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isBodyStart(objectStart),
                 "Unexpected token " + objectStart, tokenizer.line());
         String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+        while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
                 case STATEMENT_END -> {
                     var child = parseEmpty(tokenizer);
@@ -346,7 +350,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "reserved"  -> {
-                    var child = parseReserved(tokenizer);
+                    var child = parseReserved(tokenizer, false);
                     statement.addChild(child);
                 }
                 case "oneof" -> {
@@ -386,7 +390,7 @@ public final class ProtobufParser {
                    }
                }
            }else {
-               var type = tokenizer.nextRequiredToken();
+               var type = tokenizer.nextRawToken();
                ProtobufParserException.check(isValidType(type),
                        "Unexpected token " + type, tokenizer.line());
                reference = ProtobufTypeReference.of(type);
@@ -411,13 +415,13 @@ public final class ProtobufParser {
         }
         child.setModifier(modifier);
 
-        var nameOrTypeArgs = tokenizer.nextRequiredToken();
+        var nameOrTypeArgs = tokenizer.nextRawToken();
         if(isTypeParametersStart(nameOrTypeArgs)) {
             if(!(child.type() instanceof ProtobufMapTypeReference mapType) || mapType.isAttributed()) {
                 throw new ProtobufParserException("Unexpected token " + nameOrTypeArgs, tokenizer.line());
             }
 
-            var keyTypeToken = tokenizer.nextRequiredToken();
+            var keyTypeToken = tokenizer.nextRawToken();
             ProtobufParserException.check(isValidIdent(keyTypeToken),
                     "Unexpected token " + keyTypeToken, tokenizer.line());
             var keyType = ProtobufTypeReference.of(keyTypeToken);
@@ -426,21 +430,21 @@ public final class ProtobufParser {
             }
             mapType.setKeyType(keyType);
 
-            var separator = tokenizer.nextRequiredToken();
+            var separator = tokenizer.nextRawToken();
             ProtobufParserException.check(isArraySeparator(separator),
                     "Unexpected token " + separator, tokenizer.line());
 
-            var valueTypeToken = tokenizer.nextRequiredToken();
+            var valueTypeToken = tokenizer.nextRawToken();
             ProtobufParserException.check(isValidIdent(valueTypeToken),
                     "Unexpected token " + valueTypeToken, tokenizer.line());
             var valueType = ProtobufTypeReference.of(valueTypeToken);
             mapType.setValueType(valueType);
 
-            var end = tokenizer.nextRequiredToken();
+            var end = tokenizer.nextRawToken();
             ProtobufParserException.check(isTypeParametersEnd(end),
                     "Unexpected token " + end, tokenizer.line());
 
-            var childName = tokenizer.nextRequiredToken();
+            var childName = tokenizer.nextRawToken();
             ProtobufParserException.check(isValidIdent(childName),
                     "Unexpected token " + childName, tokenizer.line());
             child.setName(childName);
@@ -450,16 +454,20 @@ public final class ProtobufParser {
             throw new ProtobufParserException("Unexpected token " + nameOrTypeArgs, tokenizer.line());
         }
 
-        var operator = tokenizer.nextRequiredToken();
+        var operator = tokenizer.nextRawToken();
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
-        var index = tokenizer.nextRequiredIndex(false, false);
-        child.setIndex(index);
+        var index = tokenizer.nextToken();
+        if(index instanceof ProtobufToken.Number(var number) && number instanceof ProtobufInteger integer) {
+            child.setIndex(integer);
+        }else {
+            throw new ProtobufParserException("Unexpected token " + index, tokenizer.line());
+        }
 
         var bodyStartOrStatementEndToken = parseFieldOptions(tokenizer, child);
         if(child instanceof ProtobufGroupFieldStatement groupStatement && isBodyStart(bodyStartOrStatementEndToken)) {
             String groupToken;
-            while(!isBodyEnd(groupToken = tokenizer.nextRequiredToken())) {
+            while(!isBodyEnd(groupToken = tokenizer.nextRawToken())) {
                 switch (groupToken) {
                     case STATEMENT_END -> {
                         var groupChild = parseEmpty(tokenizer);
@@ -487,7 +495,7 @@ public final class ProtobufParser {
                     }
 
                     case "reserved" -> {
-                        var groupChild = parseReserved(tokenizer);
+                        var groupChild = parseReserved(tokenizer, false);
                         groupStatement.addChild(groupChild);
                     }
 
@@ -511,7 +519,7 @@ public final class ProtobufParser {
     }
 
     private static String parseFieldOptions(ProtobufTokenizer tokenizer, ProtobufFieldStatement child) throws IOException {
-        var maybeOptionStart = tokenizer.nextRequiredToken();
+        var maybeOptionStart = tokenizer.nextRawToken();
         if(!isArrayStart(maybeOptionStart)) {
             return maybeOptionStart;
         }
@@ -520,25 +528,25 @@ public final class ProtobufParser {
         do {
             var expression = parseOption(tokenizer, OptionParser.EXPRESSION);
             child.addOption(expression);
-        }while (isArraySeparator(optionSeparatorOrOptionEnd = tokenizer.nextRequiredToken()));
+        }while (isArraySeparator(optionSeparatorOrOptionEnd = tokenizer.nextRawToken()));
 
         ProtobufParserException.check(isArrayEnd(optionSeparatorOrOptionEnd),
                 "Unexpected token " + optionSeparatorOrOptionEnd, tokenizer.line());
 
-        return tokenizer.nextRequiredToken();
+        return tokenizer.nextRawToken();
     }
 
     private static ProtobufEnumStatement parseEnum(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufEnumStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
-        var objectStart = tokenizer.nextRequiredToken();
+        var objectStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isBodyStart(objectStart),
                 "Unexpected token " + objectStart, tokenizer.line());
         String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+        while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
                 case STATEMENT_END -> {
                     var child = parseEmpty(tokenizer);
@@ -553,7 +561,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "reserved"  -> {
-                    var child = parseReserved(tokenizer);
+                    var child = parseReserved(tokenizer, true);
                     statement.addChild(child);
                 }
                 default -> {
@@ -571,12 +579,16 @@ public final class ProtobufParser {
         statement.setModifier(ProtobufFieldStatement.Modifier.NONE);
         statement.setName(token);
 
-        var operator = tokenizer.nextRequiredToken();
+        var operator = tokenizer.nextRawToken();
         ProtobufParserException.check(isAssignmentOperator(operator),
                 "Unexpected token " + operator, tokenizer.line());
 
-        var index = tokenizer.nextRequiredIndex(true, false);
-        statement.setIndex(index);
+        var index = tokenizer.nextToken();
+        if(index instanceof ProtobufToken.Number(var number) && number instanceof ProtobufInteger integer) {
+            statement.setIndex(integer);
+        }else {
+            throw new ProtobufParserException("Unexpected token " + index, tokenizer.line());
+        }
 
         var statementEndToken = parseFieldOptions(tokenizer, statement);
 
@@ -589,81 +601,103 @@ public final class ProtobufParser {
         var statement = new ProtobufExtensionsStatement(tokenizer.line());
 
         while(true) {
-            var value = tokenizer.nextRequiredIndex(true, false);
-            var operator = tokenizer.nextRequiredToken();
+            var valueOrMinToken = tokenizer.nextToken();
+            if (!(valueOrMinToken instanceof ProtobufToken.Number(var valueOrMinNumber)) || !(valueOrMinNumber instanceof ProtobufInteger valueOrMinInt)) {
+                throw new ProtobufParserException("Unexpected token " + valueOrMinToken, tokenizer.line());
+            }
+
+            var operator = tokenizer.nextRawToken();
             if(isRangeOperator(operator)) {
-                var end = tokenizer.nextRequiredIndex(true, true);
-                var expression = new ProtobufRangeExpression(tokenizer.line());
-                expression.setMin(value);
-                expression.setMax(end);
+                var maxToken = tokenizer.nextToken();
+                var range = switch (maxToken) {
+                    case ProtobufToken.Number(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufRange.Bounded(valueOrMinInt, maxInt);
+                    case ProtobufToken.Raw(var token) when isMax(token) -> new ProtobufRange.LowerBounded(valueOrMinInt);
+                    default -> throw new ProtobufParserException("Unexpected token " + maxToken, tokenizer.line());
+                };
+
+                var expression = new ProtobufIntegerRangeExpression(tokenizer.line());
+                expression.setValue(range);
                 statement.addExpression(expression);
-                operator = tokenizer.nextRequiredToken();
+
+                operator = tokenizer.nextRawToken();
             }else {
-                var expression = new ProtobufIntegerExpression(tokenizer.line());
-                expression.setValue(value);
+                var expression = new ProtobufNumberExpression(tokenizer.line());
+                expression.setValue(valueOrMinInt);
                 statement.addExpression(expression);
             }
+
             if (isStatementEnd(operator)) {
+                if(statement.expressions().isEmpty()) {
+                    throw new ProtobufParserException("Unexpected token " + operator, tokenizer.line());
+                }
+
                 break;
             } else if (!isArraySeparator(operator)) {
-                throw new ProtobufParserException("Unexpected token " + tokenizer.line(), tokenizer.line());
+                throw new ProtobufParserException("Unexpected token " + operator, tokenizer.line());
             }
-        }
-
-        if(statement.expressions().isEmpty()) {
-            throw new ProtobufParserException("Unexpected token ;", tokenizer.line());
         }
 
         return statement;
     }
 
-    private static ProtobufReservedStatement parseReserved(ProtobufTokenizer tokenizer) throws IOException {
+    private static ProtobufReservedStatement parseReserved(ProtobufTokenizer tokenizer, boolean enumeration) throws IOException {
         var statement = new ProtobufReservedStatement(tokenizer.line());
 
         bodyLoop: {
-            while(true) {
-                var value = tokenizer.nextRequiredParsedToken();
-                switch (value) {
-                    case ProtobufToken.Literal literal -> {
+            while (true) {
+                var valueOrMinToken = tokenizer.nextToken();
+                switch (valueOrMinToken) {
+                    case ProtobufToken.Literal(var value, _) -> {
                         var expression = new ProtobufLiteralExpression(tokenizer.line());
-                        expression.setValue(literal.value());
+                        expression.setValue(value);
                         statement.addExpression(expression);
-                        var operator = tokenizer.nextRequiredToken();
+                        var operator = tokenizer.nextRawToken();
                         if(isStatementEnd(operator)) {
+                            if(statement.expressions().isEmpty()) {
+                                throw new ProtobufParserException("Unexpected token " + operator, tokenizer.line());
+                            }
+
                             break bodyLoop;
                         }else if(!isArraySeparator(operator)) {
                             throw new ProtobufParserException("Unexpected token " + tokenizer.line(), tokenizer.line());
                         }
                     }
 
-                    case ProtobufToken.Number.Integer integer -> {
-                        var operator = tokenizer.nextRequiredToken();
+                    case ProtobufToken.Number(var number) when number instanceof ProtobufInteger valueOrMinInt -> {
+                        var operator = tokenizer.nextRawToken();
                         if(isRangeOperator(operator)) {
-                            var end = tokenizer.nextRequiredIndex(true, true);
-                            var expression = new ProtobufRangeExpression(tokenizer.line());
-                            expression.setMin(integer.value());
-                            expression.setMax(end);
+                            var maxToken = tokenizer.nextToken();
+                            var range = switch (maxToken) {
+                                case ProtobufToken.Number(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufRange.Bounded(valueOrMinInt, maxInt);
+                                case ProtobufToken.Raw(var token) when isMax(token) -> new ProtobufRange.LowerBounded(valueOrMinInt);
+                                default -> throw new ProtobufParserException("Unexpected token " + maxToken, tokenizer.line());
+                            };
+
+                            var expression = new ProtobufIntegerRangeExpression(tokenizer.line());
+                            expression.setValue(range);
                             statement.addExpression(expression);
-                            operator = tokenizer.nextRequiredToken();
+
+                            operator = tokenizer.nextRawToken();
                         }else {
-                            var expression = new ProtobufIntegerExpression(tokenizer.line());
-                            expression.setValue(integer.value());
+                            var expression = new ProtobufNumberExpression(tokenizer.line());
+                            expression.setValue(valueOrMinInt);
                             statement.addExpression(expression);
                         }
+
                         if(isStatementEnd(operator)) {
+                            if(statement.expressions().isEmpty()) {
+                                throw new ProtobufParserException("Unexpected token " + operator, tokenizer.line());
+                            }
+
                             break bodyLoop;
                         }else if(!isArraySeparator(operator)) {
                             throw new ProtobufParserException("Unexpected token " + tokenizer.line(), tokenizer.line());
                         }
                     }
 
-                    default -> throw new ProtobufParserException("Unexpected token " + tokenizer.line(), tokenizer.line());
+                    default -> throw new ProtobufParserException("Unexpected token " + valueOrMinToken, tokenizer.line());
                 }
             }
-        }
-
-        if(statement.expressions().isEmpty()) {
-            throw new ProtobufParserException("Unexpected token ;", tokenizer.line());
         }
 
         return statement;
@@ -671,15 +705,15 @@ public final class ProtobufParser {
 
     private static ProtobufServiceStatement parseService(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufServiceStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
-        var objectStart = tokenizer.nextRequiredToken();
+        var objectStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isBodyStart(objectStart),
                 "Unexpected token " + objectStart, tokenizer.line());
         String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+        while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
                 case STATEMENT_END -> {
                     var child = parseEmpty(tokenizer);
@@ -701,21 +735,21 @@ public final class ProtobufParser {
 
     private static ProtobufMethodStatement parseMethod(ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufMethodStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
         var inputType = parseMethodType(tokenizer);
         statement.setInputType(inputType);
-        var returnsToken = tokenizer.nextRequiredToken();
+        var returnsToken = tokenizer.nextRawToken();
         ProtobufParserException.check(Objects.equals(returnsToken, "returns"),
                 "Unexpected token: " + returnsToken, tokenizer.line());
         var outputType = parseMethodType(tokenizer);
         statement.setOutputType(outputType);
-        var objectStartOrStatementEnd = tokenizer.nextRequiredToken();
+        var objectStartOrStatementEnd = tokenizer.nextRawToken();
         if(isBodyStart(objectStartOrStatementEnd)){
             String token;
-            while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+            while (!isBodyEnd(token = tokenizer.nextRawToken())) {
                 switch (token) {
                     case STATEMENT_END -> {
                         var child = parseEmpty(tokenizer);
@@ -735,14 +769,14 @@ public final class ProtobufParser {
     }
 
     private static ProtobufMethodStatement.Type parseMethodType(ProtobufTokenizer tokenizer) throws IOException {
-        var typeStart = tokenizer.nextRequiredToken();
+        var typeStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isParensStart(typeStart),
                 "Unexpected token: " + typeStart, tokenizer.line());
-        var typeOrModifier = tokenizer.nextRequiredToken();
+        var typeOrModifier = tokenizer.nextRawToken();
         ProtobufTypeReference typeReference;
         boolean stream;
         if(isStreamModifier(typeOrModifier)) {
-            typeReference = ProtobufTypeReference.of(tokenizer.nextRequiredToken());
+            typeReference = ProtobufTypeReference.of(tokenizer.nextRawToken());
             stream = true;
         }else {
             typeReference = ProtobufTypeReference.of(typeOrModifier);
@@ -750,7 +784,7 @@ public final class ProtobufParser {
         }
         ProtobufParserException.check(typeReference instanceof ProtobufUnresolvedObjectTypeReference,
                 "Unexpected type, only messages can be used: " + typeReference.name(), tokenizer.line());
-        var typeEnd = tokenizer.nextRequiredToken();
+        var typeEnd = tokenizer.nextRawToken();
         ProtobufParserException.check(isParensEnd(typeEnd),
                 "Unexpected token: " + typeEnd, tokenizer.line());
         return new ProtobufMethodStatement.Type(typeReference, stream);
@@ -758,15 +792,15 @@ public final class ProtobufParser {
 
     private static ProtobufOneofFieldStatement parseOneof(ProtobufDocumentTree document, ProtobufTokenizer tokenizer) throws IOException {
         var statement = new ProtobufOneofFieldStatement(tokenizer.line());
-        var name = tokenizer.nextRequiredToken();
+        var name = tokenizer.nextRawToken();
         ProtobufParserException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
         statement.setName(name);
-        var objectStart = tokenizer.nextRequiredToken();
+        var objectStart = tokenizer.nextRawToken();
         ProtobufParserException.check(isBodyStart(objectStart),
                 "Unexpected token " + objectStart, tokenizer.line());
         String token;
-        while (!isBodyEnd(token = tokenizer.nextRequiredToken())) {
+        while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
                 case STATEMENT_END -> {
                     var child = parseEmpty(tokenizer);
@@ -787,11 +821,12 @@ public final class ProtobufParser {
 
     private static ProtobufImportStatement parseImport(ProtobufTokenizer tokenizer) throws IOException {
         var importStatement = new ProtobufImportStatement(tokenizer.line());
-        switch (tokenizer.nextRequiredParsedToken()) {
+        var token = tokenizer.nextToken();
+        switch (token) {
             case ProtobufToken.Literal literal -> {
                 importStatement.setModifier(ProtobufImportStatement.Modifier.NONE);
                 importStatement.setLocation(literal.value());
-                var end = tokenizer.nextRequiredToken();
+                var end = tokenizer.nextRawToken();
                 ProtobufParserException.check(isStatementEnd(end),
                         "Unexpected token " + end, tokenizer.line());
             }
@@ -799,37 +834,32 @@ public final class ProtobufParser {
                 var modifier = ProtobufImportStatement.Modifier.of(raw.value())
                         .orElseThrow(() -> new ProtobufParserException("Unexpected token " + raw.value(), tokenizer.line()));
                 importStatement.setModifier(modifier);
-                var location = tokenizer.nextRequiredLiteral();
+                var locationToken = tokenizer.nextToken();
+                if(!(locationToken instanceof ProtobufToken.Literal(var location, _))) {
+                    throw new ProtobufParserException("Unexpected token " + locationToken, tokenizer.line());
+                }
                 importStatement.setLocation(location);
-                var end = tokenizer.nextRequiredToken();
+                var end = tokenizer.nextRawToken();
                 ProtobufParserException.check(isStatementEnd(end),
                         "Unexpected token " + end, tokenizer.line());
             }
-            case ProtobufToken.Boolean bool -> throw new ProtobufParserException("Unexpected token " + bool.value(), tokenizer.line());
-            case ProtobufToken.Number.Integer number -> throw new ProtobufParserException("Unexpected token " + number.value(), tokenizer.line());
-            case ProtobufToken.Number.FloatingPoint number -> throw new ProtobufParserException("Unexpected token " + number.value(), tokenizer.line());
+            default -> throw new ProtobufParserException("Unexpected token " + token, tokenizer.line());
         }
         return importStatement;
     }
 
     private static ProtobufExpression readExpression(ProtobufTokenizer tokenizer) throws IOException {
         var line = tokenizer.line();
-        return switch (tokenizer.nextRequiredParsedToken()) {
+        return switch (tokenizer.nextToken()) {
             case ProtobufToken.Boolean bool -> {
                 var expression = new ProtobufBoolExpression(line);
                 expression.setValue(bool.value());
                 yield expression;
             }
 
-            case ProtobufToken.Number.Integer integer -> {
-                var expression = new ProtobufIntegerExpression(line);
-                expression.setValue(integer.value());
-                yield expression;
-            }
-
-            case ProtobufToken.Number.FloatingPoint floatingPoint -> {
-                var expression = new ProtobufFloatingPointExpression(line);
-                expression.setValue(floatingPoint.value());
+            case ProtobufToken.Number number -> {
+                var expression = new ProtobufNumberExpression(line);
+                expression.setValue(number.value());
                 yield expression;
             }
 
@@ -846,22 +876,18 @@ public final class ProtobufParser {
                 var expression = new ProtobufMessageValueExpression(line);
                 loop: {
                     while (true) {
-                        var keyToken = tokenizer.nextRequiredParsedToken();
+                        var keyToken = tokenizer.nextToken();
                         switch (keyToken) {
                             case ProtobufToken.Raw(var value)
                                     when isBodyEnd(value) -> {
                                 break loop;
                             }
-                            case ProtobufToken.Literal(var key) -> {
-                                var keyValueSeparatorToken = tokenizer.nextNullableToken();
-                                if(keyValueSeparatorToken == null) {
-                                    throw new ProtobufParserException("Unexpected end of input");
-                                }
-
+                            case ProtobufToken.Literal(var key, _) -> {
+                                var keyValueSeparatorToken = tokenizer.nextRawToken();
                                 ProtobufParserException.check(!isKeyValueSeparatorOperator(keyValueSeparatorToken),
                                         "Unexpected token " + keyValueSeparatorToken, line);
-                                var value = readExpression(tokenizer);
 
+                                var value = readExpression(tokenizer);
                                 expression.addData(key, value);
                             }
                             default -> throw new ProtobufParserException("Unexpected token " + raw.value(), line);
@@ -994,5 +1020,9 @@ public final class ProtobufParser {
 
     private static boolean isStreamModifier(String typeOrModifier) {
         return Objects.equals(typeOrModifier, STREAM);
+    }
+
+    private static boolean isMax(String token) {
+        return Objects.equals(token, MAX);
     }
 }

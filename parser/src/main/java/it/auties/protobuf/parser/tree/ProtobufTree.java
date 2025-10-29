@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.type.ProtobufInteger;
+
 import java.util.Optional;
 import java.util.SequencedCollection;
 import java.util.SequencedMap;
@@ -15,9 +17,9 @@ public sealed interface ProtobufTree
     sealed interface WithIndex
             extends ProtobufTree
             permits ProtobufFieldStatement {
-        Long index();
+        ProtobufInteger index();
         boolean hasIndex();
-        void setIndex(Long index);
+        void setIndex(ProtobufInteger index);
     }
 
     sealed interface WithName

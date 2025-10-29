@@ -1,5 +1,6 @@
 package it.auties.protobuf.parser.tree;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -80,12 +81,17 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
     }
 
     static Optional<WithIndex> getDirectChildByIndex(Collection<? extends ProtobufTree> children, long index) {
+        var indexAsBigInteger = BigInteger.valueOf(index);
         return children.stream()
-                .filter(entry -> entry instanceof WithIndex withIndex
-                        && withIndex.hasIndex()
-                        && withIndex.index() == index)
+                .filter(entry -> hasIndex(entry, indexAsBigInteger))
                 .findFirst()
                 .map(entry -> (WithIndex) entry);
+    }
+
+    private static boolean hasIndex(ProtobufTree entry, BigInteger index) {
+        return entry instanceof WithIndex withIndex
+               && withIndex.hasIndex()
+               && withIndex.index().value().compareTo(index) == 0;
     }
 
     @Override
@@ -124,11 +130,9 @@ sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
     }
 
     static <V extends ProtobufTree> Optional<V> getDirectChildByIndexAndType(Collection<? extends ProtobufTree> children, long index, Class<V> clazz) {
+        var indexAsBigInteger = BigInteger.valueOf(index);
         return children.stream()
-                .filter(entry -> clazz.isAssignableFrom(entry.getClass())
-                        && entry instanceof WithIndex withIndex
-                        && withIndex.hasIndex()
-                        && withIndex.index() == index)
+                .filter(entry -> clazz.isAssignableFrom(entry.getClass()) && hasIndex(entry, indexAsBigInteger))
                 .findFirst()
                 .map(clazz::cast);
     }

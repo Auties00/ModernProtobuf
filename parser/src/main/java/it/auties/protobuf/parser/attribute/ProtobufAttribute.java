@@ -212,73 +212,8 @@ public final class ProtobufAttribute {
                     + "\" inside " + ((ProtobufTree.WithName) protobufField.parent()).name());
         }
 
-        switch (definition.type().protobufType()) {
-            case UNKNOWN, MAP, GROUP -> throwOnOption(protobufField, optionName, definition, "unknown option type");
-            case MESSAGE -> {
 
-            }
-            case ENUM -> {
-
-            }
-            case FLOAT -> {
-                if(!(option.value() instanceof ProtobufNumberExpression numberExpression)
-                        || numberExpression.value().floatValue() != numberExpression.value().doubleValue()) {
-                    throwOnOption(protobufField, optionName, definition, "expected float");
-                }
-            }
-            case DOUBLE -> {
-                if(!(option.value() instanceof ProtobufNumberExpression)) {
-                    throwOnOption(protobufField, optionName, definition, "expected double");
-                }
-            }
-            case BOOL -> {
-                if(!(option.value() instanceof ProtobufBoolExpression)) {
-                    throwOnOption(protobufField, optionName, definition, "expected bool");
-                }
-            }
-            case STRING -> {
-                if(!(option.value() instanceof ProtobufLiteralExpression)) {
-                    throwOnOption(protobufField, optionName, definition, "expected string literal");
-                }
-            }
-            case BYTES -> {
-                if(!(option.value() instanceof ProtobufLiteralExpression)) {
-                    throwOnOption(protobufField, optionName, definition, "expected bytes");
-                }
-            }
-            case INT32, SINT32, FIXED32, SFIXED32 -> {
-                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
-                        || numberExpression.value().intValue() != numberExpression.value()) {
-                    throwOnOption(protobufField, optionName, definition, "expected int");
-                }
-            }
-            case INT64, SINT64, FIXED64, SFIXED64 -> {
-                if(!(option.value() instanceof ProtobufIntegerExpression)) {
-                    throwOnOption(protobufField, optionName, definition, "expected long");
-                }
-            }
-            case UINT32 -> {
-                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
-                        || numberExpression.value().intValue() != numberExpression.value()
-                        || numberExpression.value().intValue() < 0) {
-                    throwOnOption(protobufField, optionName, definition, "expected unsigned int");
-                }
-            }
-            case UINT64 -> {
-                if(!(option.value() instanceof ProtobufIntegerExpression numberExpression)
-                        || numberExpression.value() < 0) {
-                    throwOnOption(protobufField, optionName, definition, "expected unsigned long");
-                }
-            }
-        }
-    }
-
-    private static void throwOnOption(ProtobufFieldStatement optionParent, String optionName, ProtobufFieldStatement optionDefinition, String errorMessage) {
-        throw new ProtobufParserException("Invalid option \"" + optionName
-            + "\" for field \"" + optionParent.name()
-            + "\" inside " + ((ProtobufTree.WithName) optionParent.parent()).name()
-            + " defined by " + ((ProtobufTree.WithName) optionDefinition.parent()).name()
-            + ": " + errorMessage);
+        // TODO
     }
 
     private static void attributeType(ProtobufDocumentTree document, ProtobufFieldStatement typedFieldTree) {

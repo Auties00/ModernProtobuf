@@ -8,6 +8,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.Nested;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 
@@ -553,7 +554,7 @@ public class ProtobufParserSemanticTests {
         var doc1 = ProtobufParser.parseOnly(protoUnknown);
         var enum1 = doc1.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
         var constant1 = enum1.getDirectChildByNameAndType("UNKNOWN", ProtobufEnumConstantStatement.class).orElseThrow();
-        assertEquals(Long.valueOf(0), constant1.index());
+        assertEquals(BigInteger.ZERO, constant1.index().value());
 
         var protoUnspecified = """
                 syntax = "proto3";
@@ -566,7 +567,7 @@ public class ProtobufParserSemanticTests {
         var doc2 = ProtobufParser.parseOnly(protoUnspecified);
         var enum2 = doc2.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
         var constant2 = enum2.getDirectChildByNameAndType("STATUS_UNSPECIFIED", ProtobufEnumConstantStatement.class).orElseThrow();
-        assertEquals(Long.valueOf(0), constant2.index());
+        assertEquals(BigInteger.ZERO, constant2.index().value());
     }
 
     // 4.4.2 Alias Handling

@@ -1,8 +1,0 @@
-syntax = "proto2";
-message M {
-  optional string a = 1 [default = "line1\nline2"];
-  optional string b = 2 [default = "tab\there"];
-  optional string c = 3 [default = "back\\slash"];
-  optional string d = 4 [default = "quote\"here"];
-  optional string e = 5 [default = "'apos\'here'"];
-}
