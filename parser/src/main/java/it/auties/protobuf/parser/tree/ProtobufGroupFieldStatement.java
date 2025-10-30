@@ -6,11 +6,79 @@ import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import java.util.*;
 import java.util.stream.Stream;
 
+/**
+ * Represents a group field declaration in the Protocol Buffer AST.
+ * <p>
+ * Groups are a deprecated proto2 feature that combines a nested message type definition with
+ * a field declaration. The group's name defines both the field name (lowercased) and the
+ * message type name (capitalized). Groups were deprecated in favor of nested message types.
+ * </p>
+ * <h2>Examples:</h2>
+ * <pre>{@code
+ * message SearchResponse {
+ *   // Deprecated group syntax
+ *   repeated group Result = 1 {
+ *     required string url = 2;
+ *     optional string title = 3;
+ *     repeated string snippets = 4;
+ *   }
+ * }
+ *
+ * // The above is equivalent to the modern nested message approach:
+ * message SearchResponse {
+ *   message Result {
+ *     required string url = 2;
+ *     optional string title = 3;
+ *     repeated string snippets = 4;
+ *   }
+ *   repeated Result result = 1;
+ * }
+ * }</pre>
+ * <p>
+ * Group characteristics:
+ * </p>
+ * <ul>
+ *   <li>Groups define both a message type and a field</li>
+ *   <li>The group name must start with a capital letter (message type convention)</li>
+ *   <li>The field name is the lowercased version of the group name</li>
+ *   <li>Groups can have modifiers (optional, required, repeated)</li>
+ *   <li>Groups have a field number like regular fields</li>
+ *   <li>Groups use a different wire format encoding than nested messages</li>
+ * </ul>
+ * <p>
+ * Groups can contain the same child elements as messages:
+ * </p>
+ * <ul>
+ *   <li><strong>Fields:</strong> Data members of the group</li>
+ *   <li><strong>Nested messages:</strong> Additional message definitions</li>
+ *   <li><strong>Nested enums:</strong> Enum definitions</li>
+ *   <li><strong>Options:</strong> Configuration options</li>
+ *   <li><strong>Empty statements:</strong> Standalone semicolons</li>
+ * </ul>
+ * <p>
+ * This class extends {@link ProtobufFieldStatement} and maintains its own body of child statements.
+ * The type is automatically set to a {@link ProtobufGroupTypeReference} and cannot be changed.
+ * </p>
+ * <p>
+ * <strong>Note:</strong> Groups are deprecated and should not be used in new .proto files.
+ * Use nested message types instead.
+ * </p>
+ *
+ * @see ProtobufGroupChild
+ * @see ProtobufFieldStatement
+ * @see ProtobufGroupTypeReference
+ */
 public final class ProtobufGroupFieldStatement
         extends ProtobufFieldStatement
         implements ProtobufTree.WithBody<ProtobufGroupChild>,
                    ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild, ProtobufExtendChild {
     private final List<ProtobufGroupChild> children;
+
+    /**
+     * Constructs a new group field statement at the specified line number.
+     *
+     * @param line the line number in the source file
+     */
     public ProtobufGroupFieldStatement(int line) {
         super(line);
         this.children = new ArrayList<>();
@@ -58,11 +126,28 @@ public final class ProtobufGroupFieldStatement
         return builder.toString();
     }
 
+    /**
+     * Returns the type reference for this group field.
+     * <p>
+     * Group fields have an implicit type that references the group itself as a message type.
+     * </p>
+     *
+     * @return a {@link ProtobufGroupTypeReference} referencing this group
+     */
     @Override
     public ProtobufTypeReference type() {
         return new ProtobufGroupTypeReference(this);
     }
 
+    /**
+     * Setting the type of a group field is not supported.
+     * <p>
+     * Groups have an implicit type that cannot be changed.
+     * </p>
+     *
+     * @param type the type reference (ignored)
+     * @throws UnsupportedOperationException always thrown
+     */
     @Override
     public void setType(ProtobufTypeReference type) {
         throw new UnsupportedOperationException("Cannot set the type of a group field");

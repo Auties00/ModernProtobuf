@@ -7,6 +7,26 @@ import java.math.BigInteger;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+/**
+ * Represents an arbitrary-precision integer value in a Protocol Buffer definition.
+ * <p>
+ * This record encapsulates integer literals parsed from Protocol Buffer files, supporting
+ * various integer formats:
+ * </p>
+ * <ul>
+ *   <li>Decimal integers: {@code 42}, {@code -123}, {@code 0}</li>
+ *   <li>Hexadecimal integers: {@code 0x2A}, {@code 0xFF}, {@code 0X10}</li>
+ *   <li>Octal integers: {@code 052}, {@code 0177}, {@code 01}</li>
+ * </ul>
+ * <p>
+ * The integer value is stored as a {@link BigInteger} to support arbitrary precision,
+ * ensuring that large integer literals in Protocol Buffer definitions are represented
+ * accurately without overflow. Range validation is performed when converting to specific
+ * Protocol Buffer contexts such as field indexes or enum constants.
+ * </p>
+ *
+ * @param value the arbitrary-precision integer value
+ */
 public record ProtobufInteger(BigInteger value) implements ProtobufNumber {
     private static final BigInteger MIN_PROPERTY_INDEX = BigInteger.valueOf(ProtobufProperty.MIN_INDEX);
     private static final BigInteger MAX_PROPERTY_INDEX = BigInteger.valueOf(ProtobufProperty.MAX_INDEX);

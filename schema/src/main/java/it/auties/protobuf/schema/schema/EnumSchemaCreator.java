@@ -16,6 +16,7 @@ import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
 import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
 import it.auties.protobuf.schema.util.AstUtils;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -95,7 +96,8 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
             return false;
         }
 
-        return intExpression.asNumber().intValue() == statement.index();
+        return BigInteger.valueOf(intExpression.asNumber().intValue())
+                .equals(statement.index().value());
     }
 
     private void createIndexField(EnumDeclaration ctEnum) {

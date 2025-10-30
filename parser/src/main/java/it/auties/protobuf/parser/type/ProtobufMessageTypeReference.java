@@ -5,6 +5,19 @@ import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
 
 import java.util.Objects;
 
+/**
+ * Represents a resolved reference to a Protocol Buffer message type.
+ * <p>
+ * Message type references are created during semantic analysis when an {@link ProtobufUnresolvedObjectTypeReference}
+ * is resolved to a message declaration. This type reference maintains a link to the actual message
+ * declaration, allowing access to the message's structure and metadata.
+ * </p>
+ * <p>
+ * Message type references are always attributed since they contain a reference to the resolved declaration.
+ * </p>
+ *
+ * @param declaration the message declaration statement, must not be null
+ */
 public record ProtobufMessageTypeReference(ProtobufMessageStatement declaration) implements ProtobufObjectTypeReference {
     public ProtobufMessageTypeReference {
         Objects.requireNonNull(declaration, "declaration cannot be null");
@@ -17,7 +30,7 @@ public record ProtobufMessageTypeReference(ProtobufMessageStatement declaration)
 
     @Override
     public String name() {
-        return declaration.name();
+        return declaration.qualifiedName();
     }
 
     @Override

@@ -1,52 +1,24 @@
 package it.auties.protobuf.parser.token;
 
-import it.auties.protobuf.annotation.ProtobufEnumIndex;
-import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
-import it.auties.protobuf.parser.type.ProtobufNumber;
+/**
+ * Represents a token produced by the Protocol Buffer lexer during tokenization.
+ * <p>
+ * Tokens are the fundamental units of the Protocol Buffer language produced during lexical analysis.
+ * This sealed interface ensures that all token types are known at compile time and can be exhaustively
+ * pattern matched.
+ * </p>
+ * <p>
+ * The lexer recognizes and produces the following token types:
+ * </p>
+ * <ul>
+ *   <li>{@link ProtobufRawToken} - Raw identifiers, keywords, and operators</li>
+ *   <li>{@link ProtobufBoolToken} - Boolean literals (true/false)</li>
+ *   <li>{@link ProtobufNumberToken} - Numeric literals (integers and floating-point values)</li>
+ *   <li>{@link ProtobufLiteralToken} - String literals enclosed in quotes</li>
+ * </ul>
+ *
+ * @see it.auties.protobuf.parser.ProtobufLexer
+ */
+public sealed interface ProtobufToken permits ProtobufBoolToken, ProtobufLiteralToken, ProtobufNumberToken, ProtobufRawToken {
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.Objects;
-
-public sealed interface ProtobufToken {
-    record Literal(String value, char delimiter) implements ProtobufToken {
-        public Literal {
-            Objects.requireNonNull(value, "value cannot be null");
-        }
-
-        @Override
-        public String toString() {
-            return delimiter + value + delimiter;
-        }
-    }
-
-    record Number(ProtobufNumber value) implements ProtobufToken {
-        public Number {
-            Objects.requireNonNull(value, "value cannot be null");
-        }
-
-       @Override
-        public String toString() {
-            return value.toString();
-        }
-    }
-
-    record Boolean(boolean value) implements ProtobufToken {
-        @Override
-        public String toString() {
-            return value ? "true" : "false";
-        }
-    }
-
-    record Raw(String value) implements ProtobufToken {
-        public Raw {
-            Objects.requireNonNull(value, "value cannot be null");
-        }
-
-        @Override
-        public String toString() {
-            return value;
-        }
-    }
 }

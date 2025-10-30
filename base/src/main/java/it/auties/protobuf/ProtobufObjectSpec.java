@@ -66,7 +66,7 @@ public final class ProtobufObjectSpec {
                 }catch (ProtobufDeserializationException ignored) {
                     // It wasn't an embedded message
                     buffer.position(position); // Reset the position
-                    try {
+                    try { // Maybe it's a string
                         value = StandardCharsets.UTF_8.newDecoder()
                                 .onMalformedInput(CodingErrorAction.REPORT)
                                 .onUnmappableCharacter(CodingErrorAction.REPORT)

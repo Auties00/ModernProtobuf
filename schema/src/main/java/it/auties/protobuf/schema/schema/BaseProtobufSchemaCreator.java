@@ -13,6 +13,7 @@ import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
+import it.auties.protobuf.parser.type.ProtobufRange;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -300,16 +301,32 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
         protobufReservable.getDirectChildrenByType(ProtobufReservedStatement.class).forEachOrdered(child -> {
             for(var expression : child.expressions()) {
                 switch (expression) {
-                    case ProtobufIntegerExpression indexExpression -> {
-                        var entry = new IntegerLiteralExpr(String.valueOf(indexExpression.value()));
+                    case ProtobufNumberExpression indexExpression -> {
+                        var valueIndex = indexExpression.value()
+                                .toEnumConstant()
+                                .orElseThrow(() -> new IllegalArgumentException("Overflow: " + indexExpression));
+                        var entry = new IntegerLiteralExpr(String.valueOf(valueIndex));
                         indexValues.add(entry);
                     }
 
                     case ProtobufIntegerRangeExpression rangeExpression -> {
                         var entry = new NormalAnnotationExpr();
                         entry.setName(ProtobufReservedRange.class.getSimpleName());
-                        entry.addPair("min", new IntegerLiteralExpr(String.valueOf(rangeExpression.min())));
-                        entry.addPair("max", new IntegerLiteralExpr(String.valueOf(rangeExpression.max())));
+                        var minIndex = rangeExpression.value()
+                                .min()
+                                .toEnumConstant()
+                                .orElseThrow(() -> new IllegalArgumentException("Overflow: " + rangeExpression.value().min()));
+                        entry.addPair("min", new IntegerLiteralExpr(String.valueOf(minIndex)));
+                        var max = switch (rangeExpression.value()) {
+                            case ProtobufRange.Bounded bounded -> {
+                                var maxIndex = bounded.max()
+                                        .toEnumConstant()
+                                        .orElseThrow(() -> new IllegalArgumentException("Overflow: " + rangeExpression.value().min()));
+                                yield String.valueOf(maxIndex);
+                            }
+                            case ProtobufRange.LowerBounded _ -> "max";
+                        };
+                        entry.addPair("max", new IntegerLiteralExpr(max));
                         indexRanges.add(entry);
                     }
 

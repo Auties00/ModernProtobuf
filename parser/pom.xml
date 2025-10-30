@@ -15,8 +15,6 @@
     <url>https://github.com/Auties00/ModernProtobuf</url>
 
     <properties>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -25,12 +23,6 @@
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
             <version>4.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>RELEASE</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

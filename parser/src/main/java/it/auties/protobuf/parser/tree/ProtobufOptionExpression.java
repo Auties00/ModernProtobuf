@@ -3,6 +3,34 @@ package it.auties.protobuf.parser.tree;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Represents an option key-value pair expression in the Protocol Buffer AST.
+ * <p>
+ * Options are metadata annotations that configure behavior of Protocol Buffer elements.
+ * They appear in square brackets and consist of a name and a value:
+ * </p>
+ * <h2>Examples:</h2>
+ * <pre>{@code
+ * // Field options
+ * optional string name = 1 [deprecated = true, default = "unknown"];
+ *
+ * // File-level option statement
+ * option java_package = "com.example.proto";
+ *
+ * // Custom extension option
+ * option (my.custom.option) = {
+ *   field: "value"
+ * };
+ * }</pre>
+ * <p>
+ * During semantic analysis, the option name is resolved to its definition (a field in a
+ * *Options message from descriptor.proto), and the value's type is validated against
+ * the definition.
+ * </p>
+ *
+ * @see ProtobufOptionName
+ * @see ProtobufExpression
+ */
 public final class ProtobufOptionExpression
         extends ProtobufExpressionImpl
         implements ProtobufExpression {
@@ -10,6 +38,11 @@ public final class ProtobufOptionExpression
     private ProtobufExpression value;
     private ProtobufFieldStatement definition;
 
+    /**
+     * Constructs a new option expression at the specified line number.
+     *
+     * @param line the line number in the source file
+     */
     public ProtobufOptionExpression(int line) {
         super(line);
     }
@@ -21,38 +54,91 @@ public final class ProtobufOptionExpression
                && hasValue();
     }
 
+    /**
+     * Returns the option name.
+     *
+     * @return the option name, or null if not yet set
+     */
     public ProtobufOptionName name() {
         return name;
     }
 
+    /**
+     * Checks whether this option has a name assigned.
+     *
+     * @return true if a name is present, false otherwise
+     */
     public boolean hasName() {
         return name != null;
     }
 
+    /**
+     * Sets the option name.
+     *
+     * @param name the option name to set
+     */
     public void setName(ProtobufOptionName name) {
         this.name = name;
     }
 
+    /**
+     * Returns the field definition for this option from descriptor.proto.
+     * <p>
+     * This is populated during semantic analysis when the option name is resolved
+     * to its definition in the appropriate *Options message.
+     * </p>
+     *
+     * @return optional containing the field definition, or empty if not yet attributed
+     */
     public Optional<ProtobufFieldStatement> definition() {
         return Optional.ofNullable(definition);
     }
 
+    /**
+     * Checks whether this option has been attributed with a definition.
+     *
+     * @return true if a definition is present, false otherwise
+     */
     public boolean hasDefinition() {
         return definition != null;
     }
 
+    /**
+     * Sets the field definition for this option.
+     *
+     * @param definition the field definition from descriptor.proto
+     */
     public void setDefinition(ProtobufFieldStatement definition) {
         this.definition = definition;
     }
 
+    /**
+     * Returns the value expression for this option.
+     *
+     * @return the value expression, or null if not yet set
+     */
     public ProtobufExpression value() {
         return value;
     }
 
+    /**
+     * Checks whether this option has a value assigned.
+     *
+     * @return true if a value is present, false otherwise
+     */
     public boolean hasValue() {
         return value != null;
     }
 
+    /**
+     * Sets the value expression for this option.
+     * <p>
+     * The value is automatically linked to this option as its parent.
+     * </p>
+     *
+     * @param value the value expression to set
+     * @throws IllegalStateException if the value already has a different parent
+     */
     public void setValue(ProtobufExpression value) {
         if(value != null) {
             if(value.hasParent()) {

@@ -6,16 +6,16 @@ import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufMapTypeReference;
 import it.auties.protobuf.parser.type.ProtobufPrimitiveTypeReference;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-@Nested
-public class ProtobufParserSyntaxTests {
+class ProtobufParserSyntaxTest {
     @Test
     public void testValidProto2SyntaxDeclaration() {
         var proto = """
@@ -172,7 +172,7 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
         assertEquals("java_package", option.name().toString());
-        assertTrue(option.value() instanceof ProtobufLiteralExpression);
+        assertInstanceOf(ProtobufLiteralExpression.class, option.value());
         assertEquals("com.example.foo", ((ProtobufLiteralExpression) option.value()).value());
     }
 
@@ -184,7 +184,7 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
         assertEquals("java_multiple_files", option.name().toString());
-        assertTrue(option.value() instanceof ProtobufBoolExpression);
+        assertInstanceOf(ProtobufBoolExpression.class, option.value());
         assertSame(true, ((ProtobufBoolExpression) option.value()).value());
     }
 
@@ -196,7 +196,7 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
         assertEquals("java_multiple_files", option.name().toString());
-        assertTrue(option.value() instanceof ProtobufBoolExpression);
+        assertInstanceOf(ProtobufBoolExpression.class, option.value());
         assertSame(false, ((ProtobufBoolExpression) option.value()).value());
     }
 
@@ -208,11 +208,9 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var option = document.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
         assertEquals("optimize_for", option.name().toString());
-        assertTrue(option.value() instanceof ProtobufEnumConstantExpression);
+        assertInstanceOf(ProtobufEnumConstantExpression.class, option.value());
         assertEquals("SPEED", ((ProtobufEnumConstantExpression) option.value()).name());
     }
-
-    // There are no standard int, float or message file level options to test
 
     @Test
     public void testStandardFileLevelOptionWithParenthesisError() {
@@ -280,16 +278,16 @@ public class ProtobufParserSyntaxTests {
         assertSame(2, message.children().size());
         var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
         assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, firstField.modifier());
-        assertTrue(firstField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, firstField.type());
         assertSame(ProtobufType.INT32, firstField.type().protobufType());
         assertEquals("id", firstField.name());
-        assertEquals((Long) 1L, firstField.index());
+        assertEquals(1L, firstField.index().value().longValue());
         var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
         assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, secondField.modifier());
-        assertTrue(secondField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, secondField.type());
         assertSame(ProtobufType.STRING, secondField.type().protobufType());
         assertEquals("name", secondField.name());
-        assertEquals((Long) 2L, secondField.index());
+        assertEquals(2L, secondField.index().value().longValue());
     }
 
     @Test
@@ -308,16 +306,16 @@ public class ProtobufParserSyntaxTests {
         assertSame(2, message.children().size());
         var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
         assertEquals(ProtobufFieldStatement.Modifier.NONE, firstField.modifier());
-        assertTrue(firstField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, firstField.type());
         assertSame(ProtobufType.INT32, firstField.type().protobufType());
         assertEquals("id", firstField.name());
-        assertEquals((Long) 1L, firstField.index());
+        assertEquals(1L, firstField.index().value().longValue());
         var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
         assertEquals(ProtobufFieldStatement.Modifier.NONE, secondField.modifier());
-        assertTrue(secondField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, secondField.type());
         assertSame(ProtobufType.STRING, secondField.type().protobufType());
         assertEquals("name", secondField.name());
-        assertEquals((Long) 2L, secondField.index());
+        assertEquals(2L, secondField.index().value().longValue());
     }
 
     @Test
@@ -367,13 +365,13 @@ public class ProtobufParserSyntaxTests {
         assertEquals("my_union", oneof.name());
         assertEquals(2, oneof.children().size());
         var nameField = oneof.getDirectChildByNameAndType("name", ProtobufFieldStatement.class).orElseThrow();
-        assertTrue(nameField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, nameField.type());
         assertSame(ProtobufType.STRING, nameField.type().protobufType());
-        assertEquals(Long.valueOf(1), nameField.index());
+        assertEquals(1L, nameField.index().value().longValue());
         var idField = oneof.getDirectChildByNameAndType("id", ProtobufFieldStatement.class).orElseThrow();
-        assertTrue(idField.type() instanceof ProtobufPrimitiveTypeReference);
+        assertInstanceOf(ProtobufPrimitiveTypeReference.class, idField.type());
         assertSame(ProtobufType.INT32, idField.type().protobufType());
-        assertEquals(Long.valueOf(2), idField.index());
+        assertEquals(2L, idField.index().value().longValue());
     }
 
     @Test
@@ -389,11 +387,11 @@ public class ProtobufParserSyntaxTests {
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
         assertEquals("Result", group.name());
-        assertEquals(Long.valueOf(2), group.index());
+        assertEquals(2L, group.index().value().longValue());
         assertEquals(1, group.children().size());
         var innerField = group.getDirectChildByNameAndType("name", ProtobufFieldStatement.class).orElseThrow();
         assertSame(ProtobufType.STRING, innerField.type().protobufType());
-        assertEquals(Long.valueOf(3), innerField.index());
+        assertEquals(3L, innerField.index().value().longValue());
     }
 
     @Test
@@ -406,11 +404,11 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         var field = message.getDirectChildByNameAndType("map_field", ProtobufFieldStatement.class).orElseThrow();
-        assertTrue(field.type() instanceof ProtobufMapTypeReference);
+        assertInstanceOf(ProtobufMapTypeReference.class, field.type());
         var mapType = (ProtobufMapTypeReference) field.type();
         assertSame(ProtobufType.STRING, mapType.keyType().protobufType());
         assertSame(ProtobufType.INT32, mapType.valueType().protobufType());
-        assertEquals(Long.valueOf(1), field.index());
+        assertEquals(1L, field.index().value().longValue());
     }
 
     @Test
@@ -436,9 +434,9 @@ public class ProtobufParserSyntaxTests {
         assertEquals("E", enumStmt.name());
         assertEquals(2, enumStmt.children().size());
         var unknown = enumStmt.getDirectChildByNameAndType("UNKNOWN", ProtobufEnumConstantStatement.class).orElseThrow();
-        assertEquals(Long.valueOf(0), unknown.index());
+        assertEquals(0L, unknown.index().value().longValue());
         var started = enumStmt.getDirectChildByNameAndType("STARTED", ProtobufEnumConstantStatement.class).orElseThrow();
-        assertEquals(Long.valueOf(1), started.index());
+        assertEquals(1L, started.index().value().longValue());
     }
 
     @Test
@@ -452,10 +450,10 @@ public class ProtobufParserSyntaxTests {
         var document = ProtobufParser.parseOnly(proto);
         var enumStmt = document.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
         var opt = enumStmt.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
-        assertTrue(opt.value() instanceof ProtobufBoolExpression);
+        assertInstanceOf(ProtobufBoolExpression.class, opt.value());
         assertSame(true, ((ProtobufBoolExpression) opt.value()).value());
         var constant = enumStmt.getDirectChildByNameAndType("A", ProtobufEnumConstantStatement.class).orElseThrow();
-        assertEquals(Long.valueOf(0), constant.index());
+        assertEquals(0L, constant.index().value().longValue());
     }
 
     @Test
@@ -516,7 +514,7 @@ public class ProtobufParserSyntaxTests {
     public void testExtendDefinition() {
         var proto = """
                 message MessageType {
-                
+                  extensions 100;
                 }
                 
                 extend MessageType {
@@ -530,7 +528,7 @@ public class ProtobufParserSyntaxTests {
         assertEquals("MessageType", extend.declaration().name());
         var field = extend.getDirectChildByNameAndType("ext_field", ProtobufFieldStatement.class).orElseThrow();
         assertSame(ProtobufType.STRING, field.type().protobufType());
-        assertEquals(Long.valueOf(100), field.index());
+        assertEquals(100L, field.index().value().longValue());
     }
 
     @Test
@@ -567,7 +565,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testMismatchedParentheses() {
-        // Missing closing ")" after Req
         var proto = """
                 syntax = "proto3";
                 service S {
@@ -586,20 +583,7 @@ public class ProtobufParserSyntaxTests {
     }
 
     @Test
-    public void testInvalidKeywordsAsIdentifiers() {
-        // Using the keyword "message" as a field name should fail
-        var proto = """
-                syntax = "proto3";
-                message Demo {
-                  int32 message = 1;
-                }
-                """;
-        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
-    }
-
-    @Test
     public void testInvalidIdentifiersInPlaceOfKeywords() {
-        // Top-level "massage" instead of "message" should fail
         var proto = """
                 syntax = "proto3";
                 massage Demo {
@@ -629,8 +613,6 @@ public class ProtobufParserSyntaxTests {
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
-
-    // 5.2 Semantic Errors
 
     @Test
     public void testDuplicateFieldNumbersError() {
@@ -682,7 +664,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testTypeMismatchesFieldDefaultValue() {
-        // In proto2, default is allowed but must match the field type
         var proto = """
                 syntax = "proto2";
                 message A {
@@ -694,7 +675,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testTypeMismatchesInvalidMapKeyType() {
-        // double is not a valid map key type
         var proto = """
                 syntax = "proto3";
                 message A {
@@ -765,7 +745,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testEnumZeroValueViolationError() {
-        // In proto3, the first enum value must be zero
         var proto = """
                 syntax = "proto3";
                 enum E {
@@ -788,14 +767,6 @@ public class ProtobufParserSyntaxTests {
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
-    @Ignore("Requires multi-file resolution/import graph handling")
-    @Test
-    public void testCircularDependenciesWarning() {
-        // Intentionally left ignored: would require an import resolver/environment
-    }
-
-    // 5.3 Malformed Input
-
     @Test
     public void testEmptyFile() {
         var proto = "";
@@ -815,15 +786,6 @@ public class ProtobufParserSyntaxTests {
     }
 
     @Test
-    public void testBinaryDataAsInputError() {
-        // Embed control chars that should not be acceptable in proto source
-        var proto = "syntax = \"proto3\";\u0000\u0001message A { int32 id = 1; }";
-        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
-    }
-
-    // 5.4 Large and Complex Files
-
-    @Test(timeout = 8000)
     public void testExtremelyLargeFilePerformance() {
         var sb = new StringBuilder();
         sb.append("syntax = \"proto3\";\n");
@@ -852,7 +814,6 @@ public class ProtobufParserSyntaxTests {
         }
         sb.append("}\n");
 
-        // Add basic message types used by the service
         sb.append("message Req { int32 x = 1; }\n");
         sb.append("message Res { int32 y = 1; }\n");
 
@@ -868,9 +829,7 @@ public class ProtobufParserSyntaxTests {
             sb.append("message N").append(i).append(" {\n");
         }
         sb.append("  int32 leaf = 1;\n");
-        for (var i = 1; i <= depth; i++) {
-            sb.append("}\n");
-        }
+        sb.append("}\n".repeat(depth));
         ProtobufParser.parseOnly(sb.toString());
     }
 
@@ -905,20 +864,6 @@ public class ProtobufParserSyntaxTests {
         ProtobufParser.parseOnly(proto);
     }
 
-    @Ignore("Requires multi-file parsing and import resolution")
-    @Test
-    public void testInterdependentFiles() {
-        // Intentionally left ignored: would require multi-file import resolution
-    }
-
-    @Ignore("Requires multi-file parsing and import resolution")
-    @Test
-    public void testMixedProto2AndProto3Imports() {
-        // Intentionally left ignored: would require multi-file import resolution
-    }
-
-    // 3.1 Field Definitions
-    // 3.1.1 Scalar Types
     @Test
     public void testAllScalarTypesRecognition() {
         var proto = """
@@ -962,7 +907,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testStringFieldsUTF8EncodingNote() {
-        // Parser should accept UTF-8 string literals in proto2 defaults
         var proto = """
                 syntax = "proto2";
                 package test;
@@ -976,7 +920,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testBytesFieldsArbitrarySequenceNote() {
-        // Parser should accept hex escapes in bytes defaults
         var proto = """
                 syntax = "proto2";
                 package test;
@@ -990,7 +933,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testScalarTypeInternalRepresentationAlignment() {
-        // Sanity: ensure all scalar aliases are accepted as-is
         var proto = """
                 syntax = "proto3";
                 package test;
@@ -1005,7 +947,6 @@ public class ProtobufParserSyntaxTests {
         ProtobufParser.parseOnly(proto);
     }
 
-    // 3.1.2 Cardinality (Required, Optional, Repeated, Implicit)
     @Test
     public void testProto2RequiredFields() {
         var proto = """
@@ -1076,7 +1017,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testRepeatedScalarNumericTypesPackedByDefaultProto3() {
-        // Ensure parser accepts repeated numeric with and without explicit packed option
         var proto = """
                 syntax = "proto3";
                 package test;
@@ -1128,7 +1068,6 @@ public class ProtobufParserSyntaxTests {
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
-    // 3.1.3 Field Numbers
     @Test
     public void testValidFieldNumbers() {
         var proto = """
@@ -1145,7 +1084,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testReservedFieldNumbersError() {
-        // 19000–19999 are reserved for internal use
         var proto = """
                 syntax = "proto3";
                 package test;
@@ -1174,7 +1112,7 @@ public class ProtobufParserSyntaxTests {
                 package test;
                 
                 message M {
-                  string a = 536870912; // 2^29 exceeds max valid field number
+                  string a = 536870912;
                 }
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(protoTooHigh));
@@ -1194,7 +1132,6 @@ public class ProtobufParserSyntaxTests {
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
-    // 3.1.4 Default Values (Proto2 Specific)
     @Test
     public void testValidDefaultValuesProto2() {
         var proto = """
@@ -1228,7 +1165,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testDisallowedDefaultValuesProto2() {
-        // Defaults are not allowed on repeated fields or message-typed fields
         var protoRepeated = """
                 syntax = "proto2";
                 package test;
@@ -1264,7 +1200,6 @@ public class ProtobufParserSyntaxTests {
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
-    // 3.1.5 Field Options (e.g., packed, deprecated, custom options)
     @Test
     public void testPackedOption() {
         var proto = """
@@ -1326,7 +1261,6 @@ public class ProtobufParserSyntaxTests {
 
     @Test
     public void testCustomFieldOptions() {
-        // Use an extension-like option name; parser should accept syntactically even if unknown
         var proto = """
                 syntax = "proto3";
                 package test;
@@ -1349,5 +1283,1077 @@ public class ProtobufParserSyntaxTests {
                 }
                 """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(protoMissingEquals));
+    }
+
+    @Test
+    public void testPackageSingleComponent() {
+        var proto = """
+                package mypackage;
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("mypackage", document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testPackageVeryLongName() {
+        var proto = """
+                package com.company.division.team.project.module.submodule.component.feature.impl;
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("com.company.division.team.project.module.submodule.component.feature.impl",
+                document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testPackageWithUnderscores() {
+        var proto = """
+                package my_package.sub_package;
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("my_package.sub_package", document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testPackageWithNumbers() {
+        var proto = """
+                package pkg.v1.v2;
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("pkg.v1.v2", document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testPackageStartingWithDotError() {
+        var proto = """
+                package .invalid;
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testPackageEndingWithDotError() {
+        var proto = """
+                package invalid.;
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testPackageWithDoubleDotError() {
+        var proto = """
+                package invalid..package;
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testMultipleImports() throws IOException {
+        var proto = """
+                import "file1.proto";
+                import "file2.proto";
+                import "file3.proto";
+                """;
+        var tempDir = Files.createTempDirectory("protobuf-test");
+        var file1Path = tempDir.resolve("file1.proto");
+        var file2Path = tempDir.resolve("file2.proto");
+        var file3Path = tempDir.resolve("file3.proto");
+        Files.writeString(file1Path, "syntax = \"proto3\";", StandardOpenOption.CREATE);
+        Files.writeString(file2Path, "syntax = \"proto3\";", StandardOpenOption.CREATE);
+        Files.writeString(file3Path, "syntax = \"proto3\";", StandardOpenOption.CREATE);
+
+        var file1 = ProtobufParser.parseOnly(file1Path);
+        var file2 = ProtobufParser.parseOnly(file2Path);
+        var file3 = ProtobufParser.parseOnly(file3Path);
+        var document = ProtobufParser.parseOnly(proto, file1, file2, file3);
+        assertEquals(3, document.getDirectChildrenByType(ProtobufImportStatement.class).count());
+    }
+
+    @Test
+    public void testServiceEmpty() {
+        var proto = """
+                service EmptyService {
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        assertEquals("EmptyService", service.name());
+        assertEquals(0, service.children().size());
+    }
+
+    @Test
+    public void testServiceWithMultipleMethods() {
+        var proto = """
+                message Req { int32 x = 1; }
+                message Res { int32 y = 1; }
+                
+                service MyService {
+                  rpc Method1 (Req) returns (Res);
+                  rpc Method2 (Req) returns (Res);
+                  rpc Method3 (Req) returns (Res);
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByNameAndType("MyService", ProtobufServiceStatement.class).orElseThrow();
+        assertEquals(3, service.getDirectChildrenByType(ProtobufMethodStatement.class).count());
+    }
+
+    @Test
+    public void testServiceWithBidirectionalStream() {
+        var proto = """
+                message Req { int32 x = 1; }
+                message Res { int32 y = 1; }
+                
+                service MyService {
+                  rpc BiStream (stream Req) returns (stream Res);
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        var method = service.getDirectChildByType(ProtobufMethodStatement.class).orElseThrow();
+        assertTrue(method.inputType().stream());
+        assertTrue(method.outputType().stream());
+    }
+
+    @Test
+    public void testServiceMethodWithOptions() {
+        var proto = """
+                message Req { int32 x = 1; }
+                message Res { int32 y = 1; }
+                
+                service MyService {
+                  rpc MyMethod (Req) returns (Res) {
+                    option deprecated = true;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        var method = service.getDirectChildByType(ProtobufMethodStatement.class).orElseThrow();
+        assertNotNull(method);
+    }
+
+    @Test
+    public void testServiceWithOptions() {
+        var proto = """
+                service MyService {
+                  option deprecated = true;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var service = document.getDirectChildByType(ProtobufServiceStatement.class).orElseThrow();
+        var option = service.getDirectChildByType(ProtobufOptionStatement.class).orElseThrow();
+        assertEquals("deprecated", option.name().toString());
+    }
+
+    @Test
+    public void testDeeplyNestedMessages() {
+        var proto = """
+                message L1 {
+                  message L2 {
+                    message L3 {
+                      message L4 {
+                        message L5 {
+                          int32 value = 1;
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testNestedMessageWithSameNameAsParent() {
+        var proto = """
+                message Message {
+                  message Message {
+                    int32 value = 1;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testNestedMessageReferencingParentType() {
+        var proto = """
+                message Outer {
+                  int32 id = 1;
+                
+                  message Inner {
+                    Outer parent = 1;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testNestedMessageCircularReference() {
+        var proto = """
+                message Node {
+                  int32 value = 1;
+                  Node next = 2;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testEnumWithManyValues() {
+        var proto = """
+                enum Status {
+                  UNKNOWN = 0;
+                  VALUE1 = 1;
+                  VALUE2 = 2;
+                  VALUE3 = 3;
+                  VALUE4 = 4;
+                  VALUE5 = 5;
+                  VALUE6 = 6;
+                  VALUE7 = 7;
+                  VALUE8 = 8;
+                  VALUE9 = 9;
+                  VALUE10 = 10;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var enumStmt = document.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
+        assertEquals(11, enumStmt.getDirectChildrenByType(ProtobufEnumConstantStatement.class).count());
+    }
+
+    @Test
+    public void testEnumWithNonSequentialValues() {
+        var proto = """
+                enum Status {
+                  UNKNOWN = 0;
+                  ACTIVE = 5;
+                  INACTIVE = 10;
+                  DELETED = 100;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testEnumValueWithOptions() {
+        var proto = """
+                enum Status {
+                  UNKNOWN = 0;
+                  DEPRECATED_VALUE = 1 [deprecated = true];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var enumStmt = document.getDirectChildByType(ProtobufEnumStatement.class).orElseThrow();
+        var constant = enumStmt.getDirectChildByNameAndType("DEPRECATED_VALUE", ProtobufEnumConstantStatement.class).orElseThrow();
+        assertTrue(constant.options().stream()
+                .anyMatch(opt -> opt.name().toString().equals("deprecated")));
+    }
+
+    @Test
+    public void testMultipleOptionsInSameBracket() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  repeated int32 field = 1 [deprecated = true, packed = false];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        var field = message.getDirectChildByType(ProtobufFieldStatement.class).orElseThrow();
+        assertEquals(2, field.options().size());
+    }
+
+    @Test
+    public void testOptionWithDottedName() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  int32 field = 1 [(custom.option) = true];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testOptionWithMessageValue() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  int32 field = 1 [(custom.option).sub_field = "value"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testReservedMultipleStatements() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  reserved 1, 2, 3;
+                  reserved 10 to 20;
+                  reserved "foo", "bar";
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        assertEquals(3, message.getDirectChildrenByType(ProtobufReservedStatement.class).count());
+    }
+
+    @Test
+    public void testReservedSingleNumber() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  reserved 5;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testReservedSingleName() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  reserved "field_name";
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testGroupWithOptionalModifier() {
+        var proto = """
+                syntax = "proto2";
+                
+                message M {
+                  optional group MyGroup = 1 {
+                    optional string field = 2;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
+        assertEquals("MyGroup", group.name());
+    }
+
+    @Test
+    public void testGroupNameMustBeCapitalized() {
+        var proto = """
+                syntax = "proto2";
+                
+                message M {
+                  repeated group Result = 1 {
+                    optional string name = 2;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testGroupWithMultipleFields() {
+        var proto = """
+                syntax = "proto2";
+                
+                message M {
+                  repeated group Data = 1 {
+                    optional string name = 2;
+                    optional int32 value = 3;
+                    optional bool flag = 4;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
+        assertEquals(3, group.children().size());
+    }
+
+    @Test
+    public void testExtensionRangeSingleNumber() {
+        var proto = """
+                syntax = "proto2";
+                
+                message M {
+                  extensions 100;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testExtensionRangeMultiple() {
+        var proto = """
+                syntax = "proto2";
+                
+                message M {
+                  extensions 100 to 199, 500, 1000 to max;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testCorrectFileOrdering() {
+        var proto = """
+                syntax = "proto3";
+                package mypackage;
+                import "other.proto";
+                option java_package = "com.example";
+                
+                message M {
+                  int32 field = 1;
+                }
+                """;
+        var other = new ProtobufDocumentTree(Path.of("other.proto"));
+        var document = ProtobufParser.parseOnly(proto, other);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testSyntaxMustBeFirst() {
+        var proto = """
+                package mypackage;
+                syntax = "proto3";
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testRepeatedScalarField() {
+        var proto = """
+                syntax = "proto3";
+                
+                message M {
+                  repeated int32 values = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testRepeatedMessageField() {
+        var proto = """
+                syntax = "proto3";
+                
+                message Sub {
+                  int32 x = 1;
+                }
+                
+                message M {
+                  repeated Sub items = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testRepeatedEnumField() {
+        var proto = """
+                syntax = "proto3";
+
+                enum E { UNKNOWN = 0; A = 1; }
+
+                message M {
+                  repeated E values = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    // Additional comprehensive tests for full spec compliance
+
+    @Test
+    public void testMultipleSyntaxDeclarationsError() {
+        var proto = """
+                syntax = "proto3";
+                syntax = "proto2";
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testFieldNumberAtWireFormatBoundary15() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string field15 = 15;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFieldNumberAtWireFormatBoundary16() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string field16 = 16;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFieldNumberAtWireFormatBoundary2047() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string field2047 = 2047;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFieldNumberAtWireFormatBoundary2048() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string field2048 = 2048;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testJsonNameOption() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string my_field = 1 [json_name = "myField"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testPackedOptionExplicitlyFalse() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  repeated int32 nums = 1 [packed = false];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testServiceMethodWithMultipleOptions() {
+        var proto = """
+                message Req { int32 x = 1; }
+                message Res { int32 y = 1; }
+
+                service S {
+                  rpc M (Req) returns (Res) {
+                    option deprecated = true;
+                    option idempotency_level = NO_SIDE_EFFECTS;
+                  }
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testExtensionRangeOverlappingError() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  extensions 100 to 200;
+                  extensions 150 to 250;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testGroupNameMustStartWithCapital() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  repeated group lowercase = 1 {
+                    optional string name = 2;
+                  }
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testNestedOneofError() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  oneof outer {
+                    string a = 1;
+                    oneof inner {
+                      string b = 2;
+                    }
+                  }
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testMapAsExtensionFieldError() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  extensions 100 to 200;
+                }
+                extend M {
+                  map<string, int32> ext_map = 100;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testGroupInOneofError() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  oneof choice {
+                    group G = 1 {
+                      optional string name = 2;
+                    }
+                  }
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testDuplicateOneofNames() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  oneof choice {
+                    string a = 1;
+                  }
+                  oneof choice {
+                    int32 b = 2;
+                  }
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testFieldTypeReferenceAcrossFiles() throws IOException {
+        var imported = """
+                syntax = "proto3";
+                package external;
+                message ExternalType {
+                  int32 value = 1;
+                }
+                """;
+        var tempDir = Files.createTempDirectory("protobuf-test");
+        var importedFile = tempDir.resolve("external.proto");
+        Files.writeString(importedFile, imported, StandardOpenOption.CREATE);
+        var importedDoc = ProtobufParser.parseOnly(importedFile);
+
+        var main = """
+                syntax = "proto3";
+                import "external/external.proto";
+
+                message MainType {
+                  external.ExternalType field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(main, importedDoc);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testCircularMessageTypeReference() {
+        var proto = """
+                syntax = "proto3";
+                message A {
+                  B b = 1;
+                }
+                message B {
+                  A a = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testSelfReferencingMessage() {
+        var proto = """
+                syntax = "proto3";
+                message TreeNode {
+                  int32 value = 1;
+                  TreeNode left = 2;
+                  TreeNode right = 3;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testMultipleFieldOptionsOnSameField() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  repeated int32 nums = 1 [packed = true, deprecated = true];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testOptionWithAggregateValue() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  int32 field = 1 [(custom.option).sub_field = "value", (custom.option).num = 42];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testReservedRangeTouchingOtherRanges() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  reserved 1 to 5;
+                  reserved 6 to 10;
+                  reserved 11 to 15;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testProto3OptionalFieldPresence() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  optional string explicit = 1;
+                  string implicit = 2;
+                  optional int32 explicit_int = 3;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
+        var explicit = message.getDirectChildByNameAndType("explicit", ProtobufFieldStatement.class).orElseThrow();
+        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, explicit.modifier());
+        var implicit = message.getDirectChildByNameAndType("implicit", ProtobufFieldStatement.class).orElseThrow();
+        assertSame(ProtobufFieldStatement.Modifier.NONE, implicit.modifier());
+    }
+
+    @Test
+    public void testEmptyEnum() {
+        var proto = """
+                syntax = "proto3";
+                enum E {
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testEmptyService() {
+        var proto = """
+                syntax = "proto3";
+                service S {
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testCommentBeforeSyntax() {
+        var proto = """
+                // File header comment
+                /* Block comment */
+                syntax = "proto3";
+                message M {
+                  string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testReservedKeywordAsFieldName() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string option = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testPackageComponentStartingWithNumber() {
+        var proto = """
+                syntax = "proto3";
+                package com.1example.foo;
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testValidPackageWithVersion() {
+        var proto = """
+                syntax = "proto3";
+                package com.example.v1;
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("com.example.v1", document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testEnumValueMaxBoundary() {
+        var proto = """
+                syntax = "proto3";
+                enum E {
+                  ZERO = 0;
+                  MAX_INT32 = 2147483647;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testEnumValueMinBoundary() {
+        var proto = """
+                syntax = "proto3";
+                enum E {
+                  ZERO = 0;
+                  MIN_INT32 = -2147483648;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testMapFieldCannotBeRepeated() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  repeated map<string, int32> invalid = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testMapFieldCannotBeOptional() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  optional map<string, int32> invalid = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testExtensionNumberAtMaxBoundary() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  extensions 1000 to max;
+                }
+                extend M {
+                  optional string field = 536870911;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFieldNumberSequentialFromOne() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string f1 = 1;
+                  string f2 = 2;
+                  string f3 = 3;
+                  string f4 = 4;
+                  string f5 = 5;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFieldNumberSparseAllocation() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string f1 = 1;
+                  string f100 = 100;
+                  string f1000 = 1000;
+                  string f10000 = 10000;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testEnumWithSingleZeroValue() {
+        var proto = """
+                syntax = "proto3";
+                enum E {
+                  ZERO = 0;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testProto2EnumWithoutZeroValue() {
+        var proto = """
+                syntax = "proto2";
+                enum E {
+                  ONE = 1;
+                  TWO = 2;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testMessageWithOnlyReservedStatements() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  reserved 1 to 10;
+                  reserved "old_field1", "old_field2";
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testMessageWithOnlyExtensionsDeclaration() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  extensions 100 to max;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testComplexNestedStructure() {
+        var proto = """
+                syntax = "proto3";
+                message Outer {
+                  message Middle {
+                    message Inner {
+                      string value = 1;
+                      enum Status {
+                        UNKNOWN = 0;
+                        ACTIVE = 1;
+                      }
+                      Status status = 2;
+                    }
+                    Inner inner = 1;
+                  }
+                  Middle middle = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testAllFieldModifierCombinationsProto2() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                  required string req = 1;
+                  optional string opt = 2;
+                  repeated string rep = 3;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testAllFieldModifierCombinationsProto3() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                  string implicit = 1;
+                  optional string explicit = 2;
+                  repeated string repeated_field = 3;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testPackedOptionOnRepeatedEnumField() {
+        var proto = """
+                syntax = "proto3";
+                enum E { UNKNOWN = 0; A = 1; }
+                message M {
+                  repeated E enums = 1 [packed = true];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 }

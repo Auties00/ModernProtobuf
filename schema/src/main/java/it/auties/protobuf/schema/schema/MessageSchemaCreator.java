@@ -22,6 +22,7 @@ import it.auties.protobuf.parser.type.ProtobufMessageTypeReference;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 import it.auties.protobuf.schema.util.AstUtils;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -360,7 +361,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 .filter(arg -> Objects.equals(arg.getNameAsString(), "index"))
                 .filter(arg -> arg.getValue() instanceof IntegerLiteralExpr)
                 .map(arg -> (IntegerLiteralExpr) arg.getValue())
-                .anyMatch(index -> index.asNumber().intValue() == fieldStatement.index());
+                .anyMatch(index -> BigInteger.valueOf(index.asNumber().intValue()).equals(fieldStatement.index().value()));
     }
 
     private MessageType getMessageType(TypeDeclaration<?> scope, ProtobufFieldStatement fieldStatement, boolean wrapType) {

@@ -67,10 +67,10 @@ public @interface ProtobufEnumIndex {
     /**
      * The minimum valid index for a Protobuf enum constant.
      */
-    int MIN_VALUE = 0;
+    int MIN_VALUE = -2147483648; // -2^31
 
     /**
      * Represents the maximum allowable index for a Protobuf enum constant.
      */
-    int MAX_VALUE = 2147483647; // 2^31
+    int MAX_VALUE = 2147483647; // 2^31 - 1
 }

@@ -1,4 +1,3 @@
-
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.exception.ProtobufParserException;
@@ -8,17 +7,14 @@ import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
 import it.auties.protobuf.parser.tree.ProtobufNumberExpression;
 import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
 import it.auties.protobuf.parser.type.ProtobufInteger;
-import org.junit.Test;
-import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-@Nested
-public class ProtobufParserLexicalTests {
-    // 2.1.1 Identifiers
+class ProtobufParserLexicologyTest {
     @Test
     public void testValidSingleWordIdentifiers() {
         var proto = """
@@ -106,7 +102,6 @@ public class ProtobufParserLexicalTests {
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
     }
 
-    // 2.1.2 Literals (Integers, Floats, Booleans, Strings)
     @Test
     public void testIntegerDecimalLiterals() {
         var proto = """
@@ -118,23 +113,23 @@ public class ProtobufParserLexicalTests {
                 """;
         var document = ProtobufParser.parseOnly(proto);
         assertNotNull(document);
-        
+
         var a = document.getAnyChildByNameAndType("a", ProtobufFieldStatement.class);
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufInteger);
+        assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
         assertEquals(BigInteger.valueOf(123), ((ProtobufInteger) aDefaultValue.value()).value());
-       
+
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
         var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
-        assertTrue(bDefaultValue.value() instanceof ProtobufInteger);
+        assertInstanceOf(ProtobufInteger.class, bDefaultValue.value());
         assertEquals(BigInteger.valueOf(-45), ((ProtobufInteger) bDefaultValue.value()).value());
     }
 
@@ -153,10 +148,10 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufInteger);
-        assertEquals(BigInteger.valueOf(63L), ((ProtobufInteger) aDefaultValue.value()).value()); // 077 octal = 63 decimal
+        assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
+        assertEquals(BigInteger.valueOf(63L), ((ProtobufInteger) aDefaultValue.value()).value());
     }
 
     @Test
@@ -175,19 +170,19 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufInteger);
-        assertEquals(BigInteger.valueOf(255), ((ProtobufInteger) aDefaultValue.value()).value()); // 0xFF = 255
+        assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
+        assertEquals(BigInteger.valueOf(255), ((ProtobufInteger) aDefaultValue.value()).value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
         var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
-        assertTrue(bDefaultValue.value() instanceof ProtobufInteger);
-        assertEquals(BigInteger.valueOf(16), ((ProtobufInteger) bDefaultValue.value()).value()); // 0x10 = 16
+        assertInstanceOf(ProtobufInteger.class, bDefaultValue.value());
+        assertEquals(BigInteger.valueOf(16), ((ProtobufInteger) bDefaultValue.value()).value());
     }
 
     @Test
@@ -206,18 +201,18 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(1.0), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
         var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
-        assertTrue(bDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(3.14), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }
 
@@ -237,18 +232,18 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(-3.14e-5d), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
         var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
-        assertTrue(bDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(1.23e10d), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }
 
@@ -268,18 +263,18 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
         var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
-        assertTrue(aDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(.5), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufNumberExpression);
+        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
         var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
-        assertTrue(bDefaultValue.value() instanceof ProtobufFloatingPoint.Finite);
+        assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(.25), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }
 
@@ -313,14 +308,14 @@ public class ProtobufParserLexicalTests {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertTrue(aDefault.get().value() instanceof ProtobufBoolExpression);
+        assertInstanceOf(ProtobufBoolExpression.class, aDefault.get().value());
         assertEquals(true, ((ProtobufBoolExpression) aDefault.get().value()).value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertTrue(bDefault.get().value() instanceof ProtobufBoolExpression);
+        assertInstanceOf(ProtobufBoolExpression.class, bDefault.get().value());
         assertEquals(false, ((ProtobufBoolExpression) bDefault.get().value()).value());
     }
 
@@ -413,7 +408,6 @@ public class ProtobufParserLexicalTests {
         assertNotNull(document);
     }
 
-    // 2.1.3 Comments and Whitespace
     @Test
     public void testSingleLineComments() {
         var proto = """
@@ -496,9 +490,523 @@ public class ProtobufParserLexicalTests {
                     string field = 1;
                 }
                 """;
-        // Should parse successfully as "messageLike" is not exactly "message"
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByNameAndType("messageLike", ProtobufMessageStatement.class).orElseThrow();
         assertNotNull(message);
+    }
+
+    @Test
+    public void testIntegerZero() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 0];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIntegerLargePositive() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int64 a = 1 [default = 9223372036854775807];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIntegerLargeNegative() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int64 a = 1 [default = -9223372036854775808];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testOctalWithLeadingZeros() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 00077];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testHexUppercaseLetters() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 0xABCDEF];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testHexLowercaseLetters() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 0xabcdef];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testHexMixedCase() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional int32 a = 1 [default = 0xAbCdEf];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatWithExponentUppercaseE() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 1.23E5];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatWithExponentLowercaseE() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 1.23e5];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatWithPositiveExponent() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 1.5e+10];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatNoDecimalPart() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 5e10];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatTrailingDecimal() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = 5.];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatInfPositive() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = inf];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatInfNegative() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = -inf];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFloatNaN() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional float a = 1 [default = nan];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringAllCommonEscapes() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\a\\b\\f\\n\\r\\t\\v\\\\\\'\\""];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringUnicodeEscapeShort() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\u0041"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringUnicodeEscapeLong() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\U00000041"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringOctalEscapeOneDigit() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\7"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringOctalEscapeTwoDigits() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\77"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringOctalEscapeThreeDigits() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\377"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringHexEscapeLowercase() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\x41\\x42"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringHexEscapeUppercase() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "\\x41\\x42"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringConcatenationSameQuotes() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "hello " "world"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringConcatenationMixedQuotes() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "hello " 'world'];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringConcatenationMultipleParts() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "part1" "part2" "part3"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringEmptyString() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = ""];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringUTF8Characters() {
+        var proto = """
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "Hello 世界 🌍"];
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testStringVeryLong() {
+        var longString = "a".repeat(1000);
+        var proto = String.format("""
+                syntax = "proto2";
+                message M {
+                    optional string a = 1 [default = "%s"];
+                }
+                """, longString);
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierMaxUnderscores() {
+        var proto = """
+                syntax = "proto3";
+                message ___message___ {
+                    string ___field___ = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierAllCaps() {
+        var proto = """
+                syntax = "proto3";
+                message ALLMESSAGE {
+                    string ALLFIELD = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierAllLower() {
+        var proto = """
+                syntax = "proto3";
+                message allmessage {
+                    string allfield = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierMixedCase() {
+        var proto = """
+                syntax = "proto3";
+                message MyMessageType {
+                    string myFieldName = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierVeryLong() {
+        var longName = "a".repeat(200);
+        var proto = String.format("""
+                syntax = "proto3";
+                message %s {
+                    string field = 1;
+                }
+                """, longName);
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testFullIdentifierWithPackage() {
+        var proto = """
+                syntax = "proto3";
+                package com.example.app.v1.models;
+                message M {
+                    string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertEquals("com.example.app.v1.models", document.packageName().orElse(null));
+    }
+
+    @Test
+    public void testIdentifierSingleLetter() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                    string a = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testIdentifierSingleUnderscore() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                    string _ = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testNestedBlockCommentsError() {
+        var proto = """
+                syntax = "proto3";
+                /* outer /* inner */ still comment? */
+                message M {
+                    string field = 1;
+                }
+                """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testBlockCommentSpanningMultipleLines() {
+        var proto = """
+                syntax = "proto3";
+                /*
+                 * This is a
+                 * multi-line
+                 * block comment
+                 * spanning several lines
+                 */
+                message M {
+                    string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testSingleLineCommentAtEndOfFile() {
+        var proto = """
+                syntax = "proto3";
+                message M {
+                    string field = 1;
+                }
+                // Comment at end with no newline""";
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testCommentWithSpecialCharacters() {
+        var proto = """
+                syntax = "proto3";
+                // Comment with special chars: !@#$%^&*(){}[]<>?/\\|`~
+                message M {
+                    string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testCommentWithUnicode() {
+        var proto = """
+                syntax = "proto3";
+                // Comment with Unicode: 你好世界 🌍
+                message M {
+                    string field = 1;
+                }
+                """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 }
