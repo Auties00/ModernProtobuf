@@ -67,6 +67,8 @@ public final class ProtobufAnalyzer {
             ProtobufDocumentTree.class, "FileOptions",
             ProtobufMessageStatement.class, "MessageOptions",
             ProtobufEnumStatement.class, "EnumOptions",
+            ProtobufOneofFieldStatement.class, "OneOfOptions",
+            ProtobufEnumConstantExpression.class, "EnumValueOptions",
             ProtobufFieldStatement.class, "FieldOptions",
             ProtobufServiceStatement.class, "ServiceOptions",
             ProtobufMethodStatement.class, "MethodOptions",
