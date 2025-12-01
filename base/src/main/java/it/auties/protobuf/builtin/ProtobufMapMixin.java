@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@SuppressWarnings("unused")
 @ProtobufMixin
 public final class ProtobufMapMixin {
     @ProtobufDefaultValue
@@ -38,7 +39,7 @@ public final class ProtobufMapMixin {
     }
 
     @ProtobufUnknownFields.Setter
-    public static void addUnknownField(Map<Long, Object> map, Long index, Object value) {
+    public static void addUnknownField(Map<Long, Object> map, long index, Object value) {
         map.put(index, value);
     }
 }

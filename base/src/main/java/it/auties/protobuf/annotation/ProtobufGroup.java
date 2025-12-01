@@ -22,6 +22,15 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ProtobufGroup {
     /**
+     * Specifies the fully qualified name of the referenced Protobuf Group schema.
+     * This is used by the CLI to update schemas.
+     *
+     * @return the fully qualified name of the Protobuf Group schema, or empty if it should be detected automatically
+     */
+    String name() default "";
+
+
+    /**
      * Specifies the names that are reserved and cannot be used in the context
      * where this annotation is applied. Reserved names are typically used
      * to ensure compatibility or avoid conflicts in Protobuf definitions.

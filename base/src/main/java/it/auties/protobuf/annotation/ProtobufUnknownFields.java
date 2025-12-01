@@ -55,7 +55,7 @@ public @interface ProtobufUnknownFields {
      * @ProtobufMixin
      * final class ProtobufMapMixin {
      *     @ProtobufUnknownFields.Setter
-     *     public static void addUnknownField(Map<Long, Object> map, Long index, Object value) {
+     *     public static void addUnknownField(Map<Long, Object> map, long index, Object value) {
      *         map.put(index, value);
      *     }
      * }

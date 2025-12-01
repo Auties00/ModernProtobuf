@@ -1,18 +1,70 @@
 package it.auties.protobuf.serialization.generator;
 
+import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.FieldSpec;
+import com.palantir.javapoet.JavaFile;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeSpec;
 import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
-import it.auties.protobuf.serialization.writer.CompilationUnitWriter;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.annotation.processing.Filer;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import java.io.IOException;
 import java.util.*;
 
+// Main orchestrator that generates complete Spec classes for protobuf objects
+//
+// Example Input:
+//   @ProtobufMessage
+//   public record Person(
+//       @ProtobufProperty(index = 1) String name,
+//       @ProtobufProperty(index = 2) int age
+//   ) {}
+//
+// Example Output (PersonSpec.java):
+//   public class PersonSpec {
+//       // Overload: byte[] -> Person
+//       public static Person decode(byte[] protoInputObject) { ... }
+//
+//       // Main deserializer: ProtobufInputStream -> Person
+//       public static Person decode(ProtobufInputStream protoInputStream) { ... }
+//
+//       // Overload: Person -> byte[]
+//       public static byte[] encode(Person protoInputObject) { ... }
+//
+//       // Main serializer: Person -> void (writes to stream)
+//       public static void encode(Person protoInputObject, ProtobufOutputStream protoOutputStream) { ... }
+//
+//       // Size calculator: Person -> int
+//       public static int sizeOf(Person protoInputObject) { ... }
+//   }
+//
+// For Enums, also generates:
+//   private static final Map<Integer, Status> VALUES = new HashMap<>();
+//   static {
+//       VALUES.put(0, Status.ACTIVE);
+//       VALUES.put(1, Status.INACTIVE);
+//   }
+//
+// Execution Flow:
+//   1. Create TypeSpec.Builder for the Spec class
+//   2. For enums:
+//      a. Create static VALUES field (Map<Integer, EnumType>)
+//      b. Populate VALUES in static initializer block
+//   3. Generate all methods using specialized generators:
+//      a. ProtobufObjectSerializationOverloadGenerator - encode(object) -> byte[]
+//      b. ProtobufObjectSerializationGenerator - encode(object, stream)
+//      c. ProtobufObjectDeserializationOverloadGenerator - decode(byte[]) -> object
+//      d. ProtobufObjectDeserializationGenerator - decode(stream) -> object
+//      e. ProtobufObjectSizeGenerator - sizeOf(object) -> int
+//   4. Build TypeSpec and write to JavaFile
+//   5. Write JavaFile to Filer (generates .java source file)
 public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
     public ProtobufObjectSpecGenerator(Filer filer) {
         super(filer);
@@ -21,52 +73,54 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
     public void createClass(ProtobufObjectElement objectElement, PackageElement packageElement) throws IOException {
         // Names
         var simpleGeneratedClassName = getGeneratedClassNameBySuffix(objectElement.typeElement(), "Spec");
-        var qualifiedGeneratedClassName = packageElement != null ? packageElement + "." + simpleGeneratedClassName : simpleGeneratedClassName;
-        var sourceFile = filer.createSourceFile(qualifiedGeneratedClassName);
+        var packageName = packageElement != null ? packageElement.getQualifiedName().toString() : "";
 
-        // Declare a new compilation unit
-        try (var compilationUnitWriter = new CompilationUnitWriter(sourceFile.openWriter())) {
-            // If a package is available, write it in the compilation unit
-            if(packageElement != null) {
-                compilationUnitWriter.printPackageDeclaration(packageElement.getQualifiedName().toString());
+        // Create the class
+        var classBuilder = TypeSpec.classBuilder(simpleGeneratedClassName)
+                .addModifiers(Modifier.PUBLIC);
+
+        if(objectElement.type() == Type.ENUM) {
+            var objectType = objectElement.typeElement().getSimpleName().toString();
+            var objectClassName = ClassName.get(objectElement.typeElement());
+            var mapType = ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(Integer.class), objectClassName);
+
+            var valuesField = FieldSpec.builder(mapType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD)
+                    .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                    .initializer("new $T<>()", HashMap.class)
+                    .build();
+            classBuilder.addField(valuesField);
+
+            var staticBlock = com.palantir.javapoet.CodeBlock.builder();
+            for(var entry : objectElement.constants().entrySet()) {
+                staticBlock.addStatement("$L.put($L, $L.$L)",
+                        ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD,
+                        entry.getKey(),
+                        objectType,
+                        entry.getValue());
             }
-
-            // Declare the imports needed for everything to work
-            var imports = getSpecImports(objectElement);
-            imports.forEach(compilationUnitWriter::printImportDeclaration);
-
-            // Separate imports from classes
-            compilationUnitWriter.printSeparator();
-
-            // Declare the spec class
-            try(var classWriter = compilationUnitWriter.printClassDeclaration(simpleGeneratedClassName)) {
-                if(objectElement.type() == Type.ENUM) {
-                    var objectType = objectElement.typeElement().getSimpleName().toString();
-                    classWriter.println("private static final Map<Integer, %s> %s = new HashMap<>();".formatted(objectType, ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD));
-                    try(var staticInitBlock = classWriter.printStaticBlock()) {
-                        for(var entry : objectElement.constants().entrySet()) {
-                            staticInitBlock.println("%s.put(%s, %s.%s);".formatted(ProtobufObjectDeserializationGenerator.ENUM_VALUES_FIELD, entry.getKey(), objectType, entry.getValue()));
-                        }
-                    }
-                }
-
-                // Write the serializer
-                var serializationOverloadVisitor = new ProtobufObjectSerializationOverloadGenerator(objectElement);
-                serializationOverloadVisitor.generate(classWriter);
-                var serializationVisitor = new ProtobufObjectSerializationGenerator(objectElement);
-                serializationVisitor.generate(classWriter);
-
-                // Write the deserializer
-                var deserializationOverloadVisitor = new ProtobufObjectDeserializationOverloadGenerator(objectElement);
-                deserializationOverloadVisitor.generate(classWriter);
-                var deserializationVisitor = new ProtobufObjectDeserializationGenerator(objectElement);
-                deserializationVisitor.generate(classWriter);
-
-                // Write the size calculator
-                var sizeVisitor = new ProtobufObjectSizeGenerator(objectElement);
-                sizeVisitor.generate(classWriter);
-            }
+            classBuilder.addStaticBlock(staticBlock.build());
         }
+
+        // Write the serializer
+        var serializationOverloadVisitor = new ProtobufObjectSerializationOverloadGenerator(objectElement);
+        serializationOverloadVisitor.generate(classBuilder);
+        var serializationVisitor = new ProtobufObjectSerializationGenerator(objectElement);
+        serializationVisitor.generate(classBuilder);
+
+        // Write the deserializer
+        var deserializationOverloadVisitor = new ProtobufObjectDeserializationOverloadGenerator(objectElement);
+        deserializationOverloadVisitor.generate(classBuilder);
+        var deserializationVisitor = new ProtobufObjectDeserializationGenerator(objectElement);
+        deserializationVisitor.generate(classBuilder);
+
+        // Write the size calculator
+        var sizeVisitor = new ProtobufObjectSizeGenerator(objectElement);
+        sizeVisitor.generate(classBuilder);
+
+        // Write the file
+        var javaFile = JavaFile.builder(packageName, classBuilder.build())
+                .build();
+        javaFile.writeTo(filer);
     }
 
     // Get the imports to include in the compilation unit

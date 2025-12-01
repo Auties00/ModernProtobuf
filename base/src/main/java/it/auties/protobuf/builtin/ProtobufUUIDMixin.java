@@ -3,7 +3,7 @@ package it.auties.protobuf.builtin;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
-import it.auties.protobuf.model.ProtobufString;
+import it.auties.protobuf.model.ProtobufLazyString;
 
 import java.util.UUID;
 
@@ -11,12 +11,12 @@ import java.util.UUID;
 @ProtobufMixin
 public final class ProtobufUUIDMixin {
     @ProtobufDeserializer
-    public static UUID ofNullable(ProtobufString value) {
-        return value == null ? null : UUID.fromString(value.toString());
+    public static UUID ofNullable(String value) {
+        return value == null ? null : UUID.fromString(value);
     }
 
     @ProtobufSerializer
-    public static ProtobufString toValue(UUID value) {
-        return value == null ? null : ProtobufString.wrap(value.toString());
+    public static String toValue(UUID value) {
+        return value == null ? null : value.toString();
     }
 }

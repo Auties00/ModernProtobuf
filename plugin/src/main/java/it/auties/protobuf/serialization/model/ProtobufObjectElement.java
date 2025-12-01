@@ -11,7 +11,7 @@ import java.util.*;
 public class ProtobufObjectElement {
     private final Type type;
     private final TypeElement typeElement;
-    private final Map<Integer, ProtobufPropertyElement> properties;
+    private final Map<Long, ProtobufPropertyElement> properties;
     private final List<ProtobufBuilderElement> builders;
     private final Map<Integer, String> constants;
     private final ProtobufEnumMetadata enumMetadata;
@@ -111,7 +111,7 @@ public class ProtobufObjectElement {
         return Collections.unmodifiableSet(reservedElements);
     }
 
-    public boolean isIndexAllowed(int value) {
+    public boolean isIndexAllowed(long value) {
         return reservedElements.stream()
                 .filter(element -> element instanceof ProtobufReservedElement.Index)
                 .allMatch(element -> ((ProtobufReservedElement.Index) element).allows(value));

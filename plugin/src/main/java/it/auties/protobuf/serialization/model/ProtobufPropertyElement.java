@@ -3,7 +3,7 @@ package it.auties.protobuf.serialization.model;
 import javax.lang.model.element.Element;
 
 public record ProtobufPropertyElement(
-        int index,
+        long index,
         String name,
         Element accessor,
         ProtobufPropertyType type,

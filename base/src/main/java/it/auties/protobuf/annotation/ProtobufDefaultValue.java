@@ -55,11 +55,14 @@ import java.lang.annotation.Target;
  * <pre>{@code
  * @ProtobufEnum
  * public enum Type {
+ *     @ProtobufEnum.Constant(0)
  *     FIRST,
  *
+ *     @ProtobufEnum.Constant(1)
  *     @ProtobufDefaultValue
  *     SECOND,
  *
+ *     @ProtobufEnum.Constant(2)
  *     THIRD
  * }
  * }</pre>

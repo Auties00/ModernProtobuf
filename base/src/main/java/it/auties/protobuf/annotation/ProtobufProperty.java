@@ -9,7 +9,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * This annotation can be applied to non-static fields and method to describe a property
+ * This annotation can be applied to non-static fields and methods to describe a property
  * in a type annotated with {@link ProtobufMessage} or {@link ProtobufGroup}.
  * <h2>Usage Example:</h2>
  * <pre>{@code
@@ -35,7 +35,7 @@ public @interface ProtobufProperty {
      *
      * @return the numeric index of the property
      */
-    int index();
+    long index();
 
     /**
      * Returns the type of the Protobuf property.
@@ -67,10 +67,7 @@ public @interface ProtobufProperty {
      * Mixins provide additional functionalities such as default value generation,
      * serialization, and deserialization support for specific types.
      *
-     * @return an array of mixin classes including:
-     *         {@link ProtobufAtomicMixin}, {@link ProtobufOptionalMixin}, {@link ProtobufUUIDMixin},
-     *         {@link ProtobufURIMixin}, {@link ProtobufRepeatedMixin}, {@link ProtobufMapMixin},
-     *         {@link ProtobufFutureMixin}, and {@link ProtobufLazyMixin}
+     * @return an array of mixin classes
      */
     Class<?>[] mixins() default {
             ProtobufAtomicMixin.class,
@@ -79,8 +76,7 @@ public @interface ProtobufProperty {
             ProtobufURIMixin.class,
             ProtobufRepeatedMixin.class,
             ProtobufMapMixin.class,
-            ProtobufFutureMixin.class,
-            ProtobufLazyMixin.class
+            ProtobufFutureMixin.class
     };
 
     /**

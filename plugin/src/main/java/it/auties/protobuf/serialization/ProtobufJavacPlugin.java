@@ -1100,7 +1100,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
     private boolean hasProtobufIndexAnnotation(ExecutableElement constructor, int index) {
         return constructor.getParameters()
                 .get(index)
-                .getAnnotation(ProtobufEnumIndex.class) != null;
+                .getAnnotation(ProtobufEnum.Constant.class) != null;
     }
 
     private ProtobufEnumMetadata getEnumMetadata(ExecutableElement constructor, VariableElement parameter, int index, MethodTree constructorTree, ProtobufEnumFields fields) {
@@ -1157,7 +1157,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
                 continue;
             }
 
-            if(variableElement.getAnnotation(ProtobufEnumIndex.class) != null) {
+            if(variableElement.getAnnotation(ProtobufEnum.Constant.class) != null) {
                 checkProtobufEnumIndexField(variableElement);
                 return new ProtobufEnumFields(variableElement, null);
             }

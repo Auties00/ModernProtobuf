@@ -8,9 +8,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * This annotation can be applied to static methods,
+ * This annotation can be applied to non-static methods,
  * in a type annotated with {@link ProtobufMixin}
  * or in a type that should be interpreted as a {@link ProtobufMessage}, {@link ProtobufGroup} or {@link ProtobufEnum}.
+ *
  * <h2>Usage Example:</h2>
  * <h3>In a {@link ProtobufMessage}:</h3>
  * <pre>{@code
@@ -40,6 +41,12 @@ import java.lang.annotation.Target;
  *     @ProtobufSerializer
  *     public String formatted() {
  *         return "%s/%s/%s".formatted(day, month, year);
+ *     }
+ *
+ *     @ProtobufSize
+ *     public int formattedSize() {
+ *         var formatted = "%s/%s/%s".formatted(day, month, year);
+ *         return ProtobufOutputStream.getStringSize(formatted);
  *     }
  * }
  * }</pre>
@@ -71,6 +78,12 @@ import java.lang.annotation.Target;
  *     public String format() {
  *         return "%f,%f".formatted(latitude, longitude);
  *     }
+ *
+ *     @ProtobufSize
+ *     public int formatSize() {
+ *         var formatted = "%f,%f".formatted(latitude, longitude);
+ *         return ProtobufOutputStream.getStringSize(formatted);
+ *     }
  * }
  * }</pre>
  * <h3>In a {@link ProtobufEnum}:</h3>
@@ -95,6 +108,11 @@ import java.lang.annotation.Target;
  *     public String toStringValue() {
  *         return name().toLowerCase();
  *     }
+ *
+ *     @ProtobufSize
+ *     public int toStringValueSize() {
+ *         return ProtobufOutputStream.getStringSize(name().toLowerCase());
+ *     }
  * }
  * }</pre>
  * <h3>In a {@link ProtobufMixin}:</h3>
@@ -110,11 +128,16 @@ import java.lang.annotation.Target;
  *     public static int toInt(AtomicInteger value) {
  *         return value.get();
  *     }
+ *
+ *     @ProtobufSize
+ *     public static int toIntSize(AtomicInteger value) {
+ *         return ProtobufOutputStream.getVarIntSize(value.get());
+ *     }
  * }
  * }</pre>
- * <h2>Low-Level Deserialization:</h2>
- * <p>For advanced use cases, you can deserialize directly from a {@code ProtobufInputStream}.
- * <h3>From a Protobuf stream:</h3>
+ * <h2>Low-Level Size Calculation:</h2>
+ * <p>For advanced use cases, you can calculate size with custom logic.
+ * <h3>Custom size calculation:</h3>
  * <pre>{@code
  * @ProtobufMessage
  * record BirthdayDate(int day, int month, int year) {
@@ -203,22 +226,13 @@ import java.lang.annotation.Target;
  *
  *         return ProtobufOutputStream.getVarIntSize(totalLength) + totalLength;
  *     }
- *  }
  * }</pre>
  *
- * @see ProtobufSerializer
- * @see ProtobufSize
  * @apiNote Implementing {@link ProtobufSize} is optional if the size of the serializer's return type can be calculated automatically,
- *          but mandatory when writing directly to a {@link  ProtobufOutputStream}, as the size cannot be inferred.
+ *          but mandatory when writing directly to a {@link ProtobufOutputStream}, as the size cannot be inferred.
  */
-@Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ProtobufDeserializer {
-    /**
-     * Provides an optional warning message that should be printed by the compiler when this deserializer is used.
-     * By default, no warning message is specified.
-     *
-     * @return a string containing the warning message; if not specified, an empty string is returned
-     */
-    String warning() default "";
+public @interface ProtobufSize {
+
 }

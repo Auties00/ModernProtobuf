@@ -9,7 +9,7 @@ import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
-import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.parser.tree.ProtobufEnumChild;
 import it.auties.protobuf.parser.tree.ProtobufEnumConstantStatement;
 import it.auties.protobuf.parser.tree.ProtobufEnumStatement;
@@ -117,7 +117,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
         var intType = parseType("int");
         var constructor = ctEnum.addConstructor();
         var indexParameter = new Parameter(intType, "index");
-        indexParameter.addAnnotation(new MarkerAnnotationExpr(ProtobufEnumIndex.class.getSimpleName()));
+        indexParameter.addAnnotation(new MarkerAnnotationExpr(ProtobufEnum.Constant.class.getSimpleName()));
         constructor.addParameter(indexParameter);
         var selectFieldExpression = new FieldAccessExpr(new ThisExpr(), "index");
         var selectParameterExpression = new NameExpr("index");

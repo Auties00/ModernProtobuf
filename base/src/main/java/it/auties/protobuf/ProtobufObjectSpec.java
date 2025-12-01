@@ -2,10 +2,12 @@
 package it.auties.protobuf;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
+import it.auties.protobuf.model.ProtobufUnknownValue;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -51,34 +53,42 @@ public final class ProtobufObjectSpec {
      * @throws NullPointerException if the input stream is null
      * @throws ProtobufDeserializationException if the data cannot be decoded
      *
-     * @see ProtobufInputStream#readUnknown()
+     * @see ProtobufInputStream#readUnknownProperty()
      */
-    public static Map<Long, Object> decode(ProtobufInputStream protoInputStream) {
+    public static Map<Long, ProtobufUnknownValue> decode(ProtobufInputStream protoInputStream) {
         Objects.requireNonNull(protoInputStream, "The input stream cannot be null");
-        var result = new HashMap<Long, Object>();
-        while (protoInputStream.readTag()) {
-            var key = protoInputStream.index();
-            var value = protoInputStream.readUnknown();
-            if(value instanceof ByteBuffer buffer) {
-                var position = buffer.position();
-                try { // Maybe it's an embedded message
-                    value = decode(ProtobufInputStream.fromBuffer(buffer));
-                }catch (ProtobufDeserializationException ignored) {
-                    // It wasn't an embedded message
-                    buffer.position(position); // Reset the position
-                    try { // Maybe it's a string
-                        value = StandardCharsets.UTF_8.newDecoder()
-                                .onMalformedInput(CodingErrorAction.REPORT)
-                                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                                .decode(buffer);
-                    } catch (CharacterCodingException e) {
-                        // It's actually an array of bytes
-                        buffer.position(position); // Reset the position
-                    }
-                }
-            }
+        var result = new HashMap<Long, ProtobufUnknownValue>();
+        while (protoInputStream.readPropertyTag()) {
+            var key = protoInputStream.propertyIndex();
+            var value = decodeValue(protoInputStream);
             result.put(key, value);
         }
         return result;
+    }
+
+    private static ProtobufUnknownValue decodeValue(ProtobufInputStream stream) {
+        var value = stream.readUnknownProperty();
+        return switch (value) {
+            case ProtobufUnknownValue.LengthDelimited.Bytes(var bytes) -> {
+                try { // Maybe it's an embedded message
+                    yield decodeValue(ProtobufInputStream.fromBytes(bytes));
+                }catch (ProtobufDeserializationException _) {
+                    // It wasn't an embedded message
+                    yield value;
+                }
+            }
+
+            case ProtobufUnknownValue.LengthDelimited.Buffer(var buffer) -> {
+                var position = buffer.position();
+                try { // Maybe it's an embedded message
+                    yield decodeValue(ProtobufInputStream.fromBuffer(buffer));
+                }catch (ProtobufDeserializationException _) {
+                    buffer.position(position); // Reset the position
+                    // It wasn't an embedded message
+                    yield value;
+                }
+            }
+            default -> value;
+        };
     }
 }

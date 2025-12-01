@@ -1,5 +1,9 @@
 package it.auties.protobuf.exception;
 
+import it.auties.protobuf.annotation.ProtobufDeserializer;
+
+import java.nio.charset.CharacterCodingException;
+
 /**
  * Represents an exception that occurs during the deserialization of a Protocol Buffers message.
  * This class extends {@link ProtobufException} and provides various static methods to create

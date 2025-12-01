@@ -124,7 +124,7 @@ public final class Checks {
     private void checkEnumProperties(RoundEnvironment roundEnv) {
         checkEnclosing(
                 roundEnv,
-                ProtobufEnumIndex.class,
+                ProtobufEnum.Constant.class,
                 "Illegal enclosing class: a field or parameter annotated with @ProtobufEnumIndex should be enclosed by an enum annotated with @ProtobufEnum",
                 ProtobufEnum.class
         );

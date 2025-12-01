@@ -1,11 +1,10 @@
 package it.auties.protobuf.serialization.generator;
 
+import com.palantir.javapoet.*;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufGroup;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
-import it.auties.protobuf.serialization.writer.ClassWriter;
-import it.auties.protobuf.serialization.writer.MethodWriter;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -14,32 +13,51 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.stream.IntStream;
 
+// Base class for all method generators that create individual methods in Spec classes using JavaPoet
+// Provides method signature construction, Spec class name resolution, deferred operations, and type utilities
 public abstract class ProtobufMethodGenerator {
     private static final ConcurrentMap<String, String> SPECS_CACHE = new ConcurrentHashMap<>();
 
+    // Converts a protobuf type to its generated Spec class name
+    //
+    // Examples:
+    //   com.example.Message -> com.example.MessageSpec
+    //   com.example.Outer.Inner -> com.example.OuterInnerSpec
+    //
+    // Flow:
+    //   1. Walk up the enclosing element chain to build the nested class path
+    //   2. Find the package name
+    //   3. Concatenate package + nested names + "Spec" suffix
+    //   4. Cache result for performance
     public static String getSpecFromObject(TypeMirror typeMirror) {
         if(!(typeMirror instanceof DeclaredType declaredType)
                 || !(declaredType.asElement() instanceof TypeElement element)) {
             return "";
         }
 
-        return SPECS_CACHE.computeIfAbsent(element.getQualifiedName().toString(), owner -> {
+        return SPECS_CACHE.computeIfAbsent(element.getQualifiedName().toString(), _ -> {
+            // Walk up enclosing elements to build class hierarchy
             var parent = element.getEnclosingElement();
             String packageName = null;
             var name = new StringBuilder();
             while (parent != null) {
                 if(parent instanceof TypeElement typeElement) {
+                    // Nested class: prepend parent name
                     name.append(typeElement.getSimpleName());
                 }else if(parent instanceof PackageElement packageElement) {
+                    // Found package: stop walking
                     packageName = packageElement.getQualifiedName().toString();
                     break;
                 }
 
                 parent = parent.getEnclosingElement();
             }
+
+            // Append the type's own name
             name.append(declaredType.asElement().getSimpleName());
+
+            // Build final Spec class name: package.OuterInnerSpec
             var result = new StringBuilder();
             if(packageName != null) {
                 result.append(packageName);
@@ -59,7 +77,7 @@ public abstract class ProtobufMethodGenerator {
         this.deferredOperations = new ArrayList<>();
     }
 
-    public void generate(ClassWriter writer) {
+    public void generate(TypeSpec.Builder classBuilder) {
         if (!shouldInstrument()) {
             return;
         }
@@ -70,12 +88,18 @@ public abstract class ProtobufMethodGenerator {
             throw new IllegalArgumentException("Parameters mismatch");
         }
 
-        var parameters = IntStream.range(0, parametersTypes.size())
-                .mapToObj(index -> parametersTypes.get(index) + " " + parametersNames.get(index))
-                .toArray(String[]::new);
-        try(var methodWriter = writer.printMethodDeclaration(modifiers(), returnType(), name(), parameters)) {
-            doInstrumentation(writer, methodWriter);
+        var methodBuilder = MethodSpec.methodBuilder(name());
+        methodBuilder.addModifiers(modifiers().toArray(new Modifier[0]));
+        methodBuilder.returns(returnType());
+
+        for (int i = 0; i < parametersTypes.size(); i++) {
+            var paramType = parametersTypes.get(i);
+            var paramName = parametersNames.get(i);
+            methodBuilder.addParameter(ParameterSpec.builder(paramType, paramName).build());
         }
+
+        doInstrumentation(classBuilder, methodBuilder);
+        classBuilder.addMethod(methodBuilder.build());
 
         while (!deferredOperations.isEmpty()) {
             var round = new ArrayList<>(deferredOperations);
@@ -88,15 +112,15 @@ public abstract class ProtobufMethodGenerator {
 
     public abstract boolean shouldInstrument();
 
-    protected abstract void doInstrumentation(ClassWriter classWriter, MethodWriter writer);
+    protected abstract void doInstrumentation(TypeSpec.Builder classBuilder, MethodSpec.Builder methodBuilder);
 
-    protected abstract List<String> modifiers();
+    protected abstract List<Modifier> modifiers();
 
-    protected abstract String returnType();
+    protected abstract TypeName returnType();
 
     protected abstract String name();
 
-    protected abstract List<String> parametersTypes();
+    protected abstract List<TypeName> parametersTypes();
 
     protected abstract List<String> parametersNames();
 

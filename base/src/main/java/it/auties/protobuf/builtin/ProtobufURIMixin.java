@@ -3,7 +3,7 @@ package it.auties.protobuf.builtin;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
-import it.auties.protobuf.model.ProtobufString;
+import it.auties.protobuf.model.ProtobufLazyString;
 
 import java.net.URI;
 
@@ -11,12 +11,12 @@ import java.net.URI;
 @ProtobufMixin
 public final class ProtobufURIMixin {
     @ProtobufDeserializer
-    public static URI ofNullable(ProtobufString value) {
-        return value == null ? null : URI.create(value.toString());
+    public static URI ofNullable(String value) {
+        return value == null ? null : URI.create(value);
     }
 
     @ProtobufSerializer
-    public static ProtobufString toValue(URI value) {
-        return value == null ? null : ProtobufString.wrap(value.toString());
+    public static String toValue(URI value) {
+        return value == null ? null : value.toString();
     }
 }

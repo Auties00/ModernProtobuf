@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.type;
 
+import it.auties.protobuf.annotation.ProtobufEnum;
+
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -38,8 +40,8 @@ public sealed interface ProtobufNumber
     /**
      * Attempts to convert this number to a valid Protocol Buffer enum constant value.
      * <p>
-     * Enum constant values must be in the range [{@link it.auties.protobuf.annotation.ProtobufEnumIndex#MIN_VALUE},
-     * {@link it.auties.protobuf.annotation.ProtobufEnumIndex#MAX_VALUE}]. If this number is outside
+     * Enum constant values must be in the range [{@link ProtobufEnum.Constant#MIN_INDEX},
+     * {@link ProtobufEnum.Constant#MAX_INDEX}]. If this number is outside
      * this range or cannot be represented as an integer, an empty optional is returned.
      * </p>
      *

@@ -52,7 +52,7 @@ public class UpdateCommand implements Callable<Integer>, LogProvider {
     private boolean nullable = false;
 
     @Override
-    public Integer call() {
+    public Integer call() throws IOException {
         log.log(Level.INFO, "Generating AST for protobuf file...");
         var document = ProtobufParser.parseOnly(protobuf.toPath());
         log.log(Level.INFO, "Generated AST successfully");

@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.type;
 
-import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufProperty;
 
 import java.math.BigInteger;
@@ -31,8 +31,8 @@ public record ProtobufInteger(BigInteger value) implements ProtobufNumber {
     private static final BigInteger MIN_PROPERTY_INDEX = BigInteger.valueOf(ProtobufProperty.MIN_INDEX);
     private static final BigInteger MAX_PROPERTY_INDEX = BigInteger.valueOf(ProtobufProperty.MAX_INDEX);
 
-    private static final BigInteger MIN_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnumIndex.MIN_VALUE);
-    private static final BigInteger MAX_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnumIndex.MAX_VALUE);
+    private static final BigInteger MIN_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnum.Constant.MIN_INDEX);
+    private static final BigInteger MAX_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnum.Constant.MAX_INDEX);
 
     @Override
     public OptionalLong toFieldIndex() {

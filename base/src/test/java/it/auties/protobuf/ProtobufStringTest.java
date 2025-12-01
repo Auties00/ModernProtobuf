@@ -1,9 +1,8 @@
 package it.auties.protobuf;
 
-import it.auties.protobuf.model.ProtobufString;
+import it.auties.protobuf.model.ProtobufLazyString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class ProtobufStringTest {
@@ -28,16 +27,16 @@ public class ProtobufStringTest {
 
     @Test
     public void testWrappers() {
-        var wrapped = ProtobufString.wrap(TEST_STRING);
-        var lazy = ProtobufString.lazy(TEST_STRING.getBytes());
-        Assertions.assertEquals(TEST_STRING, wrapped.toString());
+        var wrapped = TEST_STRING;
+        var lazy = ProtobufLazyString.of(TEST_STRING.getBytes());
+        Assertions.assertEquals(TEST_STRING, wrapped);
         Assertions.assertEquals(TEST_STRING, lazy.toString());
     }
 
     @Test
     public void testLength() {
-        var wrapped = ProtobufString.wrap(TEST_STRING);
-        var lazy = ProtobufString.lazy(TEST_STRING.getBytes());
+        var wrapped = TEST_STRING;
+        var lazy = ProtobufLazyString.of(TEST_STRING.getBytes());
         var javaLength = TEST_STRING.length();
         var wrappedLength = wrapped.length();
         var lazyLength = lazy.length();
@@ -47,8 +46,8 @@ public class ProtobufStringTest {
 
     @Test
     public void testSubsequence() {
-        var wrapped = ProtobufString.wrap(TEST_STRING);
-        var lazy = ProtobufString.lazy(TEST_STRING.getBytes());
+        var wrapped = TEST_STRING;
+        var lazy = ProtobufLazyString.of(TEST_STRING.getBytes());
         var length = TEST_STRING.length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
@@ -63,8 +62,8 @@ public class ProtobufStringTest {
 
     @Test
     public void testCharAt() {
-        var wrapped = ProtobufString.wrap(TEST_STRING);
-        var lazy = ProtobufString.lazy(TEST_STRING.getBytes());
+        var wrapped = TEST_STRING;
+        var lazy = ProtobufLazyString.of(TEST_STRING.getBytes());
         var length = TEST_STRING.length();
         for(var i = 0; i < length; i++) {
             var javaCharAt = TEST_STRING.charAt(i);

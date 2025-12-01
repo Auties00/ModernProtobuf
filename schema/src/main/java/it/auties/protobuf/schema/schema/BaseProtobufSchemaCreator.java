@@ -220,7 +220,7 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
 
         if(protoStatement instanceof ProtobufEnumStatement || protoStatement.getAnyChildByType(ProtobufEnumStatement.class).isPresent()){
             compilationUnit.addImport(ProtobufEnum.class.getName());
-            compilationUnit.addImport(ProtobufEnumIndex.class.getName());
+            compilationUnit.addImport(ProtobufEnum.Constant.class.getName());
         }
 
         if(hasFields(protoStatement)){

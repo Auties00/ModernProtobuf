@@ -1,6 +1,6 @@
 package it.auties.protobuf;
 
-import it.auties.protobuf.model.ProtobufString;
+import it.auties.protobuf.model.ProtobufLazyString;
 import org.openjdk.jmh.annotations.*;
 
 import java.nio.charset.StandardCharsets;
@@ -29,7 +29,7 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public int shortLazyLength() {
-        return ProtobufString.lazy(SHORT_UTF8_BYTES).length();
+        return ProtobufLazyString.of(SHORT_UTF8_BYTES).length();
     }
     
     @Benchmark
@@ -39,7 +39,7 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public int mediumLazyLength() {
-        return ProtobufString.lazy(MEDIUM_UTF8_BYTES).length();
+        return ProtobufLazyString.of(MEDIUM_UTF8_BYTES).length();
     }
     
     @Benchmark
@@ -49,7 +49,7 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public int longLazyLength() {
-        return ProtobufString.lazy(LONG_UTF8_BYTES).length();
+        return ProtobufLazyString.of(LONG_UTF8_BYTES).length();
     }
     
     @Benchmark
@@ -62,9 +62,9 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void shortLazyCharAt() {
-        var length = ProtobufString.lazy(SHORT_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(SHORT_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            ProtobufString.lazy(SHORT_UTF8_BYTES).charAt(i);
+            ProtobufLazyString.of(SHORT_UTF8_BYTES).charAt(i);
         }
     }
     
@@ -78,9 +78,9 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void mediumLazyCharAt() {
-        var length = ProtobufString.lazy(MEDIUM_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(MEDIUM_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            ProtobufString.lazy(MEDIUM_UTF8_BYTES).charAt(i);
+            ProtobufLazyString.of(MEDIUM_UTF8_BYTES).charAt(i);
         }
     }
     
@@ -94,9 +94,9 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void longLazyCharAt() {
-        var length = ProtobufString.lazy(LONG_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(LONG_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
-            ProtobufString.lazy(LONG_UTF8_BYTES).charAt(i);
+            ProtobufLazyString.of(LONG_UTF8_BYTES).charAt(i);
         }
     }
     
@@ -112,10 +112,10 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void shortLazySubSequence() {
-        var length = ProtobufString.lazy(SHORT_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(SHORT_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                ProtobufString.lazy(SHORT_UTF8_BYTES).subSequence(i, j);
+                ProtobufLazyString.of(SHORT_UTF8_BYTES).subSequence(i, j);
             }
         }
     }
@@ -132,10 +132,10 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void mediumLazySubSequence() {
-        var length = ProtobufString.lazy(MEDIUM_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(MEDIUM_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                ProtobufString.lazy(MEDIUM_UTF8_BYTES).subSequence(i, j);
+                ProtobufLazyString.of(MEDIUM_UTF8_BYTES).subSequence(i, j);
             }
         }
     }
@@ -152,10 +152,10 @@ public class ProtobufStringBenchmark {
     
     @Benchmark
     public void longLazySubSequence() {
-        var length = ProtobufString.lazy(LONG_UTF8_BYTES).length();
+        var length = ProtobufLazyString.of(LONG_UTF8_BYTES).length();
         for(var i = 0; i < length; i++) {
             for(var j = i + 1; j <= length; j++) {
-                ProtobufString.lazy(LONG_UTF8_BYTES).subSequence(i, j);
+                ProtobufLazyString.of(LONG_UTF8_BYTES).subSequence(i, j);
             }
         }
     }

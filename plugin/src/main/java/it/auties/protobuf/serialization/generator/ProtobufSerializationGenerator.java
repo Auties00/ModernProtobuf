@@ -1,10 +1,10 @@
 package it.auties.protobuf.serialization.generator;
 
+import com.palantir.javapoet.MethodSpec;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.serialization.model.ProtobufConverterElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
-import it.auties.protobuf.serialization.writer.BodyWriter;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.type.PrimitiveType;
@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+// Base class for serialization method generators with shared logic for encoding protobuf values
+// Handles serialization of normal, repeated, and map fields with support for custom @ProtobufSerializer chains
 public abstract class ProtobufSerializationGenerator extends ProtobufMethodGenerator {
     public static final String METHOD_NAME = "encode";
     private static final String OUTPUT_OBJECT_PARAMETER = "protoOutputStream";
@@ -21,57 +23,99 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         super(element);
     }
 
-    protected void writeRepeatedSerializer(BodyWriter writer, int index, String name, String accessor, ProtobufPropertyType.CollectionType collectionType, boolean packed, boolean nullCheck, boolean cast) {
+    // Serializes a repeated field to the protobuf stream
+    //
+    // For packed repeated fields (e.g., List<Integer> numbers with packed=true):
+    //   Generated code: protoOutputStream.writeInt32Packed(2, numbers);
+    //
+    // For non-packed repeated fields (e.g., List<String> names):
+    //   Generated code:
+    //     if (names != null) {
+    //         for (var namesEntry : names) {
+    //             protoOutputStream.writeString(1, namesEntry);
+    //         }
+    //     }
+    protected void writeRepeatedSerializer(MethodSpec.Builder methodBuilder, long index, String name, String accessor, ProtobufPropertyType.CollectionType collectionType, boolean packed, boolean nullCheck, boolean cast) {
         if(packed) {
+            // Packed encoding: write all elements at once using packed method
             var writeMethod = getStreamMethodName(collectionType.valueType().protobufType(), true);
-            writer.println("%s.%s(%s, %s);".formatted(OUTPUT_OBJECT_PARAMETER, writeMethod.orElseThrow(), index, accessor));
+            methodBuilder.addStatement("$L.$L($L, $L)", OUTPUT_OBJECT_PARAMETER, writeMethod.orElseThrow(), index, accessor);
         }else {
-            var bodyWriter = nullCheck ? writer.printIfStatement("%s != null".formatted(accessor)) : writer;
-            var localVariableName = "%sEntry".formatted(name); // Prevent shadowing
-            try(var forEachWriter = bodyWriter.printForEachStatement(localVariableName, accessor)) {
-                writeNormalSerializer(forEachWriter, index, name, localVariableName, collectionType.valueType(), false, true, cast);
-            }
+            // Non-packed encoding: iterate and write each element individually
             if(nullCheck) {
-                bodyWriter.close();
+                methodBuilder.beginControlFlow("if ($L != null)", accessor);
+            }
+            var localVariableName = "%sEntry".formatted(name);
+            methodBuilder.beginControlFlow("for (var $L : $L)", localVariableName, accessor);
+            writeNormalSerializer(methodBuilder, index, name, localVariableName, collectionType.valueType(), false, true, cast);
+            methodBuilder.endControlFlow();
+            if(nullCheck) {
+                methodBuilder.endControlFlow();
             }
         }
     }
 
-    protected void writeMapSerializer(BodyWriter writer, int index, String name, String accessor, ProtobufPropertyType.MapType mapType) {
-        var bodyWriter = (BodyWriter) writer.printIfStatement("%s != null".formatted(accessor));
-        var localVariableName = "%sEntry".formatted(name); // Prevent shadowing
-        try(var forWriter = bodyWriter.printForEachStatement(localVariableName, accessor + ".entrySet()")) {
-            var methodName = ProtobufSizeGenerator.getMapPropertyMethodName(name);
-            forWriter.println("%s.writeMessage(%s, %s(%s));".formatted(OUTPUT_OBJECT_PARAMETER, index, methodName, localVariableName));
-            writeNormalSerializer(
-                    forWriter,
-                    1,
-                    name + "Key",
-                    "%s.getKey()".formatted(localVariableName),
-                    mapType.keyType(),
-                    false,
-                    false,
-                    false
-            );
-            writeNormalSerializer(
-                    forWriter,
-                    2,
-                    name + "Value",
-                    "%s.getValue()".formatted(localVariableName),
-                    mapType.valueType(),
-                    true,
-                    true,
-                    false
-            );
-        }
-        if(true) {
-            bodyWriter.close();
-        }
+    // Serializes a map field by writing each entry as a length-delimited message
+    //
+    // Example for Map<String, Integer> scores:
+    //   Generated code:
+    //     if (scores != null) {
+    //         for (var scoresEntry : scores.entrySet()) {
+    //             protoOutputStream.writeMessage(3, sizeOfScores(scoresEntry));
+    //             // Write key (field 1)
+    //             protoOutputStream.writeString(1, scoresEntry.getKey());
+    //             // Write value (field 2)
+    //             var scoresValue = scoresEntry.getValue();
+    //             if (scoresValue != null) {
+    //                 protoOutputStream.writeInt32(2, scoresValue);
+    //             }
+    //         }
+    //     }
+    protected void writeMapSerializer(MethodSpec.Builder methodBuilder, long index, String name, String accessor, ProtobufPropertyType.MapType mapType) {
+        // Null check the map
+        methodBuilder.beginControlFlow("if ($L != null)", accessor);
+        var localVariableName = "%sEntry".formatted(name);
+
+        // Iterate over map entries
+        methodBuilder.beginControlFlow("for (var $L : $L.entrySet())", localVariableName, accessor);
+
+        // Write the map entry as a message (calls size calculator to get length)
+        var methodName = ProtobufSizeGenerator.getMapPropertyMethodName(name);
+        methodBuilder.addStatement("$L.writeMessage($L, $L($L))", OUTPUT_OBJECT_PARAMETER, index, methodName, localVariableName);
+
+        // Write key (field index 1 in map entry message)
+        writeNormalSerializer(
+                methodBuilder,
+                1,
+                name + "Key",
+                "%s.getKey()".formatted(localVariableName),
+                mapType.keyType(),
+                false,
+                false,
+                false
+        );
+
+        // Write value (field index 2 in map entry message)
+        writeNormalSerializer(
+                methodBuilder,
+                2,
+                name + "Value",
+                "%s.getValue()".formatted(localVariableName),
+                mapType.valueType(),
+                true,
+                true,
+                false
+        );
+
+        methodBuilder.endControlFlow();
+        methodBuilder.endControlFlow();
     }
 
-    protected void writeNormalSerializer(BodyWriter writer, int index, String name, String value, ProtobufPropertyType type, boolean declareVariable, boolean variableNullCheck, boolean cast) {
+    // Convenience wrapper that delegates to writeCustomSerializer with default handlers
+    // Simply adds the serialization statements to the method builder
+    protected void writeNormalSerializer(MethodSpec.Builder methodBuilder, long index, String name, String value, ProtobufPropertyType type, boolean declareVariable, boolean variableNullCheck, boolean cast) {
         writeCustomSerializer(
-                writer,
+                methodBuilder,
                 index,
                 name,
                 value,
@@ -79,94 +123,125 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                 declareVariable,
                 variableNullCheck,
                 cast,
-                (nestedWriter, serializedName, serializerStatements) -> {
+                // Both object and primitive handlers just add statements directly
+                (builder, serializedName, serializerStatements) -> {
                     for(var serializerStatement : serializerStatements) {
-                        nestedWriter.println(serializerStatement);
+                        builder.addStatement("$L", serializerStatement);
                     }
                 },
-                (nestedWriter, serializedName, serializerStatements) -> {
+                (builder, serializedName, serializerStatements) -> {
                     for(var serializerStatement : serializerStatements) {
-                        nestedWriter.println(serializerStatement);
+                        builder.addStatement("$L", serializerStatement);
                     }
                 }
         );
     }
 
-    protected void writeCustomSerializer(BodyWriter writer, int index, String name, String value, ProtobufPropertyType type, boolean declareVariable, boolean variableNullCheck, boolean cast, CustomSerializerHandler objectWriter, CustomSerializerHandler streamWriter) {
-        // Apply cast if necessary
+    // Writes code to serialize a field with optional custom serializer chain
+    //
+    // Example with custom serializer:
+    //   Input: @ProtobufSerializer(method = "toProto") LocalDateTime timestamp;
+    //   Generated code:
+    //     var timestamp = protoInputObject.timestamp();
+    //     if (timestamp != null) {
+    //         var timestamp0 = MyConverter.toProto(timestamp);
+    //         if (timestamp0 != null) {
+    //             protoOutputStream.writeInt64(1, timestamp0);
+    //         }
+    //     }
+    //
+    // Flow:
+    //   1. Apply cast (if needed for generics)
+    //   2. Declare variable (if needed to avoid repeated accessor calls)
+    //   3. Null check initial value (if non-primitive)
+    //   4. Apply each serializer in chain, null checking intermediate results
+    //   5. Write final value to stream using appropriate writeXxx() method
+    //   6. Close all null-check blocks
+    protected void writeCustomSerializer(MethodSpec.Builder methodBuilder, long index, String name, String value, ProtobufPropertyType type, boolean declareVariable, boolean variableNullCheck, boolean cast, CustomSerializerHandler objectWriter, CustomSerializerHandler streamWriter) {
+        // Step 1: Apply cast if necessary (for generics/wildcards)
         if(cast) {
             var castType = getQualifiedName(type.descriptorElementType());
             value = "((%s) %s)".formatted(castType, value);
         }
 
-        // Declare a variable using the provided name and valueType if necessary, or treat the valueType parameter as a property name
-        var propertyName = declareVariable ? writer.printVariableDeclaration(name, value) : value;
-
-        // Get the stream method used to serialize the final result
-        var writeMethod = getStreamMethodName(type.protobufType(), false);
-
-        // Declare a list of writers to handle nested null checks
-        var nestedWriters = new ArrayList<BodyWriter>();
-        nestedWriters.add(writer);
-
-        // Null check the initial variable if necessary
-        if(variableNullCheck && !(type.accessorType() instanceof PrimitiveType)) {
-            nestedWriters.add(writer.printIfStatement("%s != null".formatted(propertyName)));
+        // Step 2: Declare a variable to avoid repeated accessor calls
+        var propertyName = value;
+        if(declareVariable) {
+            methodBuilder.addStatement("var $L = $L", name, value);
+            propertyName = name;
         }
 
-        // Iterate through the serializers
+        // Get the stream write method for the final result (empty for MESSAGE/ENUM/GROUP)
+        var writeMethod = getStreamMethodName(type.protobufType(), false);
+
+        // Track how many null-check blocks we open (so we can close them all at the end)
+        var controlFlowDepth = 0;
+
+        // Step 3: Null check the initial value if it's a non-primitive type
+        if(variableNullCheck && !(type.accessorType() instanceof PrimitiveType)) {
+            methodBuilder.beginControlFlow("if ($L != null)", propertyName);
+            controlFlowDepth++;
+        }
+
+        // Step 4: Apply each custom serializer in the chain
         var serializers = type.serializers();
         var object = isObject(type);
         for(var i = 0; i < serializers.size(); i++) {
             var serializer = serializers.get(i);
 
-            // Get the result of applying the serializer to the current result
+            // Build the serializer invocation (e.g., "MyConverter.toProto(value)")
             var result = createSerializerInvocation(serializer, propertyName, index);
 
-            // If this is the last serializer and we are dealing with an object/group, invoke the method
+            // Check if this is the last serializer and it's an object type or void
             var lastSerializer = i == serializers.size() - 1;
             if ((lastSerializer && writeMethod.isEmpty()) || serializer.returnType().getKind() == TypeKind.VOID) {
+                // For MESSAGE types, we need to write the message header first
                 var statements = new ArrayList<String>();
                 if(type.protobufType() == ProtobufType.MESSAGE) {
                     statements.add(getMessageMethod(index, serializer, propertyName));
                 }
-                statements.add("%s;".formatted(result));
-                objectWriter.handle(nestedWriters.getLast(), propertyName, statements);
+                statements.add("%s".formatted(result));
+                objectWriter.handle(methodBuilder, propertyName, statements);
                 continue;
             }
 
-            // Declare a variable containing this serialization round's result
-            propertyName = name + i;
-            nestedWriters.getLast().printVariableDeclaration(propertyName, result);
+            // Store the result of this serialization round in a new variable
+            var newPropertyName = name + i;
+            methodBuilder.addStatement("var $L = $L", newPropertyName, result);
 
-            // If this isn't the last serializer, and the result isn't a primitive, null check it
+            // Null check the result if it's not a primitive and not the last object serializer
             if ((object && lastSerializer) || serializer.returnType() instanceof PrimitiveType) {
+                propertyName = newPropertyName;
                 continue;
             }
 
-            var newWriter = nestedWriters.getLast().printIfStatement("%s != null".formatted(propertyName));
-            nestedWriters.add(newWriter);
+            methodBuilder.beginControlFlow("if ($L != null)", newPropertyName);
+            controlFlowDepth++;
+            propertyName = newPropertyName;
         }
 
+        // Step 5: Write the final value to the stream
         if(writeMethod.isPresent()) {
-            var result = "%s.%s(%s, %s%s);".formatted(
+            var result = "%s.%s(%s, %s%s)".formatted(
                     OUTPUT_OBJECT_PARAMETER,
                     writeMethod.get(),
                     index,
                     cast ? "(%s) ".formatted(type.protobufType().deserializableType().getName()) : "",
                     propertyName
             );
-            streamWriter.handle(nestedWriters.getLast(), propertyName, List.of(result));
+            streamWriter.handle(methodBuilder, propertyName, List.of(result));
         }
 
-        for (var i = nestedWriters.size() - 1; i >= 1; i--) {
-            var nestedWriter = nestedWriters.get(i);
-            nestedWriter.close();
+        // Step 6: Close all null-check control flows
+        for (int i = 0; i < controlFlowDepth; i++) {
+            methodBuilder.endControlFlow();
         }
     }
 
-    private String getMessageMethod(int index, ProtobufConverterElement.Attributed.Serializer serializer, String propertyName) {
-        return "%s.writeMessage(%s, %s.%s(%s));".formatted(
+    // Generates code to write a message header (calls sizeOf to get length)
+    // Returns: "protoOutputStream.writeMessage(index, MessageSpec.sizeOf(value))"
+    private String getMessageMethod(long index, ProtobufConverterElement.Attributed.Serializer serializer, String propertyName) {
+        return "%s.writeMessage(%s, %s.%s(%s))".formatted(
                 OUTPUT_OBJECT_PARAMETER,
                 index,
                 serializer.delegate().ownerName(),
@@ -175,60 +250,48 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         );
     }
 
+    // Checks if a type is a complex object (MESSAGE/ENUM/GROUP) vs a primitive
     private boolean isObject(ProtobufPropertyType type) {
         return type.protobufType() == ProtobufType.MESSAGE
                 || type.protobufType() == ProtobufType.ENUM
                 || type.protobufType() == ProtobufType.GROUP;
     }
 
-    // Callback function interface used to handle a serialization write request
+    // Callback interface for handling the final write operation
+    // Allows different strategies for writing object vs primitive types
     protected interface CustomSerializerHandler {
-        // Writer: the body writer currently being used
-        // Value: The expression produced by the current serializer
-        // Statements: The statements adapted from the valueType, can be called to execute the serializer
-        void handle(BodyWriter writer, String value, List<String> statements);
+        void handle(MethodSpec.Builder builder, String value, List<String> statements);
     }
 
-    // Creates the method invocation for a given serializer using a valueType argument
-    // Serializers cannot be constructors, we can assume that because of PreliminaryChecks
+    // Builds a serializer method invocation string based on the serializer's signature
+    //
+    // For instance methods (non-static):
+    //   Returns: "value.toProto()"
+    //
+    // For static methods with 1 parameter:
+    //   Returns: "MyConverter.toProto(value)"
+    //
+    // For Spec class encode methods (2 parameters - MESSAGE/ENUM):
+    //   Returns: "MessageSpec.encode(value, protoOutputStream)"
+    //
+    // For Spec class encode methods (3 parameters - GROUP):
+    //   Returns: "GroupSpec.encode(groupIndex, value, protoOutputStream)"
     private String createSerializerInvocation(ProtobufConverterElement.Attributed.Serializer serializer, String value, int groupIndex) {
-        // If the serializer isn't static, invoke the serializer method on the valueType instance with no parameters
-        // We can assume that the valueType on which the method is called will not be a message, enum or group because of PreliminaryChecks
-        // class Wrapper {
-        //    @ProtobufSerializer
-        //    public String toValue() {
-        //        ...
-        //    }
-        // }
+        // Instance method: call on the value object
         if (!serializer.delegate().modifiers().contains(Modifier.STATIC)) {
             return "%s.%s()".formatted(value, serializer.delegate().name());
         }
 
-        // If the serializer was declared in a mixin, access the type of the mixin
-        // Casting TypeElement should be fine here because a method's parent must be a class-like or interface program element
+        // Static method: dispatch based on parameter count
         return switch (serializer.delegate().parameters().size()) {
-            // If the method only takes a parameter this is a normal mixin serializer, so we invoke the static method using valueType as a parameter
-            // @ProtobufMixin
-            // class SomeMixin {
-            //    @ProtobufSerializer
-            //    public static String toValue(Wrapper wrapper) {
-            //        ...
-            //    }
-            // }
+            // Normal mixin serializer: static method taking just the value
             case 1 -> "%s.%s(%s)".formatted(
                    serializer.delegate().ownerName(),
                     serializer.delegate().name(),
                     value
             );
 
-            // If the method takes two parameters, this is a special case
-            // In fact the only serializers allowed to take two parameters are synthetic serializers defined in the Spec class for messages and enums
-            // We can assume this because of PreliminaryChecks
-            // public class MessageSpec {
-            //    public static void encode(Message protoInputObject, ProtobufOutputStream protoOutputStream) {
-            //        ...
-            //    }
-            // }
+            // Synthetic Spec serializer for MESSAGE/ENUM: takes value + stream
             case 2 -> "%s.%s(%s, %s)".formatted(
                     serializer.delegate().ownerName(),
                     serializer.delegate().name(),
@@ -236,14 +299,7 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     OUTPUT_OBJECT_PARAMETER
             );
 
-            // If the method takes three parameters, this is a special case
-            // In fact the only serializers allowed to take three parameters are synthetic serializers defined in the Spec class for groups
-            // We can assume this because of PreliminaryChecks
-            // public class GroupSpec {
-            //     public static void encode(int protoGroupIndex, GroupRecord protoInputObject, ProtobufOutputStream protoOutputStream) {
-            //        ...
-            //     }
-            // }
+            // Synthetic Spec serializer for GROUP: takes group index + value + stream
             case 3 -> "%s.%s(%s, %s, %s)".formatted(
                     serializer.delegate().ownerName(),
                     serializer.delegate().name(),
@@ -252,7 +308,6 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
                     OUTPUT_OBJECT_PARAMETER
             );
 
-            // This should never happen
             default -> throw new IllegalArgumentException(
                     "Unexpected number of arguments for serializer "
                             +  serializer.delegate().name()
@@ -262,17 +317,15 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
         };
     }
 
-    // Returns the method to use to deserialize a property from ProtobufOutputStream
-    // Messages and enums don't have a serialization method, instead they use synthetic serializers
-    // Maps should not be passed to this method, assuming the correct logic of this class
-    // Unknown types are not expected, as assured by PreliminaryChecks
+    // Maps protobuf types to their corresponding ProtobufOutputStream write method names
+    // Returns empty Optional for MESSAGE/GROUP (handled separately with synthetic serializers)
+    // Packed variants write entire collections at once (e.g., writeInt32Packed)
     private Optional<String> getStreamMethodName(ProtobufType protobufType, boolean packed) {
-        // If available, get the method defined in ProtobufOutputStream for the input type
         var result = switch (protobufType) {
             case STRING -> "writeString";
             case UNKNOWN -> throw new IllegalArgumentException("Internal bug: unknown types should not reach getSerializerStreamMethod");
             case ENUM, INT32, SINT32 -> "writeInt32";
-            case MESSAGE, GROUP -> null;
+            case MESSAGE, GROUP -> null; // Handled separately
             case BYTES -> "writeBytes";
             case BOOL -> "writeBool";
             case UINT32 -> "writeUInt32";
@@ -285,13 +338,17 @@ public abstract class ProtobufSerializationGenerator extends ProtobufMethodGener
             case FIXED64, SFIXED64 -> "writeFixed64";
         };
 
-        // If packed, get the packed method variant
+        // Append "Packed" suffix for packed repeated fields
         if(result != null && packed) {
             return Optional.of(result + "Packed");
         }
 
-        // Return the result
         return Optional.ofNullable(result);
+    }
+
+    @Override
+    protected List<Modifier> modifiers() {
+        return List.of(Modifier.PUBLIC, Modifier.STATIC);
     }
 
     @Override

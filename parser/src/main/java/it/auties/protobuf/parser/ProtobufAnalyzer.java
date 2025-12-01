@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser;
 
-import it.auties.protobuf.annotation.ProtobufEnumIndex;
+import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
@@ -57,8 +57,8 @@ public final class ProtobufAnalyzer {
     private static final BigInteger FIELD_NUMBER_MIN = BigInteger.valueOf(ProtobufProperty.MIN_INDEX);
     private static final BigInteger FIELD_NUMBER_MAX = BigInteger.valueOf(ProtobufProperty.MAX_INDEX);
 
-    private static final BigInteger ENUM_CONSTANT_MIN = BigInteger.valueOf(ProtobufEnumIndex.MIN_VALUE);
-    private static final BigInteger ENUM_CONSTANT_MAX = BigInteger.valueOf(ProtobufEnumIndex.MAX_VALUE);
+    private static final BigInteger ENUM_CONSTANT_MIN = BigInteger.valueOf(ProtobufEnum.Constant.MIN_INDEX);
+    private static final BigInteger ENUM_CONSTANT_MAX = BigInteger.valueOf(ProtobufEnum.Constant.MAX_INDEX);
 
     private static final BigInteger RESERVED_RANGE_MIN = BigInteger.valueOf(19_000);
     private static final BigInteger RESERVED_RANGE_MAX = BigInteger.valueOf(19_999);
@@ -368,7 +368,8 @@ public final class ProtobufAnalyzer {
 
     private static ProtobufTree.WithBodyAndName<?> resolveNestedTypes(ProtobufTree.WithBodyAndName<?> current, String[] types, int startIndex) {
         for (var i = startIndex; i < types.length && current != null; i++) {
-            current = current.getDirectChildByNameAndType(types[i], ProtobufTree.WithBodyAndName.class).orElse(null);
+            current = current.getDirectChildByNameAndType(types[i], ProtobufTree.WithBodyAndName.class)
+                    .orElse(null);
         }
         return current;
     }
@@ -844,7 +845,7 @@ public final class ProtobufAnalyzer {
                     max1.value().compareTo(min2.value()) >= 0;
             };
             case ProtobufRange.LowerBounded(var min1) -> switch (range2) {
-                case ProtobufRange.Bounded(var min2, var max2) ->
+                case ProtobufRange.Bounded(_, var max2) ->
                     // [a,max] overlaps with [b,c] if c >= a
                     max2.value().compareTo(min1.value()) >= 0;
                 case ProtobufRange.LowerBounded ignored ->
@@ -1350,12 +1351,12 @@ public final class ProtobufAnalyzer {
                         case ProtobufIntegerRangeExpression rangeExpr -> {
                             var range = rangeExpr.value();
                             var start = switch (range) {
-                                case ProtobufRange.Bounded(var min, var max) -> min.value();
+                                case ProtobufRange.Bounded(var min, _) -> min.value();
                                 case ProtobufRange.LowerBounded(var min) -> min.value();
                             };
                             var end = switch (range) {
-                                case ProtobufRange.Bounded(var min, var max) -> max.value();
-                                case ProtobufRange.LowerBounded(var min) -> FIELD_NUMBER_MAX;
+                                case ProtobufRange.Bounded(_, var max) -> max.value();
+                                case ProtobufRange.LowerBounded(_) -> FIELD_NUMBER_MAX;
                             };
                             for (var i = start; i.compareTo(end) <= 0; i = i.add(BigInteger.ONE)) {
                                 reservedNumbers.add(i);
