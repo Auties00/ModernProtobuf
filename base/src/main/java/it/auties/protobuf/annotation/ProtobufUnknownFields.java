@@ -39,8 +39,8 @@ public @interface ProtobufUnknownFields {
      *     }
      *
      *     @ProtobufUnknownFields.Setter
-     *     public void addFeature(long index, Object value) {
-     *         if (value instanceof Boolean flag && flag) {
+     *     public void addFeature(long index, ProtobufUnknownValue value) {
+     *         if (value instanceof ProtobufUnknownValue.VarInt(var data) && data == 1) {
      *             unknownFeatures.add(index);
      *         }
      *     }
@@ -55,7 +55,7 @@ public @interface ProtobufUnknownFields {
      * @ProtobufMixin
      * final class ProtobufMapMixin {
      *     @ProtobufUnknownFields.Setter
-     *     public static void addUnknownField(Map<Long, Object> map, long index, Object value) {
+     *     public static void addUnknownField(Map<Long, ProtobufUnknownValue> map, long index, ProtobufUnknownValue value) {
      *         map.put(index, value);
      *     }
      * }

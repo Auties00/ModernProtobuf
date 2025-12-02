@@ -16,16 +16,6 @@ public final class ProtobufSerializationException extends ProtobufException {
     }
 
     /**
-     * Constructs a new {@code ProtobufSerializationException} with the specified cause.
-     *
-     * @param cause the underlying cause of the exception, typically another {@link Throwable}
-     *              that provides additional context about the error
-     */
-    public ProtobufSerializationException(Throwable cause) {
-        super(cause);
-    }
-
-    /**
      * Creates a {@code ProtobufSerializationException} indicating that there is a size calculation error,
      * as space is remaining for the message after serialization.
      * This exception is intended to report underlying issues in the library, so it should hopefully be never thrown.

@@ -1,4 +1,4 @@
-package it.auties.protobuf;
+package it.auties.protobuf.benchmark;
 
 import it.auties.protobuf.model.ProtobufLazyString;
 import org.openjdk.jmh.annotations.*;

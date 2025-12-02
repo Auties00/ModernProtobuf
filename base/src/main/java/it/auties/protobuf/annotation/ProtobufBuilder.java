@@ -16,6 +16,8 @@ import java.lang.annotation.Target;
  * annotated with {@link ProtobufMessage} or {@link ProtobufGroup} to auto-generate a builder
  * class that provides a fluent API for constructing instances of the protobuf type.
  *
+ * <p>The parameters of the annotated method/constructor must be annotated with {@link PropertyParameter} or {@link SyntheticParameter}.
+ *
  * @see PropertyParameter
  * @see SyntheticParameter
  * @see ProtobufMessage

@@ -1,4 +1,4 @@
-package it.auties.protobuf;
+package it.auties.protobuf.test;
 
 import it.auties.protobuf.model.ProtobufLazyString;
 import org.junit.jupiter.api.Assertions;

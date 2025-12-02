@@ -20,15 +20,6 @@ public final class ProtobufDeserializationException extends ProtobufException {
     }
 
     /**
-     * Constructs a new ProtobufDeserializationException with the specified cause.
-     *
-     * @param cause the cause of the exception, which can be used to provide additional context about the error
-     */
-    public ProtobufDeserializationException(Throwable cause) {
-        super(cause);
-    }
-
-    /**
      * Creates a new {@code ProtobufDeserializationException} indicating that a message ended unexpectedly.
      *
      * @return a {@code ProtobufDeserializationException} with a predefined message stating that the message
@@ -36,6 +27,17 @@ public final class ProtobufDeserializationException extends ProtobufException {
      */
     public static ProtobufDeserializationException truncatedMessage() {
         return new ProtobufDeserializationException("A message ended unexpectedly");
+    }
+
+    /**
+     * Creates a new {@code ProtobufDeserializationException} indicating that a message ended unexpectedly.
+     *
+     * @param cause the cause
+     * @return a {@code ProtobufDeserializationException} with a predefined message stating that the message
+     *         ended unexpectedly during deserialization
+     */
+    public static ProtobufDeserializationException truncatedMessage(Throwable cause) {
+        return new ProtobufDeserializationException("A message ended unexpectedly", cause);
     }
 
     /**
