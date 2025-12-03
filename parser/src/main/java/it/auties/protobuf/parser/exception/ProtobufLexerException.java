@@ -20,6 +20,15 @@ package it.auties.protobuf.parser.exception;
  */
 public class ProtobufLexerException extends ProtobufParserException {
     /**
+     * Constructs a new {@code ProtobufLexerException} with the specified detail message.
+     *
+     * @param message the detail message that explains the reason for the exception
+     */
+    public ProtobufLexerException(String message) {
+        super(message);
+    }
+
+    /**
      * Constructs a new {@code ProtobufLexerException} with a formatted message and optional line number.
      *
      * @param message the format string for the error message
@@ -28,24 +37,6 @@ public class ProtobufLexerException extends ProtobufParserException {
      */
     public ProtobufLexerException(String message, Integer line, Object... args) {
         super(message, line, args);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufLexerException} with the specified cause.
-     *
-     * @param throwable the underlying cause of the exception
-     */
-    public ProtobufLexerException(Throwable throwable) {
-        super(throwable);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufLexerException} with the specified detail message.
-     *
-     * @param message the detail message that explains the reason for the exception
-     */
-    public ProtobufLexerException(String message) {
-        super(message);
     }
 
     /**

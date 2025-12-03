@@ -20,6 +20,15 @@ package it.auties.protobuf.parser.exception;
  */
 public class ProtobufSemanticException extends ProtobufParserException {
     /**
+     * Constructs a new {@code ProtobufSemanticException} with the specified detail message.
+     *
+     * @param message the detail message that explains the reason for the exception
+     */
+    public ProtobufSemanticException(String message) {
+        super(message);
+    }
+
+    /**
      * Constructs a new {@code ProtobufSemanticException} with a formatted message and optional line number.
      *
      * @param message the format string for the error message
@@ -28,24 +37,6 @@ public class ProtobufSemanticException extends ProtobufParserException {
      */
     public ProtobufSemanticException(String message, Integer line, Object... args) {
         super(message, line, args);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufSemanticException} with the specified cause.
-     *
-     * @param throwable the underlying cause of the exception
-     */
-    public ProtobufSemanticException(Throwable throwable) {
-        super(throwable);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufSemanticException} with the specified detail message.
-     *
-     * @param message the detail message that explains the reason for the exception
-     */
-    public ProtobufSemanticException(String message) {
-        super(message);
     }
 
     /**

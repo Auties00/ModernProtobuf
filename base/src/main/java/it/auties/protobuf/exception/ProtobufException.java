@@ -7,21 +7,21 @@ package it.auties.protobuf.exception;
  */
 public abstract class ProtobufException extends RuntimeException {
     /**
+     * Constructs a new {@code ProtobufException} with the specified detail message and a cause.
+     *
+     * @param message the detail message that explains the reason for the exception
+     * @param cause   the cause of the exception
+     */
+    public ProtobufException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    /**
      * Constructs a new {@code ProtobufException} with the specified detail message.
      *
      * @param message the detail message that explains the reason for the exception
      */
     public ProtobufException(String message) {
         super(message);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufException} with the specified cause.
-     *
-     * @param cause the underlying cause of the exception, typically another {@link Throwable} that provides
-     *              additional context about the error
-     */
-    public ProtobufException(Throwable cause) {
-        super(cause);
     }
 }

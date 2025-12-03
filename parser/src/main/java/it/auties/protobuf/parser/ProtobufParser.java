@@ -162,7 +162,7 @@ public final class ProtobufParser {
             ProtobufAnalyzer.attribute(results);
             return result;
         } catch (IOException exception) {
-            throw new ProtobufParserException(exception);
+            throw new ProtobufParserException("Unexpected end of input");
         }
     }
 

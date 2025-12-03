@@ -146,7 +146,7 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
             Objects.requireNonNull(stream, "stream must not be null");
             stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            stream.writeRawVarInt32(length);
+            stream.writeRawFixedInt32(length);
             stream.writeRawBytes(bytes, offset, length);
         }
 
@@ -223,7 +223,7 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
             Objects.requireNonNull(stream, "stream must not be null");
             stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            stream.writeRawVarInt32(buffer.remaining());
+            stream.writeRawFixedInt32(buffer.remaining());
             stream.writeRawBuffer(buffer);
         }
 

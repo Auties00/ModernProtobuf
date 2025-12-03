@@ -39,6 +39,9 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 public abstract class ProtobufInputStream implements AutoCloseable {
+    private static final List<Boolean> TRUE_PACKED = List.of(Boolean.TRUE);
+    private static final List<Boolean> FALSE_PACKED = List.of(Boolean.FALSE);
+
     protected int wireType;
     protected long index;
     protected ProtobufInputStream() {
@@ -193,7 +196,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 yield results;
             }
 
-            case ProtobufWireType.WIRE_TYPE_VAR_INT -> List.of(readRawVarInt64() == 1);
+            case ProtobufWireType.WIRE_TYPE_VAR_INT -> readRawVarInt64() == 1 ? TRUE_PACKED : FALSE_PACKED;
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
     }
@@ -302,7 +305,6 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         };
     }
 
-    // TODO: probably refactor me tomorrow
     protected abstract int readInt64PackedPropertyCount();
 
     public int readFixed32() {
@@ -589,9 +591,11 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             }
             while (offset < length) {
                 try {
-                    var skipped = inputStream.skip(length);
+                    var skipped = inputStream.skip(length - offset);
                     if(skipped == 0) {
-                        throw ProtobufDeserializationException.truncatedMessage();
+                        if(isFinished()) {
+                            throw ProtobufDeserializationException.truncatedMessage();
+                        }
                     } else {
                         offset += skipped;   
                     }
@@ -1137,13 +1141,20 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         @Override
         public String readRawDecodedString(int size) {
             try {
-                var decoder = UTF8_DECODER.get();
-                decoder.reset();
-                var position = buffer.position();
-                var slice = buffer.slice(position, size);
-                var decoded = decoder.decode(slice);
-                buffer.position(position + size);
-                return decoded.toString();
+                if(buffer.hasArray()) {
+                    var result = new String(buffer.array(), buffer.arrayOffset() + buffer.position(), size, StandardCharsets.UTF_8);
+                    buffer.position(buffer.position() + size);
+                    return result;
+                } else {
+                    var decoder = UTF8_DECODER.get();
+                    decoder.reset();
+                    var position = buffer.position();
+                    var oldLimit = buffer.limit();
+                    buffer.limit(position + size);
+                    var decoded = decoder.decode(buffer);
+                    buffer.limit(oldLimit);
+                    return decoded.toString();
+                }
             }catch (IndexOutOfBoundsException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             } catch (CharacterCodingException _) {

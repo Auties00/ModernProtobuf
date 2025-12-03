@@ -20,6 +20,15 @@ package it.auties.protobuf.parser.exception;
  */
 public class ProtobufSyntaxException extends ProtobufParserException {
     /**
+     * Constructs a new {@code ProtobufSyntaxException} with the specified detail message.
+     *
+     * @param message the detail message that explains the reason for the exception
+     */
+    public ProtobufSyntaxException(String message) {
+        super(message);
+    }
+
+    /**
      * Constructs a new {@code ProtobufSyntaxException} with a formatted message and optional line number.
      *
      * @param message the format string for the error message
@@ -28,24 +37,6 @@ public class ProtobufSyntaxException extends ProtobufParserException {
      */
     public ProtobufSyntaxException(String message, Integer line, Object... args) {
         super(message, line, args);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufSyntaxException} with the specified cause.
-     *
-     * @param throwable the underlying cause of the exception
-     */
-    public ProtobufSyntaxException(Throwable throwable) {
-        super(throwable);
-    }
-
-    /**
-     * Constructs a new {@code ProtobufSyntaxException} with the specified detail message.
-     *
-     * @param message the detail message that explains the reason for the exception
-     */
-    public ProtobufSyntaxException(String message) {
-        super(message);
     }
 
     /**

@@ -35,15 +35,6 @@ public class ProtobufParserException extends ProtobufException {
     }
 
     /**
-     * Constructs a new {@code ProtobufParserException} with the specified cause.
-     *
-     * @param throwable the underlying cause of the exception
-     */
-    public ProtobufParserException(Throwable throwable) {
-        super(throwable);
-    }
-
-    /**
      * Constructs a new {@code ProtobufParserException} with the specified detail message.
      *
      * @param message the detail message that explains the reason for the exception

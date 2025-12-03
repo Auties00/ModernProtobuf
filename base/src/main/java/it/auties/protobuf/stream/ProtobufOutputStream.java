@@ -200,7 +200,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
     public void writeInt32Property(long fieldIndex, int value) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeRawVarInt32(value);
+        writeRawFixedInt32(value);
     }
 
     public void writeInt32PackedProperty(long fieldIndex, Collection<? extends Integer> values) {
@@ -219,7 +219,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
     public void writeUInt32Property(long fieldIndex, int value) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeRawVarInt32(value);
+        writeRawFixedInt32(value);
     }
 
     private void writeUInt32PackedProperty(long fieldIndex, Collection<? extends Integer> values) {
@@ -251,10 +251,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt32(Float.floatToRawIntBits(value));
+                    writeRawFixedInt32(Float.floatToRawIntBits(value));
                 }
             }
         }
@@ -270,11 +270,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt32(Float.floatToRawIntBits(value));
+                    writeRawFixedInt32(Float.floatToRawIntBits(value));
                 }
             }
         }
@@ -288,7 +288,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
     public void writeFixed32Property(long fieldIndex, int value) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_FIXED32);
-        writeRawVarInt32(value);
+        writeRawFixedInt32(value);
     }
 
     public void writeFixed32PackedProperty(long fieldIndex, Collection<? extends Integer> values) {
@@ -302,10 +302,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt32(value);
+                    writeRawFixedInt32(value);
                 }
             }
         }
@@ -321,11 +321,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt32(value);
+                    writeRawFixedInt32(value);
                 }
             }
         }
@@ -357,7 +357,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
     public void writeUInt64Property(long fieldIndex, long value) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_VAR_INT);
-        writeRawVarInt64(value);
+        writeRawFixedInt64(value);
     }
 
     public void writeUInt64PackedProperty(long fieldIndex, Collection<? extends Long> values) {
@@ -389,10 +389,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt64(Double.doubleToRawLongBits(value));
+                    writeRawFixedInt64(Double.doubleToRawLongBits(value));
                 }
             }
         }
@@ -408,11 +408,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt64(Double.doubleToRawLongBits(value));
+                    writeRawFixedInt64(Double.doubleToRawLongBits(value));
                 }
             }
         }
@@ -426,7 +426,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
 
     public void writeFixed64Property(long fieldIndex, long value) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_FIXED64);
-        writeRawVarInt64(value);
+        writeRawFixedInt64(value);
     }
 
     public void writeFixed64PackedProperty(long fieldIndex, Collection<? extends Long> values) {
@@ -440,10 +440,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt64(value);
+                    writeRawFixedInt64(value);
                 }
             }
         }
@@ -459,11 +459,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt64(value);
+                    writeRawFixedInt64(value);
                 }
             }
         }
@@ -491,7 +491,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
                     writeRawByte((byte) (value ? 1 : 0));
@@ -510,7 +510,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
@@ -524,7 +524,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         if(length < 0) {
             throw ProtobufDeserializationException.negativeLength(length);
         } else {
-            writeRawVarInt32(length);
+            writeRawFixedInt32(length);
         }
     }
 
@@ -545,7 +545,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         if(value != null){
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
             var size = value.remaining();
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             writeRawBuffer(value);
         }
     }
@@ -557,14 +557,14 @@ public abstract class ProtobufOutputStream<OUTPUT> {
     public void writeLengthDelimitedProperty(long fieldIndex, byte[] value, int offset, int size) {
         if(value != null){
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             writeRawBytes(value, offset, size);
         }
     }
 
     public void writeMessageProperty(long fieldIndex, int size) {
         writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-        writeRawVarInt32(size);
+        writeRawFixedInt32(size);
     }
 
     public void preparePropertyTag(long fieldIndex) {
@@ -575,13 +575,13 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         if(fieldIndex == Long.MIN_VALUE) {
             throw new IllegalStateException("No field index was set");
         }else {
-            writeRawVarInt64(ProtobufWireType.makeTag(fieldIndex, wireType));
+            writeRawFixedInt64(ProtobufWireType.makeTag(fieldIndex, wireType));
             resetFieldIndex();
         }
     } 
     
     public void writePropertyTag(long fieldIndex, int wireType) {
-        writeRawVarInt64(ProtobufWireType.makeTag(fieldIndex, wireType));
+        writeRawFixedInt64(ProtobufWireType.makeTag(fieldIndex, wireType));
         resetFieldIndex();
     }
 
@@ -589,8 +589,8 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         this.fieldIndex = Long.MIN_VALUE;
     }
 
-    public abstract void writeRawVarInt32(int value);
-    public abstract void writeRawVarInt64(long value);
+    public abstract void writeRawFixedInt32(int value);
+    public abstract void writeRawFixedInt64(long value);
     public abstract void writeRawByte(byte entry);
     public abstract void writeRawBytes(byte[] entry);
     public abstract void writeRawBytes(byte[] entry, int offset, int length);
@@ -609,10 +609,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt32(value);
+                    writeRawFixedInt32(value);
                 }
             }
         }
@@ -628,11 +628,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt32(value);
+                    writeRawFixedInt32(value);
                 }
             }
         }
@@ -649,10 +649,10 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (var value : values) {
                 if(value != null) {
-                    writeRawVarInt64(value);
+                    writeRawFixedInt64(value);
                 }
             }
         }
@@ -668,11 +668,11 @@ public abstract class ProtobufOutputStream<OUTPUT> {
                 }
             }
             writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
-            writeRawVarInt32(size);
+            writeRawFixedInt32(size);
             for (int i = 0, n = values.size(); i < n; i++) {
                 var value = values.get(i);
                 if(value != null) {
-                    writeRawVarInt64(value);
+                    writeRawFixedInt64(value);
                 }
             }
         }
@@ -741,7 +741,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt32(int value) {
+        public void writeRawFixedInt32(int value) {
             try {
                 outputStream.write(value & 0xFF);
                 outputStream.write((value >> 8) & 0xFF);
@@ -753,7 +753,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt64(long value) {
+        public void writeRawFixedInt64(long value) {
             try {
                 outputStream.write((int) value & 0xFF);
                 outputStream.write((int) (value >> 8) & 0xFF);
@@ -833,7 +833,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt32(int value) {
+        public void writeRawFixedInt32(int value) {
             buffer[position++] = (byte) (value & 0xFF);
             buffer[position++] = (byte) ((value >> 8) & 0xFF);
             buffer[position++] = (byte) ((value >> 16) & 0xFF);
@@ -841,7 +841,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt64(long value) {
+        public void writeRawFixedInt64(long value) {
             buffer[position++] = (byte) ((int) value & 0xFF);
             buffer[position++] = (byte) ((int) (value >> 8) & 0xFF);
             buffer[position++] = (byte) ((int) (value >> 16) & 0xFF);
@@ -913,7 +913,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt32(int value) {
+        public void writeRawFixedInt32(int value) {
             buffer.put((byte) (value & 0xFF));
             buffer.put((byte) ((value >> 8) & 0xFF));
             buffer.put((byte) ((value >> 16) & 0xFF));
@@ -921,7 +921,7 @@ public abstract class ProtobufOutputStream<OUTPUT> {
         }
 
         @Override
-        public void writeRawVarInt64(long value) {
+        public void writeRawFixedInt64(long value) {
             buffer.put((byte) ((int) value & 0xFF));
             buffer.put((byte) ((int) (value >> 8) & 0xFF));
             buffer.put((byte) ((int) (value >> 16) & 0xFF));
