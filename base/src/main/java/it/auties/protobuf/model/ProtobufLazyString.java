@@ -28,6 +28,8 @@ package it.auties.protobuf.model;
 
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
@@ -62,6 +64,11 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
     public static ProtobufLazyString of(ByteBuffer buffer) {
         Objects.requireNonNull(buffer, "buffer must not be null");
         return new ByteBufferBacked(buffer);
+    }
+
+    public static ProtobufLazyString of(MemorySegment segment) {
+        Objects.requireNonNull(segment, "segment must not be null");
+        return new MemorySegmentBacked(segment);
     }
 
     public abstract int encodedLength();
@@ -261,6 +268,79 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
             return this == obj || switch (obj) {
                 case ByteBufferBacked that when buffer.remaining() == that.buffer.remaining() -> buffer.mismatch(that.buffer) == -1;
                 case ByteArrayBacked that when buffer.remaining() == that.length -> equals(that.bytes, that.offset, that.length, buffer);
+                case null, default -> false;
+            };
+        }
+    }
+
+    private static final class MemorySegmentBacked extends ProtobufLazyString {
+        private final MemorySegment segment;
+
+        private MemorySegmentBacked(MemorySegment segment) {
+            if(segment.byteSize() > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException("Segment too large");
+            } else {
+                this.segment = segment;
+            }
+        }
+
+        @Override
+        public int encodedLength() {
+            return (int) segment.byteSize();
+        }
+
+        @Override
+        public int length() {
+            if (decoded.isSet()) {
+                return decoded.orElseThrow().length();
+            } else {
+                var index = 0;
+                var length = (int) segment.byteSize();
+                var position = 0;
+                var charCount = 0;
+                while (index < length) {
+                    var b = segment.getAtIndex(ValueLayout.OfByte.JAVA_BYTE, 0);
+                    if ((b & 0x80) == 0) {
+                        index++;
+                        charCount++;
+                    } else if ((b & 0xE0) == 0xC0) {
+                        index += 2;
+                        charCount++;
+                    } else if ((b & 0xF0) == 0xE0) {
+                        index += 3;
+                        charCount++;
+                    } else {
+                        index += 4;
+                        charCount += 2;
+                    }
+                }
+                return charCount;
+            }
+        }
+
+        @Override
+        public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
+            Objects.requireNonNull(stream, "stream must not be null");
+            stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+            stream.writeRawFixedInt32((int) segment.byteSize());
+            stream.writeRawSegment(segment);
+        }
+
+        @Override
+        public String toString() {
+            return decoded.orElseSet(() -> segment.getString(0, StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public int hashCode() {
+            return segment.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return this == obj || switch (obj) {
+                case ByteBufferBacked that when segment.remaining() == that.buffer.remaining() -> segment.mismatch(that.buffer) == -1;
+                case ByteArrayBacked that when segment.remaining() == that.length -> equals(that.bytes, that.offset, that.length, segment);
                 case null, default -> false;
             };
         }

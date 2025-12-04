@@ -1,5 +1,6 @@
 package it.auties.protobuf.model;
 
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
@@ -55,13 +56,13 @@ public sealed interface ProtobufUnknownValue {
          *
          * @param value the raw byte array data.
          */
-        record Bytes(byte[] value) implements LengthDelimited {
+        record AsByteArray(byte[] value) implements LengthDelimited {
             /**
              * Constructs a new {@code Bytes} record, ensuring the value is not null.
              *
              * @param value the raw byte array data.
              */
-            public Bytes {
+            public AsByteArray {
                 Objects.requireNonNull(value, "value cannot be null");
             }
 
@@ -91,7 +92,7 @@ public sealed interface ProtobufUnknownValue {
          *
          * @param value the {@code ByteBuffer} containing the data.
          */
-        record Buffer(ByteBuffer value) implements LengthDelimited {
+        record AsByteBuffer(ByteBuffer value) implements LengthDelimited {
             private static final ThreadLocal<CharsetDecoder> UTF8_DECODER = ThreadLocal.withInitial(() ->
                     StandardCharsets.UTF_8.newDecoder()
                             .onMalformedInput(CodingErrorAction.REPLACE)
@@ -102,7 +103,7 @@ public sealed interface ProtobufUnknownValue {
              *
              * @param value the {@code ByteBuffer} containing the data.
              */
-            public Buffer {
+            public AsByteBuffer {
                 Objects.requireNonNull(value, "value cannot be null");
             }
 
@@ -123,6 +124,42 @@ public sealed interface ProtobufUnknownValue {
                     // This should not happen since the error actions are set to REPLACE
                     throw new InternalError();
                 }
+            }
+
+            /**
+             * Returns a lazy string representation wrapping the ByteBuffer.
+             *
+             * @return a {@code ProtobufLazyString} instance.
+             */
+            @Override
+            public ProtobufLazyString asLazyString() {
+                return ProtobufLazyString.of(value);
+            }
+        }
+
+        /**
+         * Represents length-delimited data stored as a {@link MemorySegment}.
+         *
+         * @param value the {@code MemorySegment} containing the data.
+         */
+        record AsMemorySegment(MemorySegment value) implements LengthDelimited {
+            /**
+             * Constructs a new {@code AsMemorySegment} record, ensuring the value is not null.
+             *
+             * @param value the {@code MemorySegment} containing the data.
+             */
+            public AsMemorySegment {
+                Objects.requireNonNull(value, "value cannot be null");
+            }
+
+            /**
+             * Decodes the UTF-8 {@code ByteBuffer} contents into a {@link String}
+             *
+             * @return the decoded {@code String}.
+             */
+            @Override
+            public String asDecodedString() {
+                return value.getString(0, StandardCharsets.UTF_8);
             }
 
             /**

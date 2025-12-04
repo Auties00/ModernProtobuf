@@ -5,11 +5,6 @@ import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufUnknownValue;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -69,7 +64,7 @@ public final class ProtobufObjectSpec {
     private static ProtobufUnknownValue decodeValue(ProtobufInputStream stream) {
         var value = stream.readUnknownProperty();
         return switch (value) {
-            case ProtobufUnknownValue.LengthDelimited.Bytes(var bytes) -> {
+            case ProtobufUnknownValue.LengthDelimited.AsByteArray(var bytes) -> {
                 try { // Maybe it's an embedded message
                     yield decodeValue(ProtobufInputStream.fromBytes(bytes));
                 }catch (ProtobufDeserializationException _) {
@@ -78,7 +73,7 @@ public final class ProtobufObjectSpec {
                 }
             }
 
-            case ProtobufUnknownValue.LengthDelimited.Buffer(var buffer) -> {
+            case ProtobufUnknownValue.LengthDelimited.AsByteBuffer(var buffer) -> {
                 var position = buffer.position();
                 try { // Maybe it's an embedded message
                     yield decodeValue(ProtobufInputStream.fromBuffer(buffer));

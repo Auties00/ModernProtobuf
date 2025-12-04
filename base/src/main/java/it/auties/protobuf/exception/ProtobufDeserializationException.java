@@ -134,4 +134,8 @@ public final class ProtobufDeserializationException extends ProtobufException {
     public static ProtobufDeserializationException reservedIndex(int index) {
         return new ProtobufDeserializationException(index + " is marked as reserved");
     }
+
+    public static ProtobufDeserializationException invalidPropertyState(String reason) {
+        return new ProtobufDeserializationException("Invalid property state: " + reason);
+    }
 }
