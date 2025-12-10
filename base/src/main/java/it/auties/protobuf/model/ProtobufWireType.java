@@ -91,11 +91,9 @@ public final class ProtobufWireType {
      * The formula is: {@code tag = (fieldNumber << 3) | wireType}
      * </p>
      *
-     * @param fieldNumber the field number from the .proto file (must be between 1 and 536,870,911)
+     * @param fieldNumber the field number from the .proto file
      * @param wireType the wire type constant (one of the WIRE_TYPE_* constants in this class)
      * @return the encoded tag as an integer
-     * @throws IllegalArgumentException if fieldNumber is out of valid range (1-536,870,911)
-     * @throws IllegalArgumentException if wireType is not a valid wire type (0-5)
      *
      * @see <a href="https://developers.google.com/protocol-buffers/docs/encoding#structure">Protocol Buffers Wire Format</a>
      */

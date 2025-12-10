@@ -4,11 +4,14 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.*;
-import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.body.EnumConstantDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.IntegerLiteralExpr;
+import com.github.javaparser.ast.expr.MemberValuePair;
+import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
-import com.github.javaparser.ast.stmt.BlockStmt;
-import com.github.javaparser.ast.stmt.ReturnStmt;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.parser.tree.ProtobufEnumChild;
 import it.auties.protobuf.parser.tree.ProtobufEnumConstantStatement;
@@ -20,8 +23,6 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-
-import static com.github.javaparser.StaticJavaParser.parseType;
 
 final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStatement> {
     EnumSchemaCreator(String packageName, ProtobufEnumStatement protoStatement, List<CompilationUnit> classPool, Path output) {
@@ -47,10 +48,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
         ctEnum.setParentNode(parent);
         addEnumName(ctEnum);
         getDeferredImplementations().forEach(entry -> addImplementedType(entry, ctEnum));
-        createEnumConstructor(ctEnum);
         createEnumConstants(ctEnum);
-        createIndexField(ctEnum);
-        createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
         return ctEnum;
     }
@@ -75,18 +73,23 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
             return;
         }
 
-        var name = ctEnum.addEnumConstant(AstUtils.toJavaName(statement.name()));
-        name.addArgument(new IntegerLiteralExpr(String.valueOf(statement.index())));
+        var enumConstant = ctEnum.addEnumConstant(AstUtils.toJavaName(statement.name()));
+
+        var enumConstantAnnotation = new NormalAnnotationExpr();
+        enumConstantAnnotation.setName(ProtobufEnum.Constant.class.getCanonicalName());
+        enumConstantAnnotation.addPair("index", statement.index().value().toString());
+
+        enumConstant.addAnnotation(enumConstantAnnotation);
     }
 
     private Optional<EnumConstantDeclaration> getEnumConstant(EnumDeclaration ctEnum, ProtobufFieldStatement statement) {
         return ctEnum.getEntries()
                 .stream()
-                .filter(entry -> getEnumConstant(statement, entry))
+                .filter(entry -> hasEnumConstant(statement, entry))
                 .findFirst();
     }
 
-    private boolean getEnumConstant(ProtobufFieldStatement statement, EnumConstantDeclaration entry) {
+    private boolean hasEnumConstant(ProtobufFieldStatement statement, EnumConstantDeclaration entry) {
         if (entry.getArguments().isEmpty()) {
             return false;
         }
@@ -96,50 +99,12 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
             return false;
         }
 
-        return BigInteger.valueOf(intExpression.asNumber().intValue())
-                .equals(statement.index().value());
-    }
-
-    private void createIndexField(EnumDeclaration ctEnum) {
-        if(ctEnum.getFieldByName("index").isPresent()) {
-            return;
+        try {
+            var enumConstantIndex = BigInteger.valueOf(intExpression.asNumber().intValue());
+            return enumConstantIndex.equals(statement.index().value());
+        }catch (NumberFormatException _) {
+            return false;
         }
-
-        var intType = parseType("int");
-        ctEnum.addField(intType, "index", Modifier.Keyword.PRIVATE, Modifier.Keyword.FINAL);
-    }
-
-    private void createEnumConstructor(EnumDeclaration ctEnum) {
-        if(!ctEnum.getConstructors().isEmpty()) {
-            return;
-        }
-
-        var intType = parseType("int");
-        var constructor = ctEnum.addConstructor();
-        var indexParameter = new Parameter(intType, "index");
-        indexParameter.addAnnotation(new MarkerAnnotationExpr(ProtobufEnum.Constant.class.getSimpleName()));
-        constructor.addParameter(indexParameter);
-        var selectFieldExpression = new FieldAccessExpr(new ThisExpr(), "index");
-        var selectParameterExpression = new NameExpr("index");
-        var assignment = new AssignExpr(selectFieldExpression, selectParameterExpression, AssignExpr.Operator.ASSIGN);
-        constructor.getBody().addStatement(assignment);
-    }
-
-    private void createIndexAccessor(EnumDeclaration ctEnum) {
-        if(getMethod(ctEnum, "index").isPresent()) {
-            return;
-        }
-
-        var intType = parseType("int");
-        var method = new MethodDeclaration();
-        method.setPublic(true);
-        method.setType(intType);
-        method.setName("index");
-        var body = new BlockStmt();
-        var selectFieldExpression = new FieldAccessExpr(new ThisExpr(), "index");
-        body.addStatement(new ReturnStmt(selectFieldExpression));
-        method.setBody(body);
-        ctEnum.addMember(method);
     }
 
     @Override
@@ -150,10 +115,7 @@ final class EnumSchemaCreator extends BaseProtobufSchemaCreator<ProtobufEnumStat
         }
 
         var ctEnum = (EnumDeclaration) result.get().result();
-        createEnumConstructor(ctEnum);
         createEnumConstants(ctEnum);
-        createIndexField(ctEnum);
-        createIndexAccessor(ctEnum);
         addReservedAnnotation(ctEnum);
         return result.map(QueryResult::compilationUnit);
     }

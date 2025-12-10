@@ -3,7 +3,7 @@ package it.auties.protobuf;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufUnknownValue;
-import it.auties.protobuf.stream.ProtobufInputStream;
+import it.auties.protobuf.io.ProtobufReader;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,9 +48,9 @@ public final class ProtobufObjectSpec {
      * @throws NullPointerException if the input stream is null
      * @throws ProtobufDeserializationException if the data cannot be decoded
      *
-     * @see ProtobufInputStream#readUnknownProperty()
+     * @see ProtobufReader#readUnknownProperty()
      */
-    public static Map<Long, ProtobufUnknownValue> decode(ProtobufInputStream protoInputStream) {
+    public static Map<Long, ProtobufUnknownValue> decode(ProtobufReader protoInputStream) {
         Objects.requireNonNull(protoInputStream, "The input stream cannot be null");
         var result = new HashMap<Long, ProtobufUnknownValue>();
         while (protoInputStream.readPropertyTag()) {
@@ -61,12 +61,12 @@ public final class ProtobufObjectSpec {
         return result;
     }
 
-    private static ProtobufUnknownValue decodeValue(ProtobufInputStream stream) {
+    private static ProtobufUnknownValue decodeValue(ProtobufReader stream) {
         var value = stream.readUnknownProperty();
         return switch (value) {
             case ProtobufUnknownValue.LengthDelimited.AsByteArray(var bytes) -> {
                 try { // Maybe it's an embedded message
-                    yield decodeValue(ProtobufInputStream.fromBytes(bytes));
+                    yield decodeValue(ProtobufReader.fromBytes(bytes));
                 }catch (ProtobufDeserializationException _) {
                     // It wasn't an embedded message
                     yield value;
@@ -76,7 +76,7 @@ public final class ProtobufObjectSpec {
             case ProtobufUnknownValue.LengthDelimited.AsByteBuffer(var buffer) -> {
                 var position = buffer.position();
                 try { // Maybe it's an embedded message
-                    yield decodeValue(ProtobufInputStream.fromBuffer(buffer));
+                    yield decodeValue(ProtobufReader.fromBuffer(buffer));
                 }catch (ProtobufDeserializationException _) {
                     buffer.position(position); // Reset the position
                     // It wasn't an embedded message

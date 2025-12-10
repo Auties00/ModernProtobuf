@@ -8,7 +8,7 @@ import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
-import it.auties.protobuf.stream.ProtobufOutputStream;
+import it.auties.protobuf.io.ProtobufWriter;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
@@ -96,9 +96,9 @@ public class ProtobufObjectSerializationGenerator extends ProtobufSerializationG
         if (objectElement.type() == Type.ENUM) {
             return List.of(objectType);
         }else if(objectElement.type() == Type.GROUP) {
-            return List.of(TypeName.INT, objectType, ClassName.get(ProtobufOutputStream.class));
+            return List.of(TypeName.INT, objectType, ClassName.get(ProtobufWriter.class));
         }else {
-            return List.of(objectType, ClassName.get(ProtobufOutputStream.class));
+            return List.of(objectType, ClassName.get(ProtobufWriter.class));
         }
     }
 

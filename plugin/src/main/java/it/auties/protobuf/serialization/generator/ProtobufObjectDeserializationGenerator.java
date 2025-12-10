@@ -11,7 +11,7 @@ import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
 import it.auties.protobuf.serialization.model.ProtobufPropertyType;
 import it.auties.protobuf.serialization.model.ProtobufReservedElement;
-import it.auties.protobuf.stream.ProtobufInputStream;
+import it.auties.protobuf.io.ProtobufReader;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
@@ -109,9 +109,9 @@ public class ProtobufObjectDeserializationGenerator extends ProtobufDeserializat
         if(objectElement.type() == Type.ENUM) {
             return List.of(ClassName.get(Integer.class), ClassName.get(objectElement.typeElement()));
         } else if(objectElement.type() == Type.GROUP) {
-            return List.of(TypeName.LONG, ClassName.get(ProtobufInputStream.class));
+            return List.of(TypeName.LONG, ClassName.get(ProtobufReader.class));
         } else {
-            return List.of(ClassName.get(ProtobufInputStream.class));
+            return List.of(ClassName.get(ProtobufReader.class));
         }
     }
 

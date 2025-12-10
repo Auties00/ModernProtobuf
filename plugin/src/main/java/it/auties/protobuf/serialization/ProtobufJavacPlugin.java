@@ -10,7 +10,7 @@ import it.auties.protobuf.serialization.model.*;
 import it.auties.protobuf.serialization.support.Checks;
 import it.auties.protobuf.serialization.support.Messages;
 import it.auties.protobuf.serialization.support.Types;
-import it.auties.protobuf.stream.ProtobufOutputStream;
+import it.auties.protobuf.io.ProtobufWriter;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -72,7 +72,7 @@ public class ProtobufJavacPlugin extends AbstractProcessor {
         this.serializersGraph = new ProtobufConverterGraph(types);
         this.deserializersGraph = new ProtobufConverterGraph(types);
         this.intType = types.getType(int.class);
-        this.outputStreamType = types.getType(ProtobufOutputStream.class);
+        this.outputStreamType = types.getType(ProtobufWriter.class);
         this.serializedGroupType = types.getType(ProtobufType.GROUP.serializedType());
         this.serializedMessageType = types.getType(ProtobufType.MESSAGE.serializedType());
         this.linkedTypes = new HashSet<>();

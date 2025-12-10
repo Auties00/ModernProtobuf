@@ -26,14 +26,15 @@
 
 package it.auties.protobuf.model;
 
-import it.auties.protobuf.stream.ProtobufOutputStream;
+import it.auties.protobuf.annotation.ProtobufDeserializer;
+import it.auties.protobuf.annotation.ProtobufSerializer;
+import it.auties.protobuf.annotation.ProtobufSize;
+import it.auties.protobuf.io.ProtobufReader;
+import it.auties.protobuf.io.ProtobufWriter;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
@@ -49,6 +50,27 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
 
     protected ProtobufLazyString() {
         this.decoded = StableValue.of();
+    }
+
+    @ProtobufDeserializer
+    public static ProtobufLazyString from(ProtobufReader reader) {
+        var length = reader.readLengthDelimitedPropertyLength();
+        return switch (reader.rawDataTypePreference()) {
+            case BYTE_ARRAY -> {
+                var source = reader.readRawBytes(length);
+                yield new ByteArrayBacked(source, 0, source.length);
+            }
+
+            case BYTE_BUFFER -> {
+                var source = reader.readRawBuffer(length);
+                yield new ByteBufferBacked(source);
+            }
+
+            case MEMORY_SEGMENT -> {
+                var  source = reader.readRawMemorySegment(length);
+                yield new MemorySegmentBacked(source);
+            }
+        };
     }
 
     public static ProtobufLazyString of(byte[] bytes) {
@@ -71,9 +93,11 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         return new MemorySegmentBacked(segment);
     }
 
+    @ProtobufSize
     public abstract int encodedLength();
 
-    public abstract void writeTo(long fieldIndex, ProtobufOutputStream<?> stream);
+    @ProtobufSerializer
+    public abstract void writeTo(ProtobufWriter<?> stream);
 
     @Override
     public char charAt(int index) {
@@ -150,9 +174,8 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         }
 
         @Override
-        public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
-            Objects.requireNonNull(stream, "stream must not be null");
-            stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        public void writeTo(ProtobufWriter<?> stream) {
+            stream.writePropertyTag(ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
             stream.writeRawFixedInt32(length);
             stream.writeRawBytes(bytes, offset, length);
         }
@@ -179,11 +202,6 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
     }
 
     private static final class ByteBufferBacked extends ProtobufLazyString {
-        private static final ThreadLocal<CharsetDecoder> UTF8_DECODER = ThreadLocal.withInitial(() ->
-                StandardCharsets.UTF_8.newDecoder()
-                        .onMalformedInput(CodingErrorAction.REPLACE)
-                        .onUnmappableCharacter(CodingErrorAction.REPLACE));
-
         private final ByteBuffer buffer;
 
         private ByteBufferBacked(ByteBuffer buffer) {
@@ -226,10 +244,9 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
             }
         }
 
-        @Override
-        public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
+        public void writeTo(ProtobufWriter<?> stream) {
             Objects.requireNonNull(stream, "stream must not be null");
-            stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+            stream.writePropertyTag(ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
             stream.writeRawFixedInt32(buffer.remaining());
             stream.writeRawBuffer(buffer);
         }
@@ -237,13 +254,12 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         @Override
         public String toString() {
             return decoded.orElseSet(() -> {
-                var decoder = UTF8_DECODER.get();
-                decoder.reset();
-                try {
-                    var charBuffer = decoder.decode(buffer.duplicate());
-                    return charBuffer.toString();
-                } catch (CharacterCodingException _) {
-                    throw new InternalError();
+                if(buffer.hasArray()) {
+                    return new String(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining(), StandardCharsets.UTF_8);
+                } else {
+                    var copy = new byte[buffer.remaining()];
+                    buffer.get(copy);
+                    return new String(copy, 0, copy.length, StandardCharsets.UTF_8);
                 }
             });
         }
@@ -319,11 +335,10 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         }
 
         @Override
-        public void writeTo(long fieldIndex, ProtobufOutputStream<?> stream) {
-            Objects.requireNonNull(stream, "stream must not be null");
-            stream.writePropertyTag(fieldIndex, ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
+        public void writeTo(ProtobufWriter<?> stream) {
+            stream.writePropertyTag(ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED);
             stream.writeRawFixedInt32((int) segment.byteSize());
-            stream.writeRawSegment(segment);
+            stream.writeRawMemorySegment(segment);
         }
 
         @Override
@@ -339,8 +354,8 @@ public sealed abstract class ProtobufLazyString implements CharSequence {
         @Override
         public boolean equals(Object obj) {
             return this == obj || switch (obj) {
-                case ByteBufferBacked that when segment.remaining() == that.buffer.remaining() -> segment.mismatch(that.buffer) == -1;
-                case ByteArrayBacked that when segment.remaining() == that.length -> equals(that.bytes, that.offset, that.length, segment);
+                case ByteBufferBacked that when segment.byteSize() == that.buffer.remaining() -> segment.mismatch(MemorySegment.ofBuffer(that.buffer)) == -1;
+                case ByteArrayBacked that when segment.byteSize() == that.length -> equals(that.bytes, that.offset, that.length, segment.asByteBuffer());
                 case null, default -> false;
             };
         }

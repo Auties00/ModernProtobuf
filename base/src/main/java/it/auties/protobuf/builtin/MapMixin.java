@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentMap;
 
 @SuppressWarnings("unused")
 @ProtobufMixin
-public final class ProtobufMapMixin {
+public final class MapMixin {
     @ProtobufDefaultValue
     public static <K, V> Map<K, V> newMap() {
         return new HashMap<>();

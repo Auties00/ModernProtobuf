@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 
 @SuppressWarnings("unused")
 @ProtobufMixin
-public final class ProtobufFutureMixin {
+public final class FutureMixin {
     @ProtobufDefaultValue
     public static <T> CompletableFuture<T> newCompletableFuture() {
         return CompletableFuture.completedFuture(null);

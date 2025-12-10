@@ -14,12 +14,13 @@ import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
+import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.model.ProtobufLazyString;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.tree.ProtobufFieldStatement.Modifier;
-import it.auties.protobuf.parser.type.ProtobufMessageTypeReference;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.type.*;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.math.BigInteger;
@@ -95,7 +96,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private void addMessageName(NodeWithAnnotations<?> node) {
-        var annotation = getOrAddAnnotation(node, it.auties.protobuf.annotation.ProtobufMessage.class);
+        var annotation = getOrAddAnnotation(node, ProtobufMessage.class);
         annotation.setPairs(NodeList.nodeList(new MemberValuePair("name", new StringLiteralExpr(protoStatement.qualifiedName()))));
         node.addAnnotation(annotation);
     }
@@ -244,6 +245,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     private void addClassMembers(ClassOrInterfaceDeclaration ctClass) {
         for(var statement : protoStatement.children()){
             switch (statement) {
+                case ProtobufOneofFieldStatement oneofFieldStatement -> addOneOfStatement(ctClass, oneofFieldStatement);
                 case ProtobufFieldStatement fieldStatement -> addClassField(fieldStatement, ctClass, false);
                 case ProtobufMessageStatement messageStatement -> addNestedMessage(ctClass, messageStatement);
                 case ProtobufEnumStatement enumStatement -> addNestedEnum(ctClass, enumStatement);
@@ -276,7 +278,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         field.addVariable(variable);
         var annotation = new NormalAnnotationExpr();
         annotation.setName(ProtobufProperty.class.getSimpleName());
-        annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index())));
+        annotation.addPair("index", new IntegerLiteralExpr(fieldStatement.index().value().toString()));
         annotation.addPair("type", new NameExpr(fieldStatement.type().protobufType().name()));
         var modifier = fieldStatement.modifier();
         if(modifier == Modifier.REQUIRED) {
@@ -299,6 +301,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     private void addRecordMembers(RecordDeclaration ctRecord) {
         for(var statement : protoStatement.children()){
             switch (statement) {
+                case ProtobufOneofFieldStatement oneofFieldStatement -> addOneOfStatement(ctRecord, oneofFieldStatement);
                 case ProtobufFieldStatement fieldStatement -> addRecordParameter(fieldStatement, ctRecord, false);
                 case ProtobufMessageStatement messageStatement -> addNestedMessage(ctRecord, messageStatement);
                 case ProtobufEnumStatement enumStatement -> addNestedEnum(ctRecord, enumStatement);
@@ -323,7 +326,7 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
         parameter.setType(AstUtils.toCanonicalJavaName(parameterType.value().fieldType()));
         var annotation = new NormalAnnotationExpr();
         annotation.setName(ProtobufProperty.class.getSimpleName());
-        annotation.addPair("index", new IntegerLiteralExpr(String.valueOf(fieldStatement.index())));
+        annotation.addPair("index", new IntegerLiteralExpr(fieldStatement.index().value().toString()));
         annotation.addPair("type", new NameExpr(fieldStatement.type().protobufType().name()));
         if(fieldStatement.modifier() == Modifier.REQUIRED) {
             annotation.addPair("required", new BooleanLiteralExpr(true));
@@ -361,7 +364,14 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
                 .filter(arg -> Objects.equals(arg.getNameAsString(), "index"))
                 .filter(arg -> arg.getValue() instanceof IntegerLiteralExpr)
                 .map(arg -> (IntegerLiteralExpr) arg.getValue())
-                .anyMatch(index -> BigInteger.valueOf(index.asNumber().intValue()).equals(fieldStatement.index().value()));
+                .anyMatch(index -> {
+                    try {
+                        var annotationIndex = BigInteger.valueOf(index.asNumber().intValue());
+                        return annotationIndex.equals(fieldStatement.index().value());
+                    } catch (NumberFormatException _) {
+                        return false;
+                    }
+                });
     }
 
     private MessageType getMessageType(TypeDeclaration<?> scope, ProtobufFieldStatement fieldStatement, boolean wrapType) {
@@ -412,42 +422,91 @@ final class MessageSchemaCreator extends BaseProtobufSchemaCreator<ProtobufMessa
     }
 
     private MessageFieldType getMessageFieldType(ProtobufTypeReference type, boolean required, boolean repeated) {
-        if (!(type instanceof ProtobufMessageTypeReference(var declaration))) {
-            var fieldType = getJavaType(type, required, repeated, mutable);
-            var accessorType = getJavaType(type, required, repeated, repeated);
-            return new MessageFieldType(fieldType, accessorType);
-        }
-
-        var objectType = declaration.qualifiedName();
-        var accessorType = nullable || required ? objectType : "%s<%s>".formatted(Optional.class.getSimpleName(), objectType);
-        var fieldType = mutable ? objectType : accessorType;
+        var fieldType = getMessageFieldJavaType(type, required, repeated, mutable);
+        var accessorType = getMessageFieldJavaType(type, required, repeated, repeated);
         return new MessageFieldType(fieldType, accessorType);
     }
 
-    private String getJavaType(ProtobufTypeReference type, boolean required, boolean repeated, boolean forceNullable) {
-        if (!repeated && required) {
-            return type.protobufType()
-                    .serializedType()
-                    .getSimpleName();
+    private String getMessageFieldJavaType(ProtobufTypeReference type, boolean required, boolean repeated, boolean forceNullable) {
+        if(repeated) {
+            return getMessageFieldMapJavaType(type, required, forceNullable);
+        } else if(required) {
+            return getMessageFieldSimpleJavaType(type, true);
+        }else if (forceNullable || nullable) {
+            return getMessageFieldSimpleJavaType(type, false);
+        } else {
+            return getMessageFieldOptionalJavaType(type);
         }
+    }
 
-        if(forceNullable || nullable) {
-            return type.protobufType() == ProtobufType.BYTES ? "byte[]" : type.protobufType().deserializableType()
-                    .getSimpleName();
-        }
+    private String getMessageFieldMapJavaType(ProtobufTypeReference type, boolean required, boolean forceNullable) {
+        var parameterType = getMessageFieldJavaType(type, required, false, forceNullable);
+        return "%s<%s>".formatted(SequencedCollection.class.getName(), parameterType);
+    }
 
+    private String getMessageFieldSimpleJavaType(ProtobufTypeReference type, boolean primitive) {
         return switch (type.protobufType()) {
-            case DOUBLE -> OptionalDouble.class.getSimpleName();
-            case BOOL -> "%s<Boolean>".formatted(Optional.class.getSimpleName());
-            case FLOAT -> "%s<Float>".formatted(Optional.class.getSimpleName());
-            case STRING ->"%s<String>".formatted(Optional.class.getSimpleName());
-            case BYTES -> "%s<byte[]>".formatted(Optional.class.getSimpleName());
-            case INT32, SINT32, UINT32, FIXED32, SFIXED32 -> OptionalInt.class.getSimpleName();
-            case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> OptionalLong.class.getSimpleName();
-            default -> throw new IllegalStateException("Unexpected value: " + type.protobufType());
+            case UNKNOWN -> throw new IllegalArgumentException("Unknown type");
+            case MESSAGE -> {
+                var messageType = (ProtobufMessageTypeReference) type;
+                yield messageType.declaration().qualifiedName();
+            }
+            case ENUM -> {
+                var enumType = (ProtobufEnumTypeReference) type;
+                yield enumType.declaration().qualifiedName();
+            }
+            case GROUP -> {
+                var groupType = (ProtobufGroupTypeReference) type;
+                yield groupType.declaration().qualifiedName();
+            }
+            case MAP -> {
+                var mapType = (ProtobufMapTypeReference) type;
+                var keyType = getMessageFieldJavaType(mapType.keyType(), false, false, true);
+                var valueType = getMessageFieldJavaType(mapType.valueType(), false, false, true);
+                yield "%s<%s, %s>".formatted(SequencedMap.class.getName(), keyType, valueType);
+            }
+            case FLOAT -> primitive ? Float.TYPE.getSimpleName() : Float.class.getSimpleName();
+            case DOUBLE -> primitive ? Double.TYPE.getSimpleName() : Double.class.getSimpleName();
+            case BOOL -> primitive ? Boolean.TYPE.getSimpleName() : Boolean.class.getSimpleName();
+            case STRING -> ProtobufLazyString.class.getSimpleName();
+            case BYTES -> byte[].class.getSimpleName();
+            case INT32, SFIXED32, SFIXED64, FIXED32, UINT32, SINT32 -> primitive ? Integer.TYPE.getSimpleName() : Integer.class.getSimpleName();
+            case INT64, FIXED64, UINT64, SINT64 -> primitive ? Long.TYPE.getSimpleName() : Long.class.getSimpleName();
         };
     }
 
+    private String getMessageFieldOptionalJavaType(ProtobufTypeReference type) {
+        return switch (type.protobufType()) {
+            case UNKNOWN -> throw new IllegalArgumentException("Unknown type");
+            case MESSAGE -> {
+                var messageType = (ProtobufMessageTypeReference) type;
+                var messageTypeName = messageType.declaration().qualifiedName();
+                yield "%s<%s>".formatted(Optional.class.getName(), messageTypeName);
+            }
+            case ENUM -> {
+                var enumType = (ProtobufEnumTypeReference) type;
+                var enumTypeName = enumType.declaration().qualifiedName();
+                yield "%s<%s>".formatted(Optional.class.getName(), enumTypeName);
+            }
+            case GROUP -> {
+                var groupType = (ProtobufGroupTypeReference) type;
+                var groupTypeName = groupType.declaration().qualifiedName();
+                yield "%s<%s>".formatted(Optional.class.getName(), groupTypeName);
+            }
+            case MAP -> {
+                var mapType = (ProtobufMapTypeReference) type;
+                var keyType = getMessageFieldJavaType(mapType.keyType(), false, false, true);
+                var valueType = getMessageFieldJavaType(mapType.valueType(), false, false, true);
+                yield "%s<%s, %s>".formatted(SequencedMap.class.getName(), keyType, valueType);
+            }
+            case FLOAT, DOUBLE -> OptionalDouble.class.getName();
+            case INT32, SINT32, UINT32, FIXED32, SFIXED32 -> OptionalInt.class.getName();
+            case INT64, SINT64, UINT64, FIXED64, SFIXED64 -> OptionalLong.class.getName();
+            case BOOL -> "%s<%s>".formatted(Optional.class.getName(), Boolean.class.getSimpleName());
+            case STRING -> "%s<%s>".formatted(Optional.class.getName(),  String.class.getSimpleName());
+            case BYTES -> "%s<%s>".formatted(Optional.class.getName(),  byte[].class.getSimpleName());
+        };
+    }
     private record MessageType(MessageFieldType value, TypeDeclaration<?> wrapper, String fallbackWrapper) {
         public boolean hasWrapper(){
             return wrapper != null;

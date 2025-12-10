@@ -12,7 +12,7 @@ import java.util.OptionalLong;
 
 @SuppressWarnings({"OptionalAssignedToNull", "OptionalUsedAsFieldOrParameterType", "unused"})
 @ProtobufMixin
-public final class ProtobufOptionalMixin {
+public final class OptionalValueMixin {
     @ProtobufDefaultValue
     public static <T> Optional<T> newOptional() {
         return Optional.empty();

@@ -22,7 +22,7 @@ public @interface ProtobufUnknownFields {
      * @return an array of {@code Class<?>} representing the default mixins
      */
     Class<?>[] mixins() default {
-            ProtobufMapMixin.class
+            MapMixin.class
     };
 
     /**

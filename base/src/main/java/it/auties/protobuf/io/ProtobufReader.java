@@ -8,11 +8,13 @@
 // I'm not sure if the LICENSE copyright header is necessary as only two methods in this class are taken from Google's source code
 // But just to be sure I included it
 
-package it.auties.protobuf.stream;
+package it.auties.protobuf.io;
 
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufUnknownValue;
 import it.auties.protobuf.model.ProtobufWireType;
+import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.VectorOperators;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,11 +23,8 @@ import java.lang.foreign.ValueLayout;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.IntBuffer;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * An abstract input stream for reading Protocol Buffer encoded data.
@@ -35,48 +34,37 @@ import java.util.*;
  * wire types and provides both type-safe and unchecked reading methods.
  * <p>
  *
- * @see ProtobufOutputStream
- * @see AutoCloseable
+ * @see ProtobufWriter
  */
-@SuppressWarnings("unused")
-public abstract class ProtobufInputStream implements AutoCloseable {
-    private static final ValueLayout.OfInt FIXED_INT32_LAYOUT = ValueLayout.JAVA_INT_UNALIGNED
-            .withOrder(ByteOrder.LITTLE_ENDIAN);
-    private static final ValueLayout.OfLong FIXED_INT64_LAYOUT = ValueLayout.JAVA_LONG_UNALIGNED
-            .withOrder(ByteOrder.LITTLE_ENDIAN);
-    private static final ValueLayout.OfFloat FLOAT_LAYOUT = ValueLayout.JAVA_FLOAT_UNALIGNED
-            .withOrder(ByteOrder.LITTLE_ENDIAN);
-    private static final ValueLayout.OfDouble DOUBLE_LAYOUT = ValueLayout.JAVA_DOUBLE_UNALIGNED
-            .withOrder(ByteOrder.LITTLE_ENDIAN);
-
+public abstract non-sealed class ProtobufReader extends ProtobufIO {
     protected int wireType;
     protected long index;
-    protected ProtobufInputStream() {
+    protected ProtobufReader() {
         resetPropertyTag();
     }
 
-    public static ProtobufInputStream fromBytes(byte[] bytes) {
-        return new ByteArraySource(bytes, 0, bytes.length);
+    public static ProtobufReader fromBytes(byte[] bytes) {
+        return new ByteArrayReader(bytes, 0, bytes.length);
     }
 
-    public static ProtobufInputStream fromBytes(byte[] bytes, int offset, int length) {
-        return new ByteArraySource(bytes, offset, offset + length);
+    public static ProtobufReader fromBytes(byte[] bytes, int offset, int length) {
+        return new ByteArrayReader(bytes, offset, offset + length);
     }
 
-    public static ProtobufInputStream fromBuffer(ByteBuffer buffer) {
-        return new ByteBufferSource(buffer);
+    public static ProtobufReader fromBuffer(ByteBuffer buffer) {
+        return new ByteBufferReader(buffer);
     }
 
-    public static ProtobufInputStream fromStream(InputStream buffer) {
-        return new InputStreamSource(buffer, true);
+    public static ProtobufReader fromStream(InputStream buffer) {
+        return new InputStreamReader(buffer, true);
     }
 
-    public static ProtobufInputStream fromStream(InputStream buffer, boolean autoclose) {
-        return new InputStreamSource(buffer, autoclose);
+    public static ProtobufReader fromStream(InputStream buffer, boolean autoclose) {
+        return new InputStreamReader(buffer, autoclose);
     }
 
-    public static ProtobufInputStream fromMemorySegment(MemorySegment segment) {
-        return new MemorySegmentSource(segment);
+    public static ProtobufReader fromMemorySegment(MemorySegment segment) {
+        return new MemorySegmentReader(segment);
     }
 
     public int propertyWireType() {
@@ -121,7 +109,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
     }
 
-    public ProtobufInputStream readLengthDelimitedProperty() {
+    public ProtobufReader readLengthDelimitedProperty() {
         if(wireType != ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         } else {
@@ -154,7 +142,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED32) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         } else {
-            var result = Float.intBitsToFloat(readRawFixedInt32());
+            var result = readRawFloat();
             resetPropertyTag();
             return result;
         }
@@ -164,7 +152,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED64) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         } else {
-            var result = Double.longBitsToDouble(readRawFixedInt64());
+            var result = readRawDouble();
             resetPropertyTag();
             return result;
         }
@@ -235,6 +223,14 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     }
 
     public int readFixed32Property() {
+        return readFixed32();
+    }
+
+    public int readSFixed32Property() {
+        return readFixed32();
+    }
+
+    private int readFixed32() {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED32) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         } else {
@@ -245,6 +241,14 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     }
 
     public long readFixed64Property() {
+        return readFixed64();
+    }
+
+    public long readSFixed64Property() {
+        return readFixed64();
+    }
+
+    private long readFixed64() {
         if(wireType != ProtobufWireType.WIRE_TYPE_FIXED64) {
             throw ProtobufDeserializationException.invalidWireType(wireType);
         } else {
@@ -266,7 +270,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             }
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> {
                 var size = readLengthDelimitedPropertyLength();
-                yield switch (preferredRawDataType()) {
+                yield switch (rawDataTypePreference()) {
                     case BYTE_ARRAY -> new ProtobufUnknownValue.LengthDelimited.AsByteArray(readRawBytes(size));
                     case BYTE_BUFFER -> new ProtobufUnknownValue.LengthDelimited.AsByteBuffer(readRawBuffer(size));
                     case MEMORY_SEGMENT -> new ProtobufUnknownValue.LengthDelimited.AsMemorySegment(readRawMemorySegment(size));
@@ -277,7 +281,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var index = this.index;
                 while (readPropertyTag()) {
                     var key = this.index;
-                    var value = readUnknownProperty(); // TODO: Maybe no recursion?
+                    var value = readUnknownProperty();
                     result.put(key, value);
                 }
                 readEndGroupProperty(index);
@@ -294,7 +298,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     public float[] readPackedFloatProperty() {
         var result = switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readRawPackedFloat();
-            case ProtobufWireType.WIRE_TYPE_FIXED32 -> new float[]{Float.intBitsToFloat(readRawFixedInt32())};
+            case ProtobufWireType.WIRE_TYPE_FIXED32 -> new float[]{readRawFloat()};
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
         resetPropertyTag();
@@ -304,7 +308,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     public double[] readPackedDoubleProperty() {
         var result = switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readRawPackedDouble();
-            case ProtobufWireType.WIRE_TYPE_FIXED64 -> new double[]{Double.longBitsToDouble(readRawFixedInt64())};
+            case ProtobufWireType.WIRE_TYPE_FIXED64 -> new double[]{readRawDouble()};
             default -> throw ProtobufDeserializationException.invalidWireType(wireType);
         };
         resetPropertyTag();
@@ -378,6 +382,14 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     }
 
     public int[] readPackedFixed32Property() {
+        return readPackedFixed32();
+    }
+
+    public int[] readPackedSFixed32Property() {
+        return readPackedFixed32();
+    }
+
+    private int[] readPackedFixed32() {
         var result = switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readRawPackedFixedInt32();
             case ProtobufWireType.WIRE_TYPE_FIXED32 -> new int[]{readRawFixedInt32()};
@@ -388,6 +400,14 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     }
 
     public long[] readPackedFixed64Property() {
+        return readPackedFixed64();
+    }
+
+    public long[] readPackedSFixed64Property() {
+        return  readPackedFixed64();
+    }
+
+    private long[] readPackedFixed64() {
         var result = switch (wireType) {
             case ProtobufWireType.WIRE_TYPE_LENGTH_DELIMITED -> readRawPackedFixedInt64();
             case ProtobufWireType.WIRE_TYPE_FIXED64 -> new long[]{readRawFixedInt64()};
@@ -418,7 +438,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             case ProtobufWireType.WIRE_TYPE_START_OBJECT -> {
                 var index = this.index;
                 while (readPropertyTag()) {
-                    skipUnknownProperty(); // TODO: Maybe no recursion?
+                    skipUnknownProperty();
                 }
                 readEndGroupProperty(index);
             }
@@ -436,6 +456,16 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         throw ProtobufDeserializationException.malformedVarInt();
     }
 
+    public int readRawZigZagVarInt32() {
+        var value = readRawVarInt32();
+        var unsigned = Integer.toUnsignedLong(value);
+        return (int) ((unsigned >> 1) ^ (-(unsigned & 1)));
+    }
+
+    public long readRawZigZagVarInt64() {
+        var value = readRawVarInt64();
+        return (value >>> 1) ^ (-(value & 1));
+    }
 
     public abstract void skipRawBytes(int size);
     public abstract byte readRawByte();
@@ -443,14 +473,13 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     public abstract byte[] readRawBytes(int size);
     public abstract ByteBuffer readRawBuffer(int size);
     public abstract MemorySegment readRawMemorySegment(int size);
-    public abstract DataType preferredRawDataType();
 
     public abstract int readRawFixedInt32();
     public abstract long readRawFixedInt64();
+    public abstract float readRawFloat();
+    public abstract double readRawDouble();
     public abstract int readRawVarInt32();
     public abstract long readRawVarInt64();
-    public abstract int readRawZigZagVarInt32();
-    public abstract long readRawZigZagVarInt64();
 
     public abstract float[] readRawPackedFloat();
     public abstract double[] readRawPackedDouble();
@@ -462,303 +491,16 @@ public abstract class ProtobufInputStream implements AutoCloseable {
     public abstract int[] readRawPackedFixedInt32();
     public abstract long[] readRawPackedFixedInt64();
 
-    public abstract ProtobufInputStream readRawLengthDelimited(int size);
+    public abstract ProtobufReader readRawLengthDelimited(int size);
 
     public abstract boolean isFinished();
 
-    public enum DataType {
-        BYTE_ARRAY,
-        BYTE_BUFFER,
-        MEMORY_SEGMENT
-    }
-
-    private static final class InputStreamSource extends ProtobufInputStream {
-        private static final int MAX_VAR_INT_SIZE = 10;
-
-        private final InputStream inputStream;
-        private final boolean autoclose;
-        private final long length;
-        private long position;
-        
-        private byte nextBufferedValue;
-        private boolean hasNextBufferedValue;
-        
-        private final byte[] scalarBuffer;
-
-        private InputStreamSource(InputStream inputStream, boolean autoclose) {
-            Objects.requireNonNull(inputStream, "inputStream cannot be null");
-            this.inputStream = inputStream;
-            this.autoclose = autoclose;
-            this.length = -1;
-            this.scalarBuffer = new byte[Long.BYTES];
-        }
-
-        private InputStreamSource(InputStream inputStream, long length, byte[] scalarBuffer) {
-            this.inputStream = inputStream;
-            this.autoclose = false;
-            this.length = length;
-            this.scalarBuffer = scalarBuffer;
-        }
-
-        @Override
-        public byte readRawByte() {
-            position++;
-            if(hasNextBufferedValue) {
-                hasNextBufferedValue = false;
-                return nextBufferedValue;
-            } else {
-                try {
-                    var read = inputStream.read();
-                    if(read == -1) {
-                        throw ProtobufDeserializationException.truncatedMessage();
-                    } else {
-                        return (byte) read;
-                    }
-                }catch (IOException exception) {
-                    throw ProtobufDeserializationException.truncatedMessage(exception);
-                }
-            }
-        }
-
-        @Override
-        public byte[] readRawBytes(int size) {
-            try {
-                var result = new byte[size];
-                readRawBytes(result, size);
-                return result;
-            }catch (NegativeArraySizeException _) {
-                throw new IllegalArgumentException("size cannot be negative");
-            }
-        }
-        
-        private void readRawBytes(byte[] output, int length) {
-            position += length;
-            var offset = 0;
-            if(length > 0 && hasNextBufferedValue) {
-                hasNextBufferedValue = false;
-                offset++;
-                output[0] = nextBufferedValue;
-            }
-            while (offset < length) {
-                try {
-                    var read = inputStream.read(output, offset, length - offset);
-                    if (read == -1) {
-                        throw ProtobufDeserializationException.truncatedMessage();
-                    } else {
-                        offset += read;
-                    }
-                }catch (IOException exception) {
-                    throw ProtobufDeserializationException.truncatedMessage(exception);
-                }
-            }
-        }
-
-        @Override
-        public ByteBuffer readRawBuffer(int size) {
-            var bytes = readRawBytes(size);
-            return ByteBuffer.wrap(bytes);
-        }
-
-        @Override
-        public MemorySegment readRawMemorySegment(int size) {
-            var bytes = readRawBytes(size);
-            return MemorySegment.ofArray(bytes);
-        }
-
-        @Override
-        public DataType preferredRawDataType() {
-            return DataType.BYTE_ARRAY;
-        }
-
-        @Override
-        public boolean isFinished() {
-            if(length != -1) {
-                return position >= length;
-            } else if(hasNextBufferedValue){
-                return false;
-            } else {
-                try {
-                    position++;
-                    var read = inputStream.read();
-                    if(read == -1) {
-                        return true;
-                    } else {
-                        position--;
-                        hasNextBufferedValue = true;
-                        nextBufferedValue = (byte) read;
-                        return false;
-                    }
-                }catch (IOException exception) {
-                    throw ProtobufDeserializationException.truncatedMessage(exception);
-                }
-            }
-        }
-
-        @Override
-        public void skipRawBytes(int length) {
-            if(length < 0) {
-                throw new IllegalArgumentException("length cannot be negative");
-            }
-
-            position += length;
-
-            var offset = 0L;
-            if(length > 0 && hasNextBufferedValue) {
-                hasNextBufferedValue = false;
-                offset++;
-            }
-            while (offset < length) {
-                try {
-                    var skipped = inputStream.skip(length - offset);
-                    if(skipped == 0) {
-                        if(isFinished()) {
-                            throw ProtobufDeserializationException.truncatedMessage();
-                        }
-                    } else {
-                        offset += skipped;   
-                    }
-                }catch (IOException exception) {
-                    throw ProtobufDeserializationException.truncatedMessage(exception);
-                }
-            }
-        }
-
-        @Override
-        public int readRawFixedInt32() {
-            readRawBytes(scalarBuffer, Integer.BYTES);
-            return (scalarBuffer[0] & 0xFF)
-                   | (scalarBuffer[1] & 0xFF) << 8
-                   | (scalarBuffer[2] & 0xFF) << 16
-                   | (scalarBuffer[3] & 0xFF) << 24;
-        }
-
-        @Override
-        public long readRawFixedInt64() {
-            readRawBytes(scalarBuffer, Long.BYTES);
-            return (scalarBuffer[0] & 0xFFL)
-                    | (scalarBuffer[1] & 0xFFL) << 8
-                    | (scalarBuffer[2] & 0xFFL) << 16
-                    | (scalarBuffer[3] & 0xFFL) << 24
-                    | (scalarBuffer[4] & 0xFFL) << 32
-                    | (scalarBuffer[5] & 0xFFL) << 40
-                    | (scalarBuffer[6] & 0xFFL) << 48
-                    | (scalarBuffer[7] & 0xFFL) << 56;
-        }
-
-        @Override
-        public InputStreamSource readRawLengthDelimited(int size) {
-            var result = new InputStreamSource(inputStream, size, scalarBuffer);
-            position += size;
-            return result;
-        }
-
-        @Override
-        public void close() throws IOException {
-            if(autoclose) {
-                inputStream.close();
-            }
-        }
-
-        private int readFromStream(byte[] result, int offset, int length) {
-            try {
-                return inputStream.read(result, offset, length);
-            }catch (IOException exception) {
-                throw ProtobufDeserializationException.truncatedMessage(exception);
-            }
-        }
-
-        private long skipFromStream(long length) {
-            try {
-                return inputStream.skip(length);
-            }catch (IOException exception) {
-                throw ProtobufDeserializationException.truncatedMessage(exception);
-            }
-        }
-
-        @Override
-        public int readRawVarInt32() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long readRawVarInt64() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int readRawZigZagVarInt32() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long readRawZigZagVarInt64() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public float[] readRawPackedFloat() {
-            var length = readRawVarInt32();
-            var bytes = readRawBytes(length);
-            return MemorySegment.ofArray(bytes)
-                    .toArray(FLOAT_LAYOUT);
-        }
-
-        @Override
-        public double[] readRawPackedDouble() {
-            var length = readRawVarInt32();
-            var bytes = readRawBytes(length);
-            return MemorySegment.ofArray(bytes)
-                    .toArray(DOUBLE_LAYOUT);
-        }
-
-        @Override
-        public int[] readRawPackedVarInt32() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int[] readRawPackedZigZagVarInt32() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long[] readRawPackedVarInt64() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long[] readRawPackedZigZagVarInt64() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean[] readRawPackedBool() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int[] readRawPackedFixedInt32() {
-            var length = readRawVarInt32();
-            var bytes = readRawBytes(length);
-            return MemorySegment.ofArray(bytes)
-                    .toArray(FIXED_INT32_LAYOUT);
-        }
-
-        @Override
-        public long[] readRawPackedFixedInt64() {
-            var length = readRawVarInt32();
-            var bytes = readRawBytes(length);
-            return MemorySegment.ofArray(bytes)
-                    .toArray(FIXED_INT64_LAYOUT);
-        }
-    }
-
-    private static final class ByteArraySource extends ProtobufInputStream {
+    private static final class ByteArrayReader extends ProtobufReader {
         private final byte[] buffer;
         private final int limit;
         private int offset;
 
-        private ByteArraySource(byte[] buffer, int offset, int limit) {
+        ByteArrayReader(byte[] buffer, int offset, int limit) {
             Objects.requireNonNull(buffer, "buffer cannot be null");
             Objects.checkFromToIndex(offset, limit, buffer.length);
             this.buffer = buffer;
@@ -768,9 +510,9 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
         @Override
         public byte readRawByte() {
-            if(offset >= limit) {
+            if (offset >= limit) {
                 throw ProtobufDeserializationException.truncatedMessage();
-            }else {
+            } else {
                 return buffer[offset++];
             }
         }
@@ -784,7 +526,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 return result;
             } catch (NegativeArraySizeException _) {
                 throw ProtobufDeserializationException.negativeLength(size);
-            }catch (IndexOutOfBoundsException error) {
+            } catch (IndexOutOfBoundsException error) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
@@ -795,8 +537,8 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = ByteBuffer.wrap(buffer, offset, size);
                 offset += size;
                 return result;
-            }catch (IndexOutOfBoundsException error) {
-                if(size < 0) {
+            } catch (IndexOutOfBoundsException error) {
+                if (size < 0) {
                     throw ProtobufDeserializationException.negativeLength(size);
                 } else {
                     throw ProtobufDeserializationException.truncatedMessage();
@@ -810,8 +552,8 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = MemorySegment.ofBuffer(ByteBuffer.wrap(buffer, offset, offset + size));
                 offset += size;
                 return result;
-            }catch (IndexOutOfBoundsException error) {
-                if(size < 0) {
+            } catch (IndexOutOfBoundsException error) {
+                if (size < 0) {
                     throw ProtobufDeserializationException.negativeLength(size);
                 } else {
                     throw ProtobufDeserializationException.truncatedMessage();
@@ -820,7 +562,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
 
         @Override
-        public DataType preferredRawDataType() {
+        public DataType rawDataTypePreference() {
             return DataType.BYTE_ARRAY;
         }
 
@@ -831,11 +573,11 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
         @Override
         public void skipRawBytes(int size) {
-            if(size < 0) {
+            if (size < 0) {
                 throw new IllegalArgumentException("size cannot be negative");
             } else {
                 offset += size;
-                if(offset > limit) {
+                if (offset > limit) {
                     throw ProtobufDeserializationException.truncatedMessage();
                 }
             }
@@ -843,36 +585,52 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
         @Override
         public int readRawFixedInt32() {
-            if(offset + Integer.BYTES > limit) {
+            if (offset + Integer.BYTES > limit) {
                 throw ProtobufDeserializationException.truncatedMessage();
             } else {
-                return (buffer[offset++] & 0xFF)
-                       | (buffer[offset++] & 0xFF) << 8
-                       | (buffer[offset++] & 0xFF) << 16
-                       | (buffer[offset++] & 0xFF) << 24;
+                var result = getIntLE(buffer, offset);
+                offset += Integer.BYTES;
+                return result;
             }
         }
 
         @Override
         public long readRawFixedInt64() {
-            if(offset + Long.BYTES > limit) {
+            if (offset + Long.BYTES > limit) {
                 throw ProtobufDeserializationException.truncatedMessage();
             } else {
-                return (buffer[offset++] & 0xFFL)
-                        | (buffer[offset++] & 0xFFL) << 8
-                        | (buffer[offset++] & 0xFFL) << 16
-                        | (buffer[offset++] & 0xFFL) << 24
-                        | (buffer[offset++] & 0xFFL) << 32
-                        | (buffer[offset++] & 0xFFL) << 40
-                        | (buffer[offset++] & 0xFFL) << 48
-                        | (buffer[offset++] & 0xFFL) << 56;
+                var result = getLongLE(buffer, offset);
+                offset += Long.BYTES;
+                return result;
             }
         }
 
         @Override
-        public ByteArraySource readRawLengthDelimited(int size) {
+        public float readRawFloat() {
+            if (offset + Float.BYTES > limit) {
+                throw ProtobufDeserializationException.truncatedMessage();
+            } else {
+                var result = getFloatLE(buffer, offset);
+                offset += Float.BYTES;
+                return result;
+            }
+        }
+
+        @Override
+        public double readRawDouble() {
+            if (offset + Double.BYTES > limit) {
+                throw ProtobufDeserializationException.truncatedMessage();
+            } else {
+                var result = getDoubleLE(buffer, offset);
+                offset += Double.BYTES;
+                return result;
+            }
+        }
+
+        @Override
+        public ByteArrayReader readRawLengthDelimited(int size) {
             try {
-                var result = new ByteArraySource(buffer, offset, offset + size);
+                var result = new ByteArrayReader(buffer, offset, offset + size);
                 offset += size;
                 return result;
             } catch (IndexOutOfBoundsException _) {
@@ -887,22 +645,42 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
         @Override
         public int readRawVarInt32() {
-            throw new UnsupportedOperationException();
+            var value = getLongLE(buffer, offset);
+            var mostSignificantBits = ~value & ~INT64_PEXT_MASK_LOW;
+            var lengthInBits = Long.numberOfTrailingZeros(mostSignificantBits) + 1;
+            var varIntPart = value & (mostSignificantBits ^ (mostSignificantBits - 1));
+            var result = (int) Long.compress(varIntPart, INT32_PEXT_MASK);
+            offset += lengthInBits >>> 3;
+            return result;
         }
 
         @Override
         public long readRawVarInt64() {
-            throw new UnsupportedOperationException();
-        }
+            var b0 = getLongLE(buffer, offset);
+            var b1 = getLongLE(buffer, offset + 8);
 
-        @Override
-        public int readRawZigZagVarInt32() {
-            throw new UnsupportedOperationException();
-        }
+            var msbB0 = ~b0 & ~INT64_PEXT_MASK_LOW;
+            var msbB1 = ~b1 & ~INT64_PEXT_MASK_LOW;
 
-        @Override
-        public long readRawZigZagVarInt64() {
-            throw new UnsupportedOperationException();
+            var lenB0 = Long.numberOfTrailingZeros(msbB0) + 1;
+            var lenB1 = Long.numberOfTrailingZeros(msbB1) + 1;
+
+            var partB0 = b0 & (msbB0 ^ (msbB0 - 1));
+            var partB1 = (b1 & (msbB1 ^ (msbB1 - 1))) * ((msbB0 == 0) ? 1L : 0L);
+
+            var vectorBytes = new byte[16];
+            putLongLE(vectorBytes, 0, partB0);
+            putLongLE(vectorBytes, 8, partB1);
+
+            var x = getLongLE(vectorBytes, 0);
+            var y = getLongLE(vectorBytes, 8);
+
+            var result = Long.compress(x, INT64_PEXT_MASK_LOW)
+                         | (Long.compress(y, INT64_PEXT_MASK_HIGH) << 56);
+
+            offset += (msbB0 == 0 ? lenB1 + 64 : lenB0) >>> 3;
+
+            return result;
         }
 
         @Override
@@ -910,7 +688,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             var length = readRawVarInt32();
             var buffer = ByteBuffer.wrap(this.buffer, offset, offset + length)
                     .asFloatBuffer();
-            var result = new float[buffer.limit()];
+            var result = new float[buffer.remaining()];
             buffer.get(result);
             return result;
         }
@@ -920,7 +698,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             var length = readRawVarInt32();
             var buffer = ByteBuffer.wrap(this.buffer, offset, offset + length)
                     .asDoubleBuffer();
-            var result = new double[buffer.limit()];
+            var result = new double[buffer.remaining()];
             buffer.get(result);
             return result;
         }
@@ -955,7 +733,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             var length = readRawVarInt32();
             var buffer = ByteBuffer.wrap(this.buffer, offset, offset + length)
                     .asIntBuffer();
-            var result = new int[buffer.limit()];
+            var result = new int[buffer.remaining()];
             buffer.get(result);
             return result;
         }
@@ -965,20 +743,16 @@ public abstract class ProtobufInputStream implements AutoCloseable {
             var length = readRawVarInt32();
             var buffer = ByteBuffer.wrap(this.buffer, offset, offset + length)
                     .asLongBuffer();
-            var result = new long[buffer.limit()];
+            var result = new long[buffer.remaining()];
             buffer.get(result);
             return result;
         }
     }
 
-    private static final class ByteBufferSource extends ProtobufInputStream {
-        private static final ThreadLocal<CharsetDecoder> UTF8_DECODER = ThreadLocal.withInitial(() ->
-                StandardCharsets.UTF_8.newDecoder()
-                        .onMalformedInput(CodingErrorAction.REPLACE)
-                        .onUnmappableCharacter(CodingErrorAction.REPLACE));
-
+    private static final class ByteBufferReader extends ProtobufReader {
         private final ByteBuffer buffer;
-        private ByteBufferSource(ByteBuffer buffer) {
+
+        ByteBufferReader(ByteBuffer buffer) {
             Objects.requireNonNull(buffer, "buffer cannot be null");
             this.buffer = buffer.duplicate()
                     .order(ByteOrder.LITTLE_ENDIAN);
@@ -988,7 +762,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         public byte readRawByte() {
             try {
                 return buffer.get();
-            }catch (BufferUnderflowException _) {
+            } catch (BufferUnderflowException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
@@ -1013,7 +787,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = buffer.slice(position, size);
                 buffer.position(position + size);
                 return result;
-            }catch (IndexOutOfBoundsException _) {
+            } catch (IndexOutOfBoundsException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
@@ -1025,13 +799,13 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = buffer.slice(position, size);
                 buffer.position(position + size);
                 return MemorySegment.ofBuffer(result);
-            }catch (IndexOutOfBoundsException _) {
+            } catch (IndexOutOfBoundsException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
 
         @Override
-        public DataType preferredRawDataType() {
+        public DataType rawDataTypePreference() {
             return DataType.BYTE_BUFFER;
         }
 
@@ -1053,25 +827,43 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         public int readRawFixedInt32() {
             try {
                 return buffer.getInt();
-            }catch (BufferUnderflowException _) {
+            } catch (BufferUnderflowException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
 
         @Override
         public long readRawFixedInt64() {
-           try {
-               return buffer.getLong();
-           }catch (BufferUnderflowException _) {
-               throw ProtobufDeserializationException.truncatedMessage();
-           }
+            try {
+                return buffer.getLong();
+            } catch (BufferUnderflowException _) {
+                throw ProtobufDeserializationException.truncatedMessage();
+            }
         }
 
         @Override
-        public ByteBufferSource readRawLengthDelimited(int size) {
+        public float readRawFloat() {
+            try {
+                return buffer.getFloat();
+            } catch (BufferUnderflowException _) {
+                throw ProtobufDeserializationException.truncatedMessage();
+            }
+        }
+
+        @Override
+        public double readRawDouble() {
+            try {
+                return buffer.getDouble();
+            } catch (BufferUnderflowException _) {
+                throw ProtobufDeserializationException.truncatedMessage();
+            }
+        }
+
+        @Override
+        public ByteBufferReader readRawLengthDelimited(int size) {
             try {
                 var position = buffer.position();
-                var result = new ByteBufferSource(buffer.slice(position, size));
+                var result = new ByteBufferReader(buffer.slice(position, size));
                 buffer.position(position + size);
                 return result;
             } catch (IllegalArgumentException _) {
@@ -1081,41 +873,61 @@ public abstract class ProtobufInputStream implements AutoCloseable {
 
         @Override
         public void close() {
-            
+
         }
 
         @Override
         public int readRawVarInt32() {
-            throw new UnsupportedOperationException();
+            var value = getLongLE(buffer, buffer.position());
+            var mostSignificantBits = ~value & ~INT64_PEXT_MASK_LOW;
+            var lengthInBits = Long.numberOfTrailingZeros(mostSignificantBits) + 1;
+            var varIntPart = value & (mostSignificantBits ^ (mostSignificantBits - 1));
+            var result = (int) Long.compress(varIntPart, INT32_PEXT_MASK);
+            buffer.position(lengthInBits >>> 3);
+            return result;
         }
 
         @Override
         public long readRawVarInt64() {
-            throw new UnsupportedOperationException();
-        }
+            var b0 = getLongLE(buffer, buffer.position());
+            var b1 = getLongLE(buffer, buffer.position() + 8);
 
-        @Override
-        public int readRawZigZagVarInt32() {
-            throw new UnsupportedOperationException();
-        }
+            var msbB0 = ~b0 & ~INT64_PEXT_MASK_LOW;
+            var msbB1 = ~b1 & ~INT64_PEXT_MASK_LOW;
 
-        @Override
-        public long readRawZigZagVarInt64() {
-            throw new UnsupportedOperationException();
+            var lenB0 = Long.numberOfTrailingZeros(msbB0) + 1;
+            var lenB1 = Long.numberOfTrailingZeros(msbB1) + 1;
+
+            var partB0 = b0 & (msbB0 ^ (msbB0 - 1));
+            var partB1 = (b1 & (msbB1 ^ (msbB1 - 1))) * ((msbB0 == 0) ? 1L : 0L);
+
+            var vectorBytes = new byte[16];
+            putLongLE(vectorBytes, 0, partB0);
+            putLongLE(vectorBytes, 8, partB1);
+
+            var x = getLongLE(vectorBytes, 0);
+            var y = getLongLE(vectorBytes, 8);
+
+            var result = Long.compress(x, INT64_PEXT_MASK_LOW)
+                         | (Long.compress(y, INT64_PEXT_MASK_HIGH) << 56);
+
+            buffer.position((msbB0 == 0 ? lenB1 + 64 : lenB0) >>> 3);
+
+            return result;
         }
 
         @Override
         public float[] readRawPackedFloat() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FLOAT_LAYOUT);
+            return toFloatArrayLE(segment);
         }
 
         @Override
         public double[] readRawPackedDouble() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(DOUBLE_LAYOUT);
+            return toDoubleArrayLE(segment);
         }
 
         @Override
@@ -1147,22 +959,22 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         public int[] readRawPackedFixedInt32() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FIXED_INT32_LAYOUT);
+            return toIntArrayLE(segment);
         }
 
         @Override
         public long[] readRawPackedFixedInt64() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FIXED_INT64_LAYOUT);
+            return toLongArrayLE(segment);
         }
     }
 
-    private static final class MemorySegmentSource extends ProtobufInputStream {
+    private static final class MemorySegmentReader extends ProtobufReader {
         private final MemorySegment segment;
         private int position;
 
-        private MemorySegmentSource(MemorySegment segment) {
+        MemorySegmentReader(MemorySegment segment) {
             Objects.requireNonNull(segment, "segment cannot be null");
             this.segment = segment;
             this.position = 0;
@@ -1174,7 +986,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = segment.get(ValueLayout.OfByte.JAVA_BYTE, position);
                 position++;
                 return result;
-            }catch (BufferUnderflowException _) {
+            } catch (BufferUnderflowException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
@@ -1199,7 +1011,7 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = segment.asSlice(position, position + size);
                 position += size;
                 return result.asByteBuffer();
-            }catch (IndexOutOfBoundsException _) {
+            } catch (IndexOutOfBoundsException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
@@ -1210,13 +1022,13 @@ public abstract class ProtobufInputStream implements AutoCloseable {
                 var result = segment.asSlice(position, position + size);
                 position += size;
                 return result;
-            }catch (IndexOutOfBoundsException _) {
+            } catch (IndexOutOfBoundsException _) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
 
         @Override
-        public DataType preferredRawDataType() {
+        public DataType rawDataTypePreference() {
             return DataType.MEMORY_SEGMENT;
         }
 
@@ -1228,28 +1040,42 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         @Override
         public void skipRawBytes(int size) {
             position += size;
-            if(position > size) {
+            if (position > size) {
                 throw ProtobufDeserializationException.truncatedMessage();
             }
         }
 
         @Override
         public int readRawFixedInt32() {
-            var result = segment.getAtIndex(ValueLayout.OfInt.JAVA_INT, position);
+            var result = segment.getAtIndex(ValueLayout.OfInt.JAVA_INT_UNALIGNED, position);
             position += Integer.BYTES;
             return result;
         }
 
         @Override
         public long readRawFixedInt64() {
-            var result = segment.getAtIndex(ValueLayout.OfLong.JAVA_LONG, position);
+            var result = segment.getAtIndex(ValueLayout.OfLong.JAVA_LONG_UNALIGNED, position);
             position += Long.BYTES;
             return result;
         }
 
         @Override
-        public MemorySegmentSource readRawLengthDelimited(int size) {
-            var result = new MemorySegmentSource(segment.asSlice(position, size));
+        public float readRawFloat() {
+            var result = segment.getAtIndex(ValueLayout.OfInt.JAVA_FLOAT_UNALIGNED, position);
+            position += Float.BYTES;
+            return result;
+        }
+
+        @Override
+        public double readRawDouble() {
+            var result = segment.getAtIndex(ValueLayout.OfInt.JAVA_DOUBLE_UNALIGNED, position);
+            position += Double.BYTES;
+            return result;
+        }
+
+        @Override
+        public MemorySegmentReader readRawLengthDelimited(int size) {
+            var result = new MemorySegmentReader(segment.asSlice(position, size));
             position += size;
             return result;
         }
@@ -1270,27 +1096,17 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         }
 
         @Override
-        public int readRawZigZagVarInt32() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long readRawZigZagVarInt64() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public float[] readRawPackedFloat() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FLOAT_LAYOUT);
+            return toFloatArrayLE(segment);
         }
 
         @Override
         public double[] readRawPackedDouble() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(DOUBLE_LAYOUT);
+            return toDoubleArrayLE(segment);
         }
 
         @Override
@@ -1322,14 +1138,352 @@ public abstract class ProtobufInputStream implements AutoCloseable {
         public int[] readRawPackedFixedInt32() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FIXED_INT32_LAYOUT);
+            return toIntArrayLE(segment);
         }
 
         @Override
         public long[] readRawPackedFixedInt64() {
             var length = readRawVarInt32();
             var segment = readRawMemorySegment(length);
-            return segment.toArray(FIXED_INT64_LAYOUT);
+            return toLongArrayLE(segment);
+        }
+    }
+
+    private static final class InputStreamReader extends ProtobufReader {
+        private static final int MAX_VAR_INT_SIZE = 10;
+
+        private final InputStream inputStream;
+        private final boolean autoclose;
+        private final long length;
+        private long position;
+
+        private final byte[] buffer;
+        private int bufferPosition;
+        private int bufferLength;
+
+        InputStreamReader(InputStream inputStream, boolean autoclose) {
+            Objects.requireNonNull(inputStream, "inputStream cannot be null");
+            this.inputStream = inputStream;
+            this.autoclose = autoclose;
+            this.length = -1;
+            this.buffer = new byte[MAX_VAR_INT_SIZE];
+        }
+
+        private InputStreamReader(InputStream inputStream, long length, byte[] buffer, int bufferPosition, int bufferLength) {
+            this.inputStream = inputStream;
+            this.autoclose = false;
+            this.length = length;
+            this.buffer = buffer;
+            this.bufferPosition = bufferPosition;
+            this.bufferLength = bufferLength;
+        }
+
+        @Override
+        public byte readRawByte() {
+            position++;
+            if (bufferPosition < bufferLength) {
+                return buffer[bufferPosition++];
+            } else {
+                try {
+                    var read = inputStream.read();
+                    if (read == -1) {
+                        throw ProtobufDeserializationException.truncatedMessage();
+                    } else {
+                        return (byte) read;
+                    }
+                } catch (IOException exception) {
+                    throw ProtobufDeserializationException.truncatedMessage(exception);
+                }
+            }
+        }
+
+        @Override
+        public byte[] readRawBytes(int size) {
+            try {
+                var result = new byte[size];
+                readRawBytes(result, size);
+                return result;
+            } catch (NegativeArraySizeException _) {
+                throw new IllegalArgumentException("size cannot be negative");
+            }
+        }
+
+        private void readRawBytes(byte[] output, int length) {
+            position += length;
+            var offset = 0;
+            if (length > 0 && bufferPosition < bufferLength) {
+                var bufferedLength = Math.min(bufferLength - bufferPosition, length);
+                System.arraycopy(buffer, bufferPosition, output, offset, bufferedLength);
+                offset += bufferedLength;
+                bufferPosition += bufferedLength;
+            }
+            while (offset < length) {
+                try {
+                    var read = inputStream.read(output, offset, length - offset);
+                    if (read == -1) {
+                        throw ProtobufDeserializationException.truncatedMessage();
+                    } else {
+                        offset += read;
+                    }
+                } catch (IOException exception) {
+                    throw ProtobufDeserializationException.truncatedMessage(exception);
+                }
+            }
+        }
+
+        @Override
+        public ByteBuffer readRawBuffer(int size) {
+            var bytes = readRawBytes(size);
+            return ByteBuffer.wrap(bytes);
+        }
+
+        @Override
+        public MemorySegment readRawMemorySegment(int size) {
+            var bytes = readRawBytes(size);
+            return MemorySegment.ofArray(bytes);
+        }
+
+        @Override
+        public DataType rawDataTypePreference() {
+            return DataType.BYTE_ARRAY;
+        }
+
+        @Override
+        public boolean isFinished() {
+            if (length != -1) {
+                return position >= length;
+            } else if (bufferPosition < bufferLength) {
+                return false;
+            } else {
+                try {
+                    position++;
+                    var read = inputStream.read();
+                    if (read == -1) {
+                        return true;
+                    } else {
+                        position--;
+                        buffer[bufferPosition = 0] = (byte) read;
+                        bufferLength = 1;
+                        return false;
+                    }
+                } catch (IOException exception) {
+                    throw ProtobufDeserializationException.truncatedMessage(exception);
+                }
+            }
+        }
+
+        @Override
+        public void skipRawBytes(int length) {
+            if (length < 0) {
+                throw new IllegalArgumentException("length cannot be negative");
+            }
+
+            if (length > 0 && bufferPosition < bufferLength) {
+                var bufferedLength = Math.min(length, bufferLength - bufferPosition);
+                length -= bufferedLength;
+                position += bufferedLength;
+            }
+            while (length > 0) {
+                try {
+                    var skipped = inputStream.skip(length);
+                    if (skipped == 0) {
+                        if (isFinished()) {
+                            throw ProtobufDeserializationException.truncatedMessage();
+                        }
+                    } else {
+                        length -= (int) skipped;
+                        position += skipped;
+                    }
+                } catch (IOException exception) {
+                    throw ProtobufDeserializationException.truncatedMessage(exception);
+                }
+            }
+        }
+
+        @Override
+        public int readRawFixedInt32() {
+            readRawBytes(buffer, Integer.BYTES);
+            return getIntLE(buffer, 0);
+        }
+
+        @Override
+        public long readRawFixedInt64() {
+            readRawBytes(buffer, Long.BYTES);
+            return getLongLE(buffer, 0);
+        }
+
+        @Override
+        public float readRawFloat() {
+            readRawBytes(buffer, Float.BYTES);
+            return getFloatLE(buffer, 0);
+        }
+
+        @Override
+        public double readRawDouble() {
+            readRawBytes(buffer, Double.BYTES);
+            return getDoubleLE(buffer, 0);
+        }
+
+        @Override
+        public InputStreamReader readRawLengthDelimited(int size) {
+            var result = new InputStreamReader(inputStream, size, buffer, bufferPosition, bufferLength);
+            position += size;
+            return result;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (autoclose) {
+                inputStream.close();
+            }
+        }
+
+        @Override
+        public int readRawVarInt32() {
+            readRawBytes(buffer, MAX_VAR_INT_SIZE);
+            var value = getLongLE(buffer, 0);
+            var mostSignificantBits = ~value & ~INT64_PEXT_MASK_LOW;
+            var lengthInBits = Long.numberOfTrailingZeros(mostSignificantBits) + 1;
+            var varIntPart = value & (mostSignificantBits ^ (mostSignificantBits - 1));
+            var result = (int) Long.compress(varIntPart, INT32_PEXT_MASK);
+            var length = lengthInBits >>> 3;
+            bufferPosition = length;
+            bufferLength = MAX_VAR_INT_SIZE;
+            position += length;
+            return result;
+        }
+
+        @Override
+        public long readRawVarInt64() {
+            readRawBytes(buffer, MAX_VAR_INT_SIZE);
+            var b0 = getLongLE(buffer, 0);
+            var b1 = getLongLE(buffer, 8);
+            var msbB0 = ~b0 & ~INT64_PEXT_MASK_LOW;
+            var msbB1 = ~b1 & ~INT64_PEXT_MASK_LOW;
+            var lenB0 = Long.numberOfTrailingZeros(msbB0) + 1;
+            var lenB1 = Long.numberOfTrailingZeros(msbB1) + 1;
+            var partB0 = b0 & (msbB0 ^ (msbB0 - 1));
+            var partB1 = (b1 & (msbB1 ^ (msbB1 - 1))) * ((msbB0 == 0) ? 1L : 0L);
+            var vectorBytes = new byte[16];
+            putLongLE(vectorBytes, 0, partB0);
+            putLongLE(vectorBytes, 8, partB1);
+            var x = getLongLE(vectorBytes, 0);
+            var y = getLongLE(vectorBytes, 8);
+            var result = Long.compress(x, INT64_PEXT_MASK_LOW) | (Long.compress(y, INT64_PEXT_MASK_HIGH) << 56);
+            var length = (msbB0 == 0 ? lenB1 + 64 : lenB0) >>> 3;
+            bufferPosition = length;
+            bufferLength = MAX_VAR_INT_SIZE;
+            position += length;
+            return result;
+        }
+
+        @Override
+        public float[] readRawPackedFloat() {
+            var length = readRawVarInt32();
+            var segment = readRawMemorySegment(length);
+            return toFloatArrayLE(segment);
+        }
+
+        @Override
+        public double[] readRawPackedDouble() {
+            var length = readRawVarInt32();
+            var segment = readRawMemorySegment(length);
+            return toDoubleArrayLE(segment);
+        }
+
+        @Override
+        public int[] readRawPackedVarInt32() {
+            var bufferLength = readRawVarInt32();
+            var buffer = readRawBytes(bufferLength);
+
+            var resultsCount = countVarInts(buffer);
+            var results = new int[resultsCount];
+
+            throw new UnsupportedOperationException();
+        }
+
+        private int countVarInts(byte[] segment) {
+            var len = segment.length;
+            var count = 0;
+            var i = 0;
+
+            if (SUPPORTS_V512) {
+                long bound512 = V512.loopBound(len);
+                for (; i < bound512; i += V512.length()) {
+                    count += ByteVector.fromArray(V512, segment, i)
+                            .compare(VectorOperators.GE, (byte) 0)
+                            .trueCount();
+                }
+            }
+
+            if(SUPPORTS_V256) {
+                long bound256 = i + V256.loopBound(len - i);
+                for (; i < bound256; i += V256.length()) {
+                    count += ByteVector.fromArray(V256, segment, i)
+                            .compare(VectorOperators.GE, (byte) 0)
+                            .trueCount();
+                }
+            }
+
+            if(SUPPORTS_V128) {
+                long bound128 = i + V128.loopBound(len - i);
+                for (; i < bound128; i += V128.length()) {
+                    count += ByteVector.fromArray(V128, segment, i)
+                            .compare(VectorOperators.GE, (byte) 0)
+                            .trueCount();
+                }
+            }
+
+            if(SUPPORTS_V64) {
+                long bound64 = i + V64.loopBound(len - i);
+                for (; i < bound64; i += V64.length()) {
+                    count += ByteVector.fromArray(V64, segment, i)
+                            .compare(VectorOperators.GE, (byte) 0)
+                            .trueCount();
+                }
+            }
+
+            for (; i < len; i++) {
+                if (segment[i] >= 0) {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        @Override
+        public int[] readRawPackedZigZagVarInt32() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long[] readRawPackedVarInt64() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long[] readRawPackedZigZagVarInt64() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean[] readRawPackedBool() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int[] readRawPackedFixedInt32() {
+            var length = readRawVarInt32();
+            var segment = readRawMemorySegment(length);
+            return toIntArrayLE(segment);
+        }
+
+        @Override
+        public long[] readRawPackedFixedInt64() {
+            var length = readRawVarInt32();
+            var segment = readRawMemorySegment(length);
+            return toLongArrayLE(segment);
         }
     }
 }

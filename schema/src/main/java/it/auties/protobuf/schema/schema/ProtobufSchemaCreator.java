@@ -27,23 +27,24 @@ public record ProtobufSchemaCreator(ProtobufDocumentTree document, File director
         var results = document.children()
                 .stream()
                 .map(entry -> generate(entry, mutable, nullable, classPool))
+                .filter(Objects::nonNull)
                 .toList();
         results.forEach(this::writeOrThrow);
     }
 
     public CompilationUnit generate(ProtobufTree object, boolean mutable, boolean nullable, List<CompilationUnit> classPool) {
         Objects.requireNonNull(directory, "Cannot generate files without a target directory");
-        if (object instanceof ProtobufMessageStatement msg) {
-            var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
-            return schema.generate();
-        }
-
-        if (object instanceof ProtobufEnumStatement enm) {
-            var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
-            return schema.generate();
-        }
-
-        throw new IllegalArgumentException("Cannot find a schema generator for statement with type " + object.getClass().getName());
+        return switch (object) {
+            case ProtobufMessageStatement msg -> {
+                var schema = new MessageSchemaCreator(document.packageName().orElse(null), msg, mutable, nullable, classPool, directory.toPath());
+                yield schema.generate();
+            }
+            case ProtobufEnumStatement enm -> {
+                var schema = new EnumSchemaCreator(document.packageName().orElse(null), enm, classPool, directory.toPath());
+                yield schema.generate();
+            }
+            default -> null;
+        };
     }
 
     private void writeOrThrow(CompilationUnit unit) {
@@ -62,7 +63,6 @@ public record ProtobufSchemaCreator(ProtobufDocumentTree document, File director
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.ORDER_IMPORTS, true));
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.SORT_IMPORTS_STRATEGY, new IntelliJImportOrderingStrategy()));
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.SPACE_AROUND_OPERATORS, true));
-            configuration.addOption(new DefaultConfigurationOption(ConfigOption.COLUMN_ALIGN_ARGUMENTS, true));
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.COLUMN_ALIGN_PARAMETERS, true));
             configuration.addOption(new DefaultConfigurationOption(ConfigOption.MAX_ENUM_CONSTANTS_TO_ALIGN_HORIZONTALLY, 0));
             var printer = new DefaultPrettyPrinter(configuration);

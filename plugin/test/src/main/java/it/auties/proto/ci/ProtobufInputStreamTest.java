@@ -4,7 +4,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.stream.ProtobufInputStream;
+import it.auties.protobuf.io.ProtobufInputStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

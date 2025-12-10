@@ -70,13 +70,15 @@ public @interface ProtobufProperty {
      * @return an array of mixin classes
      */
     Class<?>[] mixins() default {
-            ProtobufAtomicMixin.class,
-            ProtobufOptionalMixin.class,
-            ProtobufUUIDMixin.class,
-            ProtobufURIMixin.class,
-            ProtobufRepeatedMixin.class,
-            ProtobufMapMixin.class,
-            ProtobufFutureMixin.class
+            AtomicValueMixin.class,
+            CollectionMixin.class,
+            FutureMixin.class,
+            MapMixin.class,
+            OptionalValueMixin.class,
+            StringMixin.class,
+            URIMixin.class,
+            URLMixin.class,
+            UUIDMixin.class
     };
 
     /**

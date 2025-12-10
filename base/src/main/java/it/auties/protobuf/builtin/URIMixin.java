@@ -3,20 +3,19 @@ package it.auties.protobuf.builtin;
 import it.auties.protobuf.annotation.ProtobufDeserializer;
 import it.auties.protobuf.annotation.ProtobufMixin;
 import it.auties.protobuf.annotation.ProtobufSerializer;
-import it.auties.protobuf.model.ProtobufLazyString;
 
-import java.util.UUID;
+import java.net.URI;
 
 @SuppressWarnings("unused")
 @ProtobufMixin
-public final class ProtobufUUIDMixin {
+public final class URIMixin {
     @ProtobufDeserializer
-    public static UUID ofNullable(String value) {
-        return value == null ? null : UUID.fromString(value);
+    public static URI ofNullable(String value) {
+        return value == null ? null : URI.create(value);
     }
 
     @ProtobufSerializer
-    public static String toValue(UUID value) {
+    public static String toValue(URI value) {
         return value == null ? null : value.toString();
     }
 }

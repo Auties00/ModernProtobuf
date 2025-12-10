@@ -148,13 +148,15 @@ public @interface ProtobufBuilder {
          * @return an array of mixin classes for type conversion
          */
         Class<?>[] mixins() default {
-                ProtobufAtomicMixin.class,
-                ProtobufOptionalMixin.class,
-                ProtobufUUIDMixin.class,
-                ProtobufURIMixin.class,
-                ProtobufRepeatedMixin.class,
-                ProtobufMapMixin.class,
-                ProtobufFutureMixin.class
+                AtomicValueMixin.class,
+                CollectionMixin.class,
+                FutureMixin.class,
+                MapMixin.class,
+                OptionalValueMixin.class,
+                StringMixin.class,
+                URIMixin.class,
+                URLMixin.class,
+                UUIDMixin.class
         };
     }
 }

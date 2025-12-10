@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @SuppressWarnings("unused")
 @ProtobufMixin
-public final class ProtobufAtomicMixin {
+public final class AtomicValueMixin {
     @ProtobufDefaultValue
     public static AtomicInteger newAtomicInt() {
         return new AtomicInteger();

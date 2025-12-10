@@ -9,8 +9,8 @@ import it.auties.protobuf.model.ProtobufWireType;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement;
 import it.auties.protobuf.serialization.model.ProtobufObjectElement.Type;
 import it.auties.protobuf.serialization.model.ProtobufPropertyElement;
-import it.auties.protobuf.stream.ProtobufInputStream;
-import it.auties.protobuf.stream.ProtobufOutputStream;
+import it.auties.protobuf.io.ProtobufReader;
+import it.auties.protobuf.io.ProtobufWriter;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
@@ -130,7 +130,7 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
                     message.typeElement().getQualifiedName().toString(),
                     Arrays.class.getName(),
                     Optional.class.getName(),
-                    ProtobufOutputStream.class.getName(),
+                    ProtobufWriter.class.getName(),
                     Map.class.getName(),
                     HashMap.class.getName()
             );
@@ -138,8 +138,8 @@ public class ProtobufObjectSpecGenerator extends ProtobufClassGenerator {
 
         var imports = new ArrayList<String>();
         imports.add(message.typeElement().getQualifiedName().toString());
-        imports.add(ProtobufInputStream.class.getName());
-        imports.add(ProtobufOutputStream.class.getName());
+        imports.add(ProtobufReader.class.getName());
+        imports.add(ProtobufWriter.class.getName());
         imports.add(ProtobufWireType.class.getName());
         if (message.properties().stream().anyMatch(ProtobufPropertyElement::required)) {
             imports.add(Objects.class.getName());

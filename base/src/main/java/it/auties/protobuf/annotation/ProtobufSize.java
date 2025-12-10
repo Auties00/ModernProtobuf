@@ -1,6 +1,6 @@
 package it.auties.protobuf.annotation;
 
-import it.auties.protobuf.stream.ProtobufOutputStream;
+import it.auties.protobuf.io.ProtobufWriter;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -229,7 +229,7 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * @apiNote Implementing {@link ProtobufSize} is optional if the size of the serializer's return type can be calculated automatically,
- *          but mandatory when writing directly to a {@link ProtobufOutputStream}, as the size cannot be inferred.
+ *          but mandatory when writing directly to a {@link ProtobufWriter }, as the size cannot be inferred.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
