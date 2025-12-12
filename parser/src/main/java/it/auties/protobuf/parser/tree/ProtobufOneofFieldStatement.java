@@ -63,7 +63,7 @@ import java.util.stream.Stream;
 public final class ProtobufOneofFieldStatement
         extends ProtobufFieldStatement
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>, ProtobufTree.WithBodyAndName<ProtobufOneofChild>,
-                   ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild {
+                   ProtobufMessageChild, ProtobufGroupChild {
     private String name;
     private final List<ProtobufOneofChild> children;
 
@@ -88,6 +88,16 @@ public final class ProtobufOneofFieldStatement
      */
     public String className() {
         return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Seal";
+    }
+
+    @Override
+    public Modifier modifier() {
+        return Modifier.NONE;
+    }
+
+    @Override
+    public void setModifier(Modifier modifier) {
+
     }
 
     /**

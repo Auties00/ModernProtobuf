@@ -42,7 +42,7 @@ package it.auties.protobuf.parser.tree;
  */
 sealed abstract class ProtobufExpressionImpl
         implements ProtobufExpression
-        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufNumberExpression, ProtobufOptionExpression, ProtobufIntegerRangeExpression {
+        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufFloatingPointExpression, ProtobufGroupValueExpression, ProtobufIntegerExpression, ProtobufIntegerRangeExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufOptionExpression {
     final int line;
     ProtobufTree parent;
 

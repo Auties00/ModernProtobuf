@@ -22,28 +22,9 @@ import java.util.Objects;
  *
  * @see ProtobufGroupFieldStatement
  */
-public final class ProtobufGroupTypeReference implements ProtobufObjectTypeReference {
-    private final String name;
-    private ProtobufGroupFieldStatement declaration;
-
-    /**
-     * Constructs a new unattributed group type reference with the specified name.
-     *
-     * @param name the group type name, must not be null
-     */
-    public ProtobufGroupTypeReference(String name) {
-        this.name = Objects.requireNonNull(name, "name cannot be null");
-    }
-
-    /**
-     * Constructs a new attributed group type reference linked to its declaration.
-     *
-     * @param declaration the group field declaration statement, must not be null
-     */
-    public ProtobufGroupTypeReference(ProtobufGroupFieldStatement declaration) {
+public record ProtobufGroupTypeReference(ProtobufGroupFieldStatement declaration) implements ProtobufObjectTypeReference {
+    public ProtobufGroupTypeReference {
         Objects.requireNonNull(declaration, "declaration cannot be null");
-        this.name = declaration.name();
-        this.declaration = declaration;
     }
 
     @Override
@@ -53,34 +34,7 @@ public final class ProtobufGroupTypeReference implements ProtobufObjectTypeRefer
 
     @Override
     public String name() {
-        return name;
-    }
-
-    /**
-     * Returns the group field declaration statement if this reference has been attributed.
-     *
-     * @return the declaration, or null if not yet attributed
-     */
-    public ProtobufGroupFieldStatement declaration() {
-        return declaration;
-    }
-
-    /**
-     * Checks whether this group type reference has been attributed with a declaration.
-     *
-     * @return {@code true} if a declaration is present, {@code false} otherwise
-     */
-    public boolean hasDeclaration() {
-        return declaration != null;
-    }
-
-    /**
-     * Sets the declaration for this group type reference, attributing it.
-     *
-     * @param statement the group field declaration statement
-     */
-    public void setDeclaration(ProtobufGroupFieldStatement statement) {
-        this.declaration = statement;
+        return declaration.name();
     }
 
     @Override
@@ -90,6 +44,6 @@ public final class ProtobufGroupTypeReference implements ProtobufObjectTypeRefer
 
     @Override
     public boolean isAttributed(){
-        return declaration != null;
+        return true;
     }
 }

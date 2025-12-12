@@ -241,7 +241,7 @@ public sealed class ProtobufFieldStatement
 
     @Override
     public boolean isAttributed() {
-        return hasIndex() && hasName() && hasModifier() && hasType();
+        return hasType() && hasName() && hasIndex();
     }
 
     /**
@@ -270,7 +270,7 @@ public sealed class ProtobufFieldStatement
     @Override
     public String toString() {
         var builder = new StringBuilder();
-        if(modifier != null && modifier != Modifier.NONE) {
+        if(modifier != null) {
             builder.append(modifier.token());
             builder.append(" ");
         }
@@ -294,10 +294,9 @@ public sealed class ProtobufFieldStatement
      */
     public enum Modifier {
         /**
-         * No explicit modifier - default for proto3 fields (implicitly optional).
+         * No explicit modifier - default for proto3 fields (implicitly optional) and the only valid modifier for enum constants.
          */
-        NONE(""),
-
+        NONE(null),
         /**
          * Required modifier (proto2 only) - field must be set.
          * <p>
@@ -336,11 +335,12 @@ public sealed class ProtobufFieldStatement
          * @return the token string
          */
         public String token() {
-            return token;
+            return Objects.requireNonNullElse(token, "");
         }
 
         private static final Map<String, Modifier> VALUES = Arrays.stream(values())
-                .collect(Collectors.toUnmodifiableMap(Modifier::token, Function.identity()));
+                .filter(entry -> entry.token != null)
+                .collect(Collectors.toUnmodifiableMap(entry -> entry.token, Function.identity()));
 
         /**
          * Looks up a modifier by its token string.

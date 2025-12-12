@@ -7,7 +7,7 @@ package it.auties.protobuf.parser.tree;
  * defined in other files. This sealed interface restricts which expression types can be used:
  * </p>
  * <ul>
- *   <li>{@link ProtobufNumberExpression} - Single extension field number</li>
+ *   <li>{@link ProtobufIntegerExpression} - Single extension field number</li>
  *   <li>{@link ProtobufIntegerRangeExpression} - Extension field number ranges</li>
  * </ul>
  * <h2>Example:</h2>
@@ -22,5 +22,5 @@ package it.auties.protobuf.parser.tree;
  */
 public sealed interface ProtobufExtensionsExpression
         extends ProtobufExpression
-        permits ProtobufNumberExpression, ProtobufIntegerRangeExpression {
+        permits ProtobufIntegerExpression, ProtobufIntegerRangeExpression {
 }

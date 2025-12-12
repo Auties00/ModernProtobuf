@@ -37,7 +37,7 @@ import java.util.Optional;
 public final class ProtobufOptionStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
-                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild, ProtobufExtendChild {
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild {
     private ProtobufOptionName name;
     private ProtobufExpression value;
     private ProtobufFieldStatement definition;

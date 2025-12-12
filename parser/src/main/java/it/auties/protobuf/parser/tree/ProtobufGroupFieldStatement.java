@@ -73,6 +73,7 @@ public final class ProtobufGroupFieldStatement
         implements ProtobufTree.WithBody<ProtobufGroupChild>,
                    ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild, ProtobufExtendChild {
     private final List<ProtobufGroupChild> children;
+    private final ProtobufGroupTypeReference reference;
 
     /**
      * Constructs a new group field statement at the specified line number.
@@ -82,13 +83,14 @@ public final class ProtobufGroupFieldStatement
     public ProtobufGroupFieldStatement(int line) {
         super(line);
         this.children = new ArrayList<>();
+        this.reference = new ProtobufGroupTypeReference(this);
     }
 
     @Override
     public String toString() {
         var builder = new StringBuilder();
 
-        if(modifier != null && modifier != Modifier.NONE) {
+        if(modifier != null) {
             builder.append(modifier);
             builder.append(" ");
         }
@@ -136,7 +138,7 @@ public final class ProtobufGroupFieldStatement
      */
     @Override
     public ProtobufTypeReference type() {
-        return new ProtobufGroupTypeReference(this);
+        return reference;
     }
 
     /**
@@ -146,11 +148,10 @@ public final class ProtobufGroupFieldStatement
      * </p>
      *
      * @param type the type reference (ignored)
-     * @throws UnsupportedOperationException always thrown
      */
     @Override
     public void setType(ProtobufTypeReference type) {
-        throw new UnsupportedOperationException("Cannot set the type of a group field");
+
     }
 
     @Override

@@ -42,7 +42,6 @@ import java.util.Objects;
  *   <li><strong>Nested messages:</strong> Message definitions within the message body</li>
  *   <li><strong>Nested enums:</strong> Enum definitions scoped to the message</li>
  *   <li><strong>Oneofs:</strong> Groups of fields where at most one can be set</li>
- *   <li><strong>Extensions:</strong> Extension ranges for third-party additions</li>
  *   <li><strong>Reserved:</strong> Reserved field numbers or names</li>
  *   <li><strong>Options:</strong> Configuration options for the message</li>
  *   <li><strong>Empty statements:</strong> Standalone semicolons</li>
@@ -64,7 +63,7 @@ import java.util.Objects;
 public final class ProtobufMessageStatement
         extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>, ProtobufTree.WithBodyAndName<ProtobufMessageChild>,
-                   ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild, ProtobufExtendChild {
+                   ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
     private String name;
 
     /**

@@ -22,7 +22,7 @@ package it.auties.protobuf.parser.tree;
 public final class ProtobufEmptyStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
-                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufOneofChild, ProtobufMethodChild, ProtobufServiceChild, ProtobufExtendChild {
+                   ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufMethodChild, ProtobufServiceChild {
     /**
      * Constructs a new empty statement at the specified line number.
      *

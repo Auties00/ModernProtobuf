@@ -2,10 +2,10 @@ package it.auties.protobuf.parser;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufProperty;
-import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.exception.ProtobufSemanticException;
+import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.*;
 
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * </p>
  * <ul>
  *   <li><strong>Type Resolution:</strong> Resolves unattributed type references to their declarations,
- *       converting {@link ProtobufUnresolvedObjectTypeReference} to concrete type references</li>
+ *       converting {@link ProtobufUnresolvedTypeReference} to concrete type references</li>
  *   <li><strong>Import Attribution:</strong> Processes import statements and links imported documents
  *       to the importing document, enabling cross-file type resolution</li>
  *   <li><strong>Semantic Validation:</strong> Validates Protocol Buffer language rules including:
@@ -62,6 +62,18 @@ public final class ProtobufAnalyzer {
 
     private static final BigInteger RESERVED_RANGE_MIN = BigInteger.valueOf(19_000);
     private static final BigInteger RESERVED_RANGE_MAX = BigInteger.valueOf(19_999);
+
+    private static final BigInteger INT32_MIN = BigInteger.valueOf(Integer.MIN_VALUE);
+    private static final BigInteger INT32_MAX = BigInteger.valueOf(Integer.MAX_VALUE);
+
+    private static final BigInteger UINT32_MIN = BigInteger.ZERO;
+    private static final BigInteger UINT32_MAX = BigInteger.valueOf(4294967295L);
+
+    private static final BigInteger INT64_MIN = BigInteger.valueOf(Long.MIN_VALUE);
+    private static final BigInteger INT64_MAX = BigInteger.valueOf(Long.MAX_VALUE);
+
+    private static final BigInteger UINT64_MIN = BigInteger.ZERO;
+    private static final BigInteger UINT64_MAX = new BigInteger("18446744073709551615");
 
     private static final Map<Class<? extends ProtobufTree>, String> TYPE_OPTIONS_MAP = Map.of(
             ProtobufDocumentTree.class, "FileOptions",
@@ -145,48 +157,40 @@ public final class ProtobufAnalyzer {
 
         // Add built-in types once
         if(BUILT_IN_TYPES != null) {
-            BUILT_IN_TYPES.forEach(document -> canonicalPathToDocumentMap.put(document.qualifiedPath(), document));
+            for (var document : BUILT_IN_TYPES) {
+                canonicalPathToDocumentMap.put(document.qualifiedPath(), document);
+            }
         }
 
         // Attribute imports for all documents
-        documents.forEach(document -> attributeImports(document, canonicalPathToDocumentMap));
+        for (var document : documents) {
+            attributeImports(document, canonicalPathToDocumentMap);
+        }
 
         // Attribute and validate each document
-        documents.forEach(ProtobufAnalyzer::attributeDocument);
-
-        // Validate document-level constraints
-        documents.forEach(ProtobufAnalyzer::validateDocumentLevel);
+        for (var document : documents) {
+            attributeDocument(document);
+        }
     }
 
     private static Map<String, ProtobufDocumentTree> buildImportsMap(Collection<ProtobufDocumentTree> documents) {
-        var mapSize = documents.size() + (BUILT_IN_TYPES != null ? BUILT_IN_TYPES.size() : 0);
-        Map<String, ProtobufDocumentTree> canonicalPathToDocumentMap = HashMap.newHashMap(mapSize);
-        var visited = new HashSet<ProtobufDocumentTree>();
-        documents.forEach(document -> collectAllReferencedDocuments(document, canonicalPathToDocumentMap, visited));
-        return canonicalPathToDocumentMap;
-    }
-
-    private static void collectAllReferencedDocuments(ProtobufDocumentTree document, Map<String, ProtobufDocumentTree> map, Set<ProtobufDocumentTree> visited) {
-        if (!visited.add(document)) {
-            return;
+        var queue = new LinkedList<>(documents);
+        var result = new HashMap<String, ProtobufDocumentTree>();
+        while(!queue.isEmpty()) {
+            var document = queue.poll();
+            if (result.put(document.qualifiedPath(), document) == null) {
+                document.getDirectChildrenByType(ProtobufImportStatement.class)
+                        .filter(ProtobufImportStatement::hasDocument)
+                        .forEachOrdered(importStatement -> queue.add(importStatement.document()));
+            }
         }
-
-        map.put(document.qualifiedPath(), document);
-
-        // Recursively collect all imported documents
-        document.children().stream()
-                .filter(ProtobufImportStatement.class::isInstance)
-                .map(ProtobufImportStatement.class::cast)
-                .filter(importStatement -> importStatement.document() != null)
-                .forEach(importStatement -> collectAllReferencedDocuments(importStatement.document(), map, visited));
+        return result;
     }
 
     private static void attributeImports(ProtobufDocumentTree document, Map<String, ProtobufDocumentTree> canonicalPathToDocumentMap) {
-        document.children().stream()
-                .filter(ProtobufImportStatement.class::isInstance)
-                .map(ProtobufImportStatement.class::cast)
+        document.getDirectChildrenByType(ProtobufImportStatement.class)
                 .filter(importStatement -> !importStatement.isAttributed())
-                .forEach(importStatement -> {
+                .forEachOrdered(importStatement -> {
                     var imported = canonicalPathToDocumentMap.get(importStatement.location());
                     ProtobufSemanticException.check(imported != null,
                             "Cannot resolve import '%s'\n\nThe imported file could not be found or loaded.",
@@ -196,125 +200,164 @@ public final class ProtobufAnalyzer {
     }
 
     private static void attributeDocument(ProtobufDocumentTree document) {
+        var names = new HashSet<String>();
         var queue = new LinkedList<ProtobufTree>();
         queue.add(document);
         while (!queue.isEmpty()) {
             var tree = queue.removeFirst();
-            switch (tree) {
-                case ProtobufExtendStatement extendStatement -> {
-                    attributeStatement(document, extendStatement);
-                    queue.addAll(extendStatement.children());
-                }
-                case ProtobufOneofFieldStatement oneofStatement -> {
-                    attributeStatement(document, oneofStatement);
-                    queue.addAll(oneofStatement.children());
-                }
-                case ProtobufTree.WithBody<?> body -> queue.addAll(body.children());
-                case ProtobufStatement protobufStatement -> attributeStatement(document, protobufStatement);
-                case ProtobufExpression ignored -> throw new InternalError("Expressions should be attributed in-place");
-            }
-        }
-    }
 
-    private static void attributeStatement(ProtobufDocumentTree document, ProtobufStatement protobufStatement) {
-        switch (protobufStatement) {
-            case ProtobufEmptyStatement emptyStatement when !emptyStatement.isAttributed() ->
-                throw new InternalError("Empty statement should already be attributed");
-            case ProtobufExtendStatement extendStatement -> validateExtendDeclaration(document, extendStatement);
-            case ProtobufExtensionsStatement protobufExtension -> validateExtensions(document, protobufExtension);
-            case ProtobufOneofFieldStatement oneofStatement -> validateOneof(oneofStatement);
-            case ProtobufFieldStatement protobufField -> {
-                attributeType(document, protobufField);
-                validateField(document, protobufField);
-                protobufField.options().forEach(option -> attributeFieldOption(document, protobufField, option));
+            if(tree instanceof ProtobufTree.WithName withName) {
+                ProtobufSyntaxException.check(names.add(withName.name()),
+                        "Duplicate type name \"%s\"",
+                        withName.line(),
+                        withName.name());
             }
-            case ProtobufImportStatement protobufImport when !protobufImport.isAttributed() ->
-                throw new InternalError("Import statement should already be attributed");
-            case ProtobufOptionStatement protobufOption -> validateOption(protobufOption);
-            case ProtobufPackageStatement packageStatement -> validatePackage(packageStatement);
-            case ProtobufReservedStatement protobufReserved -> validateReserved(protobufReserved);
-            case ProtobufSyntaxStatement protobufSyntax when !protobufSyntax.hasVersion() ->
-                throw new InternalError("Syntax statement should already be attributed");
-            default -> {}
+
+            if(tree instanceof ProtobufTree.WithBody<?> withBody) {
+                queue.addAll(withBody.children());
+            }
+
+            switch (tree) {
+                case ProtobufEmptyStatement _ -> {
+                    // Nothing to do
+                }
+
+                case ProtobufExtendStatement extendStatement -> {
+                    validateExtendDeclaration(document, extendStatement);
+                }
+
+                case ProtobufExtensionsStatement protobufExtension -> {
+                    validateExtensions(document, protobufExtension);
+                }
+
+                case ProtobufFieldStatement protobufField -> {
+                    attributeType(document, protobufField);
+                    validateField(document, protobufField);
+                    for (var option : protobufField.options()) {
+                        attributeFieldOption(document, protobufField, option);
+                    }
+                }
+
+                case ProtobufOptionStatement protobufOption -> {
+                    validateOption(protobufOption);
+                }
+
+                case ProtobufPackageStatement _ -> {
+                    // Nothing to do
+                }
+
+                case ProtobufReservedStatement protobufReserved -> {
+                    validateReserved(protobufReserved);
+                }
+
+                case ProtobufEnumStatement enumStatement -> {
+                    validateEnum(enumStatement);
+                }
+
+                case ProtobufImportStatement _ -> {
+                    // Nothing to do
+                }
+
+                case ProtobufMessageStatement messageStatement -> {
+
+                }
+
+                case ProtobufMethodStatement methodStatement -> {
+
+                }
+
+                case ProtobufServiceStatement serviceStatement -> {
+                    validateService(document, serviceStatement);
+                }
+
+                case ProtobufSyntaxStatement _ -> {
+
+                }
+
+                case ProtobufDocumentTree protobufDocumentTree -> {
+
+                }
+
+                case ProtobufExpression protobufExpression -> {
+
+                }
+            }
         }
     }
 
     private static void validateExtendDeclaration(ProtobufDocumentTree document, ProtobufExtendStatement extendStatement) {
         // Resolve the declaration type
-        var declaration = extendStatement.declaration();
-        if (declaration instanceof ProtobufUnresolvedObjectTypeReference(var name)) {
+        var reference = extendStatement.declaration();
+        if (reference instanceof ProtobufUnresolvedTypeReference(var name)) {
             var resolvedType = tryResolveType(document, name, extendStatement);
             ProtobufSemanticException.check(resolvedType != null,
-                    "Cannot resolve extended type '%s'\n\nThe message type being extended could not be found.\n\nHelp: Make sure:\n      1. The message is defined in this file or imported\n      2. The message name is spelled correctly\n      3. If the message is in another package, use the fully qualified name\n      \n      Example:\n        extend MyMessage {{ ... }}\n        extend com.example.MyMessage {{ ... }}",
+                    """
+                            Cannot resolve extended type '%s'
+                            
+                            The message type being extended could not be found.
+                            
+                            Help: Make sure:
+                                  1. The message is defined in this file or imported
+                                  2. The message name is spelled correctly
+                                  3. If the message is in another package, use the fully qualified name
+                                     Example:
+                                           extend com.example.MyMessage { ... }""",
                     extendStatement.line(), name);
             extendStatement.setDeclaration(resolvedType);
-            declaration = resolvedType;
+            reference = resolvedType;
         }
 
-        // Validate extend statement
-        if (!(declaration instanceof ProtobufMessageTypeReference(var messageDeclaration))) {
-            return; // Can only extend messages
-        }
+        var declaration = switch (reference) {
+            case ProtobufMessageTypeReference(var messageDeclaration) -> messageDeclaration;
+            case ProtobufGroupTypeReference(var groupDeclaration) -> groupDeclaration;
+            default -> throw new ProtobufSemanticException("""
+                            Extended type '%s' is not a message or a group.
+                         
+                            Help: Only messages and groups can be extended.""",
+                    extendStatement.line(), reference.name());
+        };
 
-        // Check that the target message has declared extension ranges
-        var hasExtensionRanges = messageDeclaration.children().stream()
-                .anyMatch(ProtobufExtensionsStatement.class::isInstance);
+        var ranges = buildExtensionsLookup(declaration);
+        for(var statement : extendStatement.children()) {
+            switch (statement) {
+                case ProtobufFieldStatement field -> {
+                    // Extension fields cannot be required
+                    ProtobufSemanticException.check(field.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
+                            "Extension field '%s' cannot be required\n\nExtension fields cannot use the 'required' modifier.\nThis ensures backward compatibility with code that doesn't know about the extension.\n\nHelp: Remove the 'required' modifier or use 'optional' instead:\n      extend MyMessage {{\n        optional string %s = 100;  // OK\n        string %s = 100;           // Also OK (implicitly optional)\n      }}",
+                            field.line(), field.name(), field.name(), field.name());
 
-        ProtobufSemanticException.check(hasExtensionRanges,
-                "Cannot extend message '%s' - no extension ranges declared\n\nThe message must explicitly declare extension ranges before it can be extended.\n\nHelp: Add an 'extensions' declaration to the message being extended:\n      message %s {{\n        // ... existing fields ...\n        extensions 100 to 199;  // Reserve field numbers for extensions\n      }}\n      \n      Then extend it:\n      extend %s {{\n        string my_extension = 100;\n      }}",
-                extendStatement.line(), messageDeclaration.name(), messageDeclaration.name(), messageDeclaration.name());
+                    // Extension fields cannot be map types
+                    ProtobufSemanticException.check(!(field.type() instanceof ProtobufMapTypeReference),
+                            "Extension field '%s' cannot be a map type\n\nMap fields are not allowed in extensions.\n\nHelp: If you need a map-like structure, use a repeated message with key-value pairs:\n      message KeyValue {{\n        string key = 1;\n        ValueType value = 2;\n      }}\n      extend MyMessage {{\n        repeated KeyValue %s = 100;\n      }}",
+                            field.line(), field.name(), field.name());
 
-        // Validate each extension field
-        for(var child : extendStatement.children()) {
-            switch (child) {
-                case ProtobufOneofFieldStatement ignored -> throw new ProtobufSemanticException("Extensions cannot contain oneof fields\n\nOneof fields cannot be used in extend declarations.\n\nHelp: Only regular fields are allowed in extensions.\n      Remove the oneof block and use regular fields instead.", extendStatement.line());
-                case ProtobufFieldStatement field -> validateExtensionField(messageDeclaration, field);
-                default -> {}
+                    // Validate field number is within declared extension ranges
+                    var entry = ranges.floorEntry(field.index());
+                    var extensible = entry != null && field.index().compareTo(entry.getValue()) <= 0;
+                    ProtobufSemanticException.check(extensible,
+                            "Extension field '%s' with number %s is outside declared extension ranges\n\nThe field number must be within one of the extension ranges declared in message '%s'.\n\nHelp: Choose a field number within the declared extension ranges,\n      or update the message to include a range that covers %s:\n      \n      message %s {{\n        extensions 100 to 199;  // Declared ranges\n      }}",
+                            field.line(), field.name(), field.index(), declaration.name(), field.index(), declaration.name());
+                }
             }
         }
     }
 
-    private static void validateExtensionField(ProtobufMessageStatement targetMessage, ProtobufFieldStatement field) {
-        // Extension fields cannot be required
-        ProtobufSemanticException.check(field.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
-                "Extension field '%s' cannot be required\n\nExtension fields cannot use the 'required' modifier.\nThis ensures backward compatibility with code that doesn't know about the extension.\n\nHelp: Remove the 'required' modifier or use 'optional' instead:\n      extend MyMessage {{\n        optional string %s = 100;  // OK\n        string %s = 100;           // Also OK (implicitly optional)\n      }}",
-                field.line(), field.name(), field.name(), field.name());
-
-        // Extension fields cannot be map types
-        ProtobufSemanticException.check(!(field.type() instanceof ProtobufMapTypeReference),
-                "Extension field '%s' cannot be a map type\n\nMap fields are not allowed in extensions.\n\nHelp: If you need a map-like structure, use a repeated message with key-value pairs:\n      message KeyValue {{\n        string key = 1;\n        ValueType value = 2;\n      }}\n      extend MyMessage {{\n        repeated KeyValue %s = 100;\n      }}",
-                field.line(), field.name(), field.name());
-
-        // Validate field number is within declared extension ranges
-        var fieldNumber = field.index();
-        if(fieldNumber == null) {
-            return;
-        }
-
-        var fieldNumberValue = fieldNumber.value();
-        var inValidRange = targetMessage.children().stream()
-                .filter(ProtobufExtensionsStatement.class::isInstance)
-                .map(ProtobufExtensionsStatement.class::cast)
-                .flatMap(extensionsStatement -> extensionsStatement.expressions().stream())
-                .anyMatch(expression -> isNumberInExpression(fieldNumberValue, expression));
-
-        ProtobufSemanticException.check(inValidRange,
-                "Extension field '%s' with number %s is outside declared extension ranges\n\nThe field number must be within one of the extension ranges declared in message '%s'.\n\nHelp: Choose a field number within the declared extension ranges,\n      or update the message to include a range that covers %s:\n      \n      message %s {{\n        extensions 100 to 199;  // Declared ranges\n      }}",
-                field.line(), field.name(), fieldNumberValue, targetMessage.name(), fieldNumberValue, targetMessage.name());
-    }
-
-    private static boolean isNumberInExpression(BigInteger number, ProtobufExpression expression) {
-        return switch (expression) {
-            case ProtobufNumberExpression numberExpr
-                    when numberExpr.value() instanceof ProtobufInteger(var value) -> number.equals(value);
-            case ProtobufIntegerRangeExpression rangeExpr -> switch (rangeExpr.value()) {
-                case ProtobufRange.Bounded(var min, var max) ->
-                    number.compareTo(min.value()) >= 0 && number.compareTo(max.value()) <= 0;
-                case ProtobufRange.LowerBounded(var min) ->
-                    number.compareTo(min.value()) >= 0;
-            };
-            default -> false;
-        };
+    private static TreeMap<ProtobufInteger, ProtobufInteger> buildExtensionsLookup(ProtobufTree.WithBody<?> declaration) {
+        var ranges = new TreeMap<ProtobufInteger, ProtobufInteger>();
+        declaration.getDirectChildrenByType(ProtobufExtensionsStatement.class).forEachOrdered(extensionsStatement -> {
+            for(var expression : extensionsStatement.expressions()) {
+                switch (expression) {
+                    case ProtobufIntegerExpression integerExpression -> ranges.put(integerExpression.value(), integerExpression.value());
+                    case ProtobufIntegerRangeExpression rangeExpression -> {
+                        switch (rangeExpression.value()) {
+                            case ProtobufRange.Bounded bounded -> ranges.put(bounded.min(), bounded.max());
+                            case ProtobufRange.LowerBounded lowerBounded -> ranges.put(lowerBounded.min(), new ProtobufInteger(FIELD_NUMBER_MAX));
+                        }
+                    }
+                }
+            }
+        });
+        return ranges;
     }
 
     private static ProtobufTypeReference tryResolveType(ProtobufDocumentTree document, String originalName, ProtobufTree context) {
@@ -337,7 +380,6 @@ public final class ProtobufAnalyzer {
             var documentsToCheck = new ArrayList<ProtobufDocumentTree>(visibleImports.size() + 1);
             documentsToCheck.add(document);
             documentsToCheck.addAll(visibleImports);
-
             resolvedType = findTypeInDocuments(documentsToCheck, name);
         }
 
@@ -366,6 +408,7 @@ public final class ProtobufAnalyzer {
         return null;
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static ProtobufTree.WithBodyAndName<?> resolveNestedTypes(ProtobufTree.WithBodyAndName<?> current, String[] types, int startIndex) {
         for (var i = startIndex; i < types.length && current != null; i++) {
             current = current.getDirectChildByNameAndType(types[i], ProtobufTree.WithBodyAndName.class)
@@ -410,9 +453,9 @@ public final class ProtobufAnalyzer {
     }
 
     private static void validateDefaultOption(ProtobufDocumentTree document, ProtobufFieldStatement protobufField, ProtobufOptionExpression option) {
-        var syntax = document.syntax().orElse(null);
-
         // Proto3: Default values are NOT allowed
+        var syntax = document.syntax()
+                .orElse(ProtobufVersion.defaultVersion());
         ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3,
                 "Default values are not allowed in proto3", option.line());
 
@@ -420,56 +463,114 @@ public final class ProtobufAnalyzer {
         ProtobufSemanticException.check(protobufField.modifier() != ProtobufFieldStatement.Modifier.REPEATED,
                 "Default values cannot be used on repeated fields", option.line());
 
-        // Proto2: Cannot be used on required fields
-        ProtobufSemanticException.check(protobufField.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
-                "Default values cannot be used on required fields", option.line());
-
-        // Proto2: Cannot be used on message-typed fields
         var fieldType = protobufField.type().protobufType();
-        ProtobufSemanticException.check(fieldType != ProtobufType.MESSAGE,
-                "Default values cannot be used on message-typed fields", option.line());
-
-        // Validate value matches field type
         var value = option.value();
-        var isValidType = switch (fieldType) {
-            case INT32, INT64, UINT32, UINT64, SINT32, SINT64, FIXED32, FIXED64, SFIXED32, SFIXED64, FLOAT, DOUBLE ->
-                value instanceof ProtobufNumberExpression;
-            case STRING, BYTES -> value instanceof ProtobufLiteralExpression;
-            case BOOL -> value instanceof ProtobufBoolExpression;
-            case ENUM -> value instanceof ProtobufEnumConstantExpression;
-            default -> false;
-        };
 
-        ProtobufSemanticException.check(isValidType,
-                "Default value type mismatch for field \"%s\": expected %s but got %s",
-                option.line(), protobufField.name(), fieldType, value.getClass().getSimpleName());
-
-        // Validate numeric range for int32 fields
-        if (fieldType == ProtobufType.INT32) {
-            var numExpr = (ProtobufNumberExpression) value;
-            if (numExpr.value() instanceof ProtobufInteger(var intValue)) {
-                var int32Min = BigInteger.valueOf(Integer.MIN_VALUE);
-                var int32Max = BigInteger.valueOf(Integer.MAX_VALUE);
-                ProtobufSemanticException.check(
-                        intValue.compareTo(int32Min) >= 0 && intValue.compareTo(int32Max) <= 0,
-                        "Default value %s is out of int32 range (%d to %d) for field \"%s\"",
-                        option.line(), intValue, Integer.MIN_VALUE, Integer.MAX_VALUE, protobufField.name());
+        switch (fieldType) {
+            case UNKNOWN -> {
+                // Do not validate unknown types: it's a syntax issue
             }
-        }
 
-        // Validate enum constant exists
-        if (fieldType == ProtobufType.ENUM) {
-            var enumExpr = (ProtobufEnumConstantExpression) value;
-            var fieldTypeRef = protobufField.type();
-            if (fieldTypeRef instanceof ProtobufEnumTypeReference(var declaration)) {
-                var constantName = enumExpr.name();
-                var constantExists = declaration.children().stream()
-                        .filter(ProtobufEnumConstantStatement.class::isInstance)
-                        .map(ProtobufEnumConstantStatement.class::cast)
-                        .anyMatch(constant -> constant.name().equals(constantName));
-                ProtobufSemanticException.check(constantExists,
-                        "Default value references non-existent enum constant \"%s\" in enum \"%s\"",
-                        option.line(), constantName, declaration.name());
+            case MESSAGE -> {
+                throw new ProtobufSemanticException("Default values cannot be used on message-typed fields", option.line());
+            }
+
+            case ENUM -> {
+                ProtobufSemanticException.check(value instanceof ProtobufEnumConstantExpression,
+                        "Default value type mismatch for field \"%s\": expected enum constant",
+                        option.line(), protobufField.name());
+                var enumExpr = (ProtobufEnumConstantExpression) value;
+                switch (protobufField.type()) {
+                    case ProtobufUnresolvedTypeReference _ ->
+                            throw new ProtobufSemanticException("Default value type error for field \"%s\": unresolved type", option.line(), protobufField.name());
+                    case ProtobufMessageTypeReference _ ->
+                            throw new ProtobufSemanticException("Default value type error for field \"%s\": expected enum type, got message type", option.line(), protobufField.name());
+                    case ProtobufGroupTypeReference _ ->
+                            throw new ProtobufSemanticException("Default value type error for field \"%s\": expected enum type, got group type", option.line(), protobufField.name());
+                    case ProtobufMapTypeReference _ ->
+                            throw new InternalError("Should not be possible to reference a map type here");
+                    case ProtobufPrimitiveTypeReference _ ->
+                            throw new ProtobufSemanticException("Default value type error for field \"%s\": expected enum type, got primitive type", option.line(), protobufField.name());
+                    case ProtobufEnumTypeReference(var declaration) -> {
+                        var constant = declaration.getDirectChildByNameAndType(enumExpr.name(), ProtobufEnumConstantStatement.class);
+                        ProtobufSemanticException.check(constant.isPresent(),
+                                "Default value references non-existent enum constant \"%s\" in enum \"%s\"",
+                                option.line(), enumExpr.name(), declaration.name());
+                    }
+                }
+            }
+
+            case GROUP -> {
+                throw new ProtobufSemanticException("Default values cannot be used on group-typed fields", option.line());
+            }
+
+            case MAP -> {
+                throw new ProtobufSemanticException("Default values cannot be used on map-typed fields", option.line());
+            }
+
+            case FLOAT, DOUBLE -> {
+                // Accepts any numeric value: integers, finite floats, inf, -inf, nan
+                ProtobufSemanticException.check(value instanceof ProtobufNumberExpression,
+                        "Default value type mismatch for field \"%s\": expected numeric value",
+                        option.line(), protobufField.name());
+            }
+
+            case BOOL -> {
+                ProtobufSemanticException.check(value instanceof ProtobufBoolExpression,
+                        "Default value type mismatch for field \"%s\": expected boolean value (true or false)",
+                        option.line(), protobufField.name());
+            }
+
+            case STRING -> {
+                ProtobufSemanticException.check(value instanceof ProtobufLiteralExpression,
+                        "Default value type mismatch for field \"%s\": expected string value",
+                        option.line(), protobufField.name());
+            }
+
+            case BYTES -> {
+                ProtobufSemanticException.check(value instanceof ProtobufLiteralExpression,
+                        "Default value type mismatch for field \"%s\": expected bytes value",
+                        option.line(), protobufField.name());
+            }
+
+            case INT32, SINT32, SFIXED32 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Default value type mismatch for field \"%s\": expected integer value",
+                        option.line(), protobufField.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(INT32_MIN) >= 0 && intValue.compareTo(INT32_MAX) <= 0,
+                        "Default value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, protobufField.name(), fieldType, INT32_MIN, INT32_MAX);
+            }
+
+            case UINT32, FIXED32 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Default value type mismatch for field \"%s\": expected integer value",
+                        option.line(), protobufField.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(UINT32_MIN) >= 0 && intValue.compareTo(UINT32_MAX) <= 0,
+                        "Default value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, protobufField.name(), fieldType, UINT32_MIN, UINT32_MAX);
+            }
+
+            case INT64, SINT64, SFIXED64 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Default value type mismatch for field \"%s\": expected integer value",
+                        option.line(), protobufField.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(INT64_MIN) >= 0 && intValue.compareTo(INT64_MAX) <= 0,
+                        "Default value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, protobufField.name(), fieldType, INT64_MIN, INT64_MAX);
+            }
+
+            case UINT64, FIXED64 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Default value type mismatch for field \"%s\": expected integer value",
+                        option.line(), protobufField.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(UINT64_MIN) >= 0 && intValue.compareTo(UINT64_MAX) <= 0,
+                        "Default value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, protobufField.name(), fieldType, UINT64_MIN, UINT64_MAX);
             }
         }
     }
@@ -479,14 +580,8 @@ public final class ProtobufAnalyzer {
         ProtobufSemanticException.check(protobufField.modifier() == ProtobufFieldStatement.Modifier.REPEATED,
                 "Packed option can only be used on repeated fields", option.line());
 
-        var fieldType = protobufField.type().protobufType();
-        // Check if it's a numeric scalar type (not string, bytes, message, map, group)
-        var isNumericScalar = switch (fieldType) {
-            case STRING, BYTES, MESSAGE, MAP, GROUP, UNKNOWN -> false;
-            default -> true;
-        };
-
-        ProtobufSemanticException.check(isNumericScalar,
+        // Check if the type is packable
+        ProtobufSemanticException.check(protobufField.type().protobufType().isPackable(),
                 "Packed option can only be used on repeated numeric scalar fields", option.line());
     }
 
@@ -509,17 +604,15 @@ public final class ProtobufAnalyzer {
         }
 
         var definition = fieldOptions.get(optionName);
-        ProtobufSemanticException.check(definition != null || option.name().extension(),
-                "Invalid option \"%s\" for field \"%s\" inside %s",
-                option.line(), optionName, protobufField.name(), getParentContextName(protobufField));
-    }
-
-    private static String getParentContextName(ProtobufFieldStatement field) {
-        return switch (field.parent()) {
-            case ProtobufTree.WithName withName -> withName.name();
-            case ProtobufExtendStatement extendStatement -> "extend " + extendStatement.declaration().name();
-            case null, default -> "unknown context";
-        };
+        if (definition == null && !option.name().extension()) {
+            var parentName = switch (protobufField.parent()) {
+                case ProtobufTree.WithName withName -> withName.name();
+                case ProtobufExtendStatement extendStatement -> "extend " + extendStatement.declaration().name();
+                case null, default -> "unknown context";
+            };
+            throw new ProtobufSemanticException("Invalid option \"%s\" for field \"%s\" inside %s",
+                    option.line(), optionName, protobufField.name(), parentName);
+        }
     }
 
     private static void attributeType(ProtobufDocumentTree document, ProtobufFieldStatement typedFieldTree) {
@@ -538,7 +631,7 @@ public final class ProtobufAnalyzer {
                 continue;
             }
 
-            if(!(typeReference instanceof ProtobufUnresolvedObjectTypeReference(var originalName))) {
+            if(!(typeReference instanceof ProtobufUnresolvedTypeReference(var originalName))) {
                 throw throwUnattributableType(typedFieldTree);
             }
 
@@ -549,60 +642,6 @@ public final class ProtobufAnalyzer {
 
             typedFieldTree.setType(resolvedType);
         }
-    }
-
-    private static void attributeMapType(ProtobufDocumentTree document, ProtobufFieldStatement typedFieldTree, ProtobufMapTypeReference mapType) {
-        // Attribute key type
-        if(mapType.keyType() instanceof ProtobufUnresolvedObjectTypeReference(var keyName)) {
-            var resolvedKey = tryResolveType(document, keyName, typedFieldTree);
-            ProtobufSemanticException.check(resolvedKey != null,
-                    "Cannot resolve map key type \"%s\" in field \"%s\"",
-                    typedFieldTree.line(), keyName, typedFieldTree.name());
-            mapType.setKeyType(resolvedKey);
-        }
-
-        // Attribute value type
-        if(mapType.valueType() instanceof ProtobufUnresolvedObjectTypeReference(var valueName)) {
-            var resolvedValue = tryResolveType(document, valueName, typedFieldTree);
-            ProtobufSemanticException.check(resolvedValue != null,
-                    "Cannot resolve map value type \"%s\" in field \"%s\"",
-                    typedFieldTree.line(), valueName, typedFieldTree.name());
-            mapType.setValueType(resolvedValue);
-        }
-    }
-
-    private static List<ProtobufDocumentTree> collectVisibleImports(ProtobufDocumentTree document) {
-        var result = new ArrayList<ProtobufDocumentTree>();
-        var visited = new HashSet<ProtobufDocumentTree>();
-        collectVisibleImportsRecursive(document, result, visited, true);
-        // Always include built-in types (google.protobuf.*)
-        if(BUILT_IN_TYPES != null) {
-            result.addAll(BUILT_IN_TYPES);
-        }
-        return result;
-    }
-
-    private static void collectVisibleImportsRecursive(ProtobufDocumentTree document, List<ProtobufDocumentTree> result, Set<ProtobufDocumentTree> visited, boolean includeNonPublic) {
-        if (!visited.add(document)) {
-            return;
-        }
-
-        document.children().stream()
-                .filter(ProtobufImportStatement.class::isInstance)
-                .map(ProtobufImportStatement.class::cast)
-                .filter(importStatement -> importStatement.document() != null)
-                .forEach(importStatement -> {
-                    var imported = importStatement.document();
-                    var isPublic = importStatement.modifier() == ProtobufImportStatement.Modifier.PUBLIC;
-
-                    // Add this import if it's a direct import OR if it's a public import we're traversing
-                    if (includeNonPublic || isPublic) {
-                        result.add(imported);
-                    }
-
-                    // Always recursively collect public imports from any imported document
-                    collectVisibleImportsRecursive(imported, result, visited, false);
-                });
     }
 
     private static ProtobufParserException throwUnattributableType(ProtobufFieldStatement typedFieldTree) {
@@ -618,101 +657,90 @@ public final class ProtobufAnalyzer {
         );
     }
 
-    private static void validateExtensions(ProtobufDocumentTree document, ProtobufExtensionsStatement extensionsStatement) {
-        var syntax = document.syntax().orElse(null);
-        var parent = extensionsStatement.parent();
-
-        // Proto3: extensions only allowed for options
-        if(syntax == ProtobufVersion.PROTOBUF_3 && parent instanceof ProtobufMessageStatement message) {
-            var messageName = message.name();
-            ProtobufSemanticException.check(messageName != null && messageName.endsWith("Options"),
-                    "Extensions are not allowed in proto3 except for custom options\n\nYou're using 'extensions' in proto3, but extensions are only allowed in messages\nwhose names end with 'Options' (for defining custom options).\n\nHelp: In proto3, use one of these alternatives:\n      1. If you need to extend the protocol, use the 'Any' type:\n         import \"google/protobuf/any.proto\";\n         message MyMessage {{\n           google.protobuf.Any extra_data = 1;\n         }}\n\n      2. If you're defining custom options, ensure your message name ends with 'Options'\n\n      3. Use regular message composition instead of extensions\n\n      Note: Proto2 extensions are generally discouraged in favor of proto3's simpler model.",
-                    extensionsStatement.line());
+    private static void attributeMapType(ProtobufDocumentTree document, ProtobufFieldStatement typedFieldTree, ProtobufMapTypeReference mapType) {
+        var hasUpdate = false;
+        
+        var keyType = mapType.keyType();
+        if(keyType instanceof ProtobufUnresolvedTypeReference(var keyName)) {
+            var resolvedKeyType = tryResolveType(document, keyName, typedFieldTree);
+            ProtobufSemanticException.check(resolvedKeyType != null,
+                    "Cannot resolve map key type \"%s\" in field \"%s\"",
+                    typedFieldTree.line(), keyName, typedFieldTree.name());
+            keyType = resolvedKeyType;
+            hasUpdate = true;
         }
-
-        if(!(parent instanceof ProtobufMessageStatement message)) {
-            return;
+        
+        // Attribute value type
+        var valueType = mapType.valueType();
+        if(valueType instanceof ProtobufUnresolvedTypeReference(var valueName)) {
+            var resolvedValueType = tryResolveType(document, valueName, typedFieldTree);
+            ProtobufSemanticException.check(resolvedValueType != null,
+                    "Cannot resolve map value type \"%s\" in field \"%s\"",
+                    typedFieldTree.line(), valueName, typedFieldTree.name());
+            valueType = resolvedValueType;
+            hasUpdate = true;
         }
-
-        // Build list of extension ranges
-        var extensionRanges = extensionsStatement.expressions().stream()
-                .map(ProtobufAnalyzer::toRange)
-                .filter(Objects::nonNull)
-                .toList();
-
-        // Check for overlaps with regular field numbers and reserved ranges
-        validateExtensionRangeOverlaps(message, extensionsStatement, extensionRanges);
+        
+        if(hasUpdate) {
+            var updatedType = new ProtobufMapTypeReference(keyType, valueType);
+            typedFieldTree.setType(updatedType);
+        }
     }
 
-    private static ProtobufRange toRange(ProtobufExpression expression) {
-        return switch (expression) {
-            case ProtobufNumberExpression numberExpr when numberExpr.value() instanceof ProtobufInteger integer ->
-                new ProtobufRange.Bounded(integer, integer);
-            case ProtobufIntegerRangeExpression rangeExpr -> rangeExpr.value();
-            default -> null;
-        };
-    }
+    private static List<ProtobufDocumentTree> collectVisibleImports(ProtobufDocumentTree document) {
+        var result = new ArrayList<ProtobufDocumentTree>();
+        var visited = new HashSet<ProtobufDocumentTree>();
 
-    private static void validateExtensionRangeOverlaps(ProtobufMessageStatement message, ProtobufExtensionsStatement extensionsStatement, List<ProtobufRange> extensionRanges) {
-        // Check for overlaps with regular field numbers
-        message.children().stream()
-                .filter(ProtobufFieldStatement.class::isInstance)
-                .map(ProtobufFieldStatement.class::cast)
-                .filter(field -> field.index() != null)
-                .forEach(field -> {
-                    var fieldNumberValue = field.index().value();
-                    extensionRanges.stream()
-                            .filter(extRange -> isInRange(fieldNumberValue, extRange))
-                            .findFirst()
-                            .ifPresent(ignored -> {
-                                throw new ProtobufSemanticException(
-                                        "Extension range overlaps with field \"%s\" (field number %s)",
-                                        extensionsStatement.line(), field.name(), fieldNumberValue);
-                            });
-                });
+        record Entry(ProtobufDocumentTree document, boolean includeNonPublic) { }
+        var stack = new ArrayDeque<Entry>();
+        stack.push(new Entry(document, true));
 
-        // Check for overlaps with reserved ranges
-        message.children().stream()
-                .filter(ProtobufReservedStatement.class::isInstance)
-                .map(ProtobufReservedStatement.class::cast)
-                .flatMap(reserved -> reserved.expressions().stream())
-                .forEach(expression -> validateReservedExtensionOverlap(extensionsStatement, extensionRanges, expression));
-    }
+        while (!stack.isEmpty()) {
+            var entry = stack.pop();
+            if (visited.add(entry.document())) {
+                entry.document().getDirectChildrenByType(ProtobufImportStatement.class)
+                        .filter(ProtobufImportStatement::hasDocument)
+                        .forEachOrdered(importStatement -> {
+                            var imported = importStatement.document();
+                            var isPublic = importStatement.modifier() == ProtobufImportStatement.Modifier.PUBLIC;
 
-    private static void validateReservedExtensionOverlap(ProtobufExtensionsStatement extensionsStatement, List<ProtobufRange> extensionRanges, ProtobufExpression expression) {
-        switch (expression) {
-            case ProtobufNumberExpression numberExpr when numberExpr.value() instanceof ProtobufInteger(var value) ->
-                    extensionRanges.stream()
-                            .filter(extRange -> isInRange(value, extRange))
-                            .findFirst()
-                            .ifPresent(ignored -> {
-                                throw new ProtobufSemanticException(
-                                        "Extension range overlaps with reserved number %s",
-                                        extensionsStatement.line(), value);
-                            });
-            case ProtobufIntegerRangeExpression rangeExpr -> {
-                var reservedRange = rangeExpr.value();
-                extensionRanges.stream()
-                        .filter(extRange -> rangesOverlap(extRange, reservedRange))
-                        .findFirst()
-                        .ifPresent(ignored -> {
-                            throw new ProtobufSemanticException(
-                                    "Extension range overlaps with reserved range",
-                                    extensionsStatement.line());
+                            if (entry.includeNonPublic() || isPublic) {
+                                result.add(imported);
+                            }
+
+                            stack.push(new Entry(imported, false));
                         });
             }
-            default -> {}
+        }
+
+        // Always include built-in types (google.protobuf.*)
+        if (BUILT_IN_TYPES != null) {
+            result.addAll(BUILT_IN_TYPES);
+        }
+
+        return result;
+    }
+
+    private static void validateExtensions(ProtobufDocumentTree document, ProtobufExtensionsStatement extensionsStatement) {
+        // Proto3: extensions only allowed for options
+        var syntax = document.syntax()
+                .orElse(ProtobufVersion.defaultVersion());
+        if(syntax == ProtobufVersion.PROTOBUF_3) {
+            throw new ProtobufSemanticException("""
+                    Extensions are not allowed in proto3, except for custom options.
+                    
+                    Help: In proto3, if you need to extend the protocol, use the 'Any' type:
+                          import "google/protobuf/any.proto";
+                    
+                          message MyMessage {
+                              google.protobuf.Any extra_data = 1;
+                          }
+                    
+                    Note: Proto2 extensions are generally discouraged in favor of proto3's simpler model.""",
+                    extensionsStatement.line());
         }
     }
 
-    private static boolean isInRange(BigInteger number, ProtobufRange range) {
-        return switch (range) {
-            case ProtobufRange.Bounded(var min, var max) ->
-                number.compareTo(min.value()) >= 0 && number.compareTo(max.value()) <= 0;
-            case ProtobufRange.LowerBounded(var min) ->
-                number.compareTo(min.value()) >= 0;
-        };
-    }
 
     private static void validateOption(ProtobufOptionStatement optionStatement) {
         if(BUILT_IN_OPTIONS == null) {
@@ -749,23 +777,122 @@ public final class ProtobufAnalyzer {
         }
     }
 
-    private static void validateOptionValueType(ProtobufOptionStatement option, ProtobufFieldStatement definition) {
-        var expectedType = definition.type().protobufType();
-        var actualValue = option.value();
+    private static void validateOptionValueType(ProtobufOptionStatement option, ProtobufFieldStatement optionDefinition) {
+        var value = option.value();
+        var type = optionDefinition.type().protobufType();
+        switch (type) {
+            case UNKNOWN -> {
+                // Do not validate unknown types: it's a syntax issue
+            }
 
-        var isValidType = switch (expectedType) {
-            case INT32, INT64, UINT32, UINT64, SINT32, SINT64, FIXED32, FIXED64, SFIXED32, SFIXED64, FLOAT, DOUBLE ->
-                actualValue instanceof ProtobufNumberExpression;
-            case STRING, BYTES -> actualValue instanceof ProtobufLiteralExpression;
-            case BOOL -> actualValue instanceof ProtobufBoolExpression;
-            case ENUM -> actualValue instanceof ProtobufEnumConstantExpression;
-            case MESSAGE -> actualValue instanceof ProtobufMessageValueExpression;
-            default -> true; // Unknown type, can't validate
-        };
+            case MESSAGE -> {
+                ProtobufSemanticException.check(value instanceof ProtobufMessageValueExpression,
+                        "Option value type mismatch for field \"%s\": expected message value",
+                        option.line(), optionDefinition.name());
 
-        ProtobufSemanticException.check(isValidType,
-                "Option \"%s\" has invalid value type: expected %s but got %s",
-                option.line(), option.name().name(), expectedType, actualValue.getClass().getSimpleName());
+            }
+
+            case ENUM -> {
+                ProtobufSemanticException.check(value instanceof ProtobufEnumConstantExpression,
+                        "Option value type mismatch for field \"%s\": expected enum constant",
+                        option.line(), optionDefinition.name());
+                var enumExpr = (ProtobufEnumConstantExpression) value;
+                switch (optionDefinition.type()) {
+                    case ProtobufUnresolvedTypeReference _ ->
+                            throw new ProtobufSemanticException("Option value type error for field \"%s\": unresolved type", option.line(), optionDefinition.name());
+                    case ProtobufMessageTypeReference _ ->
+                            throw new ProtobufSemanticException("Option value type error for field \"%s\": expected enum type, got message type", option.line(), optionDefinition.name());
+                    case ProtobufGroupTypeReference _ ->
+                            throw new ProtobufSemanticException("Option value type error for field \"%s\": expected enum type, got group type", option.line(), optionDefinition.name());
+                    case ProtobufMapTypeReference _ ->
+                            throw new InternalError("Should not be possible to reference a map type here");
+                    case ProtobufPrimitiveTypeReference _ ->
+                            throw new ProtobufSemanticException("Option value type error for field \"%s\": expected enum type, got primitive type", option.line(), optionDefinition.name());
+                    case ProtobufEnumTypeReference(var declaration) -> {
+                        var constant = declaration.getDirectChildByNameAndType(enumExpr.name(), ProtobufEnumConstantStatement.class);
+                        ProtobufSemanticException.check(constant.isPresent(),
+                                "Option value references non-existent enum constant \"%s\" in enum \"%s\"",
+                                option.line(), enumExpr.name(), declaration.name());
+                    }
+                }
+            }
+
+            case GROUP -> {
+                ProtobufSemanticException.check(value instanceof ProtobufGroupValueExpression,
+                        "Option value type mismatch for field \"%s\": expected group value",
+                        option.line(), optionDefinition.name());
+
+            }
+
+            case MAP -> {
+                throw new ProtobufSemanticException("Default values cannot be used on map-typed fields", option.line());
+            }
+
+            case FLOAT, DOUBLE -> {
+                // Accepts any numeric value: integers, finite floats, inf, -inf, nan
+                ProtobufSemanticException.check(value instanceof ProtobufNumberExpression,
+                        "Option value type mismatch for field \"%s\": expected numeric value",
+                        option.line(), optionDefinition.name());
+            }
+
+            case BOOL -> {
+                ProtobufSemanticException.check(value instanceof ProtobufBoolExpression,
+                        "Option value type mismatch for field \"%s\": expected boolean value (true or false)",
+                        option.line(), optionDefinition.name());
+            }
+
+            case STRING -> {
+                ProtobufSemanticException.check(value instanceof ProtobufLiteralExpression,
+                        "Option value type mismatch for field \"%s\": expected string value",
+                        option.line(), optionDefinition.name());
+            }
+
+            case BYTES -> {
+                ProtobufSemanticException.check(value instanceof ProtobufLiteralExpression,
+                        "Option value type mismatch for field \"%s\": expected bytes value",
+                        option.line(), optionDefinition.name());
+            }
+
+            case INT32, SINT32, SFIXED32 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Option value type mismatch for field \"%s\": expected integer value",
+                        option.line(), optionDefinition.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(INT32_MIN) >= 0 && intValue.compareTo(INT32_MAX) <= 0,
+                        "Option value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, optionDefinition.name(), type, INT32_MIN, INT32_MAX);
+            }
+
+            case UINT32, FIXED32 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Option value type mismatch for field \"%s\": expected integer value",
+                        option.line(), optionDefinition.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(UINT32_MIN) >= 0 && intValue.compareTo(UINT32_MAX) <= 0,
+                        "Option value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, optionDefinition.name(), type, UINT32_MIN, UINT32_MAX);
+            }
+
+            case INT64, SINT64, SFIXED64 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Option value type mismatch for field \"%s\": expected integer value",
+                        option.line(), optionDefinition.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(INT64_MIN) >= 0 && intValue.compareTo(INT64_MAX) <= 0,
+                        "Option value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, optionDefinition.name(), type, INT64_MIN, INT64_MAX);
+            }
+
+            case UINT64, FIXED64 -> {
+                ProtobufSemanticException.check(value instanceof ProtobufIntegerExpression,
+                        "Option value type mismatch for field \"%s\": expected integer value",
+                        option.line(), optionDefinition.name());
+                var intValue = ((ProtobufIntegerExpression) value).value().value();
+                ProtobufSemanticException.check(intValue.compareTo(UINT64_MIN) >= 0 && intValue.compareTo(UINT64_MAX) <= 0,
+                        "Option value %s for field \"%s\" is out of range for %s (valid range: %s to %s)",
+                        option.line(), intValue, optionDefinition.name(), type, UINT64_MIN, UINT64_MAX);
+            }
+        }
     }
 
     private static void validateReserved(ProtobufReservedStatement reservedStatement) {
@@ -774,188 +901,129 @@ public final class ProtobufAnalyzer {
             return;
         }
 
-        // Check if mixing numbers and names (not allowed) and collect ranges
-        boolean hasNumbers = false;
-        boolean hasNames = false;
-        var ranges = new ArrayList<ProtobufRange>();
+        var ranges = new TreeMap<BigInteger, BigInteger>();
+        var names = new HashSet<String>();
+
+        var minAllowedIndex = reservedStatement.parent() instanceof ProtobufEnumStatement
+                ? ENUM_CONSTANT_MIN
+                : FIELD_NUMBER_MIN;
+        var maxAllowedIndex = reservedStatement.parent() instanceof ProtobufEnumStatement
+                ? ENUM_CONSTANT_MAX
+                : FIELD_NUMBER_MAX;
 
         for(var expression : expressions) {
             switch (expression) {
-                case ProtobufLiteralExpression ignored -> hasNames = true;
-                case ProtobufNumberExpression numberExpr when numberExpr.value() instanceof ProtobufInteger integer -> {
-                    hasNumbers = true;
-                    validateReservedNumberRange(integer.value(), reservedStatement);
-                    ranges.add(new ProtobufRange.Bounded(integer, integer));
+                case ProtobufLiteralExpression literalExpression -> {
+                    if(!names.add(literalExpression.value())) {
+                        throw new ProtobufSyntaxException("Duplicate reserved field name '%s'", literalExpression.line(), literalExpression.value());
+                    }
                 }
+
+                case ProtobufIntegerExpression integerExpression -> {
+                    var value = integerExpression.value().value();
+
+                    ProtobufSemanticException.check(value.compareTo(minAllowedIndex) > 0,
+                            "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), value, minAllowedIndex);
+
+                    ProtobufSemanticException.check(value.compareTo(maxAllowedIndex) <= 0,
+                            "Reserved number %s is invalid: must be at most %s", reservedStatement.line(), value, maxAllowedIndex);
+
+                    // Check if value falls within an existing range
+                    var floor = ranges.floorEntry(value);
+                    ProtobufSemanticException.check(floor == null || value.compareTo(floor.getValue()) > 0,
+                            "Reserved ranges overlap", reservedStatement.line());
+
+                    ranges.put(value, value);
+                }
+
                 case ProtobufIntegerRangeExpression rangeExpr -> {
-                    hasNumbers = true;
                     var range = rangeExpr.value();
-                    validateReservedRangeOrder(range, reservedStatement);
-                    ranges.add(range);
+                    switch (range) {
+                        case ProtobufRange.Bounded(ProtobufInteger(var min), ProtobufInteger(var max)) -> {
+                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) > 0,
+                                    "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), min, minAllowedIndex);
+
+                            ProtobufSemanticException.check(max.compareTo(maxAllowedIndex) <= 0,
+                                    "Reserved number %s is invalid: must be at most %s", reservedStatement.line(), max, maxAllowedIndex);
+
+                            ProtobufSemanticException.check(min.compareTo(max) <= 0,
+                                    "Invalid reserved range %s to %s: start must be <= end",
+                                    reservedStatement.line(), min, max);
+
+                            // Check overlap with range starting before min
+                            var floor = ranges.floorEntry(min);
+                            ProtobufSemanticException.check(floor == null || min.compareTo(floor.getValue()) > 0,
+                                    "Reserved ranges overlap", reservedStatement.line());
+
+                            // Check overlap with range starting within [min, max]
+                            var ceiling = ranges.ceilingEntry(min);
+                            ProtobufSemanticException.check(ceiling == null || ceiling.getKey().compareTo(max) > 0,
+                                    "Reserved ranges overlap", reservedStatement.line());
+
+                            ranges.put(min, max);
+                        }
+
+                        case ProtobufRange.LowerBounded(ProtobufInteger(var min)) -> {
+                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) > 0,
+                                    "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), min, minAllowedIndex);
+
+                            // Check overlap with range starting before min
+                            var floor = ranges.floorEntry(min);
+                            ProtobufSemanticException.check(floor == null || min.compareTo(floor.getValue()) > 0,
+                                    "Reserved ranges overlap", reservedStatement.line());
+
+                            // Any range starting at or after min would overlap with [min, max]
+                            var ceiling = ranges.ceilingEntry(min);
+                            ProtobufSemanticException.check(ceiling == null,
+                                    "Reserved ranges overlap", reservedStatement.line());
+
+                            ranges.put(min, maxAllowedIndex);
+                        }
+                    }
                 }
+
                 default -> {}
             }
         }
 
-        ProtobufSemanticException.check(!(hasNumbers && hasNames),
+        ProtobufSemanticException.check(ranges.isEmpty() || names.isEmpty(),
                 "Cannot mix reserved numbers and names in the same statement", reservedStatement.line());
-
-        // Check for overlapping ranges
-        if(hasNumbers) {
-            checkOverlappingRanges(ranges, reservedStatement);
-        }
-    }
-
-    private static void validateReservedNumberRange(BigInteger value, ProtobufReservedStatement reservedStatement) {
-        ProtobufSemanticException.check(value.compareTo(BigInteger.ZERO) > 0,
-                "Reserved number %s is invalid: must be at least 1", reservedStatement.line(), value);
-
-        ProtobufSemanticException.check(value.compareTo(FIELD_NUMBER_MAX) <= 0,
-                "Reserved number %s is invalid: must be at most 536870911", reservedStatement.line(), value);
-    }
-
-    private static void validateReservedRangeOrder(ProtobufRange range, ProtobufReservedStatement reservedStatement) {
-        if(range instanceof ProtobufRange.Bounded(var min, var max)) {
-            ProtobufSemanticException.check(min.value().compareTo(max.value()) <= 0,
-                    "Invalid reserved range %s to %s: start must be <= end",
-                    reservedStatement.line(), min.value(), max.value());
-        }
-    }
-
-    private static void checkOverlappingRanges(List<ProtobufRange> ranges, ProtobufReservedStatement reservedStatement) {
-        for(var i = 0; i < ranges.size(); i++) {
-            for(var j = i + 1; j < ranges.size(); j++) {
-                ProtobufSemanticException.check(!rangesOverlap(ranges.get(i), ranges.get(j)),
-                        "Reserved ranges overlap", reservedStatement.line());
-            }
-        }
-    }
-
-    private static boolean rangesOverlap(ProtobufRange range1, ProtobufRange range2) {
-        return switch (range1) {
-            case ProtobufRange.Bounded(var min1, var max1) -> switch (range2) {
-                case ProtobufRange.Bounded(var min2, var max2) -> {
-                    // Check if ranges overlap: [a,b] and [c,d] overlap if max(a,c) <= min(b,d)
-                    var max = min1.value().max(min2.value());
-                    var min = max1.value().min(max2.value());
-                    yield max.compareTo(min) <= 0;
-                }
-                case ProtobufRange.LowerBounded(var min2) ->
-                    // [a,b] overlaps with [c,max] if b >= c
-                    max1.value().compareTo(min2.value()) >= 0;
-            };
-            case ProtobufRange.LowerBounded(var min1) -> switch (range2) {
-                case ProtobufRange.Bounded(_, var max2) ->
-                    // [a,max] overlaps with [b,c] if c >= a
-                    max2.value().compareTo(min1.value()) >= 0;
-                case ProtobufRange.LowerBounded ignored ->
-                    // Both extend to max, always overlap
-                    true;
-            };
-        };
-    }
-
-    private static void validatePackage(ProtobufPackageStatement packageStatement) {
-        var packageName = packageStatement.name();
-        if(packageName == null || packageName.isEmpty()) {
-            return;
-        }
-
-        ProtobufSemanticException.check(!packageName.startsWith("."),
-                "Package name cannot start with a dot", packageStatement.line());
-
-        ProtobufSemanticException.check(!packageName.endsWith("."),
-                "Package name cannot end with a dot", packageStatement.line());
-
-        ProtobufSemanticException.check(!packageName.contains(".."),
-                "Package name cannot contain consecutive dots", packageStatement.line());
-    }
-
-    private static void validateOneof(ProtobufOneofFieldStatement oneofStatement) {
-        // Oneof must contain at least one field
-        var hasFields = oneofStatement.children().stream()
-                .anyMatch(ProtobufFieldStatement.class::isInstance);
-
-        ProtobufSemanticException.check(hasFields,
-                "Oneof \"%s\" must contain at least one field", oneofStatement.line(), oneofStatement.name());
-
-        // Oneof cannot contain groups
-        for (var child : oneofStatement.children()) {
-            if (child instanceof ProtobufGroupFieldStatement group) {
-                throw new ProtobufSemanticException(
-                        "Oneof \"%s\" cannot contain group \"%s\"\n\nGroups are not allowed inside oneofs.",
-                        oneofStatement.line(), oneofStatement.name(), group.name());
-            }
-        }
     }
 
     private static void validateField(ProtobufDocumentTree document, ProtobufFieldStatement field) {
-        var syntax = document.syntax().orElse(null);
-        var parent = field.parent();
-
-        // Determine the enclosing message and validate accordingly
-        switch (parent) {
-            case ProtobufMessageStatement message -> validateMessageField(field, message, syntax);
-            case ProtobufOneofFieldStatement oneof when oneof.parent() instanceof ProtobufMessageStatement message -> {
-                validateOneofField(field);
-                validateMessageField(field, message, syntax);
-            }
-            case ProtobufEnumStatement enumStatement ->
-                validateEnumConstant(document, enumStatement, (ProtobufEnumConstantStatement) field);
-            default -> {} // Not in a validation context
+        // Check field specific data
+        switch (field) {
+            case ProtobufGroupFieldStatement groupField -> validateGroupField(document, groupField);
+            case ProtobufOneofFieldStatement oneofField -> validateOneofField(oneofField);
+            default -> {}
         }
+
+        validateFieldModifiers(document, field);
+
+        validateFieldType(field);
+
+        validateFieldIndex(field);
     }
 
-    private static void validateMessageField(ProtobufFieldStatement field, ProtobufMessageStatement enclosingMessage, ProtobufVersion syntax) {
-        // Validate field number range
-        validateFieldNumber(field, syntax);
-
+    private static void validateFieldModifiers(ProtobufDocumentTree document, ProtobufFieldStatement field) {
         // Proto3: "required" modifier not allowed
+        var syntax = document.syntax()
+                .orElse(ProtobufVersion.defaultVersion());
         ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3 || field.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
                 "Field '%s' cannot use 'required' modifier in proto3\n\nProto3 simplified field presence and removed the 'required' modifier.\nAll singular fields in proto3 are optional by default.\n\nHelp: In proto3:\n      - Remove the 'required' keyword\n      - Fields are optional by default and return default values when not set\n      - Use 'optional' keyword if you need explicit presence detection\n      \n      Example:\n        Proto2: required string name = 1;\n        Proto3: string name = 1;  // Already optional\n        Proto3: optional string name = 1;  // Explicit presence tracking",
                 field.line(), field.name());
-
-        // Validate map field restrictions
-        if(field.type() instanceof ProtobufMapTypeReference mapType) {
-            validateMapField(field, mapType);
-        }
-
-        // Check for duplicate field names and numbers within the message
-        validateFieldUniqueness(enclosingMessage, field);
-
-        // Check reserved names and numbers
-        validateFieldNotReserved(enclosingMessage, field);
-
-        // Check for name conflicts with nested types
-        validateFieldNameConflicts(enclosingMessage, field);
     }
 
-    private static void validateFieldNumber(ProtobufFieldStatement field, ProtobufVersion syntax) {
-        var index = field.index();
-        if(index == null) {
-            return;
+    private static void validateFieldType(ProtobufFieldStatement field) {
+        switch (field.type()) {
+            case ProtobufMapTypeReference mapType -> validateMapField(field, mapType);
+            default -> {}
         }
-
-        var fieldNumber = index.value();
-
-        // Field numbers must be between 1 and 536,870,911
-        ProtobufSemanticException.check(fieldNumber.compareTo(FIELD_NUMBER_MIN) >= 0,
-                "Field \"%s\" has invalid field number %s\n\nField numbers must be positive integers starting from 1.\nYou used: %s\n\nHelp: Field numbers are used to identify fields in the binary format and must be\n      unique within each message. Use field number 1 for your first field.\n      Example: string name = 1;",
-                field.line(), field.name(), fieldNumber, fieldNumber);
-
-        ProtobufSemanticException.check(fieldNumber.compareTo(FIELD_NUMBER_MAX) <= 0,
-                "Field \"%s\" has invalid field number %s\n\nField numbers must not exceed 536,870,911 (2^29 - 1).\nYou used: %s\n\nHelp: This is the maximum field number allowed by the Protocol Buffers specification.\n      Consider reorganizing your message or splitting it into multiple messages if you\n      need more fields.\n\n      Field number ranges:\n        1-15:          Use for frequently set fields (1 byte encoding)\n        16-2047:       Standard range (2 bytes encoding)\n        2048-536870911: Extended range (more bytes encoding)",
-                field.line(), field.name(), fieldNumber, fieldNumber);
-
-        // Reserved range 19000-19999 for Protobuf implementation
-        ProtobufSemanticException.check(fieldNumber.compareTo(RESERVED_RANGE_MIN) < 0 || fieldNumber.compareTo(RESERVED_RANGE_MAX) > 0,
-                "Field \"%s\" uses field number %s which is reserved\n\nThe range 19000-19999 is reserved for the Protocol Buffers implementation.\nYou cannot use field numbers in this range.\n\nHelp: Choose a different field number outside this range.\n      Recommended ranges:\n        1-15:    For frequently set fields (most efficient)\n        16-2047: For less frequently set fields\n      Avoid: 19000-19999 (reserved for internal use)",
-                field.line(), field.name(), fieldNumber);
     }
 
     private static void validateMapField(ProtobufFieldStatement field, ProtobufMapTypeReference mapType) {
         // Map fields cannot have modifiers
-        ProtobufSemanticException.check(field.modifier() == null || field.modifier() == ProtobufFieldStatement.Modifier.NONE,
+        ProtobufSemanticException.check(field.modifier() == ProtobufFieldStatement.Modifier.NONE,
                 "Map field \"%s\" cannot have modifier '%s'\n\nMap fields are implicitly repeated and cannot have additional modifiers.\nYou specified: %s\n\nHelp: Remove the '%s' modifier from your map field declaration.\n      Maps are already collections and don't need 'repeated'.\n      Example: map<string, int32> my_map = 1;",
                 field.line(), field.name(), field.modifier().token(), field.modifier().token(), field.modifier().token());
 
@@ -963,32 +1031,60 @@ public final class ProtobufAnalyzer {
         var keyType = mapType.keyType();
         if(keyType != null) {
             var keyProtobufType = keyType.protobufType();
-            var isValidKeyType = switch (keyProtobufType) {
-                case FLOAT, DOUBLE, BYTES, MESSAGE, ENUM, MAP -> false;
-                default -> true;
-            };
-
-            ProtobufSemanticException.check(isValidKeyType,
+            ProtobufSemanticException.check(keyProtobufType.isValidMapKeyType(),
                     "Map field \"%s\" has invalid key type '%s'\n\nMap keys must be integral or string types for hashing and equality comparison.\nYou used: %s\n\nHelp: Valid map key types are:\n      - Integral types: int32, int64, uint32, uint64, sint32, sint64, fixed32, fixed64, sfixed32, sfixed64, bool\n      - String types: string\n\n      Invalid key types: float, double, bytes, message types, enums, and nested maps\n      Example: map<string, MyMessage> users = 1;",
                     field.line(), field.name(), keyType.name(), keyType.name());
         }
 
         // Validate value type restrictions - cannot be another map
-        ProtobufSemanticException.check(!(mapType.valueType() instanceof ProtobufMapTypeReference),
-                "Map field \"%s\" cannot have another map as its value type\n\nNested maps (map<K, map<K2, V>>) are not supported in Protocol Buffers.\n\nHelp: To achieve a similar structure, use one of these approaches:\n      1. Create a wrapper message:\n         message InnerMap {\n           map<string, int32> values = 1;\n         }\n         map<string, InnerMap> outer_map = 1;\n\n      2. Use a different data structure:\n         - Repeated nested messages with composite keys\n         - Flattened key structure (e.g., \"outer_inner\" as a single key)",
-                field.line(), field.name());
+        var valueType = mapType.valueType();
+        if(valueType != null) {
+            var valueProtobufType = valueType.protobufType();
+            ProtobufSemanticException.check(valueProtobufType.isValidMapValueType(),
+                    "Map field \"%s\" cannot have another map as its value type\n\nNested maps (map<K, map<K2, V>>) are not supported in Protocol Buffers.\n\nHelp: To achieve a similar structure, use one of these approaches:\n      1. Create a wrapper message:\n         message InnerMap {\n           map<string, int32> values = 1;\n         }\n         map<string, InnerMap> outer_map = 1;\n\n      2. Use a different data structure:\n         - Repeated nested messages with composite keys\n         - Flattened key structure (e.g., \"outer_inner\" as a single key)",
+                    field.line(), field.name());
+        }
     }
 
-    private static void validateOneofField(ProtobufFieldStatement field) {
-        // Oneof fields cannot be repeated
-        ProtobufSemanticException.check(field.modifier() != ProtobufFieldStatement.Modifier.REPEATED,
-                "Oneof field \"%s\" cannot be repeated\n\nFields inside a 'oneof' represent mutually exclusive options and cannot be repeated.\nA oneof can only hold one value at a time.\n\nHelp: Remove the 'repeated' modifier or move this field outside the oneof.\n      If you need a repeated field, define it outside the oneof block.\n      Example:\n        oneof choice {{\n          string name = 1;      // OK\n          int32 age = 2;        // OK\n        }}\n        repeated string tags = 3;  // Repeated field outside oneof",
-                field.line(), field.name());
+    private static void validateFieldIndex(ProtobufFieldStatement field) {
+        if (!field.hasIndex()) {
+            return;
+        }
+        var fieldNumber = field.index().value();
 
-        // Oneof fields cannot be optional
-        ProtobufSemanticException.check(field.modifier() != ProtobufFieldStatement.Modifier.OPTIONAL,
-                "Oneof field '%s' cannot have 'optional' modifier\n\nFields in a oneof are inherently optional - only one can be set at a time.\nThe 'optional' modifier is redundant and not allowed.\n\nHelp: Remove the 'optional' modifier from this field.\n      Example:\n        oneof choice {{\n          string name = 1;      // Already optional\n          int32 age = 2;        // Already optional\n        }}",
-                field.line(), field.name());
+        var minAllowedIndex = field.parent() instanceof ProtobufEnumStatement
+                ? ENUM_CONSTANT_MIN
+                : FIELD_NUMBER_MIN;
+        ProtobufSemanticException.check(fieldNumber.compareTo(minAllowedIndex) >= 0,
+                "Field \"%s\" has invalid field number %s\n\nField numbers must be positive integers starting from 1.\nYou used: %s\n\nHelp: Field numbers are used to identify fields in the binary format and must be\n      unique within each message. Use field number 1 for your first field.\n      Example: string name = 1;",
+                field.line(), field.name(), fieldNumber, fieldNumber);
+
+        var maxAllowedIndex = field.parent() instanceof ProtobufEnumStatement
+                ? ENUM_CONSTANT_MAX
+                : FIELD_NUMBER_MAX;
+        ProtobufSemanticException.check(fieldNumber.compareTo(maxAllowedIndex) <= 0,
+                "Field \"%s\" has invalid field number %s\n\nField numbers must not exceed 536,870,911 (2^29 - 1).\nYou used: %s\n\nHelp: This is the maximum field number allowed by the Protocol Buffers specification.\n      Consider reorganizing your message or splitting it into multiple messages if you\n      need more fields.\n\n      Field number ranges:\n        1-15:          Use for frequently set fields (1 byte encoding)\n        16-2047:       Standard range (2 bytes encoding)\n        2048-536870911: Extended range (more bytes encoding)",
+                field.line(), field.name(), fieldNumber, fieldNumber);
+
+        ProtobufSemanticException.check(fieldNumber.compareTo(RESERVED_RANGE_MIN) < 0 || fieldNumber.compareTo(RESERVED_RANGE_MAX) > 0,
+                "Field \"%s\" uses field number %s which is reserved\n\nThe range 19000-19999 is reserved for the Protocol Buffers implementation.\nYou cannot use field numbers in this range.\n\nHelp: Choose a different field number outside this range.\n      Recommended ranges:\n        1-15:    For frequently set fields (most efficient)\n        16-2047: For less frequently set fields\n      Avoid: 19000-19999 (reserved for internal use)",
+                field.line(), field.name(), fieldNumber);
+    }
+
+    private static void validateGroupField(ProtobufDocumentTree document, ProtobufGroupFieldStatement groupField) {
+        var syntax = document.syntax()
+                .orElse(ProtobufVersion.defaultVersion());
+        ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3,
+                "Group \"%s\" is not allowed in proto3\n\nGroups are deprecated and not supported in proto3.\nThey were a legacy feature from proto2 that combined field declaration with message definition.\n\nHelp: Use a nested message type instead:\n      message %s {\n        message %s {\n          // fields here\n        }\n        %s field_name = %s;\n      }",
+                groupField.line(),
+                groupField.name(), groupField.parent() instanceof ProtobufTree.WithName parentWithName ? parentWithName.name() : "unknown", groupField.name(), groupField.name(), groupField.index().value().toString());
+    }
+
+    private static void validateOneofField(ProtobufOneofFieldStatement field) {
+        // Oneof must contain at least one field
+        var child = field.getDirectChildByType(ProtobufFieldStatement.class);
+        ProtobufSemanticException.check(child.isPresent(),
+                "Oneof \"%s\" must contain at least one field", field.line(), field.name());
 
         // Oneof fields cannot be map types
         ProtobufSemanticException.check(!(field.type() instanceof ProtobufMapTypeReference),
@@ -996,442 +1092,89 @@ public final class ProtobufAnalyzer {
                 field.line(), field.name());
     }
 
-    private static void validateFieldUniqueness(ProtobufMessageStatement message, ProtobufFieldStatement field) {
-        var fieldName = field.name();
-        var fieldNumber = field.index();
-        if(fieldName == null || fieldNumber == null) {
-            return;
-        }
-
-        var fieldNumberValue = fieldNumber.value();
-
-        // If field is inside a oneof, validate uniqueness within the oneof first
-        if(field.parent() instanceof ProtobufOneofFieldStatement oneof) {
-            validateOneofUniqueness(oneof, field, fieldName, fieldNumberValue);
-        }
-
-        // Collect all fields in the message (including those in oneofs)
-        var allFields = new ArrayList<ProtobufFieldStatement>();
-        for(var child : message.children()) {
-            switch (child) {
-                case ProtobufFieldStatement childField when childField != field -> allFields.add(childField);
-                case ProtobufOneofFieldStatement oneof ->
-                    oneof.children().stream()
-                            .filter(ProtobufFieldStatement.class::isInstance)
-                            .map(ProtobufFieldStatement.class::cast)
-                            .filter(oneofField -> oneofField != field)
-                            .forEach(allFields::add);
-                default -> {}
-            }
-        }
-
-        // Check for duplicate field names and numbers across the entire message
-        for(var otherField : allFields) {
-            ProtobufSemanticException.check(!fieldName.equals(otherField.name()),
-                    "Duplicate field name '%s' in message '%s'\n\nEach field in a message must have a unique name.\nField '%s' is already defined elsewhere in this message.\n\nHelp: Choose a different name for this field.\n      Field names must be unique within the same message.\n      Example: Use 'user_id' instead if 'id' is already taken.",
-                    field.line(), fieldName, message.name(), fieldName);
-
-            var otherFieldNumber = otherField.index();
-            ProtobufSemanticException.check(otherFieldNumber == null || !fieldNumberValue.equals(otherFieldNumber.value()),
-                    "Duplicate field number %s in message '%s'\n\nField '%s' uses field number %s, which is already used by field '%s'.\n\nHelp: Each field in a message must have a unique field number.\n      Field numbers are used to identify fields in the binary format and cannot be reused.\n      Choose a different field number for '%s'.\n      \n      Tip: Use field numbers 1-15 for frequently set fields (most efficient encoding).",
-                    field.line(), fieldNumberValue, message.name(), fieldName, fieldNumberValue, otherField.name(), fieldName);
-        }
+    private static void validateEnum(ProtobufEnumStatement enumStmt) {
+        var enumConstant = enumStmt.getDirectChildByType(ProtobufEnumConstantStatement.class);
+        ProtobufSyntaxException.check(enumConstant.isPresent(),
+                "Enum \"%s\" must have at least one value",
+                enumStmt.line(), enumStmt.name());
     }
 
-    private static void validateOneofUniqueness(ProtobufOneofFieldStatement oneof, ProtobufFieldStatement field, String fieldName, BigInteger fieldNumberValue) {
-        oneof.children().stream()
-                .filter(ProtobufFieldStatement.class::isInstance)
-                .map(ProtobufFieldStatement.class::cast)
-                .filter(oneofField -> oneofField != field)
-                .forEach(oneofField -> {
-                    ProtobufSemanticException.check(!fieldName.equals(oneofField.name()),
-                            "Duplicate field name \"%s\" in oneof \"%s\"",
-                            field.line(), fieldName, oneof.name());
-
-                    var otherFieldNumber = oneofField.index();
-                    ProtobufSemanticException.check(otherFieldNumber == null || !fieldNumberValue.equals(otherFieldNumber.value()),
-                            "Duplicate field number %s in oneof \"%s\" (field \"%s\" conflicts with field \"%s\")",
-                            field.line(), fieldNumberValue, oneof.name(), fieldName, oneofField.name());
-                });
-    }
-
-    private static void validateFieldNotReserved(ProtobufMessageStatement message, ProtobufFieldStatement field) {
-        var fieldName = field.name();
-        var fieldNumber = field.index();
-        if(fieldName == null || fieldNumber == null) {
-            return;
-        }
-
-        var fieldNumberValue = fieldNumber.value();
-
-        // Check all reserved statements in the message
-        message.children().stream()
-                .filter(ProtobufReservedStatement.class::isInstance)
-                .map(ProtobufReservedStatement.class::cast)
-                .flatMap(reserved -> reserved.expressions().stream())
-                .forEach(expression -> validateNotReservedExpression(field, fieldName, fieldNumberValue, message, expression));
-    }
-
-    private static void validateNotReservedExpression(ProtobufFieldStatement field, String fieldName, BigInteger fieldNumberValue, ProtobufMessageStatement message, ProtobufExpression expression) {
-        switch (expression) {
-            case ProtobufLiteralExpression literalExpr when fieldName.equals(literalExpr.value()) ->
-                throw new ProtobufSemanticException(
-                        "Field \"%s\" uses reserved name in message \"%s\"",
-                        field.line(), fieldName, message.name());
-            case ProtobufNumberExpression numberExpr when numberExpr.value() instanceof ProtobufInteger(var value) && fieldNumberValue.equals(value) ->
-                throw new ProtobufSemanticException(
-                        "Field \"%s\" uses reserved number %s in message \"%s\"",
-                        field.line(), fieldName, fieldNumberValue, message.name());
-            case ProtobufIntegerRangeExpression rangeExpr when isInRange(fieldNumberValue, rangeExpr.value()) -> {
-                var rangeDesc = switch (rangeExpr.value()) {
-                    case ProtobufRange.Bounded(var min, var max) ->
-                        "in range %s to %s".formatted(min.value(), max.value());
-                    case ProtobufRange.LowerBounded(var min) ->
-                        "in range %s to max".formatted(min.value());
-                };
-                throw new ProtobufSemanticException(
-                        "Field \"%s\" uses reserved number %s (%s) in message \"%s\"",
-                        field.line(), fieldName, fieldNumberValue, rangeDesc, message.name());
-            }
-            default -> {}
-        }
-    }
-
-    private static void validateFieldNameConflicts(ProtobufMessageStatement message, ProtobufFieldStatement field) {
-        var fieldName = field.name();
-        if(fieldName == null) {
-            return;
-        }
-
-        // Check for conflicts with nested types and enum constants
-        for(var child : message.children()) {
-            if(child instanceof ProtobufTree.WithName withName && child != field && fieldName.equals(withName.name())) {
-                var conflictType = switch (child) {
-                    case ProtobufMessageStatement ignored -> "message";
-                    case ProtobufEnumStatement ignored -> "enum";
-                    case ProtobufOneofFieldStatement ignored -> "oneof";
-                    default -> "declaration";
-                };
-                throw new ProtobufSemanticException(
-                        "Field name \"%s\" conflicts with %s name in message \"%s\"",
-                        field.line(), fieldName, conflictType, message.name());
-            }
-
-            // Check for conflicts with enum constant names in nested enums
-            if(child instanceof ProtobufEnumStatement enumStatement) {
-                enumStatement.children().stream()
-                        .filter(ProtobufEnumConstantStatement.class::isInstance)
-                        .map(ProtobufEnumConstantStatement.class::cast)
-                        .filter(constant -> fieldName.equals(constant.name()))
-                        .findFirst()
-                        .ifPresent(ignored -> {
-                            throw new ProtobufSemanticException(
-                                    "Field name \"%s\" conflicts with enum constant name in enum \"%s\" inside message \"%s\"",
-                                    field.line(), fieldName, enumStatement.name(), message.name());
-                        });
-            }
-        }
-    }
-
-    private static void validateEnumConstant(ProtobufDocumentTree document, ProtobufEnumStatement enumStatement, ProtobufEnumConstantStatement constant) {
-        var syntax = document.syntax().orElse(null);
-        var constantName = constant.name();
-        var constantValue = constant.index();
-
-        if(constantName == null || constantValue == null) {
-            return;
-        }
-
-        var value = constantValue.value();
-
-        // Validate enum value fits in int32 range (-2147483648 to 2147483647)
-        ProtobufSemanticException.check(value.compareTo(ENUM_CONSTANT_MIN) >= 0 && value.compareTo(ENUM_CONSTANT_MAX) <= 0,
-                "Enum value %s is out of valid int32 range (-2147483648 to 2147483647) in enum \"%s\"",
-                constant.line(), value, enumStatement.name());
-
-        // Collect all other enum constants in a single pass
-        var allConstants = new ArrayList<ProtobufEnumConstantStatement>();
-        ProtobufEnumConstantStatement firstConstant = null;
-        boolean allowAlias = false;
-
-        for(var child : enumStatement.children()) {
-            switch (child) {
-                case ProtobufEnumConstantStatement otherConstant -> {
-                    if(otherConstant == constant) {
-                        if(firstConstant == null) {
-                            firstConstant = constant;
-                        }
-                    } else {
-                        if(firstConstant == null) {
-                            firstConstant = otherConstant;
-                        }
-                        allConstants.add(otherConstant);
-                    }
-                }
-                case ProtobufOptionStatement option when "allow_alias".equals(option.name().toString()) -> {
-                    var optionValue = option.value();
-                    if(optionValue instanceof ProtobufBoolExpression boolExpr && Boolean.TRUE.equals(boolExpr.value())) {
-                        allowAlias = true;
-                    }
-                }
-                default -> {}
-            }
-        }
-
-        // Check for duplicate names
-        allConstants.stream()
-                .filter(otherConstant -> constantName.equals(otherConstant.name()))
-                .findFirst()
-                .ifPresent(ignored -> {
-                    throw new ProtobufSemanticException(
-                            "Duplicate enum constant name \"%s\" in enum \"%s\"",
-                            constant.line(), constantName, enumStatement.name());
-                });
-
-        // Check for duplicate values (unless allow_alias is true)
-        if(!allowAlias) {
-            var constantValueInt = constantValue.value();
-            allConstants.stream()
-                    .filter(otherConstant -> otherConstant.index() != null && constantValueInt.equals(otherConstant.index().value()))
-                    .findFirst()
-                    .ifPresent(otherConstant -> {
-                        throw new ProtobufSemanticException(
-                                "Duplicate enum value %s in enum '%s'\n\nEnum constant '%s' has value %s, which is already used by '%s'.\n\nHelp: By default, each enum constant must have a unique value.\n      If you intentionally want multiple constants with the same value (aliases),\n      add this option to your enum:\n      \n      enum %s {{\n        option allow_alias = true;\n        %s = %s;\n        %s = %s;  // Alias for %s\n      }}\n\n      Note: Aliases can be useful for renaming constants while maintaining backward compatibility.",
-                                constant.line(), constantValueInt, enumStatement.name(), constantName, constantValueInt, otherConstant.name(),
-                                enumStatement.name(), otherConstant.name(), constantValueInt, constantName, constantValueInt, otherConstant.name());
-                    });
-        }
-
-        // Proto3: first enum value must be 0
-        if(syntax == ProtobufVersion.PROTOBUF_3 && firstConstant == constant) {
-            ProtobufSemanticException.check(constantValue.value().compareTo(BigInteger.ZERO) == 0,
-                    "First enum value in proto3 must be 0\n\nEnum '%s' has first value %s, but proto3 requires the first enum value to be 0.\nThis ensures a default value exists.\n\nHelp: Change the first enum constant's value to 0.\n      Example:\n      enum %s {{\n        UNKNOWN = 0;  // First value must be 0 in proto3\n        %s = 1;\n        // ... other values\n      }}\n\n      Tip: The zero value is used as the default when a field isn't set.\n           Consider naming it UNSPECIFIED or UNKNOWN to indicate this.",
-                    constant.line(), enumStatement.name(), constantValue.value(), enumStatement.name(), constantName);
-        }
-
-        // Check reserved names and numbers
-        validateEnumConstantNotReserved(enumStatement, constant, constantName, constantValue.value());
-    }
-
-    private static void validateEnumConstantNotReserved(ProtobufEnumStatement enumStatement, ProtobufEnumConstantStatement constant, String constantName, BigInteger constantValueInt) {
-        // Check all reserved statements in the enum
-        enumStatement.children().stream()
-                .filter(ProtobufReservedStatement.class::isInstance)
-                .map(ProtobufReservedStatement.class::cast)
-                .flatMap(reserved -> reserved.expressions().stream())
-                .forEach(expression -> validateEnumNotReservedExpression(constant, constantName, constantValueInt, enumStatement, expression));
-    }
-
-    private static void validateEnumNotReservedExpression(ProtobufEnumConstantStatement constant, String constantName, BigInteger constantValueInt, ProtobufEnumStatement enumStatement, ProtobufExpression expression) {
-        switch (expression) {
-            case ProtobufLiteralExpression literalExpr when constantName.equals(literalExpr.value()) ->
-                throw new ProtobufSemanticException(
-                        "Enum constant \"%s\" uses reserved name in enum \"%s\"",
-                        constant.line(), constantName, enumStatement.name());
-            case ProtobufNumberExpression numberExpr when numberExpr.value() instanceof ProtobufInteger(var value) && constantValueInt.equals(value) ->
-                throw new ProtobufSemanticException(
-                        "Enum constant \"%s\" uses reserved value %s in enum \"%s\"",
-                        constant.line(), constantName, constantValueInt, enumStatement.name());
-            case ProtobufIntegerRangeExpression rangeExpr when isInRange(constantValueInt, rangeExpr.value()) -> {
-                var rangeDesc = switch (rangeExpr.value()) {
-                    case ProtobufRange.Bounded(var min, var max) ->
-                        "in range %s to %s".formatted(min.value(), max.value());
-                    case ProtobufRange.LowerBounded(var min) ->
-                        "in range %s to max".formatted(min.value());
-                };
-                throw new ProtobufSemanticException(
-                        "Enum constant \"%s\" uses reserved value %s (%s) in enum \"%s\"",
-                        constant.line(), constantName, constantValueInt, rangeDesc, enumStatement.name());
-            }
-            default -> {}
-        }
-    }
-
-    // Document-level validation for global uniqueness constraints
-    private static void validateDocumentLevel(ProtobufDocumentTree document) {
-        validateUniqueTopLevelNames(document);
-        validateMessageLevelConstraints(document);
-        validateEnumConstraints(document);
-        validateServiceConstraints(document);
-    }
-
-    private static void validateUniqueTopLevelNames(ProtobufDocumentTree document) {
-        var messageNames = new HashSet<String>();
-        var enumNames = new HashSet<String>();
-        var serviceNames = new HashSet<String>();
-
-        for (var child : document.children()) {
-            switch (child) {
-                case ProtobufMessageStatement message -> {
-                    if (!messageNames.add(message.name())) {
-                        throw new ProtobufSemanticException(
-                                "Duplicate message name \"%s\"",
-                                message.line(), message.name());
-                    }
-                }
-                case ProtobufEnumStatement enumStmt -> {
-                    if (!enumNames.add(enumStmt.name())) {
-                        throw new ProtobufSemanticException(
-                                "Duplicate enum name \"%s\"",
-                                enumStmt.line(), enumStmt.name());
-                    }
-                }
-                case ProtobufServiceStatement service -> {
-                    if (!serviceNames.add(service.name())) {
-                        throw new ProtobufSemanticException(
-                                "Duplicate service name \"%s\"",
-                                service.line(), service.name());
-                    }
-                }
-                default -> {}
-            }
-        }
-    }
-
-    private static void validateMessageLevelConstraints(ProtobufDocumentTree document) {
-        var queue = new LinkedList<ProtobufTree>();
-        queue.add(document);
-
-        while (!queue.isEmpty()) {
-            var tree = queue.removeFirst();
-            if (tree instanceof ProtobufMessageStatement message) {
-                validateDuplicateOneofNames(message);
-                validateExtensionRangeNonOverlapping(message);
-                validateGroupFieldNumbers(message);
-                queue.addAll(message.children());
-            } else if (tree instanceof ProtobufTree.WithBody<?> body) {
-                queue.addAll(body.children());
-            }
-        }
-    }
-
-    private static void validateDuplicateOneofNames(ProtobufMessageStatement message) {
-        var oneofNames = new HashSet<String>();
-        for (var child : message.children()) {
-            if (child instanceof ProtobufOneofFieldStatement oneof) {
-                if (!oneofNames.add(oneof.name())) {
-                    throw new ProtobufSemanticException(
-                            "Duplicate oneof name \"%s\" in message \"%s\"",
-                            oneof.line(), oneof.name(), message.name());
-                }
-            }
-        }
-    }
-
-    private static void validateExtensionRangeNonOverlapping(ProtobufMessageStatement message) {
-        var extensionRanges = new ArrayList<ProtobufRange>();
-        for (var child : message.children()) {
-            if (child instanceof ProtobufExtensionsStatement extensions) {
-                for (var expr : extensions.expressions()) {
-                    if (expr instanceof ProtobufIntegerRangeExpression rangeExpr) {
-                        var newRange = rangeExpr.value();
-                        for (var existingRange : extensionRanges) {
-                            if (rangesOverlap(existingRange, newRange)) {
-                                throw new ProtobufSemanticException(
-                                        "Extension ranges overlap in message \"%s\"",
-                                        extensions.line(), message.name());
-                            }
-                        }
-                        extensionRanges.add(newRange);
-                    }
-                }
-            }
-        }
-    }
-
-    private static void validateGroupFieldNumbers(ProtobufMessageStatement message) {
-        // Collect reserved field numbers
-        var reservedNumbers = new HashSet<BigInteger>();
-        for (var child : message.children()) {
-            if (child instanceof ProtobufReservedStatement reserved) {
-                for (var expr : reserved.expressions()) {
-                    switch (expr) {
-                        case ProtobufNumberExpression numExpr when numExpr.value() instanceof ProtobufInteger(var value) ->
-                            reservedNumbers.add(value);
-                        case ProtobufIntegerRangeExpression rangeExpr -> {
-                            var range = rangeExpr.value();
-                            var start = switch (range) {
-                                case ProtobufRange.Bounded(var min, _) -> min.value();
-                                case ProtobufRange.LowerBounded(var min) -> min.value();
-                            };
-                            var end = switch (range) {
-                                case ProtobufRange.Bounded(_, var max) -> max.value();
-                                case ProtobufRange.LowerBounded(_) -> FIELD_NUMBER_MAX;
-                            };
-                            for (var i = start; i.compareTo(end) <= 0; i = i.add(BigInteger.ONE)) {
-                                reservedNumbers.add(i);
-                                if (reservedNumbers.size() > 100000) break; // Prevent infinite loop
-                            }
-                        }
-                        default -> {}
-                    }
-                }
-            }
-        }
-
-        // Check if any group uses a reserved field number and validate group name capitalization
-        for (var child : message.children()) {
-            if (child instanceof ProtobufGroupFieldStatement group) {
-                // Group names must start with a capital letter
-                var groupName = group.name();
-                if (groupName != null && !groupName.isEmpty() && !Character.isUpperCase(groupName.charAt(0))) {
-                    throw new ProtobufSemanticException(
-                            "Group name \"%s\" must start with a capital letter",
-                            group.line(), groupName);
-                }
-
-                var fieldNumber = group.index().value();
-                if (reservedNumbers.contains(fieldNumber)) {
-                    throw new ProtobufSemanticException(
-                            "Group \"%s\" uses reserved field number %s",
-                            group.line(), group.name(), fieldNumber);
-                }
-            }
-        }
-    }
-
-    private static void validateEnumConstraints(ProtobufDocumentTree document) {
-        var queue = new LinkedList<ProtobufTree>();
-        queue.add(document);
-
-        while (!queue.isEmpty()) {
-            var tree = queue.removeFirst();
-            if (tree instanceof ProtobufEnumStatement enumStmt) {
-                validateEnumNotEmpty(enumStmt);
-            } else if (tree instanceof ProtobufTree.WithBody<?> body) {
-                queue.addAll(body.children());
-            }
-        }
-    }
-
-    private static void validateEnumNotEmpty(ProtobufEnumStatement enumStmt) {
-        var hasConstants = enumStmt.children().stream()
-                .anyMatch(child -> child instanceof ProtobufEnumConstantStatement);
-        if (!hasConstants) {
-            throw new ProtobufSemanticException(
-                    "Enum \"%s\" must have at least one value",
-                    enumStmt.line(), enumStmt.name());
-        }
-    }
-
-    private static void validateServiceConstraints(ProtobufDocumentTree document) {
-        for (var child : document.children()) {
-            if (child instanceof ProtobufServiceStatement service) {
-                validateServiceMethodNames(service);
-            }
-        }
-    }
-
-    private static void validateServiceMethodNames(ProtobufServiceStatement service) {
+    private static void validateService(ProtobufDocumentTree document, ProtobufServiceStatement service) {
         var methodNames = new HashSet<String>();
         for (var child : service.children()) {
             if (child instanceof ProtobufMethodStatement method) {
+                // Check for duplicate method names
                 if (!methodNames.add(method.name())) {
                     throw new ProtobufSemanticException(
                             "Duplicate method name \"%s\" in service \"%s\"",
                             method.line(), method.name(), service.name());
                 }
+
+                // Validate RPC input/output types are messages (not enums)
+                validateRpcTypes(document, service, method);
             }
         }
+    }
+
+    private static void validateRpcTypes(ProtobufDocumentTree document, ProtobufServiceStatement service, ProtobufMethodStatement method) {
+        var inputTypeWrapper = method.inputType();
+        var outputTypeWrapper = method.outputType();
+
+        if (inputTypeWrapper == null || outputTypeWrapper == null) {
+            return; // Not fully parsed yet
+        }
+
+        var inputType = inputTypeWrapper.value();
+        var outputType = outputTypeWrapper.value();
+
+        // Resolve and validate input type
+        if (inputType instanceof ProtobufUnresolvedTypeReference(var inputName)) {
+            var resolvedInput = tryResolveType(document, inputName, method);
+            if (resolvedInput != null) {
+                method.setInputType(new ProtobufMethodStatement.Type(resolvedInput, inputTypeWrapper.stream()));
+                inputType = resolvedInput;
+            }
+        }
+        if (inputType instanceof ProtobufEnumTypeReference) {
+            throw new ProtobufSemanticException(
+                    "RPC method \"%s\" in service \"%s\" has enum type as input\n\nRPC methods must use message types for input and output, not enum types.\n\nHelp: Wrap the enum in a message type:\n      message %sRequest {\n        YourEnum value = 1;\n      }",
+                    method.line(), method.name(), service.name(), method.name());
+        }
+
+        // Resolve and validate output type
+        if (outputType instanceof ProtobufUnresolvedTypeReference(var outputName)) {
+            var resolvedOutput = tryResolveType(document, outputName, method);
+            if (resolvedOutput != null) {
+                method.setOutputType(new ProtobufMethodStatement.Type(resolvedOutput, outputTypeWrapper.stream()));
+                outputType = resolvedOutput;
+            }
+        }
+        if (outputType instanceof ProtobufEnumTypeReference) {
+            throw new ProtobufSemanticException(
+                    "RPC method \"%s\" in service \"%s\" has enum type as output\n\nRPC methods must use message types for input and output, not enum types.\n\nHelp: Wrap the enum in a message type:\n      message %sResponse {\n        YourEnum value = 1;\n      }",
+                    method.line(), method.name(), service.name(), method.name());
+        }
+    }
+
+    // Converts a field name to its JSON representation (lowerCamelCase)
+    private static String toJsonName(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return fieldName;
+        }
+
+        var result = new StringBuilder(fieldName.length());
+        var capitalizeNext = false;
+        for (var i = 0; i < fieldName.length(); i++) {
+            var c = fieldName.charAt(i);
+            if (c == '_') {
+                capitalizeNext = true;
+            } else if (capitalizeNext) {
+                result.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
 }

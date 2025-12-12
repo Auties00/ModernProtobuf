@@ -2,6 +2,8 @@ package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.Objects;
+
 /**
  * Represents a reference to a Protocol Buffer map type.
  * <p>
@@ -28,80 +30,10 @@ import it.auties.protobuf.model.ProtobufType;
  * attributed during parsing when both key and value types are specified.
  * </p>
  */
-public final class ProtobufMapTypeReference implements ProtobufObjectTypeReference {
-    private ProtobufTypeReference key;
-    private ProtobufTypeReference value;
-
-    /**
-     * Constructs a new unattributed map type reference with no key or value types.
-     */
-    public ProtobufMapTypeReference() {
-
-    }
-
-    /**
-     * Constructs a new map type reference with the specified key and value types.
-     *
-     * @param key the key type reference
-     * @param value the value type reference
-     */
-    public ProtobufMapTypeReference(ProtobufTypeReference key, ProtobufTypeReference value) {
-        this.key = key;
-        this.value = value;
-    }
-
-    /**
-     * Returns the key type of this map.
-     *
-     * @return the key type reference, or null if not yet set
-     */
-    public ProtobufTypeReference keyType() {
-        return key;
-    }
-
-    /**
-     * Checks whether this map type has a key type specified.
-     *
-     * @return {@code true} if a key type is present, {@code false} otherwise
-     */
-    public boolean hasKeyType() {
-        return key != null;
-    }
-
-    /**
-     * Sets the key type for this map.
-     *
-     * @param key the key type reference
-     */
-    public void setKeyType(ProtobufTypeReference key) {
-        this.key = key;
-    }
-
-    /**
-     * Returns the value type of this map.
-     *
-     * @return the value type reference, or null if not yet set
-     */
-    public ProtobufTypeReference valueType() {
-        return value;
-    }
-
-    /**
-     * Checks whether this map type has a value type specified.
-     *
-     * @return {@code true} if a value type is present, {@code false} otherwise
-     */
-    public boolean hasValueType() {
-        return value != null;
-    }
-
-    /**
-     * Sets the value type for this map.
-     *
-     * @param value the value type reference
-     */
-    public void setValueType(ProtobufTypeReference value) {
-        this.value = value;
+public record ProtobufMapTypeReference(ProtobufTypeReference keyType, ProtobufTypeReference valueType) implements ProtobufObjectTypeReference {
+    public ProtobufMapTypeReference {
+        Objects.requireNonNull(keyType, "keyType cannot be null");
+        Objects.requireNonNull(valueType, "valueType cannot be null");
     }
 
     @Override
@@ -111,16 +43,16 @@ public final class ProtobufMapTypeReference implements ProtobufObjectTypeReferen
 
     @Override
     public String name() {
-        return "map";
+        return "map<%s, %s>".formatted(keyType, valueType);
     }
 
     @Override
     public boolean isAttributed() {
-        return key != null && key.isAttributed() && value != null && value.isAttributed();
+        return keyType.isAttributed() && valueType.isAttributed();
     }
 
     @Override
     public String toString() {
-        return "map<%s, %s>".formatted(key, value);
+        return name();
     }
 }

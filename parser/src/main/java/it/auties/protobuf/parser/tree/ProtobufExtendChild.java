@@ -10,20 +10,12 @@ package it.auties.protobuf.parser.tree;
  * <ul>
  *   <li>{@link ProtobufFieldStatement} - Extension field declarations</li>
  *   <li>{@link ProtobufGroupFieldStatement} - Extension group fields (deprecated)</li>
- *   <li>{@link ProtobufOneofFieldStatement} - Oneof blocks within extensions</li>
- *   <li>{@link ProtobufMessageStatement} - Nested message definitions</li>
- *   <li>{@link ProtobufEnumStatement} - Nested enum definitions</li>
- *   <li>{@link ProtobufExtendStatement} - Nested extend blocks</li>
- *   <li>{@link ProtobufExtensionsStatement} - Extension range declarations</li>
- *   <li>{@link ProtobufReservedStatement} - Reserved field declarations</li>
- *   <li>{@link ProtobufOptionStatement} - Options</li>
- *   <li>{@link ProtobufEmptyStatement} - Empty statements</li>
  * </ul>
  *
  * @see ProtobufExtendStatement
  */
 public sealed interface ProtobufExtendChild
         extends ProtobufStatement
-        permits ProtobufEmptyStatement, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufOneofFieldStatement, ProtobufOptionStatement, ProtobufReservedStatement {
+        permits ProtobufFieldStatement, ProtobufGroupFieldStatement {
 
 }

@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
 public final class ProtobufExtensionsStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithOptions,
-                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufExtendChild {
+                   ProtobufMessageChild, ProtobufGroupChild {
     private final List<ProtobufExtensionsExpression> expressions;
     private final SequencedMap<String, ProtobufOptionExpression> options;
 

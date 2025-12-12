@@ -278,7 +278,7 @@ public final class ProtobufParser {
                 tokenizer.line());
         var statement = new ProtobufPackageStatement(tokenizer.line());
         var name = tokenizer.nextRawToken();
-        ProtobufSyntaxException.check(isValidType(name),
+        ProtobufSyntaxException.check(isValidPackage(name),
                 "Invalid package name '%s'\n\nExpected a valid identifier or qualified name (e.g., 'com.example.api')\n\nHelp: Package names must follow these rules:\n      - Use lowercase letters, numbers, and dots\n      - Start with a letter\n      - No consecutive dots or leading/trailing dots\n      Example: package com.example.myapp;".formatted(name),
                 tokenizer.line());
         statement.setName(name);
@@ -394,11 +394,11 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 case "oneof" -> {
-                    var child = parseOneof(document, tokenizer);
+                    var child = parseOneof(tokenizer);
                     statement.addChild(child);
                 }
                 default -> {
-                    var child = parseField(document, true, tokenizer, token);
+                    var child = parseField(document, tokenizer, token);
                     statement.addChild(child);
                 }
             }
@@ -415,7 +415,7 @@ public final class ProtobufParser {
 
         // In proto3, extends are only allowed for Options messages
         // Validation happens in the attribute phase, not here during parsing
-        var reference = new ProtobufUnresolvedObjectTypeReference(qualifiedName);
+        var reference = new ProtobufUnresolvedTypeReference(qualifiedName);
         statement.setDeclaration(reference);
         var objectStart = tokenizer.nextRawToken();
         ProtobufSyntaxException.check(isBodyStart(objectStart),
@@ -424,40 +424,12 @@ public final class ProtobufParser {
         String token;
         while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
-                case STATEMENT_END -> {
-                    var child = parseEmpty(tokenizer);
-                    statement.addChild(child);
-                }
-                case "option" -> {
-                    var child = parseOption(tokenizer, OptionParser.STATEMENT);
-                    statement.addChild(child);
-                }
-                case "message" -> {
-                    var child = parseMessage(document, tokenizer);
-                    statement.addChild(child);
-                }
-                case "enum" -> {
-                    var child = parseEnum(tokenizer);
-                    statement.addChild(child);
-                }
-                case "extend" -> {
-                    var child = parseExtend(document, tokenizer);
-                    statement.addChild(child);
-                }
-                case "extensions" -> {
-                    var child = parseExtensions(tokenizer);
-                    statement.addChild(child);
-                }
-                case "reserved"  -> {
-                    var child = parseReserved(tokenizer);
-                    statement.addChild(child);
-                }
                 case "oneof" -> {
-                    var child = parseOneof(document, tokenizer);
+                    var child = parseOneof(tokenizer);
                     statement.addChild(child);
                 }
                 default -> {
-                    var child = parseField(document, true, tokenizer, token);
+                    var child = parseField(document, tokenizer, token);
                     statement.addChild(child);
                 }
             }
@@ -465,152 +437,213 @@ public final class ProtobufParser {
         return statement;
     }
 
-    private static ProtobufFieldStatement parseField(ProtobufDocumentTree document, boolean parseModifier, ProtobufLexer tokenizer, String token) throws IOException {
-        ProtobufFieldStatement.Modifier modifier;
-        ProtobufTypeReference reference;
-        if(parseModifier) {
-            modifier = ProtobufFieldStatement.Modifier.of(token)
-                    .orElse(ProtobufFieldStatement.Modifier.NONE);
-           if(modifier == ProtobufFieldStatement.Modifier.NONE) {
-               ProtobufSyntaxException.check(isValidType(token),
-                       "Invalid field type '%s'\n\nExpected a scalar type, message type, or enum type.\n\nHelp: Valid scalar types: int32, int64, uint32, uint64, sint32, sint64,\n      fixed32, fixed64, sfixed32, sfixed64, double, float, bool, string, bytes\n      \n      For message/enum types: use the type name (e.g., MyMessage)\n      For qualified types: package.MessageName".formatted(token), tokenizer.line());
-               reference = ProtobufTypeReference.of(token);
-           }else {
-               var type = tokenizer.nextRawToken();
-               ProtobufSyntaxException.check(isValidType(type),
-                       "Invalid field type '%s' after modifier '%s'\n\nExpected a type name after the field modifier.\n\nHelp: Field declarations: [modifier] type name = number;\n      Example: repeated string tags = 1;".formatted(type, modifier.token()),
-                       tokenizer.line());
-               reference = ProtobufTypeReference.of(type);
-               ProtobufSyntaxException.check(reference.protobufType() != ProtobufType.MAP,
-                       "Map fields cannot have a modifier\n\nMap fields are implicitly repeated and cannot use 'repeated', 'optional', or 'required'.\n\nHelp: Remove the modifier from your map field.\n      Correct: map<string, int32> my_map = 1;\n      Wrong: repeated map<string, int32> my_map = 1;",
-                       tokenizer.line());
-           }
-       }else {
-           modifier = ProtobufFieldStatement.Modifier.NONE;
-           ProtobufSyntaxException.check(isValidType(token),
-                   "Invalid field type '%s'\n\nExpected a scalar type, message type, or enum type.\n\nHelp: Valid scalar types: int32, int64, uint32, uint64, sint32, sint64,\n      fixed32, fixed64, sfixed32, sfixed64, double, float, bool, string, bytes\n      \n      For message/enum types: use the type name (e.g., MyMessage)\n      For qualified types: package.MessageName".formatted(token),
-                   tokenizer.line());
-           reference = ProtobufTypeReference.of(token);
-       }
-
-        ProtobufFieldStatement child;
-        if(reference.protobufType() == ProtobufType.GROUP) {
-            if(document.syntax().isPresent() && document.syntax().get() == ProtobufVersion.PROTOBUF_3) {
-                throw new ProtobufSyntaxException("Group fields are not supported in proto3\n\nGroups are a deprecated proto2 feature and cannot be used in proto3.\n\nHelp: Use regular message types instead:\n      message MyGroup {{\n        string field = 1;\n      }}\n      MyGroup my_field = 1;\n\n      Note: Groups had worse performance and compatibility than regular messages.", tokenizer.line());
+    private static ProtobufFieldStatement parseField(ProtobufDocumentTree document, ProtobufLexer tokenizer, String modifierToken) throws IOException {
+        var modifier = ProtobufFieldStatement.Modifier.of(modifierToken);
+        if(modifier.isPresent()) {
+            var typeToken = tokenizer.nextRawToken();
+            if (isGroupType(typeToken)) {
+                return parseGroupField(document, tokenizer, modifier.get());
+            } else {
+                return parseField(tokenizer, modifier.get(), typeToken);
             }
-            child = new ProtobufGroupFieldStatement(tokenizer.line());
-        }else {
-            child = new ProtobufFieldStatement(tokenizer.line());
-            child.setType(reference);
+        } else {
+            if (isGroupType(modifierToken)) {
+                return parseGroupField(document, tokenizer, ProtobufFieldStatement.Modifier.NONE);
+            } else {
+                return parseField(tokenizer, ProtobufFieldStatement.Modifier.NONE, modifierToken);
+            }
         }
-        child.setModifier(modifier);
+    }
 
-        var nameOrTypeArgs = tokenizer.nextRawToken();
-        if(isTypeParametersStart(nameOrTypeArgs)) {
-            if(!(child.type() instanceof ProtobufMapTypeReference mapType) || mapType.isAttributed()) {
-                throw new ProtobufSyntaxException("Unexpected '<' after type\n\nOnly map types use angle brackets for type parameters.\n\nHelp: For map fields: map<KeyType, ValueType> field_name = number;\n      For other fields: type field_name = number;", tokenizer.line());
-            }
+    private static ProtobufGroupFieldStatement parseGroupField(ProtobufDocumentTree document, ProtobufLexer tokenizer, ProtobufFieldStatement.Modifier modifier) throws IOException {
+        var statement = new ProtobufGroupFieldStatement(tokenizer.line());
 
-            var keyTypeToken = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isValidType(keyTypeToken),
-                    "Invalid map key type '%s'\n\nExpected a type name for the map key.\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, int32> user_scores = 1;".formatted(keyTypeToken),
-                    tokenizer.line());
-            var keyType = ProtobufTypeReference.of(keyTypeToken);
-            if(keyType.protobufType() == ProtobufType.MAP || keyType.protobufType() == ProtobufType.GROUP) {
-                throw new ProtobufSyntaxException("Map key type cannot be '%s'\n\nMap keys cannot be nested maps or groups.\n\nHelp: Valid map key types: int32, int64, uint32, uint64, sint32, sint64,\n      fixed32, fixed64, sfixed32, sfixed64, bool, string".formatted(keyTypeToken), tokenizer.line());
-            }
-            mapType.setKeyType(keyType);
+        statement.setModifier(modifier);
 
-            var separator = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isArraySeparator(separator),
-                    "Expected ',' between map key and value types but found '%s'\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, int32> user_scores = 1;".formatted(separator),
-                    tokenizer.line());
+        var name = tokenizer.nextRawToken();
+        statement.setName(validateGroupFieldName(name, tokenizer.line()));
 
-            var valueTypeToken = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isValidType(valueTypeToken),
-                    "Invalid map value type '%s'\n\nExpected a type name for the map value.\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, MyMessage> entities = 1;".formatted(valueTypeToken),
-                    tokenizer.line());
-            var valueType = ProtobufTypeReference.of(valueTypeToken);
-            mapType.setValueType(valueType);
+        validateFieldIndexAssignment(tokenizer);
 
-            var end = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isTypeParametersEnd(end),
-                    "Expected '>' to close map type parameters but found '%s'\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Make sure you have matching angle brackets.".formatted(end),
-                    tokenizer.line());
-
-            var childName = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isValidIdent(childName),
-                    "Invalid field name '%s'\n\nField names must be valid identifiers.\n\nHelp: Field names should:\n      - Start with a letter or underscore\n      - Contain only letters, numbers, and underscores\n      - Use snake_case by convention\n      Example: map<string, int32> user_scores = 1;".formatted(childName),
-                    tokenizer.line());
-            child.setName(childName);
-        }else if(isValidIdent(nameOrTypeArgs)) {
-            child.setName(nameOrTypeArgs);
-        }else {
-            throw new ProtobufSyntaxException("Invalid field name '%s'\n\nExpected a valid field name after the type.\n\nHelp: Field declaration format:\n      type field_name = field_number;\n      Example: string user_name = 1;".formatted(nameOrTypeArgs), tokenizer.line());
-        }
-
-        var operator = tokenizer.nextRawToken();
-        ProtobufSyntaxException.check(isAssignmentOperator(operator),
-                "Expected '=' after field name but found '%s'\n\nHelp: Field declarations must assign a field number with '='.\n      Example: string name = 1;".formatted(operator),
-                tokenizer.line());
         var index = tokenizer.nextToken();
-        if(index instanceof ProtobufNumberToken(var number) && number instanceof ProtobufInteger integer) {
-            child.setIndex(integer);
-        }else {
-            throw new ProtobufSyntaxException("Expected field number (integer) but found '%s'\n\nField numbers must be positive integers.\n\nHelp: Field numbers identify fields in the binary format and must be unique.\n      Use 1-15 for frequently set fields (most efficient).\n      Example: string name = 1;".formatted(index), tokenizer.line());
-        }
+        statement.setIndex(validateFieldIndex(index, tokenizer.line()));
 
-        var bodyStartOrStatementEndToken = parseOptions(tokenizer, tokenizer.nextRawToken(), child);
-        if(child instanceof ProtobufGroupFieldStatement groupStatement && isBodyStart(bodyStartOrStatementEndToken)) {
-            String groupToken;
-            while(!isBodyEnd(groupToken = tokenizer.nextRawToken())) {
-                switch (groupToken) {
-                    case STATEMENT_END -> {
-                        var groupChild = parseEmpty(tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+        var bodyStartToken = parseOptions(tokenizer, tokenizer.nextRawToken(), statement);
+        ProtobufSyntaxException.check(isBodyStart(bodyStartToken),
+                "Unexpected token: " + bodyStartToken, tokenizer.line());;
 
-                    case "message" -> {
-                        var groupChild = parseMessage(document, tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+        String groupToken;
+        while(!isBodyEnd(groupToken = tokenizer.nextRawToken())) {
+            switch (groupToken) {
+                case STATEMENT_END -> {
+                    var groupChild = parseEmpty(tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    case "enum" -> {
-                        var groupChild = parseEnum(tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "message" -> {
+                    var groupChild = parseMessage(document, tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    case "extend" -> {
-                        var groupChild = parseExtend(document, tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "enum" -> {
+                    var groupChild = parseEnum(tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    case "extensions" -> {
-                        var groupChild = parseExtensions(tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "extend" -> {
+                    var groupChild = parseExtend(document, tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    case "reserved" -> {
-                        var groupChild = parseReserved(tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "extensions" -> {
+                    var groupChild = parseExtensions(tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    case "oneof" -> {
-                        var groupChild = parseOneof(document, tokenizer);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "reserved" -> {
+                    var groupChild = parseReserved(tokenizer);
+                    statement.addChild(groupChild);
+                }
 
-                    default -> {
-                        var groupChild = parseField(document, true, tokenizer, groupToken);
-                        groupStatement.addChild(groupChild);
-                    }
+                case "oneof" -> {
+                    var groupChild = parseOneof(tokenizer);
+                    statement.addChild(groupChild);
+                }
+
+                default -> {
+                    var groupChild = parseField(document, tokenizer, groupToken);
+                    statement.addChild(groupChild);
                 }
             }
-            return child;
-        } else if(isStatementEnd(bodyStartOrStatementEndToken)) {
-            return child;
-        }else {
-            throw new ProtobufSyntaxException("Unexpected token " + bodyStartOrStatementEndToken, tokenizer.line());
+        }
+
+        return statement;
+    }
+
+    private static String validateGroupFieldName(String name, int line) {
+        validateFieldName(name, line);
+        ProtobufSyntaxException.check(Character.isUpperCase(name.charAt(0)),
+                "Group name \"%s\" must start with a capital letter",
+                line,
+                name);
+        return name;
+    }
+
+    private static ProtobufFieldStatement parseField(ProtobufLexer tokenizer, ProtobufFieldStatement.Modifier modifier, String typeToken) throws IOException {
+        var statement = new ProtobufFieldStatement(tokenizer.line());
+
+        statement.setModifier(modifier);
+
+        var type = parseFieldType(tokenizer, typeToken);
+        statement.setType(type);
+
+        var name = tokenizer.nextRawToken();
+        statement.setName(validateFieldName(name, tokenizer.line()));
+
+        validateFieldIndexAssignment(tokenizer);
+
+        var index = tokenizer.nextToken();
+        statement.setIndex(validateFieldIndex(index, tokenizer.line()));
+
+        var statementEnd = parseOptions(tokenizer, tokenizer.nextRawToken(), statement);
+        ProtobufSyntaxException.check(isStatementEnd(statementEnd),
+                "Unexpected token: " + statementEnd,
+                tokenizer.line());
+
+        return statement;
+    }
+
+    private static ProtobufTypeReference parseFieldType(ProtobufLexer tokenizer, String typeToken) throws IOException {
+        var primitiveType = ProtobufType.ofPrimitive(typeToken);
+        if(primitiveType != ProtobufType.UNKNOWN) {
+            return new ProtobufPrimitiveTypeReference(primitiveType);
+        }
+
+        if(isMapType(typeToken)) {
+            var mapType = parseFieldMapType(tokenizer);
+            if(mapType.isPresent()) {
+                return mapType.get();
+            }
+        }
+
+        return new ProtobufUnresolvedTypeReference(typeToken);
+    }
+
+    private static Optional<ProtobufTypeReference> parseFieldMapType(ProtobufLexer tokenizer) throws IOException {
+        var nameOrTypeArgs = tokenizer.nextRawToken();
+        if (!isTypeParametersStart(nameOrTypeArgs)) {
+            tokenizer.moveToPreviousToken();
+            return Optional.empty();
+        }
+
+        var keyTypeToken = tokenizer.nextRawToken();
+        ProtobufSyntaxException.check(isValidType(keyTypeToken),
+                "Invalid map key type '%s'\n\nExpected a type name for the map key.\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, int32> user_scores = 1;".formatted(keyTypeToken),
+                tokenizer.line());
+        var keyType = parseFieldType(tokenizer, keyTypeToken);
+
+        var separator = tokenizer.nextRawToken();
+        ProtobufSyntaxException.check(isArraySeparator(separator),
+                "Expected ',' between map key and value types but found '%s'\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, int32> user_scores = 1;".formatted(separator),
+                tokenizer.line());
+
+        var valueTypeToken = tokenizer.nextRawToken();
+        ProtobufSyntaxException.check(isValidType(valueTypeToken),
+                "Invalid map value type '%s'\n\nExpected a type name for the map value.\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Example: map<string, MyMessage> entities = 1;".formatted(valueTypeToken),
+                tokenizer.line());
+        var valueType = parseFieldType(tokenizer, valueTypeToken);
+
+        var end = tokenizer.nextRawToken();
+        ProtobufSyntaxException.check(isTypeParametersEnd(end),
+                "Expected '>' to close map type parameters but found '%s'\n\nHelp: Map syntax: map<KeyType, ValueType> field_name = number;\n      Make sure you have matching angle brackets.".formatted(end),
+                tokenizer.line());
+
+        var result = new ProtobufMapTypeReference(keyType, valueType);
+        return Optional.of(result);
+    }
+
+    private static String validateFieldName(String name, int line) {
+        ProtobufSyntaxException.check(isValidIdent(name),
+                """
+                        Invalid field name '%s'
+                        
+                        Field names must be valid identifiers.
+                        
+                        Help: Field names should:
+                              - Start with a letter or underscore
+                              - Contain only letters, numbers, and underscores
+                              - Use snake_case by convention (not required, but recommended)
+                              Example: optional string user_scores = 1;""",
+                line,
+                name);
+        return name;
+    }
+
+    private static void validateFieldIndexAssignment(ProtobufLexer tokenizer) throws IOException {
+        var operator = tokenizer.nextRawToken();
+        ProtobufSyntaxException.check(isAssignmentOperator(operator),
+                """
+                        Expected '=' after field name but found '%s'
+                        
+                        Help: Field declarations must assign a field number with '='.
+                              Example: optional string name = 1;""",
+                tokenizer.line(),
+                operator);
+    }
+
+    private static ProtobufInteger validateFieldIndex(ProtobufToken index, int line) {
+        if (index instanceof ProtobufNumberToken(var number) && number instanceof ProtobufInteger integer) {
+            return integer;
+        } else {
+            throw new ProtobufSyntaxException("""
+                Expected field number (integer) but found '%s'
+                
+                Field numbers must be positive integers.
+                
+                Help: Field numbers identify fields in the binary format and must be unique.
+                      Use 1-15 for frequently set fields (most efficient).
+                      Example: optional string name = 1;""", line, index
+            );
         }
     }
 
@@ -632,10 +665,6 @@ public final class ProtobufParser {
                 }
                 case "option" -> {
                     var child = parseOption(tokenizer, OptionParser.STATEMENT);
-                    statement.addChild(child);
-                }
-                case "extensions" -> {
-                    var child = parseExtensions(tokenizer);
                     statement.addChild(child);
                 }
                 case "reserved"  -> {
@@ -699,7 +728,7 @@ public final class ProtobufParser {
 
                 operator = tokenizer.nextRawToken();
             }else {
-                var expression = new ProtobufNumberExpression(tokenizer.line());
+                var expression = new ProtobufIntegerExpression(tokenizer.line());
                 expression.setValue(valueOrMinInt);
                 statement.addExpression(expression);
             }
@@ -758,7 +787,7 @@ public final class ProtobufParser {
 
                             operator = tokenizer.nextRawToken();
                         }else {
-                            var expression = new ProtobufNumberExpression(tokenizer.line());
+                            var expression = new ProtobufIntegerExpression(tokenizer.line());
                             expression.setValue(valueOrMinInt);
                             statement.addExpression(expression);
                         }
@@ -859,24 +888,23 @@ public final class ProtobufParser {
             ProtobufSyntaxException.check(isValidType(type),
                     "Invalid RPC type '%s'\n\nExpected a message type name.\n\nHelp: RPC method types must be message types.\n      Example: rpc MyMethod(RequestMessage) returns (ResponseMessage);".formatted(type),
                     tokenizer.line());
-            typeReference = ProtobufTypeReference.of(type);
+            typeReference = new ProtobufUnresolvedTypeReference(type);
             stream = true;
         }else {
             ProtobufSyntaxException.check(isValidType(typeOrModifier),
                     "Invalid RPC type '%s'\n\nExpected a message type name.\n\nHelp: RPC method types must be message types.\n      Example: rpc MyMethod(RequestMessage) returns (ResponseMessage);".formatted(typeOrModifier),
                     tokenizer.line());
-            typeReference = ProtobufTypeReference.of(typeOrModifier);
+            typeReference = new ProtobufUnresolvedTypeReference(typeOrModifier);
             stream = false;
         }
-        ProtobufSyntaxException.check(typeReference instanceof ProtobufUnresolvedObjectTypeReference,
-                "Unexpected type, only messages can be used: " + typeReference.name(), tokenizer.line());
+
         var typeEnd = tokenizer.nextRawToken();
         ProtobufSyntaxException.check(isParensEnd(typeEnd),
                 "Unexpected token: " + typeEnd, tokenizer.line());
         return new ProtobufMethodStatement.Type(typeReference, stream);
     }
 
-    private static ProtobufOneofFieldStatement parseOneof(ProtobufDocumentTree document, ProtobufLexer tokenizer) throws IOException {
+    private static ProtobufOneofFieldStatement parseOneof(ProtobufLexer tokenizer) throws IOException {
         var statement = new ProtobufOneofFieldStatement(tokenizer.line());
         var name = tokenizer.nextRawToken();
         ProtobufSyntaxException.check(isValidIdent(name),
@@ -888,16 +916,12 @@ public final class ProtobufParser {
         String token;
         while (!isBodyEnd(token = tokenizer.nextRawToken())) {
             switch (token) {
-                case STATEMENT_END -> {
-                    var child = parseEmpty(tokenizer);
-                    statement.addChild(child);
-                }
                 case "option" -> {
                     var child = parseOption(tokenizer, OptionParser.STATEMENT);
                     statement.addChild(child);
                 }
                 default -> {
-                    var child = parseField(document, false, tokenizer, token);
+                    var child = parseField(tokenizer, ProtobufFieldStatement.Modifier.NONE, token);
                     statement.addChild(child);
                 }
             }
@@ -993,9 +1017,18 @@ public final class ProtobufParser {
     }
 
     private static ProtobufNumberExpression readNumberExpression(ProtobufLexer tokenizer, ProtobufNumberToken number) {
-        var expression = new ProtobufNumberExpression(tokenizer.line());
-        expression.setValue(number.value());
-        return expression;
+        return switch (number.value()) {
+            case ProtobufFloatingPoint floatingPoint -> {
+                var expression = new ProtobufFloatingPointExpression(tokenizer.line());
+                expression.setValue(floatingPoint);
+                yield expression;
+            }
+            case ProtobufInteger integer -> {
+                var expression = new ProtobufIntegerExpression(tokenizer.line());
+                expression.setValue(integer);
+                yield expression;
+            }
+        };
     }
 
     private static ProtobufBoolExpression readBoolExpression(ProtobufLexer tokenizer, ProtobufBoolToken bool) {
@@ -1087,6 +1120,28 @@ public final class ProtobufParser {
         return Objects.equals(operator, RANGE_OPERATOR);
     }
 
+    private static boolean isValidPackage(String token) {
+        var length = token.length();
+        if(length == 0) {
+            return false;
+        }
+
+        var start = 0;
+        for(var end = start + 1; end < length; end++) {
+            if (token.charAt(end) != '.') {
+                continue;
+            }
+
+            if(!isValidIdent(token.substring(start, end))) {
+                return false;
+            }
+
+            start = end + 1;
+        }
+
+        return isValidIdent(token.substring(start, length));
+    }
+
     private static boolean isValidType(String token) {
         var length = token.length();
         if(length == 0) {
@@ -1161,5 +1216,13 @@ public final class ProtobufParser {
 
     private static boolean isMax(String token) {
         return Objects.equals(token, MAX);
+    }
+
+    private static boolean isGroupType(String token) {
+        return Objects.equals(token, "group");
+    }
+
+    private static boolean isMapType(String token) {
+        return Objects.equals(token, "map");
     }
 }

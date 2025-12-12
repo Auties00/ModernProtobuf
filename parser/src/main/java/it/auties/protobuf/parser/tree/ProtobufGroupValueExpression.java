@@ -7,10 +7,10 @@ import java.util.LinkedHashMap;
 import java.util.SequencedMap;
 
 /**
- * Represents a message literal value expression in the Protocol Buffer AST.
+ * Represents a group literal value expression in the Protocol Buffer AST.
  * <p>
- * Message literal expressions represent structured data in the Protocol Buffer text format,
- * allowing inline specification of message values. They are used in custom option values that expect messages.
+ * Group literal expressions represent structured data in the Protocol Buffer text format,
+ * allowing inline specification of group values. They are used in custom option values that expect groups.
  * <h2>Example:</h2>
  * <pre>{@code
  * option (my_option) = {
@@ -22,25 +22,25 @@ import java.util.SequencedMap;
  * };
  * }</pre>
  * <p>
- * The message literal contains a map of field names to their expression values, maintaining
- * insertion order. During semantic analysis, the type is resolved to the message definition.
+ * The group literal contains a map of field names to their expression values, maintaining
+ * insertion order. During semantic analysis, the type is resolved to the group definition.
  * </p>
  *
  * @see ProtobufExpression
  * @see ProtobufMessageStatement
  */
-public final class ProtobufMessageValueExpression
+public final class ProtobufGroupValueExpression
         extends ProtobufExpressionImpl
         implements ProtobufExpression {
     private final SequencedMap<String, ProtobufExpression> data;
     private ProtobufTypeReference type;
 
     /**
-     * Constructs a new message value expression at the specified line number.
+     * Constructs a new group value expression at the specified line number.
      *
      * @param line the line number in the source file
      */
-    public ProtobufMessageValueExpression(int line) {
+    public ProtobufGroupValueExpression(int line) {
         super(line);
         this.data = new LinkedHashMap<>();
     }
@@ -58,7 +58,7 @@ public final class ProtobufMessageValueExpression
     }
 
     /**
-     * Adds a field and its value to this message literal.
+     * Adds a field and its value to this group literal.
      *
      * @param key the field name
      * @param value the field value expression
@@ -68,7 +68,7 @@ public final class ProtobufMessageValueExpression
     }
 
     /**
-     * Removes a field from this message literal.
+     * Removes a field from this group literal.
      *
      * @param key the field name to remove
      * @return the removed expression, or null if the field was not present
@@ -78,12 +78,12 @@ public final class ProtobufMessageValueExpression
     }
 
     /**
-     * Returns the type reference to the message this literal represents.
+     * Returns the type reference to the group this literal represents.
      * <p>
      * This is populated during semantic analysis after type resolution.
      * </p>
      *
-     * @return the message type reference, or null if not yet attributed
+     * @return the group type reference, or null if not yet attributed
      */
     public ProtobufTypeReference type() {
         return type;
@@ -99,9 +99,9 @@ public final class ProtobufMessageValueExpression
     }
 
     /**
-     * Sets the type reference for this message literal.
+     * Sets the type reference for this group literal.
      *
-     * @param type the message type reference
+     * @param type the group type reference
      */
     public void setType(ProtobufTypeReference type) {
         this.type = type;

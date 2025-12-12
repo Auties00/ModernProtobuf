@@ -61,9 +61,9 @@ import java.util.Objects;
  * @see ProtobufDocumentChild
  */
 public final class ProtobufExtendStatement
-        extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>
-        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufMessageChild>,
-                   ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild, ProtobufExtendChild {
+        extends ProtobufStatementWithBodyImpl<ProtobufExtendChild>
+        implements ProtobufStatement, ProtobufTree.WithBody<ProtobufExtendChild>,
+                   ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
     private ProtobufTypeReference declaration;
 
     /**

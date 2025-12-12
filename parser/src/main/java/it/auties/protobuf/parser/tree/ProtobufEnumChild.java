@@ -10,7 +10,6 @@ package it.auties.protobuf.parser.tree;
  *   <li>{@link ProtobufEnumConstantStatement} - Enum constant declarations</li>
  *   <li>{@link ProtobufOptionStatement} - Enum-level options</li>
  *   <li>{@link ProtobufReservedStatement} - Reserved value declarations</li>
- *   <li>{@link ProtobufExtensionsStatement} - Extension range declarations (rare in enums)</li>
  *   <li>{@link ProtobufEmptyStatement} - Empty statements</li>
  * </ul>
  *
@@ -18,6 +17,6 @@ package it.auties.protobuf.parser.tree;
  */
 public sealed interface ProtobufEnumChild
         extends ProtobufStatement
-        permits ProtobufEmptyStatement, ProtobufEnumConstantStatement, ProtobufExtensionsStatement, ProtobufOptionStatement, ProtobufReservedStatement {
+        permits ProtobufEmptyStatement, ProtobufEnumConstantStatement, ProtobufOptionStatement, ProtobufReservedStatement {
 
 }

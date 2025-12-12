@@ -111,6 +111,13 @@ public final class ProtobufLexer {
     }
 
     /**
+     * Moves back the tokenizer to the previous token
+     */
+    public void moveToPreviousToken() {
+        tokenizer.pushBack();
+    }
+
+    /**
      * Reads the next raw token as a string, throwing an exception if the end of input is reached.
      * <p>
      * This method reads tokens without interpreting them as specific types (numbers, booleans, etc.).
@@ -150,7 +157,7 @@ public final class ProtobufLexer {
     private String parseMultiPartStringToken(String head) throws IOException {
         var token = tokenizer.nextToken();
         if(!isStringDelimiter(token)) {
-            tokenizer.pushBack();
+            moveToPreviousToken();
             return head;
         }else {
             var result = new StringBuilder();
@@ -158,7 +165,7 @@ public final class ProtobufLexer {
             do {
                 result.append(tokenizer.sval);
             } while (isStringDelimiter((tokenizer.nextToken())));
-            tokenizer.pushBack();
+            moveToPreviousToken();
             return result.toString();
         }
     }
@@ -199,12 +206,12 @@ public final class ProtobufLexer {
             case POSITIVE_INFINITY_KEYWORD -> POSITIVE_INFINITY;
             case NEGATIVE_INFINITY_TOKEN -> NEGATIVE_INFINITY;
             case NOT_A_NUMBER_TOKEN -> NOT_A_NUMBER;
-            default -> parseBigNumber(token);
+            default -> parseNumber(token);
         };
     }
 
     @SuppressWarnings("NumberEquality")
-    private static ProtobufToken parseBigNumber(String token) {
+    private static ProtobufToken parseNumber(String token) {
         var length = token.length();
         if(length == 0) {
             return EMPTY;

@@ -1679,7 +1679,7 @@ public class ProtobufParserSemanticsTest {
     }
 
     @Test
-    public void testDefaultValueOnNonOptionalFieldProto2Error() {
+    public void testDefaultValueOnNonOptionalFieldProto2() {
         var proto = """
                     syntax = "proto2";
 
@@ -1687,7 +1687,7 @@ public class ProtobufParserSemanticsTest {
                       required string name = 1 [default = "test"];
                     }
                     """;
-        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+        assertDoesNotThrow(() -> ProtobufParser.parseOnly(proto));
     }
 
     @Test
@@ -2101,5 +2101,250 @@ public class ProtobufParserSemanticsTest {
                     }
                     """;
         assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testJsonNameConflictImplicit() {
+        // foo_bar and fooBar both convert to "fooBar" as JSON name
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      string foo_bar = 1;
+                      string fooBar = 2;
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testJsonNameConflictExplicit() {
+        // Two fields with explicit same json_name
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      string field1 = 1 [json_name = "myField"];
+                      string field2 = 2 [json_name = "myField"];
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testJsonNameConflictMixed() {
+        // Explicit json_name conflicts with implicit name of another field
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      string my_field = 1;
+                      string other = 2 [json_name = "myField"];
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testJsonNameNoConflictWithExplicitOverride() {
+        // Explicit json_name avoids conflict
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      string foo_bar = 1 [json_name = "fooBarField"];
+                      string fooBar = 2;
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testRpcInputCannotBeEnum() {
+        var proto = """
+                    syntax = "proto3";
+
+                    enum Status {
+                      UNKNOWN = 0;
+                      OK = 1;
+                    }
+
+                    message Response {}
+
+                    service S {
+                      rpc GetStatus(Status) returns (Response);
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testRpcOutputCannotBeEnum() {
+        var proto = """
+                    syntax = "proto3";
+
+                    enum Status {
+                      UNKNOWN = 0;
+                      OK = 1;
+                    }
+
+                    message Request {}
+
+                    service S {
+                      rpc GetStatus(Request) returns (Status);
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testRpcWithValidMessageTypes() {
+        var proto = """
+                    syntax = "proto3";
+
+                    message Request {
+                      string query = 1;
+                    }
+
+                    message Response {
+                      string result = 1;
+                    }
+
+                    service S {
+                      rpc Query(Request) returns (Response);
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testOneofRequiredModifierError() {
+        var proto = """
+                    syntax = "proto2";
+
+                    message M {
+                      oneof choice {
+                        required string name = 1;
+                      }
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testGroupValidInProto2() {
+        var proto = """
+                    syntax = "proto2";
+
+                    message M {
+                      optional group G = 1 {
+                        optional int32 x = 2;
+                      }
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testGroupNameMustStartWithCapital() {
+        var proto = """
+                    syntax = "proto2";
+
+                    message M {
+                      optional group g = 1 {
+                        optional int32 x = 2;
+                      }
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testJsonNameValidDifferentCamelCase() {
+        // Different fields with legitimately different JSON names
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      string first_name = 1;
+                      string last_name = 2;
+                      string middle_initial = 3;
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testRpcStreamingWithValidTypes() {
+        var proto = """
+                    syntax = "proto3";
+
+                    message Request {}
+                    message Response {}
+
+                    service S {
+                      rpc UnaryCall(Request) returns (Response);
+                      rpc ServerStream(Request) returns (stream Response);
+                      rpc ClientStream(stream Request) returns (Response);
+                      rpc BidirectionalStream(stream Request) returns (stream Response);
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testOneofFieldsWithDistinctJsonNames() {
+        var proto = """
+                    syntax = "proto3";
+
+                    message M {
+                      oneof choice {
+                        string text_value = 1;
+                        int32 int_value = 2;
+                      }
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
+    }
+
+    @Test
+    public void testMapKeyEnumNotAllowed() {
+        var proto = """
+                    syntax = "proto3";
+
+                    enum MyEnum {
+                      UNKNOWN = 0;
+                      VALUE = 1;
+                    }
+
+                    message M {
+                      map<MyEnum, string> invalid_map = 1;
+                    }
+                    """;
+        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testEnumAsMapValueIsValid() {
+        var proto = """
+                    syntax = "proto3";
+
+                    enum Status {
+                      UNKNOWN = 0;
+                      ACTIVE = 1;
+                    }
+
+                    message M {
+                      map<string, Status> status_map = 1;
+                    }
+                    """;
+        var document = ProtobufParser.parseOnly(proto);
+        assertNotNull(document);
     }
 }

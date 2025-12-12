@@ -47,7 +47,7 @@ import java.util.stream.Stream;
  * @see ProtobufTree.WithBody
  * @see ProtobufDocumentTree
  */
-sealed class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
+sealed abstract class ProtobufStatementWithBodyImpl<CHILD extends ProtobufStatement>
         extends ProtobufStatementImpl
         implements ProtobufTree.WithBody<CHILD>
         permits ProtobufEnumStatement, ProtobufExtendStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufServiceStatement {

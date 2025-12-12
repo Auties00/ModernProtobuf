@@ -1,5 +1,8 @@
 package it.auties.protobuf.parser.type;
 
+import java.math.BigInteger;
+import java.util.Objects;
+
 /**
  * Represents a numeric range in a Protocol Buffer definition.
  * <p>
@@ -28,6 +31,14 @@ public sealed interface ProtobufRange {
     ProtobufInteger min();
 
     /**
+     * Returns whether the {@code number} is in the range
+     *
+     * @param number the non-null number in the range
+     * @return true if the {@code number} is in the range, false otherwise
+     */
+    boolean contains(BigInteger number);
+
+    /**
      * Represents a bounded numeric range with both minimum and maximum values.
      * <p>
      * Bounded ranges are specified using the syntax {@code min to max} in Protocol Buffer definitions,
@@ -38,7 +49,11 @@ public sealed interface ProtobufRange {
      * @param max the maximum (ending) value of the range, inclusive
      */
     record Bounded(ProtobufInteger min, ProtobufInteger max) implements ProtobufRange {
-
+        @Override
+        public boolean contains(BigInteger number) {
+            Objects.requireNonNull(number, "number cannot be null");
+            return number.compareTo(min.value()) >= 0 && number.compareTo(max.value()) <= 0;
+        }
     }
 
     /**
@@ -52,6 +67,10 @@ public sealed interface ProtobufRange {
      * @param min the minimum (starting) value of the range, inclusive
      */
     record LowerBounded(ProtobufInteger min) implements ProtobufRange {
-
+        @Override
+        public boolean contains(BigInteger number) {
+            Objects.requireNonNull(number, "number cannot be null");
+            return number.compareTo(min.value()) >= 0;
+        }
     }
 }

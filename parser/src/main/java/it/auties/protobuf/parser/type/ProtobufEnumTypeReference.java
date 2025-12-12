@@ -8,7 +8,7 @@ import java.util.Objects;
 /**
  * Represents a resolved reference to a Protocol Buffer enum type.
  * <p>
- * Enum type references are created during semantic analysis when an {@link ProtobufUnresolvedObjectTypeReference}
+ * Enum type references are created during semantic analysis when an {@link ProtobufUnresolvedTypeReference}
  * is resolved to an enum declaration. This type reference maintains a link to the actual enum
  * declaration, allowing access to the enum's constants and metadata.
  * </p>

@@ -1,10 +1,7 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.exception.ProtobufParserException;
-import it.auties.protobuf.parser.tree.ProtobufBoolExpression;
-import it.auties.protobuf.parser.tree.ProtobufFieldStatement;
-import it.auties.protobuf.parser.tree.ProtobufMessageStatement;
-import it.auties.protobuf.parser.tree.ProtobufNumberExpression;
+import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
 import it.auties.protobuf.parser.type.ProtobufInteger;
 import org.junit.jupiter.api.Test;
@@ -118,19 +115,19 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufIntegerExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufIntegerExpression) aDefault.get().value();
         assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
-        assertEquals(BigInteger.valueOf(123), ((ProtobufInteger) aDefaultValue.value()).value());
+        assertEquals(BigInteger.valueOf(123), aDefaultValue.value().value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
-        var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
+        assertInstanceOf(ProtobufIntegerExpression.class, bDefault.get().value());
+        var bDefaultValue = (ProtobufIntegerExpression) bDefault.get().value();
         assertInstanceOf(ProtobufInteger.class, bDefaultValue.value());
-        assertEquals(BigInteger.valueOf(-45), ((ProtobufInteger) bDefaultValue.value()).value());
+        assertEquals(BigInteger.valueOf(-45), bDefaultValue.value().value());
     }
 
     @Test
@@ -148,10 +145,10 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufIntegerExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufIntegerExpression) aDefault.get().value();
         assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
-        assertEquals(BigInteger.valueOf(63L), ((ProtobufInteger) aDefaultValue.value()).value());
+        assertEquals(BigInteger.valueOf(63L), aDefaultValue.value().value());
     }
 
     @Test
@@ -170,19 +167,19 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufIntegerExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufIntegerExpression) aDefault.get().value();
         assertInstanceOf(ProtobufInteger.class, aDefaultValue.value());
-        assertEquals(BigInteger.valueOf(255), ((ProtobufInteger) aDefaultValue.value()).value());
+        assertEquals(BigInteger.valueOf(255), aDefaultValue.value().value());
 
         var b = document.getAnyChildByNameAndType("b", ProtobufFieldStatement.class);
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
-        var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
+        assertInstanceOf(ProtobufIntegerExpression.class, bDefault.get().value());
+        var bDefaultValue = (ProtobufIntegerExpression) bDefault.get().value();
         assertInstanceOf(ProtobufInteger.class, bDefaultValue.value());
-        assertEquals(BigInteger.valueOf(16), ((ProtobufInteger) bDefaultValue.value()).value());
+        assertEquals(BigInteger.valueOf(16), bDefaultValue.value().value());
     }
 
     @Test
@@ -201,8 +198,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufFloatingPointExpression) aDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(1.0), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
@@ -210,8 +207,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
-        var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, bDefault.get().value());
+        var bDefaultValue = (ProtobufFloatingPointExpression) bDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(3.14), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }
@@ -232,8 +229,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufFloatingPointExpression) aDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(-3.14e-5d), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
@@ -241,8 +238,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
-        var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, bDefault.get().value());
+        var bDefaultValue = (ProtobufFloatingPointExpression) bDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(1.23e10d), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }
@@ -263,8 +260,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(a.isPresent());
         var aDefault = a.get().getOption("default");
         assertTrue(aDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, aDefault.get().value());
-        var aDefaultValue = (ProtobufNumberExpression) aDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, aDefault.get().value());
+        var aDefaultValue = (ProtobufFloatingPointExpression) aDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, aDefaultValue.value());
         assertEquals(BigDecimal.valueOf(.5), ((ProtobufFloatingPoint.Finite) aDefaultValue.value()).value());
 
@@ -272,8 +269,8 @@ class ProtobufParserLexicologyTest {
         assertTrue(b.isPresent());
         var bDefault = b.get().getOption("default");
         assertTrue(bDefault.isPresent());
-        assertInstanceOf(ProtobufNumberExpression.class, bDefault.get().value());
-        var bDefaultValue = (ProtobufNumberExpression) bDefault.get().value();
+        assertInstanceOf(ProtobufFloatingPointExpression.class, bDefault.get().value());
+        var bDefaultValue = (ProtobufFloatingPointExpression) bDefault.get().value();
         assertInstanceOf(ProtobufFloatingPoint.Finite.class, bDefaultValue.value());
         assertEquals(BigDecimal.valueOf(.25), ((ProtobufFloatingPoint.Finite) bDefaultValue.value()).value());
     }

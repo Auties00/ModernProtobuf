@@ -8,7 +8,7 @@ import java.util.Objects;
 /**
  * Represents a resolved reference to a Protocol Buffer message type.
  * <p>
- * Message type references are created during semantic analysis when an {@link ProtobufUnresolvedObjectTypeReference}
+ * Message type references are created during semantic analysis when an {@link ProtobufUnresolvedTypeReference}
  * is resolved to a message declaration. This type reference maintains a link to the actual message
  * declaration, allowing access to the message's structure and metadata.
  * </p>

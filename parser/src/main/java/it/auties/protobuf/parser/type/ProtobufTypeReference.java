@@ -49,29 +49,4 @@ public sealed interface ProtobufTypeReference
      * @return {@code true} if this type reference is attributed, {@code false} otherwise
      */
     boolean isAttributed();
-
-    /**
-     * Creates a type reference from a type name string.
-     * <p>
-     * This factory method parses the type name and returns the appropriate {@link ProtobufTypeReference}
-     * implementation. Primitive types are resolved immediately to {@link ProtobufPrimitiveTypeReference}.
-     * User-defined types are created as {@link ProtobufUnresolvedObjectTypeReference} and will be
-     * resolved during semantic analysis.
-     * </p>
-     *
-     * @param type the type name as it appears in the Protocol Buffer definition
-     * @return a {@link ProtobufTypeReference} representing the specified type
-     */
-    static ProtobufTypeReference of(String type){
-        return switch (type) {
-            case "map" -> new ProtobufMapTypeReference();
-            case "group" -> new ProtobufGroupTypeReference(type);
-            default -> {
-                var protobufType = ProtobufType.ofPrimitive(type);
-                yield protobufType == ProtobufType.UNKNOWN
-                        ? new ProtobufUnresolvedObjectTypeReference(type)
-                        : new ProtobufPrimitiveTypeReference(protobufType);
-            }
-        };
-    }
 }

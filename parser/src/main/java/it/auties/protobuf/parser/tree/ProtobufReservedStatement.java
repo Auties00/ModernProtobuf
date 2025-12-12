@@ -75,7 +75,7 @@ import java.util.stream.Collectors;
 public final class ProtobufReservedStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement,
-                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild, ProtobufExtendChild {
+                   ProtobufMessageChild, ProtobufEnumChild, ProtobufGroupChild {
     private final List<ProtobufReservedExpression> expressions;
 
     /**

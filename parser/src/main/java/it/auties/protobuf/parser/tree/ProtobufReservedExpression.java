@@ -8,7 +8,7 @@ package it.auties.protobuf.parser.tree;
  * restricts which expression types can be used:
  * </p>
  * <ul>
- *   <li>{@link ProtobufNumberExpression} - Reserved field numbers ({@code reserved 1, 2, 3})</li>
+ *   <li>{@link ProtobufIntegerExpression} - Reserved field numbers ({@code reserved 1, 2, 3})</li>
  *   <li>{@link ProtobufIntegerRangeExpression} - Reserved field number ranges ({@code reserved 10 to 20})</li>
  *   <li>{@link ProtobufLiteralExpression} - Reserved field names ({@code reserved "old_field", "deprecated"})</li>
  * </ul>
@@ -24,5 +24,5 @@ package it.auties.protobuf.parser.tree;
  */
 public sealed interface ProtobufReservedExpression
         extends ProtobufExpression
-        permits ProtobufLiteralExpression, ProtobufNumberExpression, ProtobufIntegerRangeExpression {
+        permits ProtobufIntegerExpression, ProtobufIntegerRangeExpression, ProtobufLiteralExpression {
 }

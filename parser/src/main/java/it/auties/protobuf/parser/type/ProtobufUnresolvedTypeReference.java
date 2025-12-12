@@ -20,8 +20,8 @@ import java.util.Objects;
  *
  * @param name the unresolved type name as it appears in the Protocol Buffer definition, must not be null
  */
-public record ProtobufUnresolvedObjectTypeReference(String name) implements ProtobufObjectTypeReference {
-    public ProtobufUnresolvedObjectTypeReference(String name) {
+public record ProtobufUnresolvedTypeReference(String name) implements ProtobufObjectTypeReference {
+    public ProtobufUnresolvedTypeReference(String name) {
         this.name = Objects.requireNonNull(name, "name cannot be null");
     }
 
