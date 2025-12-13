@@ -398,8 +398,25 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 default -> {
-                    var child = parseField(document, tokenizer, token);
-                    statement.addChild(child);
+                    var modifier = ProtobufModifier.of(token);
+                    if(modifier.isPresent()) {
+                        var typeToken = tokenizer.nextRawToken();
+                        if (isGroupType(typeToken)) {
+                            var groupField = parseGroupField(document, tokenizer, modifier.get());
+                            statement.addChild(groupField);
+                        } else {
+                            var field = parseField(tokenizer, modifier.get(), typeToken);
+                            statement.addChild(field);
+                        }
+                    } else {
+                        if (isGroupType(token)) {
+                            var groupField = parseGroupField(document, tokenizer, ProtobufModifier.NONE);
+                            statement.addChild(groupField);
+                        } else {
+                            var field = parseField(tokenizer, ProtobufModifier.NONE, token);
+                            statement.addChild(field);
+                        }
+                    }
                 }
             }
         }
@@ -423,40 +440,31 @@ public final class ProtobufParser {
                 tokenizer.line());
         String token;
         while (!isBodyEnd(token = tokenizer.nextRawToken())) {
-            switch (token) {
-                case "oneof" -> {
-                    var child = parseOneof(tokenizer);
-                    statement.addChild(child);
+            var modifier = ProtobufModifier.of(token);
+            if(modifier.isPresent()) {
+                var typeToken = tokenizer.nextRawToken();
+                if (isGroupType(typeToken)) {
+                    var groupField = parseGroupField(document, tokenizer, modifier.get());
+                    statement.addChild(groupField);
+                } else {
+                    var field = parseField(tokenizer, modifier.get(), typeToken);
+                    statement.addChild(field);
                 }
-                default -> {
-                    var child = parseField(document, tokenizer, token);
-                    statement.addChild(child);
+            } else {
+                if (isGroupType(token)) {
+                    var groupField = parseGroupField(document, tokenizer, ProtobufModifier.NONE);
+                    statement.addChild(groupField);
+                } else {
+                    var field = parseField(tokenizer, ProtobufModifier.NONE, token);
+                    statement.addChild(field);
                 }
             }
         }
         return statement;
     }
 
-    private static ProtobufFieldStatement parseField(ProtobufDocumentTree document, ProtobufLexer tokenizer, String modifierToken) throws IOException {
-        var modifier = ProtobufFieldStatement.Modifier.of(modifierToken);
-        if(modifier.isPresent()) {
-            var typeToken = tokenizer.nextRawToken();
-            if (isGroupType(typeToken)) {
-                return parseGroupField(document, tokenizer, modifier.get());
-            } else {
-                return parseField(tokenizer, modifier.get(), typeToken);
-            }
-        } else {
-            if (isGroupType(modifierToken)) {
-                return parseGroupField(document, tokenizer, ProtobufFieldStatement.Modifier.NONE);
-            } else {
-                return parseField(tokenizer, ProtobufFieldStatement.Modifier.NONE, modifierToken);
-            }
-        }
-    }
-
-    private static ProtobufGroupFieldStatement parseGroupField(ProtobufDocumentTree document, ProtobufLexer tokenizer, ProtobufFieldStatement.Modifier modifier) throws IOException {
-        var statement = new ProtobufGroupFieldStatement(tokenizer.line());
+    private static ProtobufGroupStatement parseGroupField(ProtobufDocumentTree document, ProtobufLexer tokenizer, ProtobufModifier modifier) throws IOException {
+        var statement = new ProtobufGroupStatement(tokenizer.line());
 
         statement.setModifier(modifier);
 
@@ -511,8 +519,25 @@ public final class ProtobufParser {
                 }
 
                 default -> {
-                    var groupChild = parseField(document, tokenizer, groupToken);
-                    statement.addChild(groupChild);
+                    var groupModifier = ProtobufModifier.of(groupToken);
+                    if(groupModifier.isPresent()) {
+                        var typeToken = tokenizer.nextRawToken();
+                        if (isGroupType(typeToken)) {
+                            var groupField = parseGroupField(document, tokenizer, groupModifier.get());
+                            statement.addChild(groupField);
+                        } else {
+                            var field = parseField(tokenizer, groupModifier.get(), typeToken);
+                            statement.addChild(field);
+                        }
+                    } else {
+                        if (isGroupType(groupToken)) {
+                            var groupField = parseGroupField(document, tokenizer, ProtobufModifier.NONE);
+                            statement.addChild(groupField);
+                        } else {
+                            var field = parseField(tokenizer, ProtobufModifier.NONE, groupToken);
+                            statement.addChild(field);
+                        }
+                    }
                 }
             }
         }
@@ -529,7 +554,7 @@ public final class ProtobufParser {
         return name;
     }
 
-    private static ProtobufFieldStatement parseField(ProtobufLexer tokenizer, ProtobufFieldStatement.Modifier modifier, String typeToken) throws IOException {
+    private static ProtobufFieldStatement parseField(ProtobufLexer tokenizer, ProtobufModifier modifier, String typeToken) throws IOException {
         var statement = new ProtobufFieldStatement(tokenizer.line());
 
         statement.setModifier(modifier);
@@ -673,7 +698,6 @@ public final class ProtobufParser {
                 }
                 default -> {
                     var child = parseEnumConstant(token, tokenizer);
-                    child.setType(new ProtobufEnumTypeReference(statement));
                     statement.addChild(child);
                 }
             }
@@ -683,7 +707,6 @@ public final class ProtobufParser {
 
     private static ProtobufEnumConstantStatement parseEnumConstant(String token, ProtobufLexer tokenizer) throws IOException {
         var statement = new ProtobufEnumConstantStatement(tokenizer.line());
-        statement.setModifier(ProtobufFieldStatement.Modifier.NONE);
         statement.setName(token);
 
         var operator = tokenizer.nextRawToken();
@@ -904,8 +927,8 @@ public final class ProtobufParser {
         return new ProtobufMethodStatement.Type(typeReference, stream);
     }
 
-    private static ProtobufOneofFieldStatement parseOneof(ProtobufLexer tokenizer) throws IOException {
-        var statement = new ProtobufOneofFieldStatement(tokenizer.line());
+    private static ProtobufOneofStatement parseOneof(ProtobufLexer tokenizer) throws IOException {
+        var statement = new ProtobufOneofStatement(tokenizer.line());
         var name = tokenizer.nextRawToken();
         ProtobufSyntaxException.check(isValidIdent(name),
                 "Unexpected token: " + name, tokenizer.line());
@@ -921,7 +944,7 @@ public final class ProtobufParser {
                     statement.addChild(child);
                 }
                 default -> {
-                    var child = parseField(tokenizer, ProtobufFieldStatement.Modifier.NONE, token);
+                    var child = parseField(tokenizer, ProtobufModifier.NONE, token);
                     statement.addChild(child);
                 }
             }

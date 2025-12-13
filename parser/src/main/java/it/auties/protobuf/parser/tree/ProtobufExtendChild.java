@@ -9,13 +9,13 @@ package it.auties.protobuf.parser.tree;
  * </p>
  * <ul>
  *   <li>{@link ProtobufFieldStatement} - Extension field declarations</li>
- *   <li>{@link ProtobufGroupFieldStatement} - Extension group fields (deprecated)</li>
+ *   <li>{@link ProtobufGroupStatement} - Extension group fields (deprecated)</li>
  * </ul>
  *
  * @see ProtobufExtendStatement
  */
 public sealed interface ProtobufExtendChild
         extends ProtobufStatement
-        permits ProtobufFieldStatement, ProtobufGroupFieldStatement {
+        permits ProtobufFieldStatement, ProtobufGroupStatement {
 
 }

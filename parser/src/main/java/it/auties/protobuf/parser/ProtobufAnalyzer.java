@@ -79,7 +79,7 @@ public final class ProtobufAnalyzer {
             ProtobufDocumentTree.class, "FileOptions",
             ProtobufMessageStatement.class, "MessageOptions",
             ProtobufEnumStatement.class, "EnumOptions",
-            ProtobufOneofFieldStatement.class, "OneOfOptions",
+            ProtobufOneofStatement.class, "OneOfOptions",
             ProtobufEnumConstantExpression.class, "EnumValueOptions",
             ProtobufFieldStatement.class, "FieldOptions",
             ProtobufServiceStatement.class, "ServiceOptions",
@@ -200,63 +200,33 @@ public final class ProtobufAnalyzer {
     }
 
     private static void attributeDocument(ProtobufDocumentTree document) {
-        var names = new HashSet<String>();
         var queue = new LinkedList<ProtobufTree>();
         queue.add(document);
         while (!queue.isEmpty()) {
             var tree = queue.removeFirst();
-
-            if(tree instanceof ProtobufTree.WithName withName) {
-                ProtobufSyntaxException.check(names.add(withName.name()),
-                        "Duplicate type name \"%s\"",
-                        withName.line(),
-                        withName.name());
-            }
 
             if(tree instanceof ProtobufTree.WithBody<?> withBody) {
                 queue.addAll(withBody.children());
             }
 
             switch (tree) {
-                case ProtobufEmptyStatement _ -> {
-                    // Nothing to do
-                }
+                case ProtobufEmptyStatement _ -> {} // Nothing to do
 
-                case ProtobufExtendStatement extendStatement -> {
-                    validateExtendDeclaration(document, extendStatement);
-                }
+                case ProtobufExtendStatement extendStatement -> validateExtendDeclaration(document, extendStatement);
 
-                case ProtobufExtensionsStatement protobufExtension -> {
-                    validateExtensions(document, protobufExtension);
-                }
+                case ProtobufExtensionsStatement protobufExtension -> validateExtensions(document, protobufExtension);
 
-                case ProtobufFieldStatement protobufField -> {
-                    attributeType(document, protobufField);
-                    validateField(document, protobufField);
-                    for (var option : protobufField.options()) {
-                        attributeFieldOption(document, protobufField, option);
-                    }
-                }
+                case ProtobufFieldStatement protobufField -> validateField(document, protobufField);
 
-                case ProtobufOptionStatement protobufOption -> {
-                    validateOption(protobufOption);
-                }
+                case ProtobufOptionStatement protobufOption -> validateOption(protobufOption);
 
-                case ProtobufPackageStatement _ -> {
-                    // Nothing to do
-                }
+                case ProtobufPackageStatement _ -> {} // Nothing to do
 
-                case ProtobufReservedStatement protobufReserved -> {
-                    validateReserved(protobufReserved);
-                }
+                case ProtobufReservedStatement protobufReserved -> validateReserved(protobufReserved);
 
-                case ProtobufEnumStatement enumStatement -> {
-                    validateEnum(enumStatement);
-                }
+                case ProtobufEnumStatement enumStatement -> validateEnum(enumStatement);
 
-                case ProtobufImportStatement _ -> {
-                    // Nothing to do
-                }
+                case ProtobufImportStatement _ -> {} // Nothing to do
 
                 case ProtobufMessageStatement messageStatement -> {
 
@@ -266,13 +236,9 @@ public final class ProtobufAnalyzer {
 
                 }
 
-                case ProtobufServiceStatement serviceStatement -> {
-                    validateService(document, serviceStatement);
-                }
+                case ProtobufServiceStatement serviceStatement -> validateService(document, serviceStatement);
 
-                case ProtobufSyntaxStatement _ -> {
-
-                }
+                case ProtobufSyntaxStatement _ -> {} // Nothing to do
 
                 case ProtobufDocumentTree protobufDocumentTree -> {
 
@@ -281,6 +247,12 @@ public final class ProtobufAnalyzer {
                 case ProtobufExpression protobufExpression -> {
 
                 }
+
+                case ProtobufEnumConstantStatement enumConstant -> validateEnumConstant(enumConstant);
+
+                case ProtobufGroupStatement groupStatement -> validateGroupField(document, groupStatement);
+
+                case ProtobufOneofStatement oneofStatement -> validateOneofField(oneofStatement);
             }
         }
     }
@@ -322,7 +294,26 @@ public final class ProtobufAnalyzer {
             switch (statement) {
                 case ProtobufFieldStatement field -> {
                     // Extension fields cannot be required
-                    ProtobufSemanticException.check(field.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
+                    ProtobufSemanticException.check(field.modifier() != ProtobufModifier.REQUIRED,
+                            "Extension field '%s' cannot be required\n\nExtension fields cannot use the 'required' modifier.\nThis ensures backward compatibility with code that doesn't know about the extension.\n\nHelp: Remove the 'required' modifier or use 'optional' instead:\n      extend MyMessage {{\n        optional string %s = 100;  // OK\n        string %s = 100;           // Also OK (implicitly optional)\n      }}",
+                            field.line(), field.name(), field.name(), field.name());
+
+                    // Extension fields cannot be map types
+                    ProtobufSemanticException.check(!(field.type() instanceof ProtobufMapTypeReference),
+                            "Extension field '%s' cannot be a map type\n\nMap fields are not allowed in extensions.\n\nHelp: If you need a map-like structure, use a repeated message with key-value pairs:\n      message KeyValue {{\n        string key = 1;\n        ValueType value = 2;\n      }}\n      extend MyMessage {{\n        repeated KeyValue %s = 100;\n      }}",
+                            field.line(), field.name(), field.name());
+
+                    // Validate field number is within declared extension ranges
+                    var entry = ranges.floorEntry(field.index());
+                    var extensible = entry != null && field.index().compareTo(entry.getValue()) <= 0;
+                    ProtobufSemanticException.check(extensible,
+                            "Extension field '%s' with number %s is outside declared extension ranges\n\nThe field number must be within one of the extension ranges declared in message '%s'.\n\nHelp: Choose a field number within the declared extension ranges,\n      or update the message to include a range that covers %s:\n      \n      message %s {{\n        extensions 100 to 199;  // Declared ranges\n      }}",
+                            field.line(), field.name(), field.index(), declaration.name(), field.index(), declaration.name());
+                }
+
+                case ProtobufGroupStatement field -> {
+                    // Extension fields cannot be required
+                    ProtobufSemanticException.check(field.modifier() != ProtobufModifier.REQUIRED,
                             "Extension field '%s' cannot be required\n\nExtension fields cannot use the 'required' modifier.\nThis ensures backward compatibility with code that doesn't know about the extension.\n\nHelp: Remove the 'required' modifier or use 'optional' instead:\n      extend MyMessage {{\n        optional string %s = 100;  // OK\n        string %s = 100;           // Also OK (implicitly optional)\n      }}",
                             field.line(), field.name(), field.name(), field.name());
 
@@ -386,7 +377,7 @@ public final class ProtobufAnalyzer {
         return switch (resolvedType) {
             case ProtobufEnumStatement enumeration -> new ProtobufEnumTypeReference(enumeration);
             case ProtobufMessageStatement message -> new ProtobufMessageTypeReference(message);
-            case ProtobufOneofFieldStatement _ -> throw new IllegalArgumentException("Cannot resolve a type reference for a oneof field");
+            case ProtobufOneofStatement _ -> throw new IllegalArgumentException("Cannot resolve a type reference for a oneof field");
             case ProtobufServiceStatement _ -> throw new IllegalArgumentException("Cannot resolve a type reference for a service");
             case null -> null;
         };
@@ -460,7 +451,7 @@ public final class ProtobufAnalyzer {
                 "Default values are not allowed in proto3", option.line());
 
         // Proto2: Cannot be used on repeated fields
-        ProtobufSemanticException.check(protobufField.modifier() != ProtobufFieldStatement.Modifier.REPEATED,
+        ProtobufSemanticException.check(protobufField.modifier() != ProtobufModifier.REPEATED,
                 "Default values cannot be used on repeated fields", option.line());
 
         var fieldType = protobufField.type().protobufType();
@@ -577,7 +568,7 @@ public final class ProtobufAnalyzer {
 
     private static void validatePackedOption(ProtobufFieldStatement protobufField, ProtobufOptionExpression option) {
         // Packed option only allowed on repeated fields
-        ProtobufSemanticException.check(protobufField.modifier() == ProtobufFieldStatement.Modifier.REPEATED,
+        ProtobufSemanticException.check(protobufField.modifier() == ProtobufModifier.REPEATED,
                 "Packed option can only be used on repeated fields", option.line());
 
         // Check if the type is packable
@@ -922,7 +913,7 @@ public final class ProtobufAnalyzer {
                 case ProtobufIntegerExpression integerExpression -> {
                     var value = integerExpression.value().value();
 
-                    ProtobufSemanticException.check(value.compareTo(minAllowedIndex) > 0,
+                    ProtobufSemanticException.check(value.compareTo(minAllowedIndex) >= 0,
                             "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), value, minAllowedIndex);
 
                     ProtobufSemanticException.check(value.compareTo(maxAllowedIndex) <= 0,
@@ -940,7 +931,7 @@ public final class ProtobufAnalyzer {
                     var range = rangeExpr.value();
                     switch (range) {
                         case ProtobufRange.Bounded(ProtobufInteger(var min), ProtobufInteger(var max)) -> {
-                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) > 0,
+                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) >= 0,
                                     "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), min, minAllowedIndex);
 
                             ProtobufSemanticException.check(max.compareTo(maxAllowedIndex) <= 0,
@@ -964,7 +955,7 @@ public final class ProtobufAnalyzer {
                         }
 
                         case ProtobufRange.LowerBounded(ProtobufInteger(var min)) -> {
-                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) > 0,
+                            ProtobufSemanticException.check(min.compareTo(minAllowedIndex) >= 0,
                                     "Reserved number %s is invalid: must be at least %s", reservedStatement.line(), min, minAllowedIndex);
 
                             // Check overlap with range starting before min
@@ -991,25 +982,24 @@ public final class ProtobufAnalyzer {
     }
 
     private static void validateField(ProtobufDocumentTree document, ProtobufFieldStatement field) {
-        // Check field specific data
-        switch (field) {
-            case ProtobufGroupFieldStatement groupField -> validateGroupField(document, groupField);
-            case ProtobufOneofFieldStatement oneofField -> validateOneofField(oneofField);
-            default -> {}
-        }
+        attributeType(document, field);
 
         validateFieldModifiers(document, field);
 
         validateFieldType(field);
 
         validateFieldIndex(field);
+
+        for (var option : field.options()) {
+            attributeFieldOption(document, field, option);
+        }
     }
 
     private static void validateFieldModifiers(ProtobufDocumentTree document, ProtobufFieldStatement field) {
         // Proto3: "required" modifier not allowed
         var syntax = document.syntax()
                 .orElse(ProtobufVersion.defaultVersion());
-        ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3 || field.modifier() != ProtobufFieldStatement.Modifier.REQUIRED,
+        ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3 || field.modifier() != ProtobufModifier.REQUIRED,
                 "Field '%s' cannot use 'required' modifier in proto3\n\nProto3 simplified field presence and removed the 'required' modifier.\nAll singular fields in proto3 are optional by default.\n\nHelp: In proto3:\n      - Remove the 'required' keyword\n      - Fields are optional by default and return default values when not set\n      - Use 'optional' keyword if you need explicit presence detection\n      \n      Example:\n        Proto2: required string name = 1;\n        Proto3: string name = 1;  // Already optional\n        Proto3: optional string name = 1;  // Explicit presence tracking",
                 field.line(), field.name());
     }
@@ -1023,7 +1013,7 @@ public final class ProtobufAnalyzer {
 
     private static void validateMapField(ProtobufFieldStatement field, ProtobufMapTypeReference mapType) {
         // Map fields cannot have modifiers
-        ProtobufSemanticException.check(field.modifier() == ProtobufFieldStatement.Modifier.NONE,
+        ProtobufSemanticException.check(field.modifier() == ProtobufModifier.NONE,
                 "Map field \"%s\" cannot have modifier '%s'\n\nMap fields are implicitly repeated and cannot have additional modifiers.\nYou specified: %s\n\nHelp: Remove the '%s' modifier from your map field declaration.\n      Maps are already collections and don't need 'repeated'.\n      Example: map<string, int32> my_map = 1;",
                 field.line(), field.name(), field.modifier().token(), field.modifier().token(), field.modifier().token());
 
@@ -1071,25 +1061,33 @@ public final class ProtobufAnalyzer {
                 field.line(), field.name(), fieldNumber);
     }
 
-    private static void validateGroupField(ProtobufDocumentTree document, ProtobufGroupFieldStatement groupField) {
+    private static void validateEnumConstant(ProtobufEnumConstantStatement constant) {
+        if (constant.hasIndex()) {
+            var constantIndex = constant.index().value();
+            ProtobufSemanticException.check(constantIndex.compareTo(ENUM_CONSTANT_MIN) >= 0 && constantIndex.compareTo(ENUM_CONSTANT_MAX) <= 0,
+                    "Enum value %s is out of valid int32 range (-2147483648 to 2147483647) in enum \"%s\"",
+                    constant.line(), constantIndex, getParentName(constant));
+        }
+    }
+
+    private static void validateGroupField(ProtobufDocumentTree document, ProtobufGroupStatement groupField) {
         var syntax = document.syntax()
                 .orElse(ProtobufVersion.defaultVersion());
         ProtobufSemanticException.check(syntax != ProtobufVersion.PROTOBUF_3,
                 "Group \"%s\" is not allowed in proto3\n\nGroups are deprecated and not supported in proto3.\nThey were a legacy feature from proto2 that combined field declaration with message definition.\n\nHelp: Use a nested message type instead:\n      message %s {\n        message %s {\n          // fields here\n        }\n        %s field_name = %s;\n      }",
                 groupField.line(),
-                groupField.name(), groupField.parent() instanceof ProtobufTree.WithName parentWithName ? parentWithName.name() : "unknown", groupField.name(), groupField.name(), groupField.index().value().toString());
+                groupField.name(), getParentName(groupField), groupField.name(), groupField.name(), groupField.index().value().toString());
     }
 
-    private static void validateOneofField(ProtobufOneofFieldStatement field) {
+    private static String getParentName(ProtobufTree groupField) {
+        return groupField.parent() instanceof ProtobufTree.WithName parentWithName ? parentWithName.name() : "unknown";
+    }
+
+    private static void validateOneofField(ProtobufOneofStatement field) {
         // Oneof must contain at least one field
         var child = field.getDirectChildByType(ProtobufFieldStatement.class);
         ProtobufSemanticException.check(child.isPresent(),
                 "Oneof \"%s\" must contain at least one field", field.line(), field.name());
-
-        // Oneof fields cannot be map types
-        ProtobufSemanticException.check(!(field.type() instanceof ProtobufMapTypeReference),
-                "Oneof field '%s' cannot be a map type\n\nMap fields cannot be used inside oneof blocks.\n\nHelp: If you need a map-like structure in a oneof, use a wrapper message:\n      message MapWrapper {{\n        map<string, int32> values = 1;\n      }}\n      oneof choice {{\n        MapWrapper my_map = 1;\n        string other_option = 2;\n      }}",
-                field.line(), field.name());
     }
 
     private static void validateEnum(ProtobufEnumStatement enumStmt) {

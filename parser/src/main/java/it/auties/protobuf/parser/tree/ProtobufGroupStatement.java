@@ -1,9 +1,11 @@
 package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.parser.type.ProtobufGroupTypeReference;
+import it.auties.protobuf.parser.type.ProtobufInteger;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -68,22 +70,28 @@ import java.util.stream.Stream;
  * @see ProtobufFieldStatement
  * @see ProtobufGroupTypeReference
  */
-public final class ProtobufGroupFieldStatement
-        extends ProtobufFieldStatement
-        implements ProtobufTree.WithBody<ProtobufGroupChild>,
+public final class ProtobufGroupStatement
+        extends ProtobufStatementImpl
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions, ProtobufTree.WithBody<ProtobufGroupChild>, ProtobufTree.WithType, ProtobufTree.WithModifier,
                    ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild, ProtobufExtendChild {
+    private ProtobufModifier modifier;
+    private ProtobufTypeReference type;
+    private String name;
+    private ProtobufInteger index;
     private final List<ProtobufGroupChild> children;
     private final ProtobufGroupTypeReference reference;
+    private final SequencedMap<String, ProtobufOptionExpression> options;
 
     /**
      * Constructs a new group field statement at the specified line number.
      *
      * @param line the line number in the source file
      */
-    public ProtobufGroupFieldStatement(int line) {
+    public ProtobufGroupStatement(int line) {
         super(line);
         this.children = new ArrayList<>();
         this.reference = new ProtobufGroupTypeReference(this);
+        this.options = new LinkedHashMap<>();
     }
 
     @Override
@@ -108,7 +116,16 @@ public final class ProtobufGroupFieldStatement
         builder.append(index);
         builder.append(" ");
 
-        writeOptions(builder);
+        var options = this.options.sequencedEntrySet();
+        if (!options.isEmpty()) {
+            builder.append(" ");
+            builder.append("[");
+            var optionsToString = options.stream()
+                    .map(entry -> entry.getValue().toString())
+                    .collect(Collectors.joining(", "));
+            builder.append(optionsToString);
+            builder.append("]");
+        }
 
         builder.append("{");
         builder.append("\n");
@@ -128,6 +145,21 @@ public final class ProtobufGroupFieldStatement
         return builder.toString();
     }
 
+    @Override
+    public ProtobufModifier modifier() {
+        return modifier;
+    }
+
+    @Override
+    public boolean hasModifier() {
+        return modifier != null;
+    }
+
+    @Override
+    public void setModifier(ProtobufModifier modifier) {
+        this.modifier = modifier;
+    }
+
     /**
      * Returns the type reference for this group field.
      * <p>
@@ -139,6 +171,11 @@ public final class ProtobufGroupFieldStatement
     @Override
     public ProtobufTypeReference type() {
         return reference;
+    }
+
+    @Override
+    public boolean hasType() {
+        return true;
     }
 
     /**
@@ -227,5 +264,61 @@ public final class ProtobufGroupFieldStatement
     @Override
     public <V extends WithName> Stream<? extends V> getAnyChildrenByNameAndType(String name, Class<V> clazz) {
         return ProtobufStatementWithBodyImpl.getAnyChildrenByNameAndType(children, name, clazz);
+    }
+
+    @Override
+    public ProtobufInteger index() {
+        return index;
+    }
+
+    @Override
+    public boolean hasIndex() {
+        return index != null;
+    }
+
+    @Override
+    public void setIndex(ProtobufInteger index) {
+        this.index = index;
+    }
+
+    @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public boolean hasName() {
+        return name != null;
+    }
+
+    @Override
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public SequencedCollection<ProtobufOptionExpression> options() {
+        return Collections.unmodifiableSequencedCollection(options.sequencedValues());
+    }
+
+    @Override
+    public Optional<ProtobufOptionExpression> getOption(String name) {
+        return Optional.ofNullable(options.get(name));
+    }
+
+    @Override
+    public void addOption(ProtobufOptionExpression value) {
+        Objects.requireNonNull(value, "Cannot add null option");
+        options.put(value.name().toString(), value);
+    }
+
+    @Override
+    public boolean removeOption(String name) {
+        return options.remove(name) != null;
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return hasType() && hasName() && hasIndex();
     }
 }

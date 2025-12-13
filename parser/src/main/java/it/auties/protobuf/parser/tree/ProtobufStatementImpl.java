@@ -34,7 +34,7 @@ package it.auties.protobuf.parser.tree;
  */
 sealed abstract class ProtobufStatementImpl
         implements ProtobufStatement
-        permits ProtobufEmptyStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufImportStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufStatementWithBodyImpl, ProtobufSyntaxStatement {
+        permits ProtobufEmptyStatement, ProtobufEnumConstantStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupStatement, ProtobufImportStatement, ProtobufOneofStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufStatementWithBodyImpl, ProtobufSyntaxStatement {
     final int line;
     ProtobufTree.WithBody<?> parent;
 

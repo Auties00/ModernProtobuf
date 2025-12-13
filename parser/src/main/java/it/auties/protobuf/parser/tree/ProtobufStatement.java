@@ -30,8 +30,8 @@ package it.auties.protobuf.parser.tree;
  *       <ul>
  *         <li>{@link ProtobufFieldStatement} - Field definition</li>
  *         <li>{@link ProtobufMethodStatement} - RPC method definition</li>
- *         <li>{@link ProtobufOneofFieldStatement} - Oneof definition</li>
- *         <li>{@link ProtobufGroupFieldStatement} - Group field (deprecated)</li>
+ *         <li>{@link ProtobufOneofStatement} - Oneof definition</li>
+ *         <li>{@link ProtobufGroupStatement} - Group field (deprecated)</li>
  *       </ul>
  *   </li>
  *   <li><strong>Other statements:</strong>
@@ -49,7 +49,7 @@ package it.auties.protobuf.parser.tree;
  */
 public sealed interface ProtobufStatement
         extends ProtobufTree
-        permits ProtobufDocumentChild, ProtobufEmptyStatement, ProtobufEnumChild, ProtobufEnumStatement, ProtobufExtendChild, ProtobufExtendStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupChild, ProtobufImportStatement, ProtobufMessageChild, ProtobufMessageStatement, ProtobufMethodChild, ProtobufMethodStatement, ProtobufOneofChild, ProtobufOneofFieldStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufServiceChild, ProtobufServiceStatement, ProtobufStatementImpl, ProtobufSyntaxStatement {
+        permits ProtobufDocumentChild, ProtobufEmptyStatement, ProtobufEnumChild, ProtobufEnumStatement, ProtobufExtendChild, ProtobufExtendStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupChild, ProtobufGroupStatement, ProtobufImportStatement, ProtobufMessageChild, ProtobufMessageStatement, ProtobufMethodChild, ProtobufMethodStatement, ProtobufOneofChild, ProtobufOneofStatement, ProtobufOptionStatement, ProtobufPackageStatement, ProtobufReservedStatement, ProtobufServiceChild, ProtobufServiceStatement, ProtobufStatementImpl, ProtobufSyntaxStatement {
     /**
      * Returns the parent container of this statement.
      * <p>

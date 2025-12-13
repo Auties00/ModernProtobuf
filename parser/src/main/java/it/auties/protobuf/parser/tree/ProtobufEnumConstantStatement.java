@@ -1,6 +1,9 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.Objects;
+import it.auties.protobuf.parser.type.ProtobufInteger;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Represents an enum constant (value) declaration in the Protocol Buffer AST.
@@ -51,8 +54,13 @@ import java.util.Objects;
  * @see ProtobufFieldStatement
  */
 public final class ProtobufEnumConstantStatement
-        extends ProtobufFieldStatement
-        implements ProtobufEnumChild {
+        extends ProtobufStatementImpl
+        implements ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
+                   ProtobufEnumChild {
+    private String name;
+    private ProtobufInteger index;
+    private final SequencedMap<String, ProtobufOptionExpression> options;
+
     /**
      * Constructs a new enum constant statement at the specified line number.
      *
@@ -60,6 +68,7 @@ public final class ProtobufEnumConstantStatement
      */
     public ProtobufEnumConstantStatement(int line) {
         super(line);
+        this.options = new LinkedHashMap<>();
     }
 
     @Override
@@ -70,8 +79,73 @@ public final class ProtobufEnumConstantStatement
         builder.append(" = ");
         var index = Objects.requireNonNull(this.index, "[missing]");
         builder.append(index);
-        writeOptions(builder);
+        var options = this.options.sequencedEntrySet();
+        if (!options.isEmpty()) {
+            builder.append(" ");
+            builder.append("[");
+            var optionsToString = options.stream()
+                    .map(entry -> entry.getValue().toString())
+                    .collect(Collectors.joining(", "));
+            builder.append(optionsToString);
+            builder.append("]");
+        }
         builder.append(";");
         return builder.toString();
+    }
+
+    @Override
+    public ProtobufInteger index() {
+        return index;
+    }
+
+    @Override
+    public boolean hasIndex() {
+        return index != null;
+    }
+
+    @Override
+    public void setIndex(ProtobufInteger index) {
+        this.index = index;
+    }
+
+    @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public boolean hasName() {
+        return name != null;
+    }
+
+    @Override
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public SequencedCollection<ProtobufOptionExpression> options() {
+        return Collections.unmodifiableSequencedCollection(options.sequencedValues());
+    }
+
+    @Override
+    public Optional<ProtobufOptionExpression> getOption(String name) {
+        return Optional.ofNullable(options.get(name));
+    }
+
+    @Override
+    public void addOption(ProtobufOptionExpression value) {
+        Objects.requireNonNull(value, "Cannot add null option");
+        options.put(value.name().toString(), value);
+    }
+
+    @Override
+    public boolean removeOption(String name) {
+        return options.remove(name) != null;
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return hasName() && hasIndex();
     }
 }

@@ -4,7 +4,6 @@ import it.auties.protobuf.parser.type.ProtobufInteger;
 import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -56,8 +55,8 @@ import java.util.stream.Collectors;
  * </p>
  * <ul>
  *   <li>{@link ProtobufEnumConstantStatement}: Enum value declarations</li>
- *   <li>{@link ProtobufGroupFieldStatement}: Deprecated group field syntax</li>
- *   <li>{@link ProtobufOneofFieldStatement}: Oneof group declarations</li>
+ *   <li>{@link ProtobufGroupStatement}: Deprecated group field syntax</li>
+ *   <li>{@link ProtobufOneofStatement}: Oneof group declarations</li>
  * </ul>
  * <p>
  * This class implements multiple child marker interfaces, allowing fields to appear in messages,
@@ -70,16 +69,15 @@ import java.util.stream.Collectors;
  * @see ProtobufTypeReference
  * @see ProtobufOptionExpression
  */
-public sealed class ProtobufFieldStatement
+public final class ProtobufFieldStatement
         extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
-                   ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild
-        permits ProtobufEnumConstantStatement, ProtobufGroupFieldStatement, ProtobufOneofFieldStatement {
-    protected Modifier modifier;
-    protected ProtobufTypeReference type;
-    protected String name;
-    protected ProtobufInteger index;
-    protected final SequencedMap<String, ProtobufOptionExpression> options;
+                   ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild {
+    private ProtobufModifier modifier;
+    private ProtobufTypeReference type;
+    private String name;
+    private ProtobufInteger index;
+    private final SequencedMap<String, ProtobufOptionExpression> options;
 
     /**
      * Constructs a new field statement at the specified line number.
@@ -196,7 +194,7 @@ public sealed class ProtobufFieldStatement
      *
      * @return the modifier, or null if not yet set
      */
-    public Modifier modifier() {
+    public ProtobufModifier modifier() {
         return modifier;
     }
 
@@ -214,7 +212,7 @@ public sealed class ProtobufFieldStatement
      *
      * @param modifier the modifier to set
      */
-    public void setModifier(Modifier modifier) {
+    public void setModifier(ProtobufModifier modifier) {
         this.modifier = modifier;
     }
 
@@ -244,29 +242,6 @@ public sealed class ProtobufFieldStatement
         return hasType() && hasName() && hasIndex();
     }
 
-    /**
-     * Helper method to write field options to a string builder.
-     * <p>
-     * Options are written in square brackets as comma-separated key-value pairs.
-     * </p>
-     *
-     * @param builder the string builder to write to
-     */
-    void writeOptions(StringBuilder builder) {
-        var options = this.options.sequencedEntrySet();
-        if (options.isEmpty()) {
-            return;
-        }
-
-        builder.append(" ");
-        builder.append("[");
-        var optionsToString = options.stream()
-                .map(entry -> entry.getValue().toString())
-                .collect(Collectors.joining(", "));
-        builder.append(optionsToString);
-        builder.append("]");
-    }
-
     @Override
     public String toString() {
         var builder = new StringBuilder();
@@ -284,72 +259,17 @@ public sealed class ProtobufFieldStatement
         builder.append("=");
         builder.append(" ");
         builder.append(index);
-        writeOptions(builder);
+        var options = this.options.sequencedEntrySet();
+        if (!options.isEmpty()) {
+            builder.append(" ");
+            builder.append("[");
+            var optionsToString = options.stream()
+                    .map(entry -> entry.getValue().toString())
+                    .collect(Collectors.joining(", "));
+            builder.append(optionsToString);
+            builder.append("]");
+        }
         builder.append(";");
         return builder.toString();
-    }
-
-    /**
-     * Enumeration of field modifiers that control field cardinality and requirement semantics.
-     */
-    public enum Modifier {
-        /**
-         * No explicit modifier - default for proto3 fields (implicitly optional) and the only valid modifier for enum constants.
-         */
-        NONE(null),
-        /**
-         * Required modifier (proto2 only) - field must be set.
-         * <p>
-         * Required fields must have a value when serializing a message. This modifier
-         * is not available in proto3.
-         * </p>
-         */
-        REQUIRED("required"),
-
-        /**
-         * Optional modifier - field may or may not be set.
-         * <p>
-         * Optional fields can be omitted from messages. In proto3, this is the default
-         * for singular fields.
-         * </p>
-         */
-        OPTIONAL("optional"),
-
-        /**
-         * Repeated modifier - field can appear zero or more times (array/list).
-         * <p>
-         * Repeated fields represent collections of values of the same type.
-         * </p>
-         */
-        REPEATED("repeated");
-
-        private final String token;
-
-        Modifier(String token) {
-            this.token = token;
-        }
-
-        /**
-         * Returns the keyword token for this modifier.
-         *
-         * @return the token string
-         */
-        public String token() {
-            return Objects.requireNonNullElse(token, "");
-        }
-
-        private static final Map<String, Modifier> VALUES = Arrays.stream(values())
-                .filter(entry -> entry.token != null)
-                .collect(Collectors.toUnmodifiableMap(entry -> entry.token, Function.identity()));
-
-        /**
-         * Looks up a modifier by its token string.
-         *
-         * @param name the token string
-         * @return optional containing the modifier, or empty if not found
-         */
-        public static Optional<Modifier> of(String name) {
-            return Optional.ofNullable(VALUES.get(name));
-        }
     }
 }

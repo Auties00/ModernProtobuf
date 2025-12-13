@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
 import it.auties.protobuf.parser.type.ProtobufInteger;
+import it.auties.protobuf.parser.type.ProtobufTypeReference;
 
 import java.util.Optional;
 import java.util.SequencedCollection;
@@ -79,7 +80,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithIndex
             extends ProtobufTree
-            permits ProtobufFieldStatement {
+            permits ProtobufEnumConstantStatement, ProtobufFieldStatement, ProtobufGroupStatement {
         /**
          * Returns the field number/index of this node.
          *
@@ -111,7 +112,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithName
             extends ProtobufTree
-            permits ProtobufEnumStatement, ProtobufFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofFieldStatement, ProtobufServiceStatement, WithBodyAndName {
+            permits ProtobufEnumConstantStatement, ProtobufEnumStatement, ProtobufFieldStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement, WithBodyAndName {
         /**
          * Returns the simple (unqualified) name of this node.
          *
@@ -171,7 +172,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithOptions
             extends ProtobufTree
-            permits ProtobufExtensionsStatement, ProtobufFieldStatement {
+            permits ProtobufEnumConstantStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupStatement {
         /**
          * Returns all options attached to this node.
          *
@@ -215,7 +216,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithBody<T extends ProtobufStatement>
             extends ProtobufTree
-            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofFieldStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl, WithBodyAndName {
+            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl, WithBodyAndName {
         /**
          * Returns all direct children of this node.
          *
@@ -342,7 +343,19 @@ public sealed interface ProtobufTree
      */
     sealed interface WithBodyAndName<T extends ProtobufStatement>
             extends ProtobufTree, WithName, WithBody<T>
-            permits ProtobufEnumStatement, ProtobufMessageStatement, ProtobufOneofFieldStatement, ProtobufServiceStatement {
+            permits ProtobufEnumStatement, ProtobufMessageStatement, ProtobufOneofStatement, ProtobufServiceStatement {
 
+    }
+
+    sealed interface WithType permits ProtobufGroupStatement {
+        ProtobufTypeReference type();
+        boolean hasType();
+        void setType(ProtobufTypeReference type);
+    }
+
+    sealed interface WithModifier permits ProtobufGroupStatement {
+        ProtobufModifier modifier();
+        boolean hasModifier();
+        void setModifier(ProtobufModifier modifier);
     }
 }

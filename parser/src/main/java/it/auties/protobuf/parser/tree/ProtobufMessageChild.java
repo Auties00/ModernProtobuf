@@ -8,8 +8,8 @@ package it.auties.protobuf.parser.tree;
  * </p>
  * <ul>
  *   <li>{@link ProtobufFieldStatement} - Field declarations</li>
- *   <li>{@link ProtobufOneofFieldStatement} - Oneof blocks</li>
- *   <li>{@link ProtobufGroupFieldStatement} - Group fields (deprecated)</li>
+ *   <li>{@link ProtobufOneofStatement} - Oneof blocks</li>
+ *   <li>{@link ProtobufGroupStatement} - Group fields (deprecated)</li>
  *   <li>{@link ProtobufMessageStatement} - Nested message definitions</li>
  *   <li>{@link ProtobufEnumStatement} - Nested enum definitions</li>
  *   <li>{@link ProtobufExtendStatement} - Extend blocks</li>
@@ -23,6 +23,6 @@ package it.auties.protobuf.parser.tree;
  */
 public sealed interface ProtobufMessageChild
         extends ProtobufStatement
-        permits ProtobufEmptyStatement, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupFieldStatement, ProtobufMessageStatement, ProtobufOneofFieldStatement, ProtobufOptionStatement, ProtobufReservedStatement {
+        permits ProtobufEmptyStatement, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufExtensionsStatement, ProtobufFieldStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufOneofStatement, ProtobufOptionStatement, ProtobufReservedStatement {
 
 }

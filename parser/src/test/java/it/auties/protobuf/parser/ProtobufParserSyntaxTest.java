@@ -277,13 +277,13 @@ class ProtobufParserSyntaxTest {
         assertEquals("M", message.name());
         assertSame(2, message.children().size());
         var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, firstField.modifier());
+        assertSame(ProtobufModifier.OPTIONAL, firstField.modifier());
         assertInstanceOf(ProtobufPrimitiveTypeReference.class, firstField.type());
         assertSame(ProtobufType.INT32, firstField.type().protobufType());
         assertEquals("id", firstField.name());
         assertEquals(1L, firstField.index().value().longValue());
         var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, secondField.modifier());
+        assertSame(ProtobufModifier.OPTIONAL, secondField.modifier());
         assertInstanceOf(ProtobufPrimitiveTypeReference.class, secondField.type());
         assertSame(ProtobufType.STRING, secondField.type().protobufType());
         assertEquals("name", secondField.name());
@@ -305,13 +305,13 @@ class ProtobufParserSyntaxTest {
         assertEquals("M", message.name());
         assertSame(2, message.children().size());
         var firstField = message.getDirectChildByIndexAndType(1, ProtobufFieldStatement.class).orElseThrow();
-        assertEquals(ProtobufFieldStatement.Modifier.NONE, firstField.modifier());
+        assertEquals(ProtobufModifier.NONE, firstField.modifier());
         assertInstanceOf(ProtobufPrimitiveTypeReference.class, firstField.type());
         assertSame(ProtobufType.INT32, firstField.type().protobufType());
         assertEquals("id", firstField.name());
         assertEquals(1L, firstField.index().value().longValue());
         var secondField = message.getDirectChildByIndexAndType(2, ProtobufFieldStatement.class).orElseThrow();
-        assertEquals(ProtobufFieldStatement.Modifier.NONE, secondField.modifier());
+        assertEquals(ProtobufModifier.NONE, secondField.modifier());
         assertInstanceOf(ProtobufPrimitiveTypeReference.class, secondField.type());
         assertSame(ProtobufType.STRING, secondField.type().protobufType());
         assertEquals("name", secondField.name());
@@ -361,7 +361,7 @@ class ProtobufParserSyntaxTest {
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         assertEquals("M", message.name());
-        var oneof = message.getDirectChildByType(ProtobufOneofFieldStatement.class).orElseThrow();
+        var oneof = message.getDirectChildByType(ProtobufOneofStatement.class).orElseThrow();
         assertEquals("my_union", oneof.name());
         assertEquals(2, oneof.children().size());
         var nameField = oneof.getDirectChildByNameAndType("name", ProtobufFieldStatement.class).orElseThrow();
@@ -385,7 +385,7 @@ class ProtobufParserSyntaxTest {
                 """;
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
-        var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
+        var group = message.getDirectChildByType(ProtobufGroupStatement.class).orElseThrow();
         assertEquals("Result", group.name());
         assertEquals(2L, group.index().value().longValue());
         assertEquals(1, group.children().size());
@@ -1651,7 +1651,7 @@ class ProtobufParserSyntaxTest {
                 """;
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
-        var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
+        var group = message.getDirectChildByType(ProtobufGroupStatement.class).orElseThrow();
         assertEquals("MyGroup", group.name());
     }
 
@@ -1685,7 +1685,7 @@ class ProtobufParserSyntaxTest {
                 """;
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
-        var group = message.getDirectChildByType(ProtobufGroupFieldStatement.class).orElseThrow();
+        var group = message.getDirectChildByType(ProtobufGroupStatement.class).orElseThrow();
         assertEquals(3, group.children().size());
     }
 
@@ -2078,9 +2078,9 @@ class ProtobufParserSyntaxTest {
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         var explicit = message.getDirectChildByNameAndType("explicit", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, explicit.modifier());
+        assertSame(ProtobufModifier.OPTIONAL, explicit.modifier());
         var implicit = message.getDirectChildByNameAndType("implicit", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.NONE, implicit.modifier());
+        assertSame(ProtobufModifier.NONE, implicit.modifier());
     }
 
     @Test

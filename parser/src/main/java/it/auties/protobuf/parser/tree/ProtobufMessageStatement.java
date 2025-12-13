@@ -57,8 +57,8 @@ import java.util.Objects;
  *
  * @see ProtobufMessageChild
  * @see ProtobufFieldStatement
- * @see ProtobufOneofFieldStatement
- * @see ProtobufGroupFieldStatement
+ * @see ProtobufOneofStatement
+ * @see ProtobufGroupStatement
  */
 public final class ProtobufMessageStatement
         extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>

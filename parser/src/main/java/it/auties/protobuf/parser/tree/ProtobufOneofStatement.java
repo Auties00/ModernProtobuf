@@ -60,8 +60,9 @@ import java.util.stream.Stream;
  * @see ProtobufFieldStatement
  * @see ProtobufMessageChild
  */
-public final class ProtobufOneofFieldStatement
-        extends ProtobufFieldStatement
+
+public final class ProtobufOneofStatement
+        extends ProtobufStatementImpl
         implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>, ProtobufTree.WithBodyAndName<ProtobufOneofChild>,
                    ProtobufMessageChild, ProtobufGroupChild {
     private String name;
@@ -72,7 +73,7 @@ public final class ProtobufOneofFieldStatement
      *
      * @param line the line number in the source file
      */
-    public ProtobufOneofFieldStatement(int line) {
+    public ProtobufOneofStatement(int line) {
         super(line);
         this.children = new ArrayList<>();
     }
@@ -88,16 +89,6 @@ public final class ProtobufOneofFieldStatement
      */
     public String className() {
         return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1) + "Seal";
-    }
-
-    @Override
-    public Modifier modifier() {
-        return Modifier.NONE;
-    }
-
-    @Override
-    public void setModifier(Modifier modifier) {
-
     }
 
     /**
@@ -118,6 +109,11 @@ public final class ProtobufOneofFieldStatement
     @Override
     public boolean hasName() {
         return name != null;
+    }
+
+    @Override
+    public boolean isAttributed() {
+        return hasName() && children.stream().allMatch(ProtobufOneofChild::isAttributed);
     }
 
     /**

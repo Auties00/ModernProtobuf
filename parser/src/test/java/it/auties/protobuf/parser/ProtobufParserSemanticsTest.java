@@ -437,9 +437,9 @@ public class ProtobufParserSemanticsTest {
         assertSame(ProtobufVersion.PROTOBUF_2, document.syntax().orElse(null));
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         var nameField = message.getDirectChildByNameAndType("name", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.REQUIRED, nameField.modifier());
+        assertSame(ProtobufModifier.REQUIRED, nameField.modifier());
         var idField = message.getDirectChildByNameAndType("id", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.REQUIRED, idField.modifier());
+        assertSame(ProtobufModifier.REQUIRED, idField.modifier());
     }
 
     @Test
@@ -455,9 +455,9 @@ public class ProtobufParserSemanticsTest {
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
         var explicitField = message.getDirectChildByNameAndType("explicit_presence", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.OPTIONAL, explicitField.modifier());
+        assertSame(ProtobufModifier.OPTIONAL, explicitField.modifier());
         var implicitField = message.getDirectChildByNameAndType("implicit_presence", ProtobufFieldStatement.class).orElseThrow();
-        assertSame(ProtobufFieldStatement.Modifier.NONE, implicitField.modifier());
+        assertSame(ProtobufModifier.NONE, implicitField.modifier());
     }
 
     @Test
@@ -649,7 +649,7 @@ public class ProtobufParserSemanticsTest {
                     """;
         var document = ProtobufParser.parseOnly(proto);
         var message = document.getDirectChildByType(ProtobufMessageStatement.class).orElseThrow();
-        var oneof = message.getDirectChildByType(ProtobufOneofFieldStatement.class).orElseThrow();
+        var oneof = message.getDirectChildByType(ProtobufOneofStatement.class).orElseThrow();
         assertEquals(2, oneof.children().size());
 
         var protoDuplicate = """

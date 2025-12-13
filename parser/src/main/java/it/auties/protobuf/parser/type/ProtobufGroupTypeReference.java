@@ -1,7 +1,7 @@
 package it.auties.protobuf.parser.type;
 
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.parser.tree.ProtobufGroupFieldStatement;
+import it.auties.protobuf.parser.tree.ProtobufGroupStatement;
 
 import java.util.Objects;
 
@@ -20,9 +20,9 @@ import java.util.Objects;
  * <strong>Note:</strong> Groups are deprecated in Protocol Buffers and should not be used in new code.
  * </p>
  *
- * @see ProtobufGroupFieldStatement
+ * @see ProtobufGroupStatement
  */
-public record ProtobufGroupTypeReference(ProtobufGroupFieldStatement declaration) implements ProtobufObjectTypeReference {
+public record ProtobufGroupTypeReference(ProtobufGroupStatement declaration) implements ProtobufObjectTypeReference {
     public ProtobufGroupTypeReference {
         Objects.requireNonNull(declaration, "declaration cannot be null");
     }
