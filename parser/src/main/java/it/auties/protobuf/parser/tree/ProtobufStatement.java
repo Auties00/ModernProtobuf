@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.expression.ProtobufExpression;
+
 /**
  * Represents a statement in the Protocol Buffer abstract syntax tree.
  * <p>

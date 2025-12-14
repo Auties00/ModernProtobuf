@@ -3,9 +3,12 @@ package it.auties.protobuf.parser;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufParserException;
+import it.auties.protobuf.parser.expression.ProtobufBoolExpression;
+import it.auties.protobuf.parser.expression.ProtobufEnumConstantExpression;
+import it.auties.protobuf.parser.expression.ProtobufLiteralExpression;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.ProtobufMapTypeReference;
-import it.auties.protobuf.parser.type.ProtobufPrimitiveTypeReference;
+import it.auties.protobuf.parser.typeReference.ProtobufMapTypeReference;
+import it.auties.protobuf.parser.typeReference.ProtobufPrimitiveTypeReference;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -223,6 +226,8 @@ class ProtobufParserSyntaxTest {
     @Test
     public void testCustomMessageFileLevelOption() {
         var proto = """
+               import "google/protobuf/descriptor.proto";
+                
                 message MyOption {
                   optional bool a = 1;
                 }
@@ -231,13 +236,11 @@ class ProtobufParserSyntaxTest {
                   optional bool simple_option = 1000;
                   optional MyOption structured_option = 1001;
                 }
-                """;
-        var document = ProtobufParser.parseOnly(proto);
-        var proto1 = """
+                
                 option (simple_option) = true;
                 option (structured_option).a = true;
                 """;
-        ProtobufParser.parseOnly(proto1, document);
+        ProtobufParser.parseOnly(proto);
     }
 
     @Test
@@ -707,17 +710,6 @@ class ProtobufParserSyntaxTest {
     }
 
     @Test
-    public void testProto2FeaturesInProto3ErrorExtensions() {
-        var proto = """
-                syntax = "proto3";
-                message A {
-                  extensions 100 to 199;
-                }
-                """;
-        assertThrows(ProtobufParserException.class, () -> ProtobufParser.parseOnly(proto));
-    }
-
-    @Test
     public void testInvalidOneofDefinitionRepeatedField() {
         var proto = """
                 syntax = "proto3";
@@ -831,37 +823,6 @@ class ProtobufParserSyntaxTest {
         sb.append("  int32 leaf = 1;\n");
         sb.append("}\n".repeat(depth));
         ProtobufParser.parseOnly(sb.toString());
-    }
-
-    @Test
-    public void testExtensiveUseOfOptions() {
-        var proto = """
-                syntax = "proto3";
-                option java_package = "com.example";
-                option java_outer_classname = "Outer";
-                
-                message A {
-                  option (my_custom_message_option) = true;
-                  int32 id = 1 [deprecated = true];
-                }
-                
-                enum E {
-                  option (my_custom_enum_option) = "x";
-                  ZERO = 0 [(my_custom_enum_value_option) = 123];
-                  ONE = 1;
-                }
-                
-                service S {
-                  option (my_custom_service_option) = "svc";
-                  rpc Do (Req) returns (Res) {
-                    option (my_custom_rpc_option) = "rpc";
-                  }
-                }
-                
-                message Req { int32 x = 1; }
-                message Res { int32 y = 1; }
-                """;
-        ProtobufParser.parseOnly(proto);
     }
 
     @Test

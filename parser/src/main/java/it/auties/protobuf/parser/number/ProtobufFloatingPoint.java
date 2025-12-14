@@ -1,6 +1,7 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.number;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -89,7 +90,14 @@ public sealed interface ProtobufFloatingPoint extends ProtobufNumber {
      * @param value the arbitrary-precision decimal value
      */
     record Finite(BigDecimal value) implements ProtobufFloatingPoint {
+        public Finite {
+            Objects.requireNonNull(value, "value cannot be null");
+        }
 
+        @Override
+        public String toString() {
+            return value.toString();
+        }
     }
 
     /**
@@ -126,6 +134,9 @@ public sealed interface ProtobufFloatingPoint extends ProtobufNumber {
      * </p>
      */
     record NaN() implements ProtobufFloatingPoint {
-
+        @Override
+        public String toString() {
+            return "nan";
+        }
     }
 }

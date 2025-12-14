@@ -20,7 +20,7 @@ import it.auties.protobuf.model.ProtobufLazyString;
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.*;
 import it.auties.protobuf.parser.tree.ProtobufModifier;
-import it.auties.protobuf.parser.type.*;
+import it.auties.protobuf.parser.typeReference.*;
 import it.auties.protobuf.schema.util.AstUtils;
 
 import java.math.BigInteger;

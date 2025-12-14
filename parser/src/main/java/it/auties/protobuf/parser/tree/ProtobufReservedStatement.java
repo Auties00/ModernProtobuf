@@ -1,9 +1,8 @@
 package it.auties.protobuf.parser.tree;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.SequencedCollection;
+import it.auties.protobuf.parser.expression.*;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -102,44 +101,21 @@ public final class ProtobufReservedStatement
 
     /**
      * Adds a reserved expression to this statement.
-     * <p>
-     * The expression is automatically linked to this statement as its parent.
-     * </p>
      *
      * @param expression the reserved expression to add
-     * @throws IllegalStateException if the expression already has a different parent
      */
     public void addExpression(ProtobufReservedExpression expression) {
-        if(expression != null) {
-            if(expression.hasParent()) {
-                throw new IllegalStateException("Expression is already owned by another tree");
-            }
-            if(expression instanceof ProtobufExpressionImpl impl) {
-                impl.setParent(this);
-            }
-            expressions.add(expression);
-        }
+        Objects.requireNonNull(expression, "expression is null");
+        expressions.add(expression);
     }
 
     /**
      * Removes a reserved expression from this statement.
-     * <p>
-     * The expression's parent link is automatically cleared.
-     * </p>
      *
      * @param expression the reserved expression to remove
-     * @throws IllegalStateException if the expression is not owned by this statement
      */
-    public void removeExpression(ProtobufReservedExpression expression) {
-        var result = expressions.remove(expression);
-        if(result) {
-            if(expression.parent() != this) {
-                throw new IllegalStateException("Expression is not owned by this tree");
-            }
-            if(expression instanceof ProtobufExpressionImpl impl) {
-                impl.setParent(null);
-            }
-        }
+    public boolean removeExpression(ProtobufReservedExpression expression) {
+       return expressions.remove(expression);
     }
 
     @Override
@@ -161,7 +137,6 @@ public final class ProtobufReservedStatement
 
     @Override
     public boolean isAttributed() {
-        return !expressions.isEmpty() && expressions.stream()
-                .allMatch(ProtobufExpression::isAttributed);
+        return !expressions.isEmpty();
     }
 }

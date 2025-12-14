@@ -12,8 +12,11 @@ import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
 import com.github.javaparser.ast.nodeTypes.NodeWithImplements;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.ProtobufType;
+import it.auties.protobuf.parser.expression.ProtobufIntegerRangeExpression;
+import it.auties.protobuf.parser.expression.ProtobufLiteralExpression;
+import it.auties.protobuf.parser.expression.ProtobufNumberExpression;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.ProtobufRange;
+import it.auties.protobuf.parser.number.ProtobufIntegerRange;
 import it.auties.protobuf.schema.util.LogProvider;
 
 import java.lang.annotation.Annotation;
@@ -318,13 +321,13 @@ abstract sealed class BaseProtobufSchemaCreator<V extends ProtobufTree.WithName 
                                 .orElseThrow(() -> new IllegalArgumentException("Overflow: " + rangeExpression.value().min()));
                         entry.addPair("min", new IntegerLiteralExpr(String.valueOf(minIndex)));
                         var max = switch (rangeExpression.value()) {
-                            case ProtobufRange.Bounded bounded -> {
+                            case ProtobufIntegerRange.Bounded bounded -> {
                                 var maxIndex = bounded.max()
                                         .toEnumConstant()
                                         .orElseThrow(() -> new IllegalArgumentException("Overflow: " + rangeExpression.value().min()));
                                 yield String.valueOf(maxIndex);
                             }
-                            case ProtobufRange.LowerBounded _ -> "max";
+                            case ProtobufIntegerRange.LowerBounded _ -> "max";
                         };
                         entry.addPair("max", new IntegerLiteralExpr(max));
                         indexRanges.add(entry);

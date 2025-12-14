@@ -1,9 +1,10 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.number;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufProperty;
 
 import java.math.BigInteger;
+import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -33,6 +34,15 @@ public record ProtobufInteger(BigInteger value) implements ProtobufNumber {
 
     private static final BigInteger MIN_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnum.Constant.MIN_INDEX);
     private static final BigInteger MAX_ENUM_CONSTANT_INDEX = BigInteger.valueOf(ProtobufEnum.Constant.MAX_INDEX);
+
+    public ProtobufInteger {
+        Objects.requireNonNull(value, "value cannot be null");
+    }
+
+    @Override
+    public String toString() {
+        return value.toString();
+    }
 
     @Override
     public OptionalLong toFieldIndex() {

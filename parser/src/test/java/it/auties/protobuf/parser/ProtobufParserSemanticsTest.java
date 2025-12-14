@@ -3,7 +3,7 @@ package it.auties.protobuf.parser;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.ProtobufObjectTypeReference;
+import it.auties.protobuf.parser.typeReference.ProtobufObjectTypeReference;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -791,6 +791,7 @@ public class ProtobufParserSemanticsTest {
     public void testCustomOptionDefinitionAndUsage() {
         var proto = """
                     syntax = "proto3";
+                    import "google/protobuf/descriptor.proto";
                     
                     message MyOption {
                       string value = 1;

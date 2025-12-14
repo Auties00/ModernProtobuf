@@ -69,7 +69,7 @@ import java.util.Objects;
  */
 public final class ProtobufEnumStatement
         extends ProtobufStatementWithBodyImpl<ProtobufEnumChild>
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>, ProtobufTree.WithBodyAndName<ProtobufEnumChild>,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufEnumChild>,
                    ProtobufDocumentChild, ProtobufMessageChild, ProtobufGroupChild {
     private String name;
 

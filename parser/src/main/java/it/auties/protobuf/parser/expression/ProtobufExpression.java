@@ -1,4 +1,6 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.expression;
+
+import it.auties.protobuf.parser.tree.*;
 
 /**
  * Represents an expression in the Protocol Buffer abstract syntax tree.
@@ -22,7 +24,7 @@ package it.auties.protobuf.parser.tree;
  *   <li>{@link ProtobufNumberExpression} - Numeric literals</li>
  *   <li>{@link ProtobufBoolExpression} - Boolean literals</li>
  *   <li>{@link ProtobufNullExpression} - Null values</li>
- *   <li>{@link ProtobufMessageValueExpression} - Message literal values</li>
+ *   <li>{@link ProtobufJsonExpression} - JSON literal values</li>
  *   <li>{@link ProtobufEnumConstantExpression} - Enum constant references</li>
  *   <li>{@link ProtobufOptionExpression} - Option key-value pairs</li>
  *   <li>{@link ProtobufIntegerRangeExpression} - Numeric ranges</li>
@@ -34,7 +36,6 @@ package it.auties.protobuf.parser.tree;
  * @see ProtobufTree
  */
 public sealed interface ProtobufExpression
-        extends ProtobufTree
-        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufExpressionImpl, ProtobufExtensionsExpression, ProtobufGroupValueExpression, ProtobufIntegerRangeExpression, ProtobufLiteralExpression, ProtobufMessageValueExpression, ProtobufNullExpression, ProtobufNumberExpression, ProtobufOptionExpression, ProtobufReservedExpression {
+        permits ProtobufBoolExpression, ProtobufEnumConstantExpression, ProtobufExtensionsExpression, ProtobufJsonExpression, ProtobufIntegerRangeExpression, ProtobufLiteralExpression, ProtobufNullExpression, ProtobufNumberExpression, ProtobufOptionExpression, ProtobufReservedExpression {
 
 }

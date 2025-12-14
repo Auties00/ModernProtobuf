@@ -63,7 +63,7 @@ import java.util.stream.Stream;
 
 public final class ProtobufOneofStatement
         extends ProtobufStatementImpl
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>, ProtobufTree.WithBodyAndName<ProtobufOneofChild>,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufOneofChild>,
                    ProtobufMessageChild, ProtobufGroupChild {
     private String name;
     private final List<ProtobufOneofChild> children;

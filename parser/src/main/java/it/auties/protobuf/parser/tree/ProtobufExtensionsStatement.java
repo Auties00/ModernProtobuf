@@ -1,5 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.expression.*;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -93,36 +95,18 @@ public final class ProtobufExtensionsStatement
      * @throws IllegalStateException if the expression already has a different parent
      */
     public void addExpression(ProtobufExtensionsExpression expression) {
-        if(expression != null) {
-            if(expression.hasParent()) {
-                throw new IllegalStateException("Expression is already owned by another tree");
-            }
-            if(expression instanceof ProtobufExpressionImpl impl) {
-                impl.setParent(this);
-            }
-            expressions.add(expression);
-        }
+        Objects.requireNonNull(expression, "expression is null");
+        expressions.add(expression);
     }
 
     /**
      * Removes an extension range expression from this statement.
-     * <p>
-     * The expression's parent link is automatically cleared.
-     * </p>
      *
      * @param expression the extension expression to remove
-     * @throws IllegalStateException if the expression is not owned by this statement
+     * @return whether the expression was removed
      */
-    public void removeExpression(ProtobufExtensionsExpression expression) {
-        var result = expressions.remove(expression);
-        if(result) {
-            if(expression.parent() != this) {
-                throw new IllegalStateException("Expression is not owned by this tree");
-            }
-            if(expression instanceof ProtobufExpressionImpl impl) {
-                impl.setParent(null);
-            }
-        }
+    public boolean removeExpression(ProtobufExtensionsExpression expression) {
+        return expressions.remove(expression);
     }
 
     @Override
@@ -165,7 +149,6 @@ public final class ProtobufExtensionsStatement
 
     @Override
     public boolean isAttributed() {
-        return !expressions.isEmpty() && expressions.stream()
-                .allMatch(ProtobufExpression::isAttributed);
+        return !expressions.isEmpty();
     }
 }

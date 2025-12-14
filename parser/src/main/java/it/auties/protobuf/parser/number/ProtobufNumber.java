@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.number;
 
 import it.auties.protobuf.annotation.ProtobufEnum;
 

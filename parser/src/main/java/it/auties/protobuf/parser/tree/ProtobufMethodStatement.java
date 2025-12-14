@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.typeReference.ProtobufTypeReference;
 
 import java.util.Objects;
 

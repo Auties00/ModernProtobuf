@@ -1,9 +1,12 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.exception.ProtobufParserException;
+import it.auties.protobuf.parser.expression.ProtobufBoolExpression;
+import it.auties.protobuf.parser.expression.ProtobufFloatingPointExpression;
+import it.auties.protobuf.parser.expression.ProtobufIntegerExpression;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
-import it.auties.protobuf.parser.type.ProtobufInteger;
+import it.auties.protobuf.parser.number.ProtobufFloatingPoint;
+import it.auties.protobuf.parser.number.ProtobufInteger;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

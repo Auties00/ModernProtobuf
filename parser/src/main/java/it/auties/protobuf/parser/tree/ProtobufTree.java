@@ -1,7 +1,9 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufInteger;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.expression.ProtobufExpression;
+import it.auties.protobuf.parser.expression.ProtobufOptionExpression;
+import it.auties.protobuf.parser.number.ProtobufInteger;
+import it.auties.protobuf.parser.typeReference.ProtobufTypeReference;
 
 import java.util.Optional;
 import java.util.SequencedCollection;
@@ -38,7 +40,7 @@ import java.util.stream.Stream;
  * @see ProtobufExpression
  */
 public sealed interface ProtobufTree
-        permits ProtobufDocumentTree, ProtobufExpression, ProtobufStatement, ProtobufTree.WithBody, ProtobufTree.WithBodyAndName, ProtobufTree.WithIndex, ProtobufTree.WithName, ProtobufTree.WithOptions {
+        permits ProtobufDocumentTree, ProtobufOptionDefinition, ProtobufStatement, ProtobufTree.WithBody, ProtobufTree.WithIndex, ProtobufTree.WithModifier, ProtobufTree.WithName, ProtobufTree.WithOptions, ProtobufTree.WithType {
     /**
      * Returns the line number in the source file where this tree node was parsed.
      *
@@ -112,7 +114,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithName
             extends ProtobufTree
-            permits ProtobufEnumConstantStatement, ProtobufEnumStatement, ProtobufFieldStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement, WithBodyAndName {
+            permits ProtobufEnumConstantStatement, ProtobufEnumStatement, ProtobufFieldStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufOptionDefinition, ProtobufServiceStatement {
         /**
          * Returns the simple (unqualified) name of this node.
          *
@@ -216,7 +218,7 @@ public sealed interface ProtobufTree
      */
     sealed interface WithBody<T extends ProtobufStatement>
             extends ProtobufTree
-            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl, WithBodyAndName {
+            permits ProtobufDocumentTree, ProtobufEnumStatement, ProtobufExtendStatement, ProtobufGroupStatement, ProtobufMessageStatement, ProtobufMethodStatement, ProtobufOneofStatement, ProtobufServiceStatement, ProtobufStatementWithBodyImpl {
         /**
          * Returns all direct children of this node.
          *
@@ -332,28 +334,17 @@ public sealed interface ProtobufTree
         <V extends ProtobufTree.WithName> Stream<? extends V> getAnyChildrenByNameAndType(String name, Class<V> clazz);
     }
 
-    /**
-     * Capability interface for tree nodes that have both a name and contain children.
-     * <p>
-     * This is a convenience interface combining {@link WithName} and {@link WithBody}.
-     * It is implemented by major Protocol Buffer declarations like messages, enums, services, and oneofs.
-     * </p>
-     *
-     * @param <T> the type of child statements this container holds
-     */
-    sealed interface WithBodyAndName<T extends ProtobufStatement>
-            extends ProtobufTree, WithName, WithBody<T>
-            permits ProtobufEnumStatement, ProtobufMessageStatement, ProtobufOneofStatement, ProtobufServiceStatement {
-
-    }
-
-    sealed interface WithType permits ProtobufGroupStatement {
+    sealed interface WithType
+            extends ProtobufTree
+            permits ProtobufFieldStatement, ProtobufGroupStatement, ProtobufOptionDefinition {
         ProtobufTypeReference type();
         boolean hasType();
         void setType(ProtobufTypeReference type);
     }
 
-    sealed interface WithModifier permits ProtobufGroupStatement {
+    sealed interface WithModifier
+            extends ProtobufTree
+            permits ProtobufFieldStatement, ProtobufGroupStatement {
         ProtobufModifier modifier();
         boolean hasModifier();
         void setModifier(ProtobufModifier modifier);

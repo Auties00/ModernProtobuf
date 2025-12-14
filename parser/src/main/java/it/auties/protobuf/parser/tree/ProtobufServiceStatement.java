@@ -64,7 +64,7 @@ import java.util.Objects;
  */
 public final class ProtobufServiceStatement
         extends ProtobufStatementWithBodyImpl<ProtobufServiceChild>
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufServiceChild>, ProtobufTree.WithBodyAndName<ProtobufServiceChild>,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufServiceChild>,
                    ProtobufDocumentChild {
     private String name;
 

@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.exception.ProtobufParserException;
+import it.auties.protobuf.parser.exception.ProtobufSemanticException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1793,6 +1794,40 @@ public class ProtobufAnalyzerTest {
 
                 service TestService {
                   rpc Method(stream Request) returns (stream Response);
+                }
+                """;
+        var doc = ProtobufParser.parseOnly(proto);
+        assertNotNull(doc);
+    }
+
+    @Test
+    public void testNonExistentCustomOption() {
+        var proto = """                
+                message SomeMessage {
+                  option (nonExistent) = {
+                    name: "example"
+                    value: 42
+                  };
+                }
+                """;
+        assertThrows(ProtobufSemanticException.class, () -> ProtobufParser.parseOnly(proto));
+    }
+
+    @Test
+    public void testGroupCustomOption() {
+        var proto = """
+                extend google.protobuf.MessageOptions {
+                  optional group MyOption = 50001 {
+                    optional string name = 1;
+                    optional int32 value = 2;
+                  }
+                }
+                
+                message SomeMessage {
+                  option (myoption) = {   // lowercase!
+                    name: "example"
+                    value: 42
+                  };
                 }
                 """;
         var doc = ProtobufParser.parseOnly(proto);

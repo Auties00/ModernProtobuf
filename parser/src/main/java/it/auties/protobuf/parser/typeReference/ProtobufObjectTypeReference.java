@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.typeReference;
 
 /**
  * Represents a reference to an object (non-primitive) type in a Protocol Buffer definition.

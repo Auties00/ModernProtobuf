@@ -4,9 +4,13 @@ import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.model.ProtobufVersion;
 import it.auties.protobuf.parser.exception.ProtobufParserException;
 import it.auties.protobuf.parser.exception.ProtobufSyntaxException;
+import it.auties.protobuf.parser.expression.*;
+import it.auties.protobuf.parser.number.ProtobufFloatingPoint;
+import it.auties.protobuf.parser.number.ProtobufInteger;
+import it.auties.protobuf.parser.number.ProtobufIntegerRange;
 import it.auties.protobuf.parser.token.*;
 import it.auties.protobuf.parser.tree.*;
-import it.auties.protobuf.parser.type.*;
+import it.auties.protobuf.parser.typeReference.*;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -73,6 +77,8 @@ public final class ProtobufParser {
     private static final String PARENS_END = ")";
     private static final String STREAM = "stream";
     private static final String MAX = "max";
+    private static final String GROUP = "group";
+    private static final String MAP = "map";
 
     private ProtobufParser() {
         throw new UnsupportedOperationException();
@@ -740,19 +746,17 @@ public final class ProtobufParser {
             if(isRangeOperator(operator)) {
                 var maxToken = tokenizer.nextToken();
                 var range = switch (maxToken) {
-                    case ProtobufNumberToken(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufRange.Bounded(valueOrMinInt, maxInt);
-                    case ProtobufRawToken(var token) when isMax(token) -> new ProtobufRange.LowerBounded(valueOrMinInt);
+                    case ProtobufNumberToken(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufIntegerRange.Bounded(valueOrMinInt, maxInt);
+                    case ProtobufRawToken(var token) when isMax(token) -> new ProtobufIntegerRange.LowerBounded(valueOrMinInt);
                     default -> throw new ProtobufSyntaxException("Unexpected token " + maxToken, tokenizer.line());
                 };
 
-                var expression = new ProtobufIntegerRangeExpression(tokenizer.line());
-                expression.setValue(range);
+                var expression = new ProtobufIntegerRangeExpression(range);
                 statement.addExpression(expression);
 
                 operator = tokenizer.nextRawToken();
             }else {
-                var expression = new ProtobufIntegerExpression(tokenizer.line());
-                expression.setValue(valueOrMinInt);
+                var expression = new ProtobufIntegerExpression(valueOrMinInt);
                 statement.addExpression(expression);
             }
 
@@ -779,8 +783,7 @@ public final class ProtobufParser {
                 var valueOrMinToken = tokenizer.nextToken();
                 switch (valueOrMinToken) {
                     case ProtobufLiteralToken(var value, _) -> {
-                        var expression = new ProtobufLiteralExpression(tokenizer.line());
-                        expression.setValue(value);
+                        var expression = new ProtobufLiteralExpression(value);
                         statement.addExpression(expression);
                         var operator = tokenizer.nextRawToken();
                         if(isStatementEnd(operator)) {
@@ -799,19 +802,17 @@ public final class ProtobufParser {
                         if(isRangeOperator(operator)) {
                             var maxToken = tokenizer.nextToken();
                             var range = switch (maxToken) {
-                                case ProtobufNumberToken(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufRange.Bounded(valueOrMinInt, maxInt);
-                                case ProtobufRawToken(var token) when isMax(token) -> new ProtobufRange.LowerBounded(valueOrMinInt);
+                                case ProtobufNumberToken(var maxNumber) when maxNumber instanceof ProtobufInteger maxInt -> new ProtobufIntegerRange.Bounded(valueOrMinInt, maxInt);
+                                case ProtobufRawToken(var token) when isMax(token) -> new ProtobufIntegerRange.LowerBounded(valueOrMinInt);
                                 default -> throw new ProtobufSyntaxException("Unexpected token " + maxToken, tokenizer.line());
                             };
 
-                            var expression = new ProtobufIntegerRangeExpression(tokenizer.line());
-                            expression.setValue(range);
+                            var expression = new ProtobufIntegerRangeExpression(range);
                             statement.addExpression(expression);
 
                             operator = tokenizer.nextRawToken();
                         }else {
-                            var expression = new ProtobufIntegerExpression(tokenizer.line());
-                            expression.setValue(valueOrMinInt);
+                            var expression = new ProtobufIntegerExpression(valueOrMinInt);
                             statement.addExpression(expression);
                         }
 
@@ -983,81 +984,42 @@ public final class ProtobufParser {
 
     private static ProtobufExpression readExpression(ProtobufLexer tokenizer) throws IOException {
         return switch (tokenizer.nextToken()) {
-            case ProtobufBoolToken bool -> readBoolExpression(tokenizer, bool);
-            case ProtobufNumberToken number -> readNumberExpression(tokenizer, number);
-            case ProtobufLiteralToken literal -> readLiteralExpression(tokenizer, literal);
-            case ProtobufRawToken raw
-                    when isNullExpression(raw.value()) -> readNullExpression(tokenizer);
-            case ProtobufRawToken raw
-                    when isBodyStart(raw.value()) -> readMessageExpression(tokenizer);
-            case ProtobufRawToken raw
-                    when isValidIdent(raw.value()) -> readEnumConstantExpression(tokenizer, raw);
+            case ProtobufBoolToken(var value) -> new ProtobufBoolExpression(value);
+            case ProtobufLiteralToken literal -> new ProtobufLiteralExpression(literal.value());
+            case ProtobufNumberToken(var number) -> switch (number) {
+                case ProtobufFloatingPoint floatingPoint -> new ProtobufFloatingPointExpression(floatingPoint);
+                case ProtobufInteger integer -> new ProtobufIntegerExpression(integer);
+            };
+            case ProtobufRawToken raw when isValidIdent(raw.value()) -> new ProtobufEnumConstantExpression(raw.value());
+            case ProtobufRawToken raw when isNullExpression(raw.value()) -> new ProtobufNullExpression();
+            case ProtobufRawToken raw when isBodyStart(raw.value()) -> {
+                var data = new LinkedHashMap<String, ProtobufExpression>();
+                var keyOrEndToken = tokenizer.nextToken();
+                while (true) {
+                    if (!(keyOrEndToken instanceof ProtobufRawToken(var keyOrEndValue))) {
+                        throw new ProtobufSyntaxException("Unexpected token " + keyOrEndToken, tokenizer.line());
+                    }
+
+                    if (isBodyEnd(keyOrEndValue)) {
+                        break;
+                    }
+
+                    var keyValueSeparatorToken = tokenizer.nextRawToken();
+                    ProtobufSyntaxException.check(isKeyValueSeparatorOperator(keyValueSeparatorToken),
+                            "Unexpected token " + keyValueSeparatorToken, tokenizer.line());
+
+                    var valueToken = readExpression(tokenizer);
+                    data.put(keyOrEndValue, valueToken);
+
+                    var nextToken = tokenizer.nextToken();
+                    keyOrEndToken = nextToken instanceof ProtobufRawToken(var nextValue) && isArraySeparator(nextValue)
+                            ? tokenizer.nextToken()
+                            : nextToken;
+                }
+                yield new ProtobufJsonExpression(data);
+            }
             case ProtobufRawToken raw -> throw new ProtobufSyntaxException("Unexpected token " + raw.value(), tokenizer.line());
         };
-    }
-
-    private static ProtobufEnumConstantExpression readEnumConstantExpression(ProtobufLexer tokenizer, ProtobufRawToken raw) {
-        var expression = new ProtobufEnumConstantExpression(tokenizer.line());
-        expression.setName(raw.value());
-        return expression;
-    }
-
-    private static ProtobufMessageValueExpression readMessageExpression(ProtobufLexer tokenizer) throws IOException {
-        var expression = new ProtobufMessageValueExpression(tokenizer.line());
-        var keyOrEndToken = tokenizer.nextToken();
-        while (true) {
-            if (!(keyOrEndToken instanceof ProtobufRawToken(var keyOrEndValue))) {
-                throw new ProtobufSyntaxException("Unexpected token " + keyOrEndToken, tokenizer.line());
-            }
-
-            if (isBodyEnd(keyOrEndValue)) {
-                break;
-            }
-
-            var keyValueSeparatorToken = tokenizer.nextRawToken();
-            ProtobufSyntaxException.check(isKeyValueSeparatorOperator(keyValueSeparatorToken),
-                    "Unexpected token " + keyValueSeparatorToken, tokenizer.line());
-
-            var valueToken = readExpression(tokenizer);
-            expression.addData(keyOrEndValue, valueToken);
-
-            var nextToken = tokenizer.nextToken();
-            keyOrEndToken = nextToken instanceof ProtobufRawToken(var nextValue) && isArraySeparator(nextValue)
-                    ? tokenizer.nextToken()
-                    : nextToken;
-        }
-        return expression;
-    }
-
-    private static ProtobufNullExpression readNullExpression(ProtobufLexer tokenizer) {
-        return new ProtobufNullExpression(tokenizer.line());
-    }
-
-    private static ProtobufLiteralExpression readLiteralExpression(ProtobufLexer tokenizer, ProtobufLiteralToken literal) {
-        var expression = new ProtobufLiteralExpression(tokenizer.line());
-        expression.setValue(literal.value());
-        return expression;
-    }
-
-    private static ProtobufNumberExpression readNumberExpression(ProtobufLexer tokenizer, ProtobufNumberToken number) {
-        return switch (number.value()) {
-            case ProtobufFloatingPoint floatingPoint -> {
-                var expression = new ProtobufFloatingPointExpression(tokenizer.line());
-                expression.setValue(floatingPoint);
-                yield expression;
-            }
-            case ProtobufInteger integer -> {
-                var expression = new ProtobufIntegerExpression(tokenizer.line());
-                expression.setValue(integer);
-                yield expression;
-            }
-        };
-    }
-
-    private static ProtobufBoolExpression readBoolExpression(ProtobufLexer tokenizer, ProtobufBoolToken bool) {
-        var expression = new ProtobufBoolExpression(tokenizer.line());
-        expression.setValue(bool.value());
-        return expression;
     }
 
     private static String parseOptions(ProtobufLexer tokenizer, String currentToken, ProtobufTree.WithOptions child) throws IOException {
@@ -1089,12 +1051,7 @@ public final class ProtobufParser {
             return statement;
         };
 
-        OptionParser<ProtobufOptionExpression> EXPRESSION = (tokenizer, name, value) -> {
-            var expression = new ProtobufOptionExpression(tokenizer.line());
-            expression.setName(name);
-            expression.setValue(value);
-            return expression;
-        };
+        OptionParser<ProtobufOptionExpression> EXPRESSION = (_, name, value) -> new ProtobufOptionExpression(name, value);
 
         T parse(ProtobufLexer tokenizer, ProtobufOptionName name, ProtobufExpression value) throws IOException;
     }
@@ -1242,10 +1199,10 @@ public final class ProtobufParser {
     }
 
     private static boolean isGroupType(String token) {
-        return Objects.equals(token, "group");
+        return Objects.equals(token, GROUP);
     }
 
     private static boolean isMapType(String token) {
-        return Objects.equals(token, "map");
+        return Objects.equals(token, MAP);
     }
 }

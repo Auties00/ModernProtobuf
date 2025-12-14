@@ -1,4 +1,6 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.expression;
+
+import it.auties.protobuf.parser.tree.ProtobufExtensionsStatement;
 
 /**
  * Marker interface for expressions that can appear in {@code extensions} statements.

@@ -2,9 +2,9 @@ package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.exception.ProtobufLexerException;
 import it.auties.protobuf.parser.token.*;
-import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
-import it.auties.protobuf.parser.type.ProtobufFloatingPoint.Infinity.Signum;
-import it.auties.protobuf.parser.type.ProtobufInteger;
+import it.auties.protobuf.parser.number.ProtobufFloatingPoint;
+import it.auties.protobuf.parser.number.ProtobufFloatingPoint.Infinity.Signum;
+import it.auties.protobuf.parser.number.ProtobufInteger;
 
 import java.io.IOException;
 import java.io.Reader;

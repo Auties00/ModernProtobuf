@@ -1,5 +1,8 @@
 package it.auties.protobuf.parser.tree;
 
+import it.auties.protobuf.parser.expression.ProtobufExpression;
+import it.auties.protobuf.parser.expression.ProtobufOptionExpression;
+
 import java.util.Objects;
 import java.util.Optional;
 
@@ -40,7 +43,7 @@ public final class ProtobufOptionStatement
                    ProtobufDocumentChild, ProtobufMessageChild, ProtobufEnumChild, ProtobufOneofChild, ProtobufServiceChild, ProtobufMethodChild {
     private ProtobufOptionName name;
     private ProtobufExpression value;
-    private ProtobufFieldStatement definition;
+    private ProtobufOptionDefinition definition;
 
     /**
      * Constructs a new option statement at the specified line number.
@@ -93,7 +96,7 @@ public final class ProtobufOptionStatement
      *
      * @return optional containing the field definition, or empty if not yet attributed
      */
-    public Optional<ProtobufFieldStatement> definition() {
+    public Optional<ProtobufOptionDefinition> definition() {
         return Optional.ofNullable(definition);
     }
 
@@ -111,7 +114,7 @@ public final class ProtobufOptionStatement
      *
      * @param definition the field definition from descriptor.proto
      */
-    public void setDefinition(ProtobufFieldStatement definition) {
+    public void setDefinition(ProtobufOptionDefinition definition) {
         this.definition = definition;
     }
 
@@ -135,22 +138,10 @@ public final class ProtobufOptionStatement
 
     /**
      * Sets the value expression for this option.
-     * <p>
-     * The value is automatically linked to this option as its parent.
-     * </p>
      *
      * @param value the value expression to set
-     * @throws IllegalStateException if the value already has a different parent
      */
     public void setValue(ProtobufExpression value) {
-        if(value != null) {
-            if(value.hasParent()) {
-                throw new IllegalStateException("Value is already owned by another tree");
-            }
-            if(value instanceof ProtobufExpressionImpl impl) {
-                impl.setParent(this);
-            }
-        }
         this.value = value;
     }
 

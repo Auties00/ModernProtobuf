@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser.tree;
+package it.auties.protobuf.parser.expression;
 
 /**
  * Represents a numeric literal expression in the Protocol Buffer AST.

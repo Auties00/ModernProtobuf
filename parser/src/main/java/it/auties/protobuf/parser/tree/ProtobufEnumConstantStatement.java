@@ -1,6 +1,7 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufInteger;
+import it.auties.protobuf.parser.expression.ProtobufOptionExpression;
+import it.auties.protobuf.parser.number.ProtobufInteger;
 
 import java.util.*;
 import java.util.stream.Collectors;

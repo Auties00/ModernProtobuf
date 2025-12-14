@@ -1,8 +1,9 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufGroupTypeReference;
-import it.auties.protobuf.parser.type.ProtobufInteger;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.expression.ProtobufOptionExpression;
+import it.auties.protobuf.parser.typeReference.ProtobufGroupTypeReference;
+import it.auties.protobuf.parser.number.ProtobufInteger;
+import it.auties.protobuf.parser.typeReference.ProtobufTypeReference;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -72,7 +73,7 @@ import java.util.stream.Stream;
  */
 public final class ProtobufGroupStatement
         extends ProtobufStatementImpl
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions, ProtobufTree.WithBody<ProtobufGroupChild>, ProtobufTree.WithType, ProtobufTree.WithModifier,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions, ProtobufTree.WithBody<ProtobufGroupChild>, ProtobufTree.WithType, ProtobufTree.WithModifier, ProtobufOptionDefinition,
                    ProtobufMessageChild, ProtobufOneofChild, ProtobufGroupChild, ProtobufExtendChild {
     private ProtobufModifier modifier;
     private ProtobufTypeReference type;

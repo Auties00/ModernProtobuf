@@ -62,7 +62,7 @@ import java.util.Objects;
  */
 public final class ProtobufMessageStatement
         extends ProtobufStatementWithBodyImpl<ProtobufMessageChild>
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>, ProtobufTree.WithBodyAndName<ProtobufMessageChild>,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithBody<ProtobufMessageChild>,
                    ProtobufDocumentChild, ProtobufGroupChild, ProtobufMessageChild {
     private String name;
 

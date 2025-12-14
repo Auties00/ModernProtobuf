@@ -1,8 +1,8 @@
 package it.auties.protobuf.parser;
 
 import it.auties.protobuf.parser.token.*;
-import it.auties.protobuf.parser.type.ProtobufFloatingPoint;
-import it.auties.protobuf.parser.type.ProtobufInteger;
+import it.auties.protobuf.parser.number.ProtobufFloatingPoint;
+import it.auties.protobuf.parser.number.ProtobufInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

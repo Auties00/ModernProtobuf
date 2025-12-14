@@ -1,4 +1,4 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.typeReference;
 
 import it.auties.protobuf.model.ProtobufType;
 import it.auties.protobuf.parser.tree.ProtobufGroupStatement;

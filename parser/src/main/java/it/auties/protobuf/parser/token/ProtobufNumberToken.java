@@ -1,6 +1,6 @@
 package it.auties.protobuf.parser.token;
 
-import it.auties.protobuf.parser.type.ProtobufNumber;
+import it.auties.protobuf.parser.number.ProtobufNumber;
 
 import java.util.Objects;
 

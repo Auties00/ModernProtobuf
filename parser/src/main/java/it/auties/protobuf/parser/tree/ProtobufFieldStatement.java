@@ -1,7 +1,8 @@
 package it.auties.protobuf.parser.tree;
 
-import it.auties.protobuf.parser.type.ProtobufInteger;
-import it.auties.protobuf.parser.type.ProtobufTypeReference;
+import it.auties.protobuf.parser.expression.ProtobufOptionExpression;
+import it.auties.protobuf.parser.number.ProtobufInteger;
+import it.auties.protobuf.parser.typeReference.ProtobufTypeReference;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,7 +72,7 @@ import java.util.stream.Collectors;
  */
 public final class ProtobufFieldStatement
         extends ProtobufStatementImpl
-        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions,
+        implements ProtobufStatement, ProtobufTree.WithName, ProtobufTree.WithIndex, ProtobufTree.WithOptions, ProtobufTree.WithType, ProtobufTree.WithModifier, ProtobufOptionDefinition,
                    ProtobufOneofChild, ProtobufMessageChild, ProtobufGroupChild, ProtobufExtendChild {
     private ProtobufModifier modifier;
     private ProtobufTypeReference type;

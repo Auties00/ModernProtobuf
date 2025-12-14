@@ -1,7 +1,8 @@
-package it.auties.protobuf.parser.type;
+package it.auties.protobuf.parser.number;
 
 import java.math.BigInteger;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents a numeric range in a Protocol Buffer definition.
@@ -22,13 +23,20 @@ import java.util.Objects;
  * @see Bounded
  * @see LowerBounded
  */
-public sealed interface ProtobufRange {
+public sealed interface ProtobufIntegerRange {
     /**
      * Returns the minimum (starting) value of this range.
      *
      * @return the minimum value of the range
      */
-    ProtobufInteger min();
+    ProtobufInteger lowerBound();
+
+    /**
+     * Returns the maximum (ending) value of this range
+     *
+     * @return the maximum value of the range, if defined
+     */
+    Optional<ProtobufInteger> upperBound();
 
     /**
      * Returns whether the {@code number} is in the range
@@ -48,11 +56,31 @@ public sealed interface ProtobufRange {
      * @param min the minimum (starting) value of the range, inclusive
      * @param max the maximum (ending) value of the range, inclusive
      */
-    record Bounded(ProtobufInteger min, ProtobufInteger max) implements ProtobufRange {
+    record Bounded(ProtobufInteger min, ProtobufInteger max) implements ProtobufIntegerRange {
+        public Bounded {
+            Objects.requireNonNull(min, "min cannot be null");
+            Objects.requireNonNull(max, "max cannot be null");
+        }
+
+        @Override
+        public String toString() {
+            return "%s to %s".formatted(min, max);
+        }
+
         @Override
         public boolean contains(BigInteger number) {
             Objects.requireNonNull(number, "number cannot be null");
             return number.compareTo(min.value()) >= 0 && number.compareTo(max.value()) <= 0;
+        }
+
+        @Override
+        public ProtobufInteger lowerBound() {
+            return min;
+        }
+
+        @Override
+        public Optional<ProtobufInteger> upperBound() {
+            return Optional.of(max);
         }
     }
 
@@ -66,11 +94,30 @@ public sealed interface ProtobufRange {
      *
      * @param min the minimum (starting) value of the range, inclusive
      */
-    record LowerBounded(ProtobufInteger min) implements ProtobufRange {
+    record LowerBounded(ProtobufInteger min) implements ProtobufIntegerRange {
+        public LowerBounded {
+            Objects.requireNonNull(min, "min cannot be null");
+        }
+
+        @Override
+        public String toString() {
+            return "%s to max".formatted(min);
+        }
+
         @Override
         public boolean contains(BigInteger number) {
             Objects.requireNonNull(number, "number cannot be null");
             return number.compareTo(min.value()) >= 0;
+        }
+
+        @Override
+        public ProtobufInteger lowerBound() {
+            return min;
+        }
+
+        @Override
+        public Optional<ProtobufInteger> upperBound() {
+            return Optional.empty();
         }
     }
 }
